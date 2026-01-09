@@ -59,12 +59,18 @@ def get_db_config():
     # Method 1: Use environment variables (most secure and reliable)
     db_host = os.environ.get('DB_HOST', 'localhost')
     db_user = os.environ.get('DB_USER')
-    db_password = os.environ.get('DB_PASSWORD')
+    db_password = os.environ.get('DB_PASSWORD', '')  # Default to empty string
     db_name = os.environ.get('DB_NAME')
     
     # If all DB environment variables are set, use them
-    if db_user and db_password and db_name:
+    if db_user and db_name:
         print("[OK] Using database configuration from environment variables")
+        # Debug output (mask password for security)
+        password_display = '*' * len(db_password) if db_password else '(empty)'
+        print(f"  Host: {db_host}")
+        print(f"  User: {db_user}")
+        print(f"  Database: {db_name}")
+        print(f"  Password: {password_display} ({len(db_password)} chars)")
         return {
             'host': db_host,
             'user': db_user,
@@ -146,6 +152,29 @@ def get_db_config():
 # Initialize DB_CONFIG
 DB_CONFIG = get_db_config()
 
+# Debug function to test database connection (can be called manually)
+def test_db_connection():
+    """Test database connection with current configuration"""
+    try:
+        print(f"\n[DEBUG] Testing database connection...")
+        print(f"  Host: {DB_CONFIG['host']}")
+        print(f"  User: {DB_CONFIG['user']}")
+        print(f"  Database: {DB_CONFIG['database']}")
+        print(f"  Password: {'*' * len(DB_CONFIG['password']) if DB_CONFIG['password'] else '(empty)'}")
+        
+        connection = pymysql.connect(**DB_CONFIG)
+        connection.close()
+        print("[OK] Database connection successful!\n")
+        return True
+    except pymysql.Error as e:
+        print(f"[ERROR] Database connection failed: {e}\n")
+        print("Troubleshooting steps:")
+        print("1. Verify DB_PASSWORD in environment variables matches cPanel MySQL password")
+        print("2. Check that database user has proper permissions in cPanel")
+        print("3. Ensure database and user exist in cPanel MySQL Databases")
+        print("4. Try resetting the database password in cPanel and update environment variable\n")
+        return False
+
 # Schema version for migrations
 SCHEMA_VERSION = 3
 
@@ -157,6 +186,36 @@ def get_db_connection(use_database=True):
             config.pop('database', None)
         connection = pymysql.connect(**config)
         return connection
+    except pymysql.Error as e:
+        error_code, error_msg = e.args
+        print(f"Database connection error: ({error_code}, \"{error_msg}\")")
+        
+        # Provide helpful troubleshooting for common errors
+        if error_code == 1045:  # Access denied
+            print("\n[TROUBLESHOOTING] Access Denied Error:")
+            print("1. Verify DB_PASSWORD in cPanel environment variables matches MySQL password exactly")
+            print("   Current password length: {} characters".format(len(config.get('password', ''))))
+            print("2. Check for special characters - they may need to be escaped or quoted")
+            print("3. Ensure user '{}' exists and has permissions".format(config.get('user', 'unknown')))
+            print("4. In cPanel MySQL Databases, verify:")
+            print("   - User exists: {}".format(config.get('user', 'unknown')))
+            print("   - Database exists: {}".format(DB_CONFIG.get('database', 'unknown')))
+            print("   - User is linked to database with ALL PRIVILEGES")
+            print("5. Try resetting the MySQL password in cPanel and update DB_PASSWORD")
+            print("6. Common password issues:")
+            print("   - Extra spaces before/after password")
+            print("   - Case sensitivity (passwords are case-sensitive)")
+            print("   - Special characters not properly escaped")
+        elif error_code == 1049:  # Unknown database
+            print("\n[TROUBLESHOOTING] Database Not Found:")
+            print("1. Verify DB_NAME in environment variables: {}".format(DB_CONFIG.get('database', 'unknown')))
+            print("2. Create the database in cPanel MySQL Databases if it doesn't exist")
+        elif error_code == 2003:  # Can't connect to server
+            print("\n[TROUBLESHOOTING] Connection Failed:")
+            print("1. Verify DB_HOST is correct (usually 'localhost' for cPanel)")
+            print("2. Check if MySQL service is running")
+        
+        return None
     except Exception as e:
         print(f"Database connection error: {e}")
         return None

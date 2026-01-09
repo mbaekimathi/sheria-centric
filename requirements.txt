@@ -1,12 +1,14 @@
 Flask==3.0.0
 PyMySQL==1.1.0
-cryptography==41.0.7
+cryptography>=41.0.0
 werkzeug==3.0.1
-Pillow==10.1.0
-reportlab==4.0.7
-numpy>=1.26.0
-scipy>=1.11.0
-google-auth==2.23.4
-google-auth-oauthlib==1.1.0
-google-auth-httplib2==0.1.1
-python-dotenv==1.0.0
+Pillow>=10.0.0
+reportlab>=4.0.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.0
+python-dotenv>=1.0.0
+# Optional: numpy and scipy for advanced image processing (may fail on Python 3.13)
+# If installation fails, the app will work without them using basic PIL processing
+# numpy>=1.24.0,<2.0.0
+# scipy>=1.10.0,<2.0.0

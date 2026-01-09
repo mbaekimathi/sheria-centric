@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Individual Client Management - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-user text-blue-600 mr-3"></i>
+                    Individual Client Management
+                </h1>
+                <p class="text-gray-600">Manage individual client records, profiles, and relationships</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Placeholder -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+        <div class="max-w-md mx-auto">
+            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-user text-white text-4xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">Individual Client Management</h2>
+            <p class="text-gray-600 mb-6">This section will contain individual client management features including:</p>
+            <ul class="text-left text-gray-600 space-y-2 mb-6">
+                <li class="flex items-center">
+                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
+                    Individual Client Records
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
+                    Client Profiles & Documents
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
+                    Case Assignments
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
+                    Communication History
+                </li>
+            </ul>
+            <p class="text-sm text-gray-500 italic">Feature coming soon</p>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="mt-6">
+        <a href="{{ url_for('user_management') }}" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl">
+            <i class="fas fa-arrow-left mr-2"></i>Back to User Management
+        </a>
+    </div>
+</div>
+{% endblock %}
+

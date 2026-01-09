@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CASELY - Modern Advocates Firm{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        :root {
+            --casely-green: #10b981;
+            --casely-green-dark: #059669;
+            --casely-green-light: #d1fae5;
+            --casely-orange: #f97316;
+            --casely-orange-dark: #ea580c;
+            --casely-orange-light: #fed7aa;
+        }
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #f0fdf4 0%, #fff7ed 50%, #f0fdf4 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            position: relative;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(249, 115, 22, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes icon-bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .icon-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        .icon-pulse {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .icon-rotate {
+            animation: rotate 20s linear infinite;
+        }
+        .icon-bounce {
+            animation: icon-bounce 2s ease-in-out infinite;
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .icon-hover-effect {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .icon-hover-effect:hover {
+            transform: scale(1.15) rotate(5deg);
+        }
+        main {
+            flex: 1;
+            position: relative;
+            z-index: 1;
+        }
+        header {
+            position: relative;
+            z-index: 50;
+        }
+        footer {
+            position: relative;
+            z-index: 50;
+        }
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 80px;
+            width: 280px;
+            height: calc(100vh - 80px - 60px);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(229, 231, 235, 0.5);
+            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.05);
+            z-index: 40;
+            overflow-y: auto;
+            overflow-x: hidden;
+            transition: transform 0.3s ease;
+            border-top: 1px solid rgba(229, 231, 235, 0.3);
+            -webkit-overflow-scrolling: touch;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--role-color, rgba(16, 185, 129, 0.3));
+            border-radius: 3px;
+            opacity: 0.3;
+        }
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--role-color, rgba(16, 185, 129, 0.5));
+            opacity: 0.5;
+        }
+        .sidebar.collapsed {
+            transform: translateX(-280px);
+        }
+        .main-content-with-sidebar {
+            margin-left: 280px;
+            transition: margin-left 0.3s ease;
+        }
+        /* Role-based color schemes */
+        .role-admin { --role-color: #8b5cf6; --role-color-dark: #7c3aed; --role-color-light: #ede9fe; }
+        .role-partner { --role-color: #1e40af; --role-color-dark: #1e3a8a; --role-color-light: #dbeafe; }
+        .role-finance { --role-color: #0891b2; --role-color-dark: #0e7490; --role-color-light: #cffafe; }
+        .role-advocate { --role-color: #10b981; --role-color-dark: #059669; --role-color-light: #d1fae5; }
+        .role-clerk { --role-color: #f97316; --role-color-dark: #ea580c; --role-color-light: #fed7aa; }
+        .role-it { --role-color: #6366f1; --role-color-dark: #4f46e5; --role-color-light: #e0e7ff; }
+        .role-employee { --role-color: #6b7280; --role-color-dark: #4b5563; --role-color-light: #f3f4f6; }
+        
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: #6b7280;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            margin-bottom: 2px;
+        }
+        .sidebar-link:hover {
+            background: var(--role-color-light, rgba(16, 185, 129, 0.1));
+            color: var(--role-color, #10b981);
+            border-left-color: var(--role-color, #10b981);
+            transform: translateX(4px);
+        }
+        .sidebar-link.active {
+            background: linear-gradient(90deg, var(--role-color-light, rgba(16, 185, 129, 0.15)) 0%, rgba(255, 255, 255, 0.1) 100%);
+            color: var(--role-color, #10b981);
+            font-weight: 600;
+            border-left: 3px solid var(--role-color, #10b981);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .sidebar-link i {
+            width: 24px;
+            margin-right: 12px;
+            text-align: center;
+            font-size: 18px;
+        }
+        .sidebar-link span {
+            font-size: 14px;
+        }
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-280px);
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            .main-content-with-sidebar {
+                margin-left: 0;
+            }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 80px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 35;
+            }
+            .sidebar-overlay.show {
+                display: block;
+            }
+        }
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            z-index: 1000;
+            animation: slideDown 0.3s ease-out;
+        }
+        .dropdown-menu.show {
+            display: block;
+        }
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            color: #374151;
+            text-decoration: none;
+            transition: all 0.2s;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+        .dropdown-item:hover {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+        .dropdown-item i {
+            margin-right: 10px;
+            width: 20px;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="min-h-screen antialiased">
+    <!-- Header -->
+    <header class="glass-effect border-b border-gray-200/50 sticky top-0 z-50 shadow-lg">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <!-- Left Section: Mobile Menu Toggle & Logo -->
+                <div class="flex items-center space-x-3">
+                    <!-- Mobile Sidebar Toggle -->
+                    {% if session.get('employee_id') or session.get('client_id') %}
+                    <button onclick="toggleSidebar()" class="lg:hidden px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
+                        <i class="fas fa-bars text-lg" id="sidebar-toggle-icon"></i>
+                    </button>
+                    {% endif %}
+                    
+                    <!-- CASELY Logo/Icon -->
+                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard') }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('login') }}{% endif %}" class="flex items-center space-x-3 group">
+                        <div class="relative">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 icon-pulse">
+                                <i class="fas fa-hands-helping text-white text-xl icon-hover-effect"></i>
+                            </div>
+                            <div class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-orange-500 rounded-full border-2 border-white shadow-md icon-bounce"></div>
+                            <div class="absolute -top-1 -right-1 w-5 h-5 bg-orange-400/30 rounded-full animate-ping"></div>
+                        </div>
+                        <div class="flex items-baseline space-x-0.5">
+                            <span class="text-2xl font-bold text-gray-900 tracking-tight group-hover:text-green-600 transition-colors duration-300">CASE</span>
+                            <span class="text-2xl font-bold text-orange-600 tracking-tight group-hover:text-orange-700 transition-colors duration-300">LY</span>
+                        </div>
+                    </a>
+                </div>
+                
+                <!-- Center Section: Date, Time, Company -->
+                <div class="hidden lg:flex items-center space-x-4 flex-1 justify-center">
+                    <!-- Date & Time Display -->
+                    <div class="flex items-center space-x-3">
+                        <!-- Date -->
+                        <div class="px-4 py-2.5 rounded-xl glass-effect border border-green-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-calendar-alt text-green-600 text-sm icon-float"></i>
+                                <span id="current-date" class="text-xs font-semibold text-gray-800"></span>
+                            </div>
+                        </div>
+                        <!-- Live Clock -->
+                        <div class="px-4 py-2.5 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-clock text-orange-600 text-sm icon-rotate"></i>
+                                <span id="live-clock" class="text-xs font-bold text-orange-700 font-mono"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Company Name Section -->
+                    {% if session.get('company_name') %}
+                    <div class="flex items-center space-x-3 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-50/80 to-orange-50/80 border border-green-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 backdrop-blur-sm">
+                        <div class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm icon-bounce"></div>
+                        <i class="fas fa-building text-green-600 text-sm icon-hover-effect"></i>
+                        <span class="text-xs font-semibold text-gray-800">{{ session.get('company_name', 'BAUNI LAW GROUP') }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Mobile Date & Time (shown on smaller screens) -->
+                <div class="lg:hidden flex items-center space-x-2">
+                    <div class="px-3 py-2 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200/50 shadow-sm">
+                        <span id="live-clock-mobile" class="text-xs font-bold text-orange-700 font-mono"></span>
+                    </div>
+                </div>
+                
+                <!-- Right Section: Client Login & User Menu -->
+                <div class="flex items-center space-x-3">
+                    <!-- Client Login Link (only when not logged in as employee or client) -->
+                    {% if not session.get('employee_id') and not session.get('client_id') %}
+                    <a href="{{ url_for('client_login') }}" class="hidden md:flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/50 hover:from-blue-100 hover:to-blue-200 transition-all duration-300 shadow-sm hover:shadow-md group">
+                        <i class="fas fa-user-tie text-blue-600 text-sm icon-hover-effect"></i>
+                        <span class="text-sm font-semibold text-blue-700 group-hover:text-blue-800 transition-colors">Client Login</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Client Menu (if logged in as client) -->
+                    {% if session.get('client_id') and not session.get('employee_id') %}
+                    <div class="relative">
+                        <button onclick="toggleClientDropdown()" class="flex items-center space-x-3 px-3 py-2 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group">
+                            <!-- Profile Photo -->
+                            {% if session.get('client_profile_picture') %}
+                            <div class="w-10 h-10 rounded-lg overflow-hidden border-2 border-blue-500 shadow-md">
+                                {% if session.client_profile_picture.startswith('http') %}
+                                <img src="{{ session.client_profile_picture }}" 
+                                     alt="Profile" class="w-full h-full object-cover">
+                                {% else %}
+                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + session.client_profile_picture) }}" 
+                                     alt="Profile" class="w-full h-full object-cover">
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-sm border-2 border-blue-500">
+                                <span class="text-blue-600 font-semibold text-sm">{{ session.client_name[0] if session.client_name else 'C' }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Name -->
+                            <div class="hidden md:flex flex-col items-start">
+                                <span class="text-sm font-semibold text-gray-900">{{ session.get('client_name', 'Client') }}</span>
+                                <span class="text-xs text-gray-500">Client</span>
+                            </div>
+                            
+                            <!-- Dropdown Icon -->
+                            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform duration-300 group-hover:text-gray-600" id="client-dropdown-icon"></i>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="client-dropdown" class="dropdown-menu">
+                            <a href="{{ url_for('client_dashboard') }}" class="dropdown-item">
+                                <i class="fas fa-home text-blue-600"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <a href="{{ url_for('client_profile') }}" class="dropdown-item">
+                                <i class="fas fa-user-circle text-blue-600"></i>
+                                <span>Client Profile</span>
+                            </a>
+                            <a href="{{ url_for('client_logout') }}" class="dropdown-item">
+                                <i class="fas fa-sign-out-alt text-red-600"></i>
+                                <span>Logout</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- User Menu (if logged in) -->
+                    {% if session.get('employee_id') %}
+                    <div class="relative">
+                        <button onclick="toggleDropdown()" class="flex items-center space-x-3 px-3 py-2 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group">
+                            <!-- Profile Photo -->
+                            {% if session.get('profile_picture') %}
+                            <div class="w-10 h-10 rounded-lg overflow-hidden border-2 border-green-500 shadow-md">
+                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + session.get('profile_picture')) }}" 
+                                     alt="Profile" class="w-full h-full object-cover">
+                            </div>
+                            {% else %}
+                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-sm border-2 border-green-500">
+                                <i class="fas fa-user text-green-600 text-sm"></i>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Name and Role -->
+                            <div class="hidden md:flex flex-col items-start">
+                                <span class="text-sm font-semibold text-gray-900">{{ session.get('employee_name', 'Employee') }}</span>
+                                <span class="text-xs text-gray-500">{{ session.get('employee_role', 'Employee') }}</span>
+                            </div>
+                            
+                            <!-- Dropdown Icon -->
+                            <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform duration-300 group-hover:text-gray-600" id="dropdown-icon"></i>
+                        </button>
+                        
+                        <!-- Dropdown Menu -->
+                        <div id="user-dropdown" class="dropdown-menu">
+                            <a href="{{ url_for('profile') }}" class="dropdown-item">
+                                <i class="fas fa-user-circle text-green-600"></i>
+                                <span>My Profile</span>
+                            </a>
+                            <a href="{{ url_for('logout') }}" class="dropdown-item">
+                                <i class="fas fa-sign-out-alt text-red-600"></i>
+                                <span>Logout</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="hidden md:flex items-center space-x-2 px-3 py-2 rounded-lg glass-effect border border-green-200/50 shadow-sm">
+                        <i class="fas fa-shield-alt text-green-600 icon-float"></i>
+                        <span class="text-sm font-medium text-gray-700">Secure Login</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-10">
+            {% for category, message in messages %}
+            <div class="mb-3 p-4 rounded-xl border-l-4 shadow-lg glass-effect animate-slide-in {% if category == 'error' %}border-red-500 text-red-800{% elif category == 'success' %}border-green-500 text-green-800{% elif category == 'warning' %}border-yellow-500 text-yellow-800{% else %}border-blue-500 text-blue-800{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        {% if category == 'error' %}
+                        <i class="fas fa-exclamation-circle mr-3 text-red-600 text-lg icon-bounce"></i>
+                        {% elif category == 'success' %}
+                        <i class="fas fa-check-circle mr-3 text-green-600 text-lg icon-bounce"></i>
+                        {% elif category == 'warning' %}
+                        <i class="fas fa-exclamation-triangle mr-3 text-yellow-600 text-lg icon-bounce"></i>
+                        {% else %}
+                        <i class="fas fa-info-circle mr-3 text-blue-600 text-lg icon-bounce"></i>
+                        {% endif %}
+                        <span class="text-sm font-medium">{{ message }}</span>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.style.transition='opacity 0.3s'; this.parentElement.parentElement.style.opacity='0'; setTimeout(() => this.parentElement.parentElement.remove(), 300)" class="ml-4 text-gray-400 hover:text-gray-600 transition-colors hover:scale-110">
+                        <i class="fas fa-times text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Sidebar (Fixed) - Only for Logged In Users -->
+    {% if session.get('employee_id') or session.get('client_id') %}
+    {% set user_role = session.get('employee_role', 'Employee') %}
+    {% set original_role = session.get('original_role') %}
+    {% set is_role_switched = original_role and original_role == 'IT Support' and user_role != 'IT Support' %}
+    {% if user_role == 'Firm Administrator' %}
+        {% set role_class = 'role-admin' %}
+        {% set role_color = 'from-purple-600 to-purple-700' %}
+        {% set role_hover = 'hover:from-purple-700 hover:to-purple-800' %}
+    {% elif user_role == 'Managing Partner' %}
+        {% set role_class = 'role-partner' %}
+        {% set role_color = 'from-blue-700 to-blue-800' %}
+        {% set role_hover = 'hover:from-blue-800 hover:to-blue-900' %}
+    {% elif user_role == 'Finance Office' %}
+        {% set role_class = 'role-finance' %}
+        {% set role_color = 'from-cyan-600 to-cyan-700' %}
+        {% set role_hover = 'hover:from-cyan-700 hover:to-cyan-800' %}
+    {% elif user_role == 'Associate Advocate' %}
+        {% set role_class = 'role-advocate' %}
+        {% set role_color = 'from-green-600 to-green-700' %}
+        {% set role_hover = 'hover:from-green-700 hover:to-green-800' %}
+    {% elif user_role == 'Clerk' %}
+        {% set role_class = 'role-clerk' %}
+        {% set role_color = 'from-orange-600 to-orange-700' %}
+        {% set role_hover = 'hover:from-orange-700 hover:to-orange-800' %}
+    {% elif user_role == 'IT Support' %}
+        {% set role_class = 'role-it' %}
+        {% set role_color = 'from-indigo-600 to-indigo-700' %}
+        {% set role_hover = 'hover:from-indigo-700 hover:to-indigo-800' %}
+    {% else %}
+        {% set role_class = 'role-employee' %}
+        {% set role_color = 'from-gray-600 to-gray-700' %}
+        {% set role_hover = 'hover:from-gray-700 hover:to-gray-800' %}
+    {% endif %}
+    <aside class="sidebar glass-effect {{ role_class }}" id="main-sidebar">
+        <div class="flex flex-col h-full">
+            <!-- Sidebar Navigation (Scrollable) - Role-Based -->
+            <nav class="flex-1 py-2">
+                <div class="px-2">
+                    {% if session.get('client_id') %}
+                    <!-- Client Sidebar Links -->
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Client Portal</p>
+                    </div>
+                    <a href="{{ url_for('client_dashboard') }}" class="sidebar-link {% if request.endpoint == 'client_dashboard' %}active{% endif %}" id="nav-client-dashboard">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-client-cases">
+                        <i class="fas fa-briefcase"></i>
+                        <span>My Cases</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-client-documents">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Documents</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-client-messages">
+                        <i class="fas fa-comments"></i>
+                        <span>Messages</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-client-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Calendar</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-client-billing">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Billing & Invoices</span>
+                    </a>
+                    {% else %}
+                    <!-- Employee Sidebar Links -->
+                    <!-- Common Links (All Roles) -->
+                    <a href="{{ url_for('dashboard') }}" class="sidebar-link" id="nav-dashboard">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    
+                    <!-- Role Switch Indicator -->
+                    {% if is_role_switched %}
+                    <div class="px-4 py-2 mt-2 mb-2">
+                        <div class="px-3 py-2 bg-orange-100 border border-orange-300 rounded-lg">
+                            <p class="text-xs font-semibold text-orange-700 flex items-center">
+                                <i class="fas fa-exchange-alt mr-2"></i>
+                                Viewing as: {{ user_role }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Firm Administrator & Managing Partner Links -->
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administration</p>
+                    </div>
+                    <a href="#" class="sidebar-link" id="nav-cases">
+                        <i class="fas fa-briefcase"></i>
+                        <span>All Cases</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-team">
+                        <i class="fas fa-users"></i>
+                        <span>Team Management</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-reports">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reports & Analytics</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-settings">
+                        <i class="fas fa-cog"></i>
+                        <span>System Settings</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Associate Advocate Links -->
+                    {% if user_role == 'Associate Advocate' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
+                    </div>
+                    <a href="#" class="sidebar-link" id="nav-cases">
+                        <i class="fas fa-briefcase"></i>
+                        <span>My Cases</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Tasks</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-documents">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Case Documents</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Court Calendar</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-messages">
+                        <i class="fas fa-comments"></i>
+                        <span>Client Messages</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Clerk Links -->
+                    {% if user_role == 'Clerk' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administrative</p>
+                    </div>
+                    <a href="#" class="sidebar-link" id="nav-tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>Assigned Tasks</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-documents">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Document Filing</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Schedule</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-messages">
+                        <i class="fas fa-comments"></i>
+                        <span>Messages</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Finance Office Links -->
+                    {% if user_role == 'Finance Office' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Financial</p>
+                    </div>
+                    <a href="#" class="sidebar-link" id="nav-reports">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Financial Reports</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-documents">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Invoices</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Payment Schedule</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-messages">
+                        <i class="fas fa-comments"></i>
+                        <span>Messages</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- User Management Section Links -->
+                    {% if request.endpoint in ['user_management', 'individual_client_management', 'corporate_client_management'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">User Management</p>
+                    </div>
+                    <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint == 'user_management' %}active{% endif %}" id="nav-user-management">
+                        <i class="fas fa-users"></i>
+                        <span>User Management</span>
+                    </a>
+                    <a href="{{ url_for('employee_management') }}" class="sidebar-link {% if request.endpoint == 'employee_management' %}active{% endif %}" id="nav-employee-management">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employee Management</span>
+                    </a>
+                    <a href="{{ url_for('individual_client_management') }}" class="sidebar-link {% if request.endpoint == 'individual_client_management' %}active{% endif %}" id="nav-individual-client-management">
+                        <i class="fas fa-user"></i>
+                        <span>Individual Client Management</span>
+                    </a>
+                    <a href="{{ url_for('corporate_client_management') }}" class="sidebar-link {% if request.endpoint == 'corporate_client_management' %}active{% endif %}" id="nav-corporate-client-management">
+                        <i class="fas fa-building"></i>
+                        <span>Corporate Client Management</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Roles & Permissions (Standalone) -->
+                    {% if request.endpoint == 'roles_permissions' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">User Management</p>
+                    </div>
+                    <a href="{{ url_for('user_management') }}" class="sidebar-link" id="nav-user-management">
+                        <i class="fas fa-users"></i>
+                        <span>User Management</span>
+                    </a>
+                    <a href="{{ url_for('roles_permissions') }}" class="sidebar-link active" id="nav-roles-permissions">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Roles & Permissions</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Employee Management Section Links -->
+                    {% if request.endpoint in ['employee_management', 'employee_directory', 'onboarding_approvals', 'hr_roles_permissions', 'leave_availability', 'case_allocation', 'performance_compliance', 'training_certification', 'payroll_expenses', 'audit_offboarding'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Employee Management</p>
+                    </div>
+                    <a href="{{ url_for('employee_management') }}" class="sidebar-link {% if request.endpoint == 'employee_management' %}active{% endif %}" id="nav-employee-management">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employee Management</span>
+                    </a>
+                    <a href="{{ url_for('employee_directory') }}" class="sidebar-link {% if request.endpoint == 'employee_directory' %}active{% endif %}" id="nav-employee-directory">
+                        <i class="fas fa-address-book"></i>
+                        <span>Employee Directory</span>
+                    </a>
+                    <a href="{{ url_for('onboarding_approvals') }}" class="sidebar-link {% if request.endpoint == 'onboarding_approvals' %}active{% endif %}" id="nav-onboarding-approvals">
+                        <i class="fas fa-user-check"></i>
+                        <span>Onboarding & Approvals</span>
+                    </a>
+                    <a href="{{ url_for('hr_roles_permissions') }}" class="sidebar-link {% if request.endpoint == 'hr_roles_permissions' %}active{% endif %}" id="nav-hr-roles-permissions">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Roles & Permissions</span>
+                    </a>
+                    <a href="{{ url_for('leave_availability') }}" class="sidebar-link {% if request.endpoint == 'leave_availability' %}active{% endif %}" id="nav-leave-availability">
+                        <i class="fas fa-calendar-times"></i>
+                        <span>Leave & Availability</span>
+                    </a>
+                    <a href="{{ url_for('case_allocation') }}" class="sidebar-link {% if request.endpoint == 'case_allocation' %}active{% endif %}" id="nav-case-allocation">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Case Allocation & Coverage</span>
+                    </a>
+                    <a href="{{ url_for('performance_compliance') }}" class="sidebar-link {% if request.endpoint == 'performance_compliance' %}active{% endif %}" id="nav-performance-compliance">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Performance & Compliance</span>
+                    </a>
+                    <a href="{{ url_for('training_certification') }}" class="sidebar-link {% if request.endpoint == 'training_certification' %}active{% endif %}" id="nav-training-certification">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Training & Certification</span>
+                    </a>
+                    <a href="{{ url_for('payroll_expenses') }}" class="sidebar-link {% if request.endpoint == 'payroll_expenses' %}active{% endif %}" id="nav-payroll-expenses">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Payroll & Expenses</span>
+                    </a>
+                    <a href="{{ url_for('audit_offboarding') }}" class="sidebar-link {% if request.endpoint == 'audit_offboarding' %}active{% endif %}" id="nav-audit-offboarding">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Audit & Offboarding</span>
+                    </a>
+                    {% endif %}
+
+
+                    <!-- IT Support Dashboard Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'dashboard' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">IT Support</p>
+                    </div>
+                    {% if session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support' %}
+                    <a href="#" onclick="exitRoleSwitch(); return false;" class="sidebar-link text-orange-600 hover:bg-orange-50 hover:text-orange-700">
+                        <i class="fas fa-undo"></i>
+                        <span>Exit Role Switch</span>
+                    </a>
+                    {% else %}
+                    <a href="#" onclick="openRoleSwitchModal(); return false;" class="sidebar-link text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Role Switch</span>
+                    </a>
+                    <a href="{{ url_for('user_management') }}" class="sidebar-link" id="nav-user-management">
+                        <i class="fas fa-users"></i>
+                        <span>User Management</span>
+                    </a>
+                    <a href="{{ url_for('finance_billing') }}" class="sidebar-link" id="nav-finance-billing">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Finance & Billing</span>
+                    </a>
+                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-case-management">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Case Management</span>
+                    </a>
+                    <a href="{{ url_for('document_management') }}" class="sidebar-link" id="nav-document-management">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Document Management</span>
+                    </a>
+                    <a href="{{ url_for('calendar_reminders') }}" class="sidebar-link" id="nav-calendar-reminders">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Calendar & Reminders</span>
+                    </a>
+                    <a href="{{ url_for('communication_messaging') }}" class="sidebar-link" id="nav-communication-messaging">
+                        <i class="fas fa-comments"></i>
+                        <span>Communication & Messaging</span>
+                    </a>
+                    <a href="{{ url_for('compliance_audit') }}" class="sidebar-link" id="nav-compliance-audit">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Compliance & Audit</span>
+                    </a>
+                    <a href="{{ url_for('system_reports_analytics') }}" class="sidebar-link" id="nav-system-reports">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>System Reports & Analytics</span>
+                    </a>
+                    <a href="{{ url_for('data_backup_recovery') }}" class="sidebar-link" id="nav-data-backup">
+                        <i class="fas fa-database"></i>
+                        <span>Data Backup & Recovery</span>
+                    </a>
+                    <a href="{{ url_for('access_control_security') }}" class="sidebar-link" id="nav-access-control">
+                        <i class="fas fa-lock"></i>
+                        <span>Access Control & Security</span>
+                    </a>
+                    <a href="{{ url_for('system_health_module') }}" class="sidebar-link" id="nav-system-health">
+                        <i class="fas fa-heartbeat"></i>
+                        <span>System Health Module</span>
+                    </a>
+                    {% endif %}
+                    {% endif %}
+
+                    <!-- Finance & Billing Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'finance_billing' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Finance & Billing</p>
+                    </div>
+                    <a href="{{ url_for('finance_billing') }}" class="sidebar-link active" id="nav-finance-billing">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Finance & Billing</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Case Management Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'case_management' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
+                    </div>
+                    <a href="{{ url_for('case_management') }}" class="sidebar-link active" id="nav-case-management">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Case Management</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Document Management Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint in ['document_management', 'individual_client_documents', 'corporate_client_documents', 'employee_documents', 'registration_documents', 'personal_documents', 'work_documents'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Document Management</p>
+                    </div>
+                    {% if request.endpoint == 'document_management' %}
+                    <a href="{{ url_for('employee_documents') }}" class="sidebar-link {% if request.endpoint == 'employee_documents' %}active{% endif %}" id="nav-employee-documents">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employee Documents</span>
+                    </a>
+                    <a href="{{ url_for('individual_client_documents') }}" class="sidebar-link {% if request.endpoint == 'individual_client_documents' %}active{% endif %}" id="nav-individual-client-documents">
+                        <i class="fas fa-user"></i>
+                        <span>Individual Client Documents</span>
+                    </a>
+                    <a href="{{ url_for('corporate_client_documents') }}" class="sidebar-link {% if request.endpoint == 'corporate_client_documents' %}active{% endif %}" id="nav-corporate-client-documents">
+                        <i class="fas fa-building"></i>
+                        <span>Corporate Client Documents</span>
+                    </a>
+                    {% endif %}
+                    {% if request.endpoint == 'employee_documents' %}
+                    <a href="{{ url_for('registration_documents') }}" class="sidebar-link {% if request.endpoint == 'registration_documents' %}active{% endif %}" id="nav-registration-documents">
+                        <i class="fas fa-file-signature"></i>
+                        <span>Employees Registration Documents</span>
+                    </a>
+                    <a href="{{ url_for('personal_documents') }}" class="sidebar-link {% if request.endpoint == 'personal_documents' %}active{% endif %}" id="nav-personal-documents">
+                        <i class="fas fa-user-circle"></i>
+                        <span>Personal Documents</span>
+                    </a>
+                    <a href="{{ url_for('work_documents') }}" class="sidebar-link {% if request.endpoint == 'work_documents' %}active{% endif %}" id="nav-work-documents">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Work Documents</span>
+                    </a>
+                    {% endif %}
+                    {% endif %}
+
+                    <!-- Calendar & Reminders Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'calendar_reminders' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Calendar & Reminders</p>
+                    </div>
+                    <a href="{{ url_for('calendar_reminders') }}" class="sidebar-link active" id="nav-calendar-reminders">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Calendar & Reminders</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Communication & Messaging Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'communication_messaging' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Communication & Messaging</p>
+                    </div>
+                    <a href="{{ url_for('communication_messaging') }}" class="sidebar-link active" id="nav-communication-messaging">
+                        <i class="fas fa-comments"></i>
+                        <span>Communication & Messaging</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Compliance & Audit Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'compliance_audit' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Compliance & Audit</p>
+                    </div>
+                    <a href="{{ url_for('compliance_audit') }}" class="sidebar-link active" id="nav-compliance-audit">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Compliance & Audit</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- System Reports & Analytics Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'system_reports_analytics' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">System Reports & Analytics</p>
+                    </div>
+                    <a href="{{ url_for('system_reports_analytics') }}" class="sidebar-link active" id="nav-system-reports">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>System Reports & Analytics</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Data Backup & Recovery Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'data_backup_recovery' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Data Backup & Recovery</p>
+                    </div>
+                    <a href="{{ url_for('data_backup_recovery') }}" class="sidebar-link active" id="nav-data-backup">
+                        <i class="fas fa-database"></i>
+                        <span>Data Backup & Recovery</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Access Control & Security Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'access_control_security' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Access Control & Security</p>
+                    </div>
+                    <a href="{{ url_for('access_control_security') }}" class="sidebar-link active" id="nav-access-control">
+                        <i class="fas fa-lock"></i>
+                        <span>Access Control & Security</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- System Health Module Page Links -->
+                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'system_health_module' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">System Health Module</p>
+                    </div>
+                    <a href="{{ url_for('system_health_module') }}" class="sidebar-link active" id="nav-system-health">
+                        <i class="fas fa-heartbeat"></i>
+                        <span>System Health Module</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Employee (Basic) Links -->
+                    {% if user_role == 'Employee' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">General</p>
+                    </div>
+                    <a href="#" class="sidebar-link" id="nav-tasks">
+                        <i class="fas fa-tasks"></i>
+                        <span>My Tasks</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Calendar</span>
+                    </a>
+                    <a href="#" class="sidebar-link" id="nav-messages">
+                        <i class="fas fa-comments"></i>
+                        <span>Messages</span>
+                    </a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </nav>
+            
+            <!-- Sidebar Footer -->
+            <div class="p-4 border-t border-gray-200/50">
+                <a href="{{ url_for('logout') }}" class="sidebar-link text-red-600 hover:bg-red-50 hover:text-red-700">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- Sidebar Overlay for Mobile -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="flex-1 relative z-10 {% if session.get('employee_id') or session.get('client_id') %}main-content-with-sidebar{% endif %}">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-effect border-t border-gray-200/50 mt-auto shadow-lg w-full transition-all duration-300">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="py-4">
+                <div class="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0">
+                    <!-- Copyright -->
+                    <div class="flex items-center space-x-2 group">
+                        <i class="fas fa-copyright text-gray-400 text-xs group-hover:text-green-600 transition-colors duration-300"></i>
+                        <p class="text-xs text-gray-600 group-hover:text-gray-900 transition-colors duration-300">
+                            2026 <span class="font-semibold text-gray-700">casely Technologies Ltd.</span> All Rights Reserved.
+                        </p>
+                    </div>
+                    
+                    <!-- Version -->
+                    <div class="flex items-center space-x-2 group">
+                        <div class="w-6 h-6 rounded-md bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-300">
+                            <i class="fas fa-code-branch text-green-600 text-xs icon-rotate"></i>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            <span class="text-xs text-gray-500 group-hover:text-gray-700 transition-colors duration-300">Version</span>
+                            <span class="text-xs font-bold text-gray-900 px-2 py-0.5 rounded bg-gradient-to-r from-green-50 to-orange-50 border border-green-200/50 group-hover:border-green-300 transition-all duration-300">1.0.0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Powered By -->
+                    <div class="flex items-center space-x-2 group">
+                        <span class="text-xs text-gray-500 group-hover:text-gray-700 transition-colors duration-300">Powered by</span>
+                        <div class="flex items-center space-x-1.5">
+                            <div class="w-6 h-6 rounded-md bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300 icon-bounce">
+                                <i class="fas fa-bolt text-white text-xs"></i>
+                            </div>
+                            <span class="text-xs font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-300">CASELY</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Role Switch Modal -->
+    {% if session.get('employee_role') == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support') %}
+    <div id="roleSwitchModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto glass-effect">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-exchange-alt text-indigo-600 mr-3"></i>
+                        Switch Role
+                    </h2>
+                    <button onclick="closeRoleSwitchModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">Select a role to switch to and interact as that role</p>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% set roles = ['Firm Administrator', 'Managing Partner', 'Finance Office', 'Associate Advocate', 'Clerk', 'IT Support', 'Employee'] %}
+                    {% for role in roles %}
+                    <a href="{{ url_for('switch_role', role_name=role) }}" class="role-option group p-4 rounded-xl border-2 border-gray-200 hover:border-indigo-500 transition-all duration-300 hover:shadow-lg bg-white hover:bg-indigo-50">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-lg bg-gradient-to-br {% if role == 'Firm Administrator' %}from-purple-500 to-purple-600{% elif role == 'Managing Partner' %}from-blue-600 to-blue-700{% elif role == 'Finance Office' %}from-cyan-500 to-cyan-600{% elif role == 'Associate Advocate' %}from-green-500 to-green-600{% elif role == 'Clerk' %}from-orange-500 to-orange-600{% elif role == 'IT Support' %}from-indigo-500 to-indigo-600{% else %}from-gray-500 to-gray-600{% endif %} flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
+                                <i class="fas {% if role == 'Firm Administrator' %}fa-user-shield{% elif role == 'Managing Partner' %}fa-user-tie{% elif role == 'Finance Office' %}fa-dollar-sign{% elif role == 'Associate Advocate' %}fa-gavel{% elif role == 'Clerk' %}fa-file-alt{% elif role == 'IT Support' %}fa-headset{% else %}fa-user{% endif %}"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ role }}</h3>
+                                <p class="text-xs text-gray-500 mt-1">Switch to {{ role }}</p>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all"></i>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% block extra_js %}{% endblock %}
+    
+    <!-- Live Clock and Date Script -->
+    <script>
+        function updateDateTime() {
+            const now = new Date();
+            
+            // Update Date (Desktop)
+            const dateOptions = { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric'
+            };
+            const dateElement = document.getElementById('current-date');
+            if (dateElement) {
+                dateElement.textContent = now.toLocaleDateString('en-US', dateOptions);
+            }
+            
+            // Update Live Clock (Desktop)
+            const clockElement = document.getElementById('live-clock');
+            if (clockElement) {
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+            
+            // Update Live Clock (Mobile)
+            const clockElementMobile = document.getElementById('live-clock-mobile');
+            if (clockElementMobile) {
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                clockElementMobile.textContent = `${hours}:${minutes}`;
+            }
+        }
+        
+        // Dropdown toggle function
+        function toggleDropdown() {
+            const dropdown = document.getElementById('user-dropdown');
+            const icon = document.getElementById('dropdown-icon');
+            if (dropdown && icon) {
+                dropdown.classList.toggle('show');
+                if (dropdown.classList.contains('show')) {
+                    icon.style.transform = 'rotate(180deg)';
+                } else {
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
+
+        function toggleClientDropdown() {
+            const dropdown = document.getElementById('client-dropdown');
+            const icon = document.getElementById('client-dropdown-icon');
+            if (dropdown && icon) {
+                dropdown.classList.toggle('show');
+                if (dropdown.classList.contains('show')) {
+                    icon.style.transform = 'rotate(180deg)';
+                } else {
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
+        
+        // Sidebar toggle function
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const toggleIcon = document.getElementById('sidebar-toggle-icon');
+            
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('mobile-open');
+                overlay.classList.toggle('show');
+                
+                // Toggle icon between bars and times
+                if (toggleIcon) {
+                    if (sidebar.classList.contains('mobile-open')) {
+                        toggleIcon.classList.remove('fa-bars');
+                        toggleIcon.classList.add('fa-times');
+                    } else {
+                        toggleIcon.classList.remove('fa-times');
+                        toggleIcon.classList.add('fa-bars');
+                    }
+                }
+            }
+        }
+
+        function openRoleSwitchModal() {
+            const modal = document.getElementById('roleSwitchModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeRoleSwitchModal() {
+            const modal = document.getElementById('roleSwitchModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        function exitRoleSwitch() {
+            if (confirm('Are you sure you want to exit role switch and return to your original role?')) {
+                window.location.href = "{{ url_for('exit_role_switch') }}";
+            }
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('roleSwitchModal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeRoleSwitchModal();
+                    }
+                });
+            }
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('user-dropdown');
+            const clientDropdown = document.getElementById('client-dropdown');
+            const button = event.target.closest('button');
+            
+            if (dropdown && !dropdown.contains(event.target) && !button) {
+                dropdown.classList.remove('show');
+                const icon = document.getElementById('dropdown-icon');
+                if (icon) {
+                    icon.style.transform = 'rotate(0deg)';
+                }
+            }
+            
+            if (clientDropdown && !clientDropdown.contains(event.target) && !button) {
+                clientDropdown.classList.remove('show');
+                const clientIcon = document.getElementById('client-dropdown-icon');
+                if (clientIcon) {
+                    clientIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+        });
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const toggleBtn = event.target.closest('button');
+            
+            if (window.innerWidth <= 768 && sidebar) {
+                if (!sidebar.contains(event.target) && !toggleBtn && sidebar.classList.contains('mobile-open')) {
+                    sidebar.classList.remove('mobile-open');
+                    if (overlay) {
+                        overlay.classList.remove('show');
+                    }
+                }
+            }
+        });
+
+        // Set active link based on current page
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const links = document.querySelectorAll('.sidebar-link');
+            
+            links.forEach(link => {
+                link.classList.remove('active');
+                const href = link.getAttribute('href');
+                if (href) {
+                    // Remove query strings and trailing slashes for comparison
+                    const cleanHref = href.split('?')[0].replace(/\/$/, '');
+                    const cleanPath = currentPath.split('?')[0].replace(/\/$/, '');
+                    
+                    if (cleanHref === cleanPath || 
+                        (cleanPath === '/' && cleanHref.includes('dashboard')) ||
+                        (cleanPath === '/dashboard' && cleanHref.includes('dashboard'))) {
+                        link.classList.add('active');
+                    }
+                }
+            });
+        });
+        
+        // Update immediately
+        updateDateTime();
+        
+        // Update every second
+        setInterval(updateDateTime, 1000);
+    </script>
+</body>
+</html>

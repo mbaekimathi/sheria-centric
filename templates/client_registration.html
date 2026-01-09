@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Registration - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <!-- Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-user-plus text-blue-600 mr-3"></i>
+            Complete Your Registration
+        </h1>
+        <p class="text-gray-600">Please provide your phone number to complete your profile</p>
+    </div>
+
+    <!-- Registration Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <form method="POST" action="{{ url_for('submit_client_registration') }}" enctype="multipart/form-data" class="space-y-6">
+            <!-- Phone Number (Required) -->
+            <div>
+                <label for="phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Phone Number <span class="text-red-500">*</span>
+                </label>
+                <input 
+                    type="tel" 
+                    id="phone_number" 
+                    name="phone_number" 
+                    required
+                    placeholder="0712 345 678"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    pattern="[0-9\s]+"
+                    maxlength="20"
+                >
+                <p class="mt-2 text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Format: 07XX XXX XXX (Kenyan mobile number)
+                </p>
+            </div>
+
+            <!-- Client Type (Required) -->
+            <div>
+                <label for="client_type" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Client Type <span class="text-red-500">*</span>
+                </label>
+                <select 
+                    id="client_type" 
+                    name="client_type" 
+                    required
+                    onchange="toggleClientTypeFields(this.value)"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                >
+                    <option value="">Select Client Type</option>
+                    <option value="Individual">Individual</option>
+                    <option value="Corporate">Corporate</option>
+                </select>
+                <p class="mt-2 text-sm text-gray-500">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Please select whether you are an individual or corporate client
+                </p>
+            </div>
+
+            <!-- Individual Client Fields -->
+            <div id="individual_fields" class="hidden space-y-6">
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <p class="text-sm font-semibold text-blue-800 mb-3">
+                        <i class="fas fa-info-circle mr-2"></i>Individual Client Requirements
+                    </p>
+                </div>
+                
+                <!-- ID Front (Required for Individual) -->
+                <div>
+                    <label for="id_front" class="block text-sm font-semibold text-gray-700 mb-2">
+                        ID/Passport Front Image <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="file" 
+                        id="id_front" 
+                        name="id_front" 
+                        accept="image/*,.pdf"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        onchange="previewIDImage(this, 'id_front_preview')"
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Upload the front side of your ID card or passport (PNG, JPG, JPEG, or PDF - Max 16MB)
+                    </p>
+                    <div id="id_front_preview" class="mt-3 hidden">
+                        <img id="id_front_preview_img" src="" alt="ID Front Preview" class="max-w-xs rounded-lg border-2 border-blue-200">
+                    </div>
+                </div>
+
+                <!-- ID Back (Required for Individual) -->
+                <div>
+                    <label for="id_back" class="block text-sm font-semibold text-gray-700 mb-2">
+                        ID/Passport Back Image <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="file" 
+                        id="id_back" 
+                        name="id_back" 
+                        accept="image/*,.pdf"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        onchange="previewIDImage(this, 'id_back_preview')"
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Upload the back side of your ID card or passport (PNG, JPG, JPEG, or PDF - Max 16MB)
+                    </p>
+                    <div id="id_back_preview" class="mt-3 hidden">
+                        <img id="id_back_preview_img" src="" alt="ID Back Preview" class="max-w-xs rounded-lg border-2 border-blue-200">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Corporate Client Fields -->
+            <div id="corporate_fields" class="hidden space-y-6">
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded">
+                    <p class="text-sm font-semibold text-indigo-800 mb-3">
+                        <i class="fas fa-info-circle mr-2"></i>Corporate Client Requirements
+                    </p>
+                </div>
+                
+                <!-- CR-12 Certificate (Required for Corporate) -->
+                <div>
+                    <label for="cr12_certificate" class="block text-sm font-semibold text-gray-700 mb-2">
+                        CR-12 Certificate <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="file" 
+                        id="cr12_certificate" 
+                        name="cr12_certificate" 
+                        accept=".pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                    >
+                    <p class="mt-2 text-sm text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Upload your CR-12 certificate (PDF, DOC, or DOCX - Max 16MB)
+                    </p>
+                </div>
+
+                <!-- Post Office Address (Required for Corporate) -->
+                <div>
+                    <label for="post_office_address" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Post Office Address <span class="text-red-500">*</span>
+                    </label>
+                    <textarea 
+                        id="post_office_address" 
+                        name="post_office_address" 
+                        rows="3"
+                        placeholder="Enter your post office address..."
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                    ></textarea>
+                    <p class="mt-2 text-sm text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Please provide your company's post office address
+                    </p>
+                </div>
+            </div>
+
+            <!-- Profile Picture (Optional) -->
+            <div>
+                <label for="profile_picture" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Profile Picture <span class="text-gray-400 text-xs">(Optional)</span>
+                </label>
+                <div class="flex items-center space-x-4">
+                    <div class="flex-1">
+                        <input 
+                            type="file" 
+                            id="profile_picture" 
+                            name="profile_picture" 
+                            accept="image/*"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            onchange="previewProfilePicture(this)"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Accepted formats: PNG, JPG, JPEG (Max 16MB)
+                        </p>
+                    </div>
+                    <div id="profile_preview" class="hidden">
+                        <img id="preview_image" src="" alt="Preview" class="w-20 h-20 rounded-full border-2 border-blue-200 object-cover">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Profile Info -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p class="text-sm text-gray-700 mb-2">
+                    <i class="fas fa-user-circle text-blue-600 mr-2"></i>
+                    <strong>Name:</strong> {{ session.client_name }}
+                </p>
+                <p class="text-sm text-gray-700">
+                    <i class="fas fa-envelope text-blue-600 mr-2"></i>
+                    <strong>Email:</strong> {{ session.client_email }}
+                </p>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex items-center justify-between pt-4">
+                <a href="{{ url_for('client_logout') }}" class="text-gray-600 hover:text-gray-800 transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Cancel
+                </a>
+                <button 
+                    type="submit" 
+                    class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
+                >
+                    <i class="fas fa-check mr-2"></i>
+                    Complete Registration
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function previewProfilePicture(input) {
+    const preview = document.getElementById('profile_preview');
+    const previewImage = document.getElementById('preview_image');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            preview.classList.remove('hidden');
+        }
+        
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.classList.add('hidden');
+    }
+}
+
+// Format phone number as user types (Kenyan format)
+document.getElementById('phone_number').addEventListener('input', function(e) {
+    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    
+    // Format as 07XX XXX XXX
+    if (value.length > 0) {
+        if (value.length <= 4) {
+            value = value;
+        } else if (value.length <= 7) {
+            value = value.slice(0, 4) + ' ' + value.slice(4);
+        } else {
+            value = value.slice(0, 4) + ' ' + value.slice(4, 7) + ' ' + value.slice(7, 10);
+        }
+    }
+    
+    e.target.value = value;
+});
+
+// Toggle fields based on client type selection
+function toggleClientTypeFields(clientType) {
+    const individualFields = document.getElementById('individual_fields');
+    const corporateFields = document.getElementById('corporate_fields');
+    const idFrontInput = document.getElementById('id_front');
+    const idBackInput = document.getElementById('id_back');
+    const cr12Input = document.getElementById('cr12_certificate');
+    const postOfficeInput = document.getElementById('post_office_address');
+    
+    if (clientType === 'Individual') {
+        individualFields.classList.remove('hidden');
+        corporateFields.classList.add('hidden');
+        // Make Individual fields required
+        if (idFrontInput) idFrontInput.required = true;
+        if (idBackInput) idBackInput.required = true;
+        // Make Corporate fields not required
+        if (cr12Input) cr12Input.required = false;
+        if (postOfficeInput) postOfficeInput.required = false;
+    } else if (clientType === 'Corporate') {
+        individualFields.classList.add('hidden');
+        corporateFields.classList.remove('hidden');
+        // Make Corporate fields required
+        if (cr12Input) cr12Input.required = true;
+        if (postOfficeInput) postOfficeInput.required = true;
+        // Make Individual fields not required
+        if (idFrontInput) idFrontInput.required = false;
+        if (idBackInput) idBackInput.required = false;
+    } else {
+        individualFields.classList.add('hidden');
+        corporateFields.classList.add('hidden');
+        // Remove required from all
+        if (idFrontInput) idFrontInput.required = false;
+        if (idBackInput) idBackInput.required = false;
+        if (cr12Input) cr12Input.required = false;
+        if (postOfficeInput) postOfficeInput.required = false;
+    }
+}
+
+// Preview ID images
+function previewIDImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    const previewImg = document.getElementById(previewId + '_img');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const fileType = file.type;
+        
+        // Only preview if it's an image (not PDF)
+        if (fileType.startsWith('image/')) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                preview.classList.remove('hidden');
+            }
+            
+            reader.readAsDataURL(file);
+        } else {
+            // For PDF files, just show a message
+            preview.classList.add('hidden');
+        }
+    } else {
+        preview.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}
+

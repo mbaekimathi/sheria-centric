@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Non-Disclosure Agreement - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl shadow-lg p-8 mb-6 text-white">
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
+                <i class="fas fa-shield-alt text-white text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold mb-2">Confidentiality & Non-Disclosure Agreement</h1>
+            <p class="text-green-100">{{ company_settings.company_name }}</p>
+        </div>
+    </div>
+
+    <!-- Contract Content -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <div class="prose prose-lg max-w-none">
+            <!-- Introduction -->
+            <div class="mb-8">
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    This <strong>Confidentiality and Non-Disclosure Agreement</strong> ("Agreement") is entered into between 
+                    <strong>{{ company_settings.company_name }}</strong> ("Company") and the undersigned employee ("Employee") 
+                    effective as of the date of employment commencement.
+                </p>
+                <p class="text-gray-700 leading-relaxed">
+                    This Agreement is designed to protect the confidential and proprietary information of the Company and 
+                    its clients. By accepting this agreement, you acknowledge your understanding and commitment to maintain 
+                    the highest standards of confidentiality.
+                </p>
+            </div>
+
+            <!-- Section 1 -->
+            <div class="mb-8 border-l-4 border-green-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">1</span>
+                    Definition of Confidential Information
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    For purposes of this Agreement, "Confidential Information" includes, but is not limited to:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Client information, case details, and legal strategies</li>
+                    <li>Financial information, business plans, and proprietary processes</li>
+                    <li>Employee information, salary data, and personnel records</li>
+                    <li>Technical information, software, and system architectures</li>
+                    <li>Marketing strategies, client lists, and business relationships</li>
+                    <li>Any information marked as "Confidential" or "Proprietary"</li>
+                    <li>Any information that would be considered confidential by a reasonable person</li>
+                </ul>
+            </div>
+
+            <!-- Section 2 -->
+            <div class="mb-8 border-l-4 border-green-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">2</span>
+                    Obligations of Employee
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    The Employee agrees to:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Maintain Confidentiality:</strong> Not disclose, use, or permit others to use any Confidential Information except as necessary in the performance of job duties</li>
+                    <li><strong>Protect Information:</strong> Take all reasonable precautions to protect Confidential Information from unauthorized access or disclosure</li>
+                    <li><strong>Return Materials:</strong> Upon termination of employment, return all documents, files, and materials containing Confidential Information</li>
+                    <li><strong>Report Breaches:</strong> Immediately report any suspected or actual breach of confidentiality to management</li>
+                    <li><strong>Comply with Policies:</strong> Follow all company policies and procedures regarding information security and data protection</li>
+                </ul>
+            </div>
+
+            <!-- Section 3 -->
+            <div class="mb-8 border-l-4 border-green-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">3</span>
+                    Exceptions
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    This Agreement does not apply to information that:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Was publicly known or becomes publicly known through no breach of this Agreement</li>
+                    <li>Was rightfully known by the Employee prior to employment</li>
+                    <li>Is independently developed by the Employee without use of Confidential Information</li>
+                    <li>Is required to be disclosed by law or court order (with prior notice to Company when possible)</li>
+                </ul>
+            </div>
+
+            <!-- Section 4 -->
+            <div class="mb-8 border-l-4 border-green-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">4</span>
+                    Duration of Obligations
+                </h2>
+                <p class="text-gray-700 leading-relaxed">
+                    The obligations under this Agreement shall continue:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 mt-2">
+                    <li>During the entire period of employment</li>
+                    <li>For a period of <strong>three (3) years</strong> following termination of employment</li>
+                    <li>Indefinitely for trade secrets and proprietary information that remains confidential</li>
+                </ul>
+            </div>
+
+            <!-- Section 5 -->
+            <div class="mb-8 border-l-4 border-green-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">5</span>
+                    Consequences of Breach
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Any breach of this Agreement may result in:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Immediate termination of employment</li>
+                    <li>Legal action for damages and injunctive relief</li>
+                    <li>Criminal prosecution if applicable under relevant laws</li>
+                    <li>Liability for all costs and expenses incurred by the Company in enforcing this Agreement</li>
+                </ul>
+            </div>
+
+            <!-- Section 6 -->
+            <div class="mb-8 border-l-4 border-green-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-green-100 text-green-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">6</span>
+                    Acknowledgment
+                </h2>
+                <p class="text-gray-700 leading-relaxed">
+                    By accepting this Agreement, the Employee acknowledges that:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 mt-2">
+                    <li>They have read and understood all terms and conditions</li>
+                    <li>They have had the opportunity to seek legal counsel if desired</li>
+                    <li>They agree to be bound by all provisions of this Agreement</li>
+                    <li>They understand the serious consequences of breaching this Agreement</li>
+                </ul>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-12 pt-8 border-t border-gray-200">
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Effective Date:</strong> Upon acceptance during onboarding
+                    </p>
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Company:</strong> {{ company_settings.company_name }}
+                    </p>
+                    <p class="text-sm text-gray-600">
+                        <strong>Status:</strong> This agreement remains in effect until modified or terminated by mutual written consent.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center">
+        <a href="{{ url_for('onboarding') }}" class="inline-flex items-center px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Onboarding
+        </a>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Code of Conduct - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl shadow-lg p-8 mb-6 text-white">
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
+                <i class="fas fa-balance-scale text-white text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold mb-2">Code of Conduct & Professional Ethics</h1>
+            <p class="text-orange-100">{{ company_settings.company_name }}</p>
+        </div>
+    </div>
+
+    <!-- Contract Content -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <div class="prose prose-lg max-w-none">
+            <!-- Introduction -->
+            <div class="mb-8">
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    This <strong>Code of Conduct and Professional Ethics</strong> ("Code") establishes the standards of 
+                    professional behavior expected of all employees of <strong>{{ company_settings.company_name }}</strong>. 
+                    This Code reflects our commitment to integrity, excellence, and ethical conduct in all aspects of our work.
+                </p>
+                <p class="text-gray-700 leading-relaxed">
+                    All employees are expected to read, understand, and comply with this Code. Violations may result in 
+                    disciplinary action, up to and including termination of employment.
+                </p>
+            </div>
+
+            <!-- Section 1 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">1</span>
+                    Professional Integrity
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    All employees must:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Act with Honesty:</strong> Maintain the highest standards of honesty and integrity in all professional dealings</li>
+                    <li><strong>Avoid Conflicts of Interest:</strong> Disclose any potential conflicts of interest and avoid situations that could compromise professional judgment</li>
+                    <li><strong>Maintain Professional Competence:</strong> Continuously develop skills and knowledge relevant to job responsibilities</li>
+                    <li><strong>Respect Confidentiality:</strong> Protect confidential information of clients, colleagues, and the company</li>
+                    <li><strong>Comply with Laws:</strong> Adhere to all applicable laws, regulations, and professional standards</li>
+                </ul>
+            </div>
+
+            <!-- Section 2 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">2</span>
+                    Workplace Conduct
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Employees are expected to:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Respectful Behavior:</strong> Treat all colleagues, clients, and stakeholders with respect, dignity, and professionalism</li>
+                    <li><strong>No Discrimination:</strong> Maintain a workplace free from discrimination, harassment, or bullying of any kind</li>
+                    <li><strong>Equal Opportunity:</strong> Support equal opportunity and fair treatment for all employees regardless of background</li>
+                    <li><strong>Professional Communication:</strong> Use appropriate, respectful language in all communications</li>
+                    <li><strong>Team Collaboration:</strong> Work cooperatively with colleagues and support team objectives</li>
+                </ul>
+            </div>
+
+            <!-- Section 3 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">3</span>
+                    Client Relations
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    When dealing with clients, employees must:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Client Service Excellence:</strong> Provide the highest quality service and maintain professional standards</li>
+                    <li><strong>Transparency:</strong> Be honest and transparent in all client communications</li>
+                    <li><strong>Confidentiality:</strong> Protect all client information and maintain strict confidentiality</li>
+                    <li><strong>Timely Response:</strong> Respond to client inquiries and requests in a timely and professional manner</li>
+                    <li><strong>No Misrepresentation:</strong> Never misrepresent qualifications, services, or capabilities</li>
+                </ul>
+            </div>
+
+            <!-- Section 4 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">4</span>
+                    Use of Company Resources
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Employees must use company resources responsibly:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Authorized Use Only:</strong> Use company property, equipment, and systems only for authorized business purposes</li>
+                    <li><strong>Protect Assets:</strong> Take reasonable care to protect company assets from loss, damage, or misuse</li>
+                    <li><strong>No Personal Gain:</strong> Do not use company resources for personal financial gain or unauthorized purposes</li>
+                    <li><strong>Data Security:</strong> Follow all information security policies and protect sensitive data</li>
+                    <li><strong>Time Management:</strong> Use work time efficiently and productively</li>
+                </ul>
+            </div>
+
+            <!-- Section 5 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">5</span>
+                    Reporting Violations
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Employees have a responsibility to:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Report Concerns:</strong> Report any suspected violations of this Code to management or HR</li>
+                    <li><strong>No Retaliation:</strong> The company prohibits retaliation against employees who report violations in good faith</li>
+                    <li><strong>Confidential Reporting:</strong> Reports may be made confidentially through appropriate channels</li>
+                    <li><strong>Cooperation:</strong> Cooperate fully with any investigation of reported violations</li>
+                </ul>
+            </div>
+
+            <!-- Section 6 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">6</span>
+                    Compliance and Enforcement
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    The company will:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Investigate Violations:</strong> Promptly investigate all reported violations of this Code</li>
+                    <li><strong>Take Appropriate Action:</strong> Take disciplinary action, up to and including termination, for violations</li>
+                    <li><strong>Regular Review:</strong> Regularly review and update this Code to ensure it remains current and effective</li>
+                    <li><strong>Training:</strong> Provide training and resources to help employees understand and comply with this Code</li>
+                </ul>
+            </div>
+
+            <!-- Section 7 -->
+            <div class="mb-8 border-l-4 border-orange-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-orange-100 text-orange-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">7</span>
+                    Acknowledgment
+                </h2>
+                <p class="text-gray-700 leading-relaxed">
+                    By accepting this Code, I acknowledge that:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 mt-2">
+                    <li>I have read and understood this Code of Conduct</li>
+                    <li>I agree to comply with all provisions of this Code</li>
+                    <li>I understand that violations may result in disciplinary action</li>
+                    <li>I will seek clarification if I have questions about any provision</li>
+                </ul>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-12 pt-8 border-t border-gray-200">
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Effective Date:</strong> Upon acceptance during onboarding
+                    </p>
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Company:</strong> {{ company_settings.company_name }}
+                    </p>
+                    <p class="text-sm text-gray-600">
+                        <strong>Review Period:</strong> This Code is reviewed annually and may be updated as needed.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center">
+        <a href="{{ url_for('onboarding') }}" class="inline-flex items-center px-6 py-3 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Onboarding
+        </a>
+    </div>
+</div>
+{% endblock %}
+

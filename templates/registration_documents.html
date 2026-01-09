@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Employees Registration Documents - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-file-signature text-indigo-600 mr-3"></i>
+            Employees Registration Documents
+        </h1>
+        <p class="text-gray-600">Documents submitted during employee onboarding process</p>
+    </div>
+
+    <!-- Registration Documents Section -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        {% if employees %}
+        <div class="space-y-6">
+            {% for employee in employees %}
+            <div class="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">{{ employee.full_name }}</h3>
+                        <p class="text-sm text-gray-500">Employee Code: {{ employee.employee_code }} | Email: {{ employee.work_email }}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- ID Front -->
+                    {% if employee.id_front %}
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-id-card text-blue-600 mr-2"></i>
+                            <span class="font-semibold text-gray-700">1. ID Front</span>
+                        </div>
+                        <a href="{{ url_for('download_document', document_type='id_front', filename=employee.id_front) }}" 
+                           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                            <i class="fas fa-download mr-2"></i>
+                            Download
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-50">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-id-card text-gray-400 mr-2"></i>
+                            <span class="font-semibold text-gray-500">1. ID Front</span>
+                        </div>
+                        <span class="text-sm text-gray-400">Not uploaded</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- ID Back -->
+                    {% if employee.id_back %}
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-id-card text-blue-600 mr-2"></i>
+                            <span class="font-semibold text-gray-700">2. ID Back</span>
+                        </div>
+                        <a href="{{ url_for('download_document', document_type='id_back', filename=employee.id_back) }}" 
+                           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                            <i class="fas fa-download mr-2"></i>
+                            Download
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-50">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-id-card text-gray-400 mr-2"></i>
+                            <span class="font-semibold text-gray-500">2. ID Back</span>
+                        </div>
+                        <span class="text-sm text-gray-400">Not uploaded</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Employment Contract -->
+                    {% if employee.employment_contract %}
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-file-contract text-green-600 mr-2"></i>
+                            <span class="font-semibold text-gray-700">3. Employee Contract</span>
+                        </div>
+                        <a href="{{ url_for('download_document', document_type='employment_contract', filename=employee.employment_contract) }}" 
+                           class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
+                            <i class="fas fa-download mr-2"></i>
+                            Download
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 opacity-50">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-file-contract text-gray-400 mr-2"></i>
+                            <span class="font-semibold text-gray-500">3. Employee Contract</span>
+                        </div>
+                        <span class="text-sm text-gray-400">Not uploaded</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-folder-open text-gray-400 text-5xl mb-4"></i>
+            <p class="text-gray-600">No registration documents found. Employees who complete onboarding will appear here.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

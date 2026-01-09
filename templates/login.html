@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Login - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <!-- Header Section with Green Accent -->
+        <div class="bg-green-600 px-8 pt-10 pb-8">
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
+                    <i class="fas fa-user-lock text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white mb-2">Employee Login</h1>
+                <p class="text-green-50 text-sm">Enter your credentials to access CASELY</p>
+            </div>
+        </div>
+
+        <!-- Form Section -->
+        <div class="px-8 py-8">
+            <form method="POST" action="{{ url_for('login') }}" class="space-y-5">
+                <!-- Employee Code -->
+                <div>
+                    <label for="employee_code" class="block text-sm font-semibold text-gray-700 mb-2">
+                        6-Digit Employee Code
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <i class="fas fa-id-card text-gray-400"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="employee_code" 
+                            name="employee_code" 
+                            maxlength="6"
+                            pattern="[0-9]{6}"
+                            required
+                            class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                            placeholder="000000"
+                        >
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label for="password" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required
+                            class="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                            placeholder="Enter your password"
+                        >
+                        <button 
+                            type="button" 
+                            onclick="togglePassword('password')"
+                            class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <i id="password-icon" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit"
+                    class="w-full py-3.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                    <i class="fas fa-sign-in-alt mr-2"></i>Sign In
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-200"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-4 bg-white text-gray-500">New to CASELY?</span>
+                </div>
+            </div>
+
+            <!-- Sign Up Link -->
+            <div class="text-center">
+                <a href="{{ url_for('signup') }}" class="inline-flex items-center text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors">
+                    Create an account
+                    <i class="fas fa-arrow-right ml-2 text-xs"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(inputId + '-icon');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    // Auto-format employee code input
+    document.getElementById('employee_code').addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+</script>
+{% endblock %}

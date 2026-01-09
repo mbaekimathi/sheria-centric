@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Client Profile - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Profile Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-500 p-8">
+            <div class="flex flex-col md:flex-row items-center md:items-end space-y-4 md:space-y-0 md:space-x-6">
+                <!-- Profile Picture -->
+                <div class="relative">
+                    {% if client.profile_picture %}
+                        {% if client.profile_picture.startswith('http') %}
+                        <div class="w-32 h-32 rounded-2xl border-4 border-white shadow-xl overflow-hidden">
+                            <img src="{{ client.profile_picture }}" 
+                                 alt="Profile" class="w-full h-full object-cover">
+                        </div>
+                        {% else %}
+                        <div class="w-32 h-32 rounded-2xl border-4 border-white shadow-xl overflow-hidden">
+                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" 
+                                 alt="Profile" class="w-full h-full object-cover">
+                        </div>
+                        {% endif %}
+                    {% else %}
+                    <div class="w-32 h-32 rounded-2xl border-4 border-white shadow-xl bg-white flex items-center justify-center">
+                        <span class="text-blue-600 font-bold text-5xl">{{ client.full_name[0] if client.full_name else 'C' }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-blue-600 border-4 border-white flex items-center justify-center shadow-lg">
+                        <i class="fas fa-check text-white text-sm"></i>
+                    </div>
+                </div>
+                
+                <!-- Profile Info -->
+                <div class="flex-1 text-center md:text-left">
+                    <h1 class="text-3xl font-bold text-white mb-2">{{ client.full_name }}</h1>
+                    <div class="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                        <span class="px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold">
+                            <i class="fas fa-user-tag mr-2"></i>{{ client.client_type }}
+                        </span>
+                        <span class="px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold">
+                            <i class="fas fa-building mr-2"></i>{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}
+                        </span>
+                        <span class="px-4 py-1.5 rounded-full text-sm font-semibold {% if client.status == 'Active' %}bg-green-500 text-white{% else %}bg-gray-500 text-white{% endif %}">
+                            {{ client.status }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Details -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Personal Information -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-user-circle text-blue-600 mr-3"></i>
+                Personal Information
+            </h2>
+            <div class="space-y-4">
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-user text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Full Name</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.full_name }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-envelope text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Email</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.email }}</p>
+                    </div>
+                </div>
+                
+                {% if client.phone_number %}
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-phone text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Phone Number</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.phone_number }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="flex items-start space-x-4">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-tag text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Client Type</p>
+                        {% if client.client_type == 'Pending' %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>Pending - Please complete registration
+                        </span>
+                        {% else %}
+                        <p class="text-lg font-semibold text-gray-900">{{ client.client_type }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-info-circle text-indigo-600 mr-3"></i>
+                Account Information
+            </h2>
+            <div class="space-y-4">
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-calendar text-indigo-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Member Since</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.created_at.strftime('%B %d, %Y') if client.created_at else 'N/A' }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-clock text-indigo-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Last Updated</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.updated_at.strftime('%B %d, %Y') if client.updated_at else 'N/A' }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start space-x-4">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-shield-alt text-indigo-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Account Status</p>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ client.status }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="mt-6 flex flex-col sm:flex-row gap-4">
+        <button onclick="toggleEditMode()" id="editBtn" class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-800 transition-all duration-300 shadow-lg hover:shadow-xl text-center">
+            <i class="fas fa-edit mr-2"></i>Edit Profile
+        </button>
+        <a href="{{ url_for('client_dashboard') }}" class="flex-1 px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-semibold rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl text-center">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Edit Profile Form -->
+    <form id="editProfileForm" method="POST" action="{{ url_for('update_client_profile') }}" enctype="multipart/form-data" class="hidden mt-6">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-edit text-blue-600 mr-3"></i>
+                Edit Profile Information
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Profile Picture Upload -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-image mr-2 text-blue-600"></i>Profile Picture
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            {% if client.profile_picture %}
+                                {% if client.profile_picture.startswith('http') %}
+                                <div class="w-24 h-24 rounded-xl border-2 border-gray-200 overflow-hidden">
+                                    <img id="profilePreview" src="{{ client.profile_picture }}" 
+                                         alt="Profile" class="w-full h-full object-cover">
+                                </div>
+                                {% else %}
+                                <div class="w-24 h-24 rounded-xl border-2 border-gray-200 overflow-hidden">
+                                    <img id="profilePreview" src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" 
+                                         alt="Profile" class="w-full h-full object-cover">
+                                </div>
+                                {% endif %}
+                            {% else %}
+                            <div id="profilePreviewContainer" class="w-24 h-24 rounded-xl border-2 border-gray-200 bg-gray-100 flex items-center justify-center">
+                                <span class="text-gray-400 font-bold text-3xl">{{ client.full_name[0] if client.full_name else 'C' }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1">
+                            <input type="file" name="profile_picture" id="profile_picture" accept="image/*" 
+                                   class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer border border-gray-300 rounded-lg p-2" 
+                                   onchange="previewImage(this)">
+                            <p class="text-xs text-gray-500 mt-1">JPG, PNG or GIF (Max 16MB)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Full Name -->
+                <div>
+                    <label for="full_name" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-user text-blue-600 mr-2"></i>Full Name <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="full_name" id="full_name" value="{{ client.full_name }}" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                </div>
+
+                <!-- Phone Number -->
+                <div>
+                    <label for="phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-phone text-blue-600 mr-2"></i>Phone Number <span class="text-red-500">*</span>
+                    </label>
+                    <input type="tel" name="phone_number" id="phone_number" value="{{ client.phone_number or '' }}" required
+                           placeholder="0712 345 678"
+                           pattern="[0-9\s]+"
+                           maxlength="20"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                    <p class="text-xs text-gray-500 mt-1">Format: 07XX XXX XXX (Kenyan mobile number)</p>
+                </div>
+
+                <!-- Client Type -->
+                <div>
+                    <label for="client_type" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-tag text-indigo-600 mr-2"></i>Client Type <span class="text-red-500">*</span>
+                    </label>
+                    <select name="client_type" id="client_type" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                        <option value="Individual" {% if client.client_type == 'Individual' %}selected{% endif %}>Individual</option>
+                        <option value="Corporate" {% if client.client_type == 'Corporate' %}selected{% endif %}>Corporate</option>
+                    </select>
+                </div>
+
+                <!-- Email (Read-only) -->
+                <div>
+                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-envelope text-blue-600 mr-2"></i>Email
+                    </label>
+                    <input type="email" name="email" id="email" value="{{ client.email }}" 
+                           readonly disabled
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed">
+                    <p class="text-xs text-gray-500 mt-1">Email cannot be changed (linked to Google account)</p>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="mt-6 flex flex-col sm:flex-row gap-4">
+                <button type="submit" class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-800 transition-all duration-300 shadow-lg hover:shadow-xl">
+                    <i class="fas fa-save mr-2"></i>Save Changes
+                </button>
+                <button type="button" onclick="toggleEditMode()" class="flex-1 px-6 py-3 bg-gray-500 text-white font-semibold rounded-xl hover:bg-gray-600 transition-all duration-300 shadow-lg hover:shadow-xl">
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    function toggleEditMode() {
+        const viewMode = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.gap-6');
+        const editForm = document.getElementById('editProfileForm');
+        const editBtn = document.getElementById('editBtn');
+        
+        if (editForm.classList.contains('hidden')) {
+            // Switch to edit mode
+            viewMode.style.display = 'none';
+            editForm.classList.remove('hidden');
+            editBtn.innerHTML = '<i class="fas fa-eye mr-2"></i>View Profile';
+            editBtn.classList.remove('from-blue-600', 'to-indigo-700', 'hover:from-blue-700', 'hover:to-indigo-800');
+            editBtn.classList.add('from-gray-600', 'to-gray-700', 'hover:from-gray-700', 'hover:to-gray-800');
+        } else {
+            // Switch to view mode
+            viewMode.style.display = 'grid';
+            editForm.classList.add('hidden');
+            editBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Profile';
+            editBtn.classList.remove('from-gray-600', 'to-gray-700', 'hover:from-gray-700', 'hover:to-gray-800');
+            editBtn.classList.add('from-blue-600', 'to-indigo-700', 'hover:from-blue-700', 'hover:to-indigo-800');
+        }
+    }
+
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                let preview = document.getElementById('profilePreview');
+                let container = document.getElementById('profilePreviewContainer');
+                
+                if (preview) {
+                    preview.src = e.target.result;
+                } else if (container) {
+                    // Replace placeholder with image
+                    container.innerHTML = `<img id="profilePreview" src="${e.target.result}" alt="Profile" class="w-full h-full object-cover">`;
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Format phone number as user types (Kenyan format)
+    document.getElementById('phone_number').addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+        
+        // Format as 07XX XXX XXX
+        if (value.length > 0) {
+            if (value.length <= 4) {
+                value = value;
+            } else if (value.length <= 7) {
+                value = value.slice(0, 4) + ' ' + value.slice(4);
+            } else {
+                value = value.slice(0, 4) + ' ' + value.slice(4, 7) + ' ' + value.slice(7, 10);
+            }
+        }
+        
+        e.target.value = value;
+    });
+</script>
+{% endblock %}
+

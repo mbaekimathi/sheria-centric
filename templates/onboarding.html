@@ -1,0 +1,710 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Onboarding - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-500/20 backdrop-blur-sm mb-4">
+                <i class="fas fa-clipboard-check text-orange-600 text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Employee Onboarding</h1>
+            <p class="text-gray-600">Please complete your onboarding information</p>
+        </div>
+    </div>
+
+    <!-- Onboarding Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <form method="POST" action="{{ url_for('submit_onboarding') }}" enctype="multipart/form-data" class="space-y-8" onsubmit="return prepareSignatureSubmission(event)">
+            <!-- Payroll & Compensation Details Section -->
+            <div class="border-b border-gray-200 pb-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-money-bill-wave text-green-600 mr-3"></i>
+                    Payroll & Compensation Details
+                </h2>
+                <p class="text-sm text-gray-500 mb-6">All fields are required</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Account Number -->
+                    <div>
+                        <label for="account_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Account Number <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-university text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="account_number" 
+                                name="account_number" 
+                                required
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="Enter account number"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Account Name -->
+                    <div>
+                        <label for="account_name" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Account Name <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="account_name" 
+                                name="account_name" 
+                                required
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="Enter account name"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Tax PIN -->
+                    <div>
+                        <label for="tax_pin" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Tax PIN <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-id-card text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="tax_pin" 
+                                name="tax_pin" 
+                                required
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="Enter tax PIN"
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signature Upload Section -->
+            <div class="border-b border-gray-200 pb-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-signature text-purple-600 mr-3"></i>
+                    Digital Signature (Optional)
+                </h2>
+                <p class="text-sm text-gray-500 mb-6">Upload your signature for digital document signing</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Upload Section -->
+                    <div>
+                        <label for="signature" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Upload Signature Image
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="file" 
+                                    id="signature" 
+                                    name="signature" 
+                                    accept="image/*"
+                                    class="hidden"
+                                    onchange="processSignature(this)"
+                                >
+                                <label 
+                                    for="signature" 
+                                    class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 text-sm text-gray-600"
+                                >
+                                    <i class="fas fa-upload mr-2"></i>
+                                    <span id="signature-file-name">Choose signature image</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">PNG, JPG, JPEG up to 5MB</p>
+                        <div id="signature-processing" class="hidden mt-4">
+                            <div class="flex items-center space-x-2 text-sm text-purple-600">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Processing signature...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preview Section -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Signature Preview
+                        </label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 min-h-[200px] flex items-center justify-center">
+                            <div id="signature-preview-container" class="text-center">
+                                <i class="fas fa-signature text-gray-400 text-4xl mb-2"></i>
+                                <p class="text-sm text-gray-500">Preview will appear here</p>
+                            </div>
+                            <canvas id="signature-canvas" class="hidden max-w-full max-h-48 object-contain"></canvas>
+                        </div>
+                        <div id="signature-confirm" class="hidden mt-4">
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div class="flex items-center space-x-2 text-sm text-green-700 mb-2">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span class="font-semibold">Signature Ready</span>
+                                </div>
+                                <p class="text-xs text-green-600">Your signature will be securely stored and embedded in documents</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stamp Upload Section -->
+            <div class="border-b border-gray-200 pb-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-stamp text-indigo-600 mr-3"></i>
+                    Official Stamp (Optional)
+                </h2>
+                <p class="text-sm text-gray-500 mb-6">Upload your official stamp for document authentication</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Upload Section -->
+                    <div>
+                        <label for="stamp" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Upload Stamp Image
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="file" 
+                                    id="stamp" 
+                                    name="stamp" 
+                                    accept="image/*"
+                                    class="hidden"
+                                    onchange="processStamp(this)"
+                                >
+                                <label 
+                                    for="stamp" 
+                                    class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-all duration-200 text-sm text-gray-600"
+                                >
+                                    <i class="fas fa-upload mr-2"></i>
+                                    <span id="stamp-file-name">Choose stamp image</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">PNG, JPG, JPEG up to 5MB</p>
+                        <div id="stamp-processing" class="hidden mt-4">
+                            <div class="flex items-center space-x-2 text-sm text-indigo-600">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Processing stamp...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preview Section -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Stamp Preview
+                        </label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50 min-h-[200px] flex items-center justify-center">
+                            <div id="stamp-preview-container" class="text-center">
+                                <i class="fas fa-stamp text-gray-400 text-4xl mb-2"></i>
+                                <p class="text-sm text-gray-500">Preview will appear here</p>
+                            </div>
+                            <canvas id="stamp-canvas" class="hidden max-w-full max-h-48 object-contain"></canvas>
+                        </div>
+                        <div id="stamp-confirm" class="hidden mt-4">
+                            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                <div class="flex items-center space-x-2 text-sm text-indigo-700 mb-2">
+                                    <i class="fas fa-check-circle"></i>
+                                    <span class="font-semibold">Stamp Ready</span>
+                                </div>
+                                <p class="text-xs text-indigo-600">Your stamp will be securely stored and embedded in documents</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compliance & Agreements Section -->
+            <div class="border-b border-gray-200 pb-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-file-contract text-orange-600 mr-3"></i>
+                    Compliance & Agreements
+                </h2>
+                <p class="text-sm text-gray-500 mb-6">All agreements must be accepted</p>
+                
+                <div class="space-y-6">
+                    <!-- Employment Contract Upload -->
+                    <div>
+                        <label for="employment_contract" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Employment Contract Upload <span class="text-red-500">*</span>
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="file" 
+                                    id="employment_contract" 
+                                    name="employment_contract" 
+                                    accept=".pdf,.doc,.docx"
+                                    required
+                                    class="hidden"
+                                    onchange="previewContractFile(this)"
+                                >
+                                <label 
+                                    for="employment_contract" 
+                                    class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-sm text-gray-600"
+                                >
+                                    <i class="fas fa-upload mr-2"></i>
+                                    <span id="contract-file-name">Choose file or drag and drop</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">PDF, DOC, DOCX up to 10MB</p>
+                    </div>
+
+                    <!-- ID/Passport Front Upload -->
+                    <div>
+                        <label for="id_front" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Identification Card / Passport (Front) <span class="text-red-500">*</span>
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="file" 
+                                    id="id_front" 
+                                    name="id_front" 
+                                    accept="image/*,.pdf"
+                                    required
+                                    class="hidden"
+                                    onchange="previewIdFile(this, 'front')"
+                                >
+                                <label 
+                                    for="id_front" 
+                                    class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-sm text-gray-600"
+                                >
+                                    <i class="fas fa-upload mr-2"></i>
+                                    <span id="id-front-file-name">Choose file or drag and drop</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">Image (JPG, PNG) or PDF up to 10MB</p>
+                    </div>
+
+                    <!-- ID/Passport Back Upload -->
+                    <div>
+                        <label for="id_back" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Identification Card / Passport (Back) <span class="text-red-500">*</span>
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="file" 
+                                    id="id_back" 
+                                    name="id_back" 
+                                    accept="image/*,.pdf"
+                                    required
+                                    class="hidden"
+                                    onchange="previewIdFile(this, 'back')"
+                                >
+                                <label 
+                                    for="id_back" 
+                                    class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-sm text-gray-600"
+                                >
+                                    <i class="fas fa-upload mr-2"></i>
+                                    <span id="id-back-file-name">Choose file or drag and drop</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">Image (JPG, PNG) or PDF up to 10MB</p>
+                    </div>
+
+                    <!-- Compliance Checkboxes -->
+                    <div class="space-y-4">
+                        <!-- NDA -->
+                        <div class="flex items-start p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <input 
+                                type="checkbox" 
+                                id="nda_accepted" 
+                                name="nda_accepted" 
+                                required
+                                class="mt-1 mr-3 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            >
+                            <label for="nda_accepted" class="text-sm text-gray-700 leading-relaxed flex-1">
+                                I have read and accept the <a href="{{ url_for('contract_nda') }}" class="text-green-600 hover:text-green-700 font-semibold underline" target="_blank">Confidentiality / Non-Disclosure Agreement (NDA)</a> <span class="text-red-500">*</span>
+                            </label>
+                        </div>
+
+                        <!-- Code of Conduct -->
+                        <div class="flex items-start p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <input 
+                                type="checkbox" 
+                                id="code_of_conduct_accepted" 
+                                name="code_of_conduct_accepted" 
+                                required
+                                class="mt-1 mr-3 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            >
+                            <label for="code_of_conduct_accepted" class="text-sm text-gray-700 leading-relaxed flex-1">
+                                I have read and accept the <a href="{{ url_for('contract_code_of_conduct') }}" class="text-green-600 hover:text-green-700 font-semibold underline" target="_blank">Code of Conduct / Policy</a> <span class="text-red-500">*</span>
+                            </label>
+                        </div>
+
+                        <!-- Health & Safety -->
+                        <div class="flex items-start p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <input 
+                                type="checkbox" 
+                                id="health_safety_accepted" 
+                                name="health_safety_accepted" 
+                                required
+                                class="mt-1 mr-3 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            >
+                            <label for="health_safety_accepted" class="text-sm text-gray-700 leading-relaxed flex-1">
+                                I have read and accept the <a href="{{ url_for('contract_health_safety') }}" class="text-green-600 hover:text-green-700 font-semibold underline" target="_blank">Health & Safety Declaration</a> <span class="text-red-500">*</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex justify-end space-x-4 pt-6">
+                <button 
+                    type="submit"
+                    class="px-8 py-3.5 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                >
+                    <i class="fas fa-check-circle mr-2"></i>Submit Onboarding Information
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function previewContractFile(input) {
+        const fileName = document.getElementById('contract-file-name');
+        if (input.files && input.files[0]) {
+            fileName.textContent = input.files[0].name;
+        } else {
+            fileName.textContent = 'Choose file or drag and drop';
+        }
+    }
+
+    function previewIdFile(input, side) {
+        const fileName = document.getElementById(`id-${side}-file-name`);
+        if (input.files && input.files[0]) {
+            fileName.textContent = input.files[0].name;
+        } else {
+            fileName.textContent = 'Choose file or drag and drop';
+        }
+    }
+
+    function processSignature(input) {
+        if (!input.files || !input.files[0]) {
+            return;
+        }
+
+        const file = input.files[0];
+        const fileName = document.getElementById('signature-file-name');
+        const processingDiv = document.getElementById('signature-processing');
+        const previewContainer = document.getElementById('signature-preview-container');
+        const canvas = document.getElementById('signature-canvas');
+        const confirmDiv = document.getElementById('signature-confirm');
+
+        fileName.textContent = file.name;
+        processingDiv.classList.remove('hidden');
+
+        // Validate file size (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must be less than 5MB');
+            input.value = '';
+            processingDiv.classList.add('hidden');
+            return;
+        }
+
+        // Read and process image with optimized processing
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Use requestAnimationFrame for smoother processing
+                requestAnimationFrame(() => {
+                    // Set canvas dimensions
+                    const maxWidth = 400;
+                    const maxHeight = 200;
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Calculate optimal dimensions maintaining aspect ratio
+                    if (width > maxWidth || height > maxHeight) {
+                        const ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+
+                    // Set canvas size once
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: false });
+
+                    // Use image smoothing for better quality
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+
+                    // Draw image first
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Get image data for processing
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    const length = data.length;
+
+                    // First pass: identify content pixels and find bounding box
+                    const threshold = 240;
+                    let minX = width, minY = height, maxX = 0, maxY = 0;
+                    const contentPixels = [];
+                    
+                    // Find bounding box of actual content
+                    for (let i = 0; i < length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                        
+                        if (luminance < threshold) {
+                            const x = (i / 4) % width;
+                            const y = Math.floor((i / 4) / width);
+                            contentPixels.push({x, y, r, g, b, luminance, index: i});
+                            
+                            minX = Math.min(minX, x);
+                            minY = Math.min(minY, y);
+                            maxX = Math.max(maxX, x);
+                            maxY = Math.max(maxY, y);
+                        }
+                    }
+                    
+                    // Add padding around content
+                    const padding = 5;
+                    minX = Math.max(0, minX - padding);
+                    minY = Math.max(0, minY - padding);
+                    maxX = Math.min(width - 1, maxX + padding);
+                    maxY = Math.min(height - 1, maxY + padding);
+                    
+                    // Calculate new dimensions
+                    const newWidth = maxX - minX + 1;
+                    const newHeight = maxY - minY + 1;
+                    
+                    // Create new canvas with only content area
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    ctx.clearRect(0, 0, newWidth, newHeight);
+                    
+                    // Process and draw only content pixels
+                    const newImageData = ctx.createImageData(newWidth, newHeight);
+                    const newData = newImageData.data;
+                    
+                    // Process content pixels
+                    contentPixels.forEach(pixel => {
+                        const newX = pixel.x - minX;
+                        const newY = pixel.y - minY;
+                        
+                        if (newX >= 0 && newX < newWidth && newY >= 0 && newY < newHeight) {
+                            const newIndex = (newY * newWidth + newX) * 4;
+                            
+                            // Enhance contrast and make black
+                            const contrast = 1.5;
+                            const normalized = (pixel.luminance / 255) * contrast;
+                            const enhanced = Math.max(0, Math.min(255, (1 - normalized) * 255));
+                            
+                            newData[newIndex] = 0;       // R
+                            newData[newIndex + 1] = 0;   // G
+                            newData[newIndex + 2] = 0;   // B
+                            newData[newIndex + 3] = Math.round(enhanced); // A
+                        }
+                    });
+                    
+                    // Put processed data back
+                    ctx.putImageData(newImageData, 0, 0);
+
+                    // Show preview
+                    previewContainer.classList.add('hidden');
+                    canvas.classList.remove('hidden');
+                    confirmDiv.classList.remove('hidden');
+                    processingDiv.classList.add('hidden');
+
+                    // Store processed image as base64 for submission (use high quality)
+                    const processedData = canvas.toDataURL('image/png', 1.0);
+                    input.dataset.processedData = processedData;
+                });
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function processStamp(input) {
+        if (!input.files || !input.files[0]) {
+            return;
+        }
+
+        const file = input.files[0];
+        const fileName = document.getElementById('stamp-file-name');
+        const processingDiv = document.getElementById('stamp-processing');
+        const previewContainer = document.getElementById('stamp-preview-container');
+        const canvas = document.getElementById('stamp-canvas');
+        const confirmDiv = document.getElementById('stamp-confirm');
+
+        fileName.textContent = file.name;
+        processingDiv.classList.remove('hidden');
+
+        // Validate file size (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must be less than 5MB');
+            input.value = '';
+            processingDiv.classList.add('hidden');
+            return;
+        }
+
+        // Read and process image with optimized processing
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Use requestAnimationFrame for smoother processing
+                requestAnimationFrame(() => {
+                    // Set canvas dimensions
+                    const maxWidth = 400;
+                    const maxHeight = 200;
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Calculate optimal dimensions maintaining aspect ratio
+                    if (width > maxWidth || height > maxHeight) {
+                        const ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+
+                    // Set canvas size once
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: false });
+
+                    // Use image smoothing for better quality
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+
+                    // Draw image first
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Get image data for processing
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    const length = data.length;
+
+                    // First pass: identify content pixels and find bounding box
+                    const threshold = 240;
+                    let minX = width, minY = height, maxX = 0, maxY = 0;
+                    const contentPixels = [];
+                    
+                    // Find bounding box of actual content
+                    for (let i = 0; i < length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                        
+                        if (luminance < threshold) {
+                            const x = (i / 4) % width;
+                            const y = Math.floor((i / 4) / width);
+                            contentPixels.push({x, y, r, g, b, luminance, index: i});
+                            
+                            minX = Math.min(minX, x);
+                            minY = Math.min(minY, y);
+                            maxX = Math.max(maxX, x);
+                            maxY = Math.max(maxY, y);
+                        }
+                    }
+                    
+                    // Add padding around content
+                    const padding = 5;
+                    minX = Math.max(0, minX - padding);
+                    minY = Math.max(0, minY - padding);
+                    maxX = Math.min(width - 1, maxX + padding);
+                    maxY = Math.min(height - 1, maxY + padding);
+                    
+                    // Calculate new dimensions
+                    const newWidth = maxX - minX + 1;
+                    const newHeight = maxY - minY + 1;
+                    
+                    // Create new canvas with only content area
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    ctx.clearRect(0, 0, newWidth, newHeight);
+                    
+                    // Process and draw only content pixels
+                    const newImageData = ctx.createImageData(newWidth, newHeight);
+                    const newData = newImageData.data;
+                    
+                    // Process content pixels
+                    contentPixels.forEach(pixel => {
+                        const newX = pixel.x - minX;
+                        const newY = pixel.y - minY;
+                        
+                        if (newX >= 0 && newX < newWidth && newY >= 0 && newY < newHeight) {
+                            const newIndex = (newY * newWidth + newX) * 4;
+                            
+                            // Enhance contrast and make black
+                            const contrast = 1.5;
+                            const normalized = (pixel.luminance / 255) * contrast;
+                            const enhanced = Math.max(0, Math.min(255, (1 - normalized) * 255));
+                            
+                            newData[newIndex] = 0;       // R
+                            newData[newIndex + 1] = 0;   // G
+                            newData[newIndex + 2] = 0;   // B
+                            newData[newIndex + 3] = Math.round(enhanced); // A
+                        }
+                    });
+                    
+                    // Put processed data back
+                    ctx.putImageData(newImageData, 0, 0);
+
+                    // Show preview
+                    previewContainer.classList.add('hidden');
+                    canvas.classList.remove('hidden');
+                    confirmDiv.classList.remove('hidden');
+                    processingDiv.classList.add('hidden');
+
+                    // Store processed image as base64 for submission (use high quality)
+                    const processedData = canvas.toDataURL('image/png', 1.0);
+                    input.dataset.processedData = processedData;
+                });
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function prepareSignatureSubmission(event) {
+        const signatureInput = document.getElementById('signature');
+        if (signatureInput.files && signatureInput.files[0] && signatureInput.dataset.processedData) {
+            // Add processed data as hidden input
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'signature_processed';
+            hiddenInput.value = signatureInput.dataset.processedData;
+            event.target.appendChild(hiddenInput);
+        }
+
+        // Handle stamp processed data
+        const stampInput = document.getElementById('stamp');
+        if (stampInput.files && stampInput.files[0] && stampInput.dataset.processedData) {
+            // Add processed data as hidden input
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'stamp_processed';
+            hiddenInput.value = stampInput.dataset.processedData;
+            event.target.appendChild(hiddenInput);
+        }
+
+        return true;
+    }
+</script>
+{% endblock %}
+

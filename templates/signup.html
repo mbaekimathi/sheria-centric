@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <!-- Header Section with Orange Accent -->
+        <div class="bg-orange-500 px-8 pt-10 pb-8">
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
+                    <i class="fas fa-user-plus text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white mb-2">Employee Registration</h1>
+                <p class="text-orange-50 text-sm">Create your CASELY account</p>
+            </div>
+        </div>
+
+        <!-- Form Section -->
+        <div class="px-8 py-8">
+            <form method="POST" action="{{ url_for('signup') }}" enctype="multipart/form-data" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <!-- Full Name -->
+                    <div class="md:col-span-2">
+                        <label for="full_name" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Full Name <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="full_name" 
+                                name="full_name" 
+                                required
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="Enter your full name"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Phone Number -->
+                    <div>
+                        <label for="phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Phone Number <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-phone text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="tel" 
+                                id="phone_number" 
+                                name="phone_number" 
+                                required
+                                maxlength="13"
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="0712 345 678"
+                            >
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">Format: 07XX XXX XXX (Kenyan mobile number)</p>
+                    </div>
+
+                    <!-- Work Email -->
+                    <div>
+                        <label for="work_email" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Work Email <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-envelope text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="email" 
+                                id="work_email" 
+                                name="work_email" 
+                                required
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="your.email@company.com"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Employee Code -->
+                    <div>
+                        <label for="employee_code" class="block text-sm font-semibold text-gray-700 mb-2">
+                            6-Digit Employee Code <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-id-card text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="employee_code" 
+                                name="employee_code" 
+                                maxlength="6"
+                                pattern="[0-9]{6}"
+                                required
+                                class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="000000"
+                            >
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">Must be exactly 6 digits</p>
+                        <div id="employee_code_status" class="hidden text-xs mt-1.5 ml-1 font-medium"></div>
+                    </div>
+
+                    <!-- Password -->
+                    <div>
+                        <label for="password" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Password <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                required
+                                minlength="6"
+                                class="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="Minimum 6 characters (letters, numbers allowed)"
+                            >
+                            <button 
+                                type="button" 
+                                onclick="togglePassword('password')"
+                                class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <i id="password-icon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div>
+                        <label for="confirm_password" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Confirm Password <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input 
+                                type="password" 
+                                id="confirm_password" 
+                                name="confirm_password" 
+                                required
+                                minlength="6"
+                                class="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                                placeholder="Re-enter password"
+                            >
+                            <button 
+                                type="button" 
+                                onclick="togglePassword('confirm_password')"
+                                class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <i id="confirm_password-icon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div id="password-match" class="hidden text-xs mt-1.5 ml-1 font-medium"></div>
+                    </div>
+
+                    <!-- Profile Picture Upload -->
+                    <div class="md:col-span-2">
+                        <label for="profile_picture" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Profile Picture
+                        </label>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="file" 
+                                    id="profile_picture" 
+                                    name="profile_picture" 
+                                    accept="image/*"
+                                    class="hidden"
+                                    onchange="previewImage(this)"
+                                >
+                                <label 
+                                    for="profile_picture" 
+                                    class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-sm text-gray-600"
+                                >
+                                    <i class="fas fa-upload mr-2"></i>
+                                    <span id="file-name">Choose file or drag and drop</span>
+                                </label>
+                            </div>
+                            <div id="image-preview" class="hidden">
+                                <img id="preview-img" src="" alt="Preview" class="w-16 h-16 rounded-lg object-cover border-2 border-green-500 shadow-sm">
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">PNG, JPG, JPEG, GIF up to 16MB</p>
+                    </div>
+                </div>
+
+                <!-- Terms and Conditions -->
+                <div class="flex items-start pt-2">
+                    <input 
+                        type="checkbox" 
+                        id="terms_accepted" 
+                        name="terms_accepted" 
+                        required
+                        class="mt-1 mr-3 w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                    >
+                    <label for="terms_accepted" class="text-sm text-gray-700 leading-relaxed">
+                        I accept the <a href="#" class="text-green-600 hover:text-green-700 font-semibold underline">Terms and Conditions</a> 
+                        and <a href="#" class="text-green-600 hover:text-green-700 font-semibold underline">Privacy Policy</a> <span class="text-red-500">*</span>
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit"
+                    class="w-full py-3.5 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
+                >
+                    <i class="fas fa-user-plus mr-2"></i>Create Account
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-200"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-4 bg-white text-gray-500">Already have an account?</span>
+                </div>
+            </div>
+
+            <!-- Login Link -->
+            <div class="text-center">
+                <a href="{{ url_for('login') }}" class="inline-flex items-center text-sm font-medium text-green-600 hover:text-green-700 transition-colors">
+                    Sign in to your account
+                    <i class="fas fa-arrow-right ml-2 text-xs"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(inputId + '-icon');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    function previewImage(input) {
+        const file = input.files[0];
+        const fileName = document.getElementById('file-name');
+        const preview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-img');
+        
+        if (file) {
+            fileName.textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                preview.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        } else {
+            fileName.textContent = 'Choose file or drag and drop';
+            preview.classList.add('hidden');
+        }
+    }
+
+    // Password match validation
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        const password = document.getElementById('password').value;
+        const confirmPassword = this.value;
+        const matchDiv = document.getElementById('password-match');
+        
+        if (confirmPassword) {
+            matchDiv.classList.remove('hidden');
+            if (password === confirmPassword) {
+                matchDiv.textContent = '✓ Passwords match';
+                matchDiv.className = 'text-xs mt-1.5 ml-1 font-medium text-green-600';
+            } else {
+                matchDiv.textContent = '✗ Passwords do not match';
+                matchDiv.className = 'text-xs mt-1.5 ml-1 font-medium text-red-600';
+            }
+        } else {
+            matchDiv.classList.add('hidden');
+        }
+    });
+
+    // Auto-format employee code input (numbers only, uppercase) and check availability
+    let employeeCodeCheckTimeout;
+    const employeeCodeInput = document.getElementById('employee_code');
+    const employeeCodeStatus = document.getElementById('employee_code_status');
+    
+    employeeCodeInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '').toUpperCase();
+        
+        // Clear previous timeout
+        clearTimeout(employeeCodeCheckTimeout);
+        
+        // Hide status and reset border if less than 6 digits
+        if (this.value.length < 6) {
+            employeeCodeStatus.classList.add('hidden');
+            employeeCodeInput.classList.remove('border-red-500', 'border-green-500');
+            return;
+        }
+        
+        // Check availability when exactly 6 digits are entered (with small delay for debouncing)
+        if (this.value.length === 6) {
+            employeeCodeStatus.classList.remove('hidden');
+            employeeCodeStatus.textContent = 'Checking...';
+            employeeCodeStatus.className = 'text-xs mt-1.5 ml-1 font-medium text-gray-600';
+            employeeCodeInput.classList.remove('border-red-500', 'border-green-500');
+            
+            // Debounce the API call (300ms delay to avoid too many requests)
+            employeeCodeCheckTimeout = setTimeout(() => {
+                checkEmployeeCodeAvailability(this.value);
+            }, 300);
+        }
+    });
+    
+    function checkEmployeeCodeAvailability(employeeCode) {
+        fetch('/check_employee_code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ employee_code: employeeCode })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.available) {
+                employeeCodeStatus.textContent = '✓ ' + data.message;
+                employeeCodeStatus.className = 'text-xs mt-1.5 ml-1 font-medium text-green-600';
+                employeeCodeInput.classList.remove('border-red-500');
+                employeeCodeInput.classList.add('border-green-500');
+            } else {
+                employeeCodeStatus.textContent = '✗ ' + data.message;
+                employeeCodeStatus.className = 'text-xs mt-1.5 ml-1 font-medium text-red-600';
+                employeeCodeInput.classList.remove('border-green-500');
+                employeeCodeInput.classList.add('border-red-500');
+            }
+        })
+        .catch(error => {
+            console.error('Error checking employee code:', error);
+            employeeCodeStatus.textContent = '✗ Error checking availability';
+            employeeCodeStatus.className = 'text-xs mt-1.5 ml-1 font-medium text-red-600';
+        });
+    }
+
+    // Auto-format full name to uppercase
+    document.getElementById('full_name').addEventListener('input', function(e) {
+        const cursorPosition = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        // Restore cursor position (length doesn't change with case transformation)
+        this.setSelectionRange(cursorPosition, cursorPosition);
+    });
+
+    // Auto-format phone number with Kenyan formatting: 07XX XXX XXX
+    document.getElementById('phone_number').addEventListener('input', function(e) {
+        // Get cursor position before formatting
+        const cursorPosition = this.selectionStart;
+        const oldValue = this.value;
+        
+        // Remove all non-digit characters
+        let digits = this.value.replace(/\D/g, '');
+        
+        // Limit to 10 digits (Kenyan mobile: 07XX XXX XXX)
+        if (digits.length > 10) {
+            digits = digits.substring(0, 10);
+        }
+        
+        // Format as 07XX XXX XXX
+        let formattedValue = '';
+        if (digits.length === 0) {
+            formattedValue = '';
+        } else if (digits.length <= 4) {
+            formattedValue = digits;
+        } else if (digits.length <= 7) {
+            formattedValue = digits.substring(0, 4) + ' ' + digits.substring(4);
+        } else {
+            formattedValue = digits.substring(0, 4) + ' ' + digits.substring(4, 7) + ' ' + digits.substring(7, 10);
+        }
+        
+        // Calculate new cursor position
+        const digitsBeforeCursor = oldValue.substring(0, cursorPosition).replace(/\D/g, '').length;
+        let newCursorPosition = formattedValue.length;
+        
+        if (digitsBeforeCursor > 0) {
+            if (digitsBeforeCursor <= 4) {
+                newCursorPosition = digitsBeforeCursor; // No space yet
+            } else if (digitsBeforeCursor <= 7) {
+                newCursorPosition = digitsBeforeCursor + 1; // After first space
+            } else {
+                newCursorPosition = digitsBeforeCursor + 2; // After both spaces
+            }
+        }
+        
+        this.value = formattedValue;
+        
+        // Restore cursor position
+        this.setSelectionRange(newCursorPosition, newCursorPosition);
+    });
+
+    // Auto-format email to lowercase
+    document.getElementById('work_email').addEventListener('input', function(e) {
+        const cursorPosition = this.selectionStart;
+        this.value = this.value.toLowerCase();
+        // Restore cursor position (length doesn't change with case transformation)
+        this.setSelectionRange(cursorPosition, cursorPosition);
+    });
+</script>
+{% endblock %}

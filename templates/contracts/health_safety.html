@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Health & Safety Declaration - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg p-8 mb-6 text-white">
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
+                <i class="fas fa-heartbeat text-white text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold mb-2">Health & Safety Declaration</h1>
+            <p class="text-blue-100">{{ company_settings.company_name }}</p>
+        </div>
+    </div>
+
+    <!-- Contract Content -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <div class="prose prose-lg max-w-none">
+            <!-- Introduction -->
+            <div class="mb-8">
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    This <strong>Health & Safety Declaration</strong> ("Declaration") establishes the commitment of 
+                    <strong>{{ company_settings.company_name }}</strong> and its employees to maintain a safe and healthy 
+                    work environment. This Declaration reflects our shared responsibility for workplace safety and well-being.
+                </p>
+                <p class="text-gray-700 leading-relaxed">
+                    All employees are expected to read, understand, and comply with this Declaration. Your safety and 
+                    well-being are our top priorities.
+                </p>
+            </div>
+
+            <!-- Section 1 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">1</span>
+                    Company Commitment
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    {{ company_settings.company_name }} is committed to:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Safe Work Environment:</strong> Providing a safe and healthy workplace free from recognized hazards</li>
+                    <li><strong>Safety Training:</strong> Providing appropriate safety training and resources to all employees</li>
+                    <li><strong>Equipment Safety:</strong> Maintaining safe equipment and facilities</li>
+                    <li><strong>Emergency Preparedness:</strong> Establishing and maintaining emergency response procedures</li>
+                    <li><strong>Compliance:</strong> Complying with all applicable health and safety laws and regulations</li>
+                    <li><strong>Continuous Improvement:</strong> Regularly reviewing and improving safety policies and procedures</li>
+                </ul>
+            </div>
+
+            <!-- Section 2 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">2</span>
+                    Employee Responsibilities
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    All employees are responsible for:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Following Safety Procedures:</strong> Adhering to all safety policies, procedures, and instructions</li>
+                    <li><strong>Using Safety Equipment:</strong> Using provided safety equipment and personal protective equipment (PPE) as required</li>
+                    <li><strong>Reporting Hazards:</strong> Immediately reporting any unsafe conditions, hazards, or incidents to management</li>
+                    <li><strong>No Unsafe Acts:</strong> Not engaging in any activity that could endanger themselves or others</li>
+                    <li><strong>Participating in Training:</strong> Attending required safety training sessions and staying informed about safety matters</li>
+                    <li><strong>Maintaining Cleanliness:</strong> Keeping work areas clean, organized, and free from hazards</li>
+                </ul>
+            </div>
+
+            <!-- Section 3 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">3</span>
+                    Workplace Hazards
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    Employees must be aware of and report:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Physical Hazards:</strong> Slippery floors, exposed wires, damaged equipment, or unsafe structures</li>
+                    <li><strong>Ergonomic Issues:</strong> Improper workstation setup, repetitive motion risks, or lifting hazards</li>
+                    <li><strong>Chemical Hazards:</strong> Improperly stored or labeled chemicals, spills, or exposure risks</li>
+                    <li><strong>Fire Hazards:</strong> Blocked exits, faulty electrical equipment, or improper storage of flammable materials</li>
+                    <li><strong>Health Risks:</strong> Poor air quality, excessive noise, or other environmental health concerns</li>
+                </ul>
+            </div>
+
+            <!-- Section 4 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">4</span>
+                    Emergency Procedures
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    All employees must:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Know Emergency Exits:</strong> Be familiar with all emergency exits and evacuation routes</li>
+                    <li><strong>Understand Alarm Systems:</strong> Know how to recognize and respond to fire alarms and other emergency signals</li>
+                    <li><strong>First Aid:</strong> Know the location of first aid kits and how to contact emergency services</li>
+                    <li><strong>Evacuation Procedures:</strong> Follow established evacuation procedures in case of emergency</li>
+                    <li><strong>Emergency Contacts:</strong> Know how to contact emergency services and company emergency contacts</li>
+                </ul>
+            </div>
+
+            <!-- Section 5 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">5</span>
+                    Health & Wellness
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    The company supports employee health and wellness through:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Ergonomic Support:</strong> Providing ergonomic assessments and equipment to prevent workplace injuries</li>
+                    <li><strong>Mental Health:</strong> Supporting mental health and providing resources for stress management</li>
+                    <li><strong>Work-Life Balance:</strong> Encouraging healthy work-life balance and reasonable working hours</li>
+                    <li><strong>Health Resources:</strong> Providing access to health information and wellness programs</li>
+                    <li><strong>Accommodations:</strong> Providing reasonable accommodations for employees with health conditions or disabilities</li>
+                </ul>
+            </div>
+
+            <!-- Section 6 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">6</span>
+                    Incident Reporting
+                </h2>
+                <p class="text-gray-700 leading-relaxed mb-4">
+                    All employees must:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Report Immediately:</strong> Report all accidents, injuries, or near-misses immediately to management</li>
+                    <li><strong>Document Incidents:</strong> Complete incident reports accurately and completely</li>
+                    <li><strong>Seek Medical Attention:</strong> Seek appropriate medical attention for any work-related injury or illness</li>
+                    <li><strong>Cooperate with Investigations:</strong> Cooperate fully with any investigation of safety incidents</li>
+                    <li><strong>No Retaliation:</strong> Understand that reporting safety concerns will not result in retaliation</li>
+                </ul>
+            </div>
+
+            <!-- Section 7 -->
+            <div class="mb-8 border-l-4 border-blue-500 pl-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+                    <span class="bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">7</span>
+                    Acknowledgment
+                </h2>
+                <p class="text-gray-700 leading-relaxed">
+                    By accepting this Declaration, I acknowledge that:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 mt-2">
+                    <li>I have read and understood this Health & Safety Declaration</li>
+                    <li>I understand my responsibilities for workplace safety</li>
+                    <li>I will follow all safety procedures and report hazards promptly</li>
+                    <li>I will participate in safety training and comply with safety requirements</li>
+                    <li>I understand that safety is a shared responsibility</li>
+                </ul>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-12 pt-8 border-t border-gray-200">
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Effective Date:</strong> Upon acceptance during onboarding
+                    </p>
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Company:</strong> {{ company_settings.company_name }}
+                    </p>
+                    <p class="text-sm text-gray-600 mb-2">
+                        <strong>Emergency Contact:</strong> Contact HR or management immediately for any safety concerns
+                    </p>
+                    <p class="text-sm text-gray-600">
+                        <strong>Review Period:</strong> This Declaration is reviewed regularly and updated as needed to ensure continued safety.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center">
+        <a href="{{ url_for('onboarding') }}" class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Onboarding
+        </a>
+    </div>
+</div>
+{% endblock %}
+

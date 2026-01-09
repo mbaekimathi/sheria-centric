@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Onboarding & Approvals - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-user-check text-green-600 mr-3"></i>
+                    Onboarding & Approvals
+                </h1>
+                <p class="text-gray-600">Manage new employee onboarding and approval processes</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Approval Employees Content -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-user-check text-green-600 mr-3"></i>
+                Pending Approval Employees
+            </h2>
+            <span id="pending-count" class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
+                Loading...
+            </span>
+        </div>
+        
+        <div id="approval-list" class="space-y-4">
+            <div class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4"></i>
+                <p class="text-gray-500">Loading employees...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function loadPendingApprovals() {
+        fetch('{{ url_for("get_pending_approvals") }}')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('approval-list');
+                const countSpan = document.getElementById('pending-count');
+                
+                countSpan.textContent = `${data.count || 0} Pending`;
+                
+                if (data.employees && data.employees.length > 0) {
+                    container.innerHTML = data.employees.map(emp => `
+                        <div class="bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-green-300 transition-all">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center text-white text-xl font-bold">
+                                        ${emp.full_name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-gray-900">${emp.full_name}</h3>
+                                        <p class="text-sm text-gray-600">${emp.work_email}</p>
+                                        <p class="text-xs text-gray-500 mt-1">Code: ${emp.employee_code} | Phone: ${emp.phone_number}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <button onclick="approveEmployee(${emp.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                                        <i class="fas fa-check mr-2"></i>Approve
+                                    </button>
+                                    <button onclick="rejectEmployee(${emp.id})" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                                        <i class="fas fa-times mr-2"></i>Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div class="text-center py-12">
+                            <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
+                            <p class="text-gray-600 text-lg">No pending approvals</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading pending approvals:', error);
+                document.getElementById('approval-list').innerHTML = `
+                    <div class="text-center py-12 text-red-600">
+                        <i class="fas fa-exclamation-circle text-3xl mb-4"></i>
+                        <p>Error loading employees</p>
+                    </div>
+                `;
+            });
+    }
+    
+    function approveEmployee(id) {
+        if (confirm('Are you sure you want to approve this employee?')) {
+            fetch(`{{ url_for('update_employee_status') }}?id=${id}&status=Active`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadPendingApprovals();
+                } else {
+                    alert(data.message || 'Error approving employee');
+                }
+            });
+        }
+    }
+    
+    function rejectEmployee(id) {
+        if (confirm('Are you sure you want to reject this employee? This will delete their account.')) {
+            deleteEmployee(id, 'this employee');
+        }
+    }
+    
+    function deleteEmployee(id, name) {
+        if (confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
+            fetch(`{{ url_for('delete_employee') }}?id=${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadPendingApprovals();
+                } else {
+                    alert(data.message || 'Error deleting employee');
+                }
+            });
+        }
+    }
+    
+    // Load initial data
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPendingApprovals();
+    });
+</script>
+{% endblock %}

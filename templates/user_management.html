@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - CASELY{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-users text-indigo-600 mr-3"></i>
+                    User Management
+                </h1>
+                <p class="text-gray-600">Manage employees, roles, and permissions</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Placeholder -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+        <div class="max-w-md mx-auto">
+            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-users text-white text-4xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">User Management</h2>
+            <p class="text-gray-600 mb-6">Access all user management features from the sidebar:</p>
+            <ul class="text-left text-gray-600 space-y-2 mb-6">
+                <li class="flex items-center">
+                    <i class="fas fa-user-tie text-green-600 mr-2"></i>
+                    HR Management
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-shield-alt text-orange-600 mr-2"></i>
+                    Roles & Permissions
+                </li>
+                <li class="flex items-center">
+                    <i class="fas fa-user-friends text-blue-600 mr-2"></i>
+                    Client Management
+                </li>
+            </ul>
+            <p class="text-sm text-gray-500 italic">Use the sidebar to navigate between management sections</p>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="mt-6">
+        <a href="{{ url_for('dashboard') }}" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 shadow-lg hover:shadow-xl">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}
+

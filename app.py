@@ -64,7 +64,7 @@ def get_db_config():
     
     # If all DB environment variables are set, use them
     if db_user and db_password and db_name:
-        print(f"✓ Using database configuration from environment variables")
+        print("[OK] Using database configuration from environment variables")
         return {
             'host': db_host,
             'user': db_user,
@@ -77,7 +77,7 @@ def get_db_config():
     # Note: For security, prefer using individual DB_* environment variables
     if os.environ.get('DB_ENV') == 'cpanel':
         # Use environment variables for cPanel credentials
-        print("✓ Using cPanel database configuration (from DB_ENV)")
+        print("[OK] Using cPanel database configuration (from DB_ENV)")
         return {
             'host': os.environ.get('DB_HOST', 'localhost'),
             'user': os.environ.get('DB_USER', ''),
@@ -87,7 +87,7 @@ def get_db_config():
         }
     
     if os.environ.get('DB_ENV') == 'local':
-        print("✓ Using local database configuration (from DB_ENV)")
+        print("[OK] Using local database configuration (from DB_ENV)")
         return {
             'host': os.environ.get('DB_HOST', 'localhost'),
             'user': os.environ.get('DB_USER', 'root'),
@@ -98,7 +98,9 @@ def get_db_config():
     
     # Method 3: Try to detect by testing local connection (development only)
     # This is a fallback for local development when env vars are not set
-    if os.environ.get('FLASK_ENV') == 'development':
+    # Only use this if FLASK_ENV is development or not set (assumes local dev)
+    flask_env = os.environ.get('FLASK_ENV', '').lower()
+    if flask_env in ('development', '') or flask_env == '':
         try:
             test_connection = pymysql.connect(
                 host='localhost',
@@ -108,7 +110,7 @@ def get_db_config():
                 charset='utf8mb4'
             )
             test_connection.close()
-            print("✓ Using local database configuration (auto-detected for development)")
+            print("[OK] Using local database configuration (auto-detected for development)")
             return {
                 'host': 'localhost',
                 'user': 'root',
@@ -116,10 +118,26 @@ def get_db_config():
                 'database': 'casely_db',
                 'charset': 'utf8mb4'
             }
-        except:
-            pass
+        except Exception as e:
+            # If local connection fails, check if we're in production
+            if flask_env == 'production':
+                # In production, we must have environment variables
+                raise ValueError(
+                    "Database configuration not found. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME "
+                    "environment variables, or set DB_ENV=local/cpanel with appropriate DB_* variables."
+                )
+            # For development, still try local config even if connection test fails
+            print("[WARNING] Local database connection test failed, but using local config for development")
+            print(f"   Error: {e}")
+            return {
+                'host': 'localhost',
+                'user': 'root',
+                'password': '',
+                'database': 'casely_db',
+                'charset': 'utf8mb4'
+            }
     
-    # If no configuration found, raise an error
+    # If no configuration found and not in development, raise an error
     raise ValueError(
         "Database configuration not found. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME "
         "environment variables, or set DB_ENV=local/cpanel with appropriate DB_* variables."

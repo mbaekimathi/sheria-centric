@@ -32,8 +32,12 @@ instance/
 *.sqlite
 *.sqlite3
 
-# Uploads
-static/uploads/
+# Uploads - ignore files but keep directory structure
+static/uploads/*
+!static/uploads/.gitkeep
+!static/uploads/*/
+static/uploads/*/*
+!static/uploads/profile_pictures/.gitkeep
 
 # IDE
 .vscode/

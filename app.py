@@ -115,10 +115,23 @@ def get_db_config():
             'charset': 'utf8mb4'
         }
     
-    # Method 3: Try to detect by testing local connection (development only)
+    # Method 3: Check FLASK_ENV to determine default behavior
+    flask_env = os.environ.get('FLASK_ENV', '').lower()
+    
+    # If in production mode, default to cPanel configuration
+    if flask_env == 'production':
+        print("[OK] Using cPanel database configuration (production mode default)")
+        return {
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
+            'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
+            'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
+            'charset': 'utf8mb4'
+        }
+    
+    # Method 4: Try to detect by testing local connection (development only)
     # This is a fallback for local development when env vars are not set
     # Only use this if FLASK_ENV is development or not set (assumes local dev)
-    flask_env = os.environ.get('FLASK_ENV', '').lower()
     if flask_env in ('development', '') or flask_env == '':
         try:
             test_connection = pymysql.connect(
@@ -138,13 +151,6 @@ def get_db_config():
                 'charset': 'utf8mb4'
             }
         except Exception as e:
-            # If local connection fails, check if we're in production
-            if flask_env == 'production':
-                # In production, we must have environment variables
-                raise ValueError(
-                    "Database configuration not found. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME "
-                    "environment variables, or set DB_ENV=local/cpanel with appropriate DB_* variables."
-                )
             # For development, still try local config even if connection test fails
             print("[WARNING] Local database connection test failed, but using local config for development")
             print(f"   Error: {e}")
@@ -156,10 +162,10 @@ def get_db_config():
                 'charset': 'utf8mb4'
             }
     
-    # If no configuration found and not in development, raise an error
+    # If no configuration found, raise an error
     raise ValueError(
         "Database configuration not found. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME "
-        "environment variables, or set DB_ENV=local/cpanel with appropriate DB_* variables."
+        "environment variables, or set DB_ENV=local/cpanel or FLASK_ENV=production/development."
     )
 
 # Initialize DB_CONFIG
@@ -503,7 +509,7 @@ def create_employees_table():
                         try:
                             cursor.execute(f"ALTER TABLE employees ADD COLUMN {column_name} {column_def}")
                             connection.commit()
-                            print(f"✓ Added column '{column_name}' to employees table")
+                            print(f"[OK] Added column '{column_name}' to employees table")
                         except Exception as e:
                             print(f"[WARNING] Could not add column '{column_name}': {e}")
                 
@@ -626,7 +632,7 @@ def create_clients_table():
                     try:
                         cursor.execute("ALTER TABLE clients ADD COLUMN post_office_address TEXT")
                         connection.commit()
-                        print("✓ Added post_office_address column to clients table")
+                        print("[OK] Added post_office_address column to clients table")
                     except Exception as e:
                         print(f"[WARNING] Could not add post_office_address column: {e}")
             return True
@@ -1057,7 +1063,7 @@ def apply_migrations(current_version):
                         try:
                             cursor.execute(f"ALTER TABLE employees ADD COLUMN {column_name} {column_def}")
                             connection.commit()
-                            print(f"✓ Added column '{column_name}' to employees table")
+                            print(f"[OK] Added column '{column_name}' to employees table")
                         except Exception as e:
                             print(f"[WARNING] Could not add column '{column_name}': {e}")
                 
@@ -1197,7 +1203,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created case_parties table")
+                    print("[OK] Created case_parties table")
                 
                 migrations_applied = True
             
@@ -1269,7 +1275,7 @@ def apply_migrations(current_version):
                     connection.commit()
                     print("[OK] Added outcome_details column to case_proceedings table")
                 else:
-                    print("✓ outcome_details column already exists")
+                    print("[OK] outcome_details column already exists")
                 
                 migrations_applied = True
             
@@ -1317,7 +1323,7 @@ def apply_migrations(current_version):
                         ADD FOREIGN KEY (previous_proceeding_id) REFERENCES case_proceedings(id) ON DELETE SET NULL
                     """)
                     connection.commit()
-                    print("✓ Added previous_proceeding_id column to case_proceedings table")
+                    print("[OK] Added previous_proceeding_id column to case_proceedings table")
                 else:
                     print("[OK] previous_proceeding_id column already exists")
                 
@@ -1379,7 +1385,7 @@ def init_database():
     
     # Step 2: Create schema version table
     if not create_schema_version_table():
-        print("✗ Failed to create schema_version table")
+        print("[ERROR] Failed to create schema_version table")
         return False
     
     # Step 3: Create company_settings table
@@ -1399,7 +1405,7 @@ def init_database():
     
     # Step 6: Create case management tables
     if not create_case_tables():
-        print("✗ Failed to create/update case management tables")
+        print("[ERROR] Failed to create/update case management tables")
         return False
     
     # Step 7: Create matters table
@@ -1420,7 +1426,7 @@ def init_database():
     if current_version < SCHEMA_VERSION:
         print("Schema updates detected. Applying migrations...")
         if not apply_migrations(current_version):
-            print("✗ Failed to apply migrations")
+            print("[ERROR] Failed to apply migrations")
             return False
     elif current_version == SCHEMA_VERSION:
         print("[OK] Database schema is up to date")

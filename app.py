@@ -52,7 +52,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Set OAUTHLIB_INSECURE_TRANSPORT=1 in .env for local development only
 if os.environ.get('FLASK_ENV') == 'development' or os.environ.get('OAUTHLIB_INSECURE_TRANSPORT') == '1':
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    print("⚠ WARNING: OAuth insecure transport enabled (development mode only)")
+    print("WARNING: OAuth insecure transport enabled (development mode only)")
 
 # Google OAuth Configuration from environment variables
 # IMPORTANT: Set these in .env file - never commit secrets to git
@@ -258,7 +258,7 @@ def create_database():
         with connection.cursor() as cursor:
             cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
             connection.commit()
-            print(f"✓ Database '{DB_CONFIG['database']}' checked/created")
+            print(f"[OK] Database '{DB_CONFIG['database']}' checked/created")
             return True
     except Exception as e:
         print(f"Error creating database: {e}")
@@ -366,7 +366,7 @@ def create_schema_version_table():
                 )
             """)
             connection.commit()
-            print("✓ Schema version table checked/created")
+            print("[OK] Schema version table checked/created")
             return True
     except Exception as e:
         print(f"Error creating schema_version table: {e}")
@@ -401,7 +401,7 @@ def create_company_settings_table():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Company settings table created")
+                print("[OK] Company settings table created")
                 
                 # Insert default company settings
                 cursor.execute("""
@@ -410,9 +410,9 @@ def create_company_settings_table():
                     VALUES ('BAUNI LAW GROUP', NULL, NULL, NULL, NULL)
                 """)
                 connection.commit()
-                print("✓ Default company settings inserted")
+                print("[OK] Default company settings inserted")
             else:
-                print("✓ Company settings table already exists")
+                print("[OK] Company settings table already exists")
                 # Check and add missing columns
                 columns_to_check = [
                     ('company_name', "VARCHAR(255) NOT NULL DEFAULT 'BAUNI LAW GROUP'"),
@@ -442,9 +442,9 @@ def create_company_settings_table():
                         try:
                             cursor.execute(f"ALTER TABLE company_settings ADD COLUMN {column_name} {column_def}")
                             connection.commit()
-                            print(f"✓ Added column '{column_name}' to company_settings table")
+                            print(f"[OK] Added column '{column_name}' to company_settings table")
                         except Exception as e:
-                            print(f"⚠ Could not add column '{column_name}': {e}")
+                            print(f"[WARNING] Could not add column '{column_name}': {e}")
             
             return True
     except Exception as e:
@@ -480,9 +480,9 @@ def create_employees_table():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Employees table created")
+                print("[OK] Employees table created")
             else:
-                print("✓ Employees table already exists")
+                print("[OK] Employees table already exists")
                 # Check and add missing columns (excluding company_name)
                 columns_to_check = [
                     ('full_name', 'VARCHAR(255) NOT NULL'),
@@ -504,7 +504,7 @@ def create_employees_table():
                             connection.commit()
                             print(f"✓ Added column '{column_name}' to employees table")
                         except Exception as e:
-                            print(f"⚠ Could not add column '{column_name}': {e}")
+                            print(f"[WARNING] Could not add column '{column_name}': {e}")
                 
                 # Add onboarding columns if they don't exist
                 onboarding_columns = [
@@ -535,9 +535,9 @@ def create_employees_table():
                         try:
                             cursor.execute(f"ALTER TABLE employees ADD COLUMN {column_name} {column_def}")
                             connection.commit()
-                            print(f"✓ Added onboarding column '{column_name}' to employees table")
+                            print(f"[OK] Added onboarding column '{column_name}' to employees table")
                         except Exception as e:
-                            print(f"⚠ Could not add column '{column_name}': {e}")
+                            print(f"[WARNING] Could not add column '{column_name}': {e}")
             
             return True
     except Exception as e:
@@ -570,17 +570,17 @@ def create_clients_table():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Clients table created")
+                print("[OK] Clients table created")
             else:
-                print("✓ Clients table already exists")
+                print("[OK] Clients table already exists")
                 # Check and add phone_number column if it doesn't exist
                 if not column_exists('clients', 'phone_number'):
                     try:
                         cursor.execute("ALTER TABLE clients ADD COLUMN phone_number VARCHAR(20)")
                         connection.commit()
-                        print("✓ Added phone_number column to clients table")
+                        print("[OK] Added phone_number column to clients table")
                     except Exception as e:
-                        print(f"⚠ Could not add phone_number column: {e}")
+                        print(f"[WARNING] Could not add phone_number column: {e}")
                 
                 # Update client_type ENUM to include 'Pending' if needed
                 try:
@@ -589,37 +589,37 @@ def create_clients_table():
                         MODIFY COLUMN client_type ENUM('Pending', 'Individual', 'Corporate') DEFAULT 'Pending'
                     """)
                     connection.commit()
-                    print("✓ Updated client_type ENUM to include 'Pending'")
+                    print("[OK] Updated client_type ENUM to include 'Pending'")
                 except Exception as e:
                     # If error, try to check if 'Pending' already exists
                     if 'Duplicate' not in str(e) and 'already exists' not in str(e).lower():
-                        print(f"⚠ Could not update client_type ENUM: {e}")
+                        print(f"[WARNING] Could not update client_type ENUM: {e}")
                 
                 # Add columns for Individual client requirements (ID front and back)
                 if not column_exists('clients', 'id_front'):
                     try:
                         cursor.execute("ALTER TABLE clients ADD COLUMN id_front VARCHAR(500)")
                         connection.commit()
-                        print("✓ Added id_front column to clients table")
+                        print("[OK] Added id_front column to clients table")
                     except Exception as e:
-                        print(f"⚠ Could not add id_front column: {e}")
+                        print(f"[WARNING] Could not add id_front column: {e}")
                 
                 if not column_exists('clients', 'id_back'):
                     try:
                         cursor.execute("ALTER TABLE clients ADD COLUMN id_back VARCHAR(500)")
                         connection.commit()
-                        print("✓ Added id_back column to clients table")
+                        print("[OK] Added id_back column to clients table")
                     except Exception as e:
-                        print(f"⚠ Could not add id_back column: {e}")
+                        print(f"[WARNING] Could not add id_back column: {e}")
                 
                 # Add columns for Corporate client requirements (CR-12 and post office address)
                 if not column_exists('clients', 'cr12_certificate'):
                     try:
                         cursor.execute("ALTER TABLE clients ADD COLUMN cr12_certificate VARCHAR(500)")
                         connection.commit()
-                        print("✓ Added cr12_certificate column to clients table")
+                        print("[OK] Added cr12_certificate column to clients table")
                     except Exception as e:
-                        print(f"⚠ Could not add cr12_certificate column: {e}")
+                        print(f"[WARNING] Could not add cr12_certificate column: {e}")
                 
                 if not column_exists('clients', 'post_office_address'):
                     try:
@@ -627,7 +627,7 @@ def create_clients_table():
                         connection.commit()
                         print("✓ Added post_office_address column to clients table")
                     except Exception as e:
-                        print(f"⚠ Could not add post_office_address column: {e}")
+                        print(f"[WARNING] Could not add post_office_address column: {e}")
             return True
     except Exception as e:
         print(f"Error creating/updating clients table: {e}")
@@ -654,9 +654,9 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Case types table created")
+                print("[OK] Case types table created")
             else:
-                print("✓ Case types table already exists")
+                print("[OK] Case types table already exists")
             
             # Create case_categories table
             if not table_exists('case_categories'):
@@ -669,9 +669,9 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Case categories table created")
+                print("[OK] Case categories table created")
             else:
-                print("✓ Case categories table already exists")
+                print("[OK] Case categories table already exists")
             
             # Create stations table
             if not table_exists('stations'):
@@ -684,9 +684,9 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Stations table created")
+                print("[OK] Stations table created")
             else:
-                print("✓ Stations table already exists")
+                print("[OK] Stations table already exists")
             
             # Create cases table
             if not table_exists('cases'):
@@ -720,9 +720,9 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Cases table created")
+                print("[OK] Cases table created")
             else:
-                print("✓ Cases table already exists")
+                print("[OK] Cases table already exists")
             
             # Create case_parties table
             if not table_exists('case_parties'):
@@ -741,9 +741,9 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Case parties table created")
+                print("[OK] Case parties table created")
             else:
-                print("✓ Case parties table already exists")
+                print("[OK] Case parties table already exists")
             
             # Create case_proceedings table
             if not table_exists('case_proceedings'):
@@ -767,9 +767,9 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Case proceedings table created")
+                print("[OK] Case proceedings table created")
             else:
-                print("✓ Case proceedings table already exists")
+                print("[OK] Case proceedings table already exists")
             
             # Create case_proceeding_materials table
             if not table_exists('case_proceeding_materials'):
@@ -790,26 +790,26 @@ def create_case_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Case proceeding materials table created")
+                print("[OK] Case proceeding materials table created")
             else:
-                print("✓ Case proceeding materials table already exists")
+                print("[OK] Case proceeding materials table already exists")
             
             # Check and add missing columns to cases table
             if not column_exists('cases', 'tracking_number'):
                 try:
                     cursor.execute("ALTER TABLE cases ADD COLUMN tracking_number VARCHAR(50) UNIQUE AFTER id")
                     connection.commit()
-                    print("✓ Added tracking_number column to cases table")
+                    print("[OK] Added tracking_number column to cases table")
                 except Exception as e:
-                    print(f"⚠ Could not add tracking_number column: {e}")
+                    print(f"[WARNING] Could not add tracking_number column: {e}")
             
             if not column_exists('cases', 'court_case_number'):
                 try:
                     cursor.execute("ALTER TABLE cases ADD COLUMN court_case_number VARCHAR(255) AFTER tracking_number")
                     connection.commit()
-                    print("✓ Added court_case_number column to cases table")
+                    print("[OK] Added court_case_number column to cases table")
                 except Exception as e:
-                    print(f"⚠ Could not add court_case_number column: {e}")
+                    print(f"[WARNING] Could not add court_case_number column: {e}")
             
             # Update status ENUM
             try:
@@ -818,9 +818,9 @@ def create_case_tables():
                     MODIFY COLUMN status ENUM('Active', 'Closed', 'Archived', 'Mediations', 'Pending', 'Consolidated', 'Pending Approval') DEFAULT 'Pending Approval'
                 """)
                 connection.commit()
-                print("✓ Updated cases status ENUM")
+                print("[OK] Updated cases status ENUM")
             except Exception as e:
-                print(f"⚠ Could not update status ENUM: {e}")
+                print(f"[WARNING] Could not update status ENUM: {e}")
         
         return True
     except Exception as e:
@@ -869,9 +869,9 @@ def create_matters_table():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Matters table created")
+                print("[OK] Matters table created")
             else:
-                print("✓ Matters table already exists")
+                print("[OK] Matters table already exists")
             
             # Update status ENUM to include 'Pending Approval' and set as default
             try:
@@ -880,9 +880,9 @@ def create_matters_table():
                     MODIFY COLUMN status ENUM('Open', 'In Progress', 'Pending Client', 'Completed', 'On Hold', 'Closed', 'Pending Approval') DEFAULT 'Pending Approval'
                 """)
                 connection.commit()
-                print("✓ Updated matters status ENUM")
+                print("[OK] Updated matters status ENUM")
             except Exception as e:
-                print(f"⚠ Could not update matters status ENUM: {e}")
+                print(f"[WARNING] Could not update matters status ENUM: {e}")
         
         return True
     except Exception as e:
@@ -923,9 +923,9 @@ def create_email_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Email settings table created")
+                print("[OK] Email settings table created")
             else:
-                print("✓ Email settings table already exists")
+                print("[OK] Email settings table already exists")
             
             # Create email_accounts table for sub-emails
             if not table_exists('email_accounts'):
@@ -947,7 +947,7 @@ def create_email_tables():
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
                 connection.commit()
-                print("✓ Email accounts table created")
+                print("[OK] Email accounts table created")
             else:
                 print("✓ Email accounts table already exists")
         
@@ -993,7 +993,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created company_settings table")
+                    print("[OK] Created company_settings table")
                 
                 # Get company name from employees table if it exists
                 company_name = 'BAUNI LAW GROUP'
@@ -1014,16 +1014,16 @@ def apply_migrations(current_version):
                         VALUES (%s, NULL, NULL, NULL, NULL)
                     """, (company_name,))
                     connection.commit()
-                    print(f"✓ Inserted default company settings with name: {company_name}")
+                    print(f"[OK] Inserted default company settings with name: {company_name}")
                 
                 # Remove company_name column from employees table if it exists
                 if column_exists('employees', 'company_name'):
                     try:
                         cursor.execute("ALTER TABLE employees DROP COLUMN company_name")
                         connection.commit()
-                        print("✓ Removed company_name column from employees table")
+                        print("[OK] Removed company_name column from employees table")
                     except Exception as e:
-                        print(f"⚠ Could not remove company_name column: {e}")
+                        print(f"[WARNING] Could not remove company_name column: {e}")
                 
                 migrations_applied = True
             
@@ -1058,7 +1058,7 @@ def apply_migrations(current_version):
                             connection.commit()
                             print(f"✓ Added column '{column_name}' to employees table")
                         except Exception as e:
-                            print(f"⚠ Could not add column '{column_name}': {e}")
+                            print(f"[WARNING] Could not add column '{column_name}': {e}")
                 
                 migrations_applied = True
             
@@ -1077,7 +1077,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created case_types table")
+                    print("[OK] Created case_types table")
                 
                 # Create case_categories table
                 if not table_exists('case_categories'):
@@ -1090,7 +1090,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created case_categories table")
+                    print("[OK] Created case_categories table")
                 
                 # Create stations table
                 if not table_exists('stations'):
@@ -1103,7 +1103,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created stations table")
+                    print("[OK] Created stations table")
                 
                 # Create cases table
                 if not table_exists('cases'):
@@ -1137,7 +1137,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created cases table")
+                    print("[OK] Created cases table")
                 
                 migrations_applied = True
             
@@ -1150,18 +1150,18 @@ def apply_migrations(current_version):
                     try:
                         cursor.execute("ALTER TABLE cases ADD COLUMN tracking_number VARCHAR(50) UNIQUE AFTER id")
                         connection.commit()
-                        print("✓ Added tracking_number column to cases table")
+                        print("[OK] Added tracking_number column to cases table")
                     except Exception as e:
-                        print(f"⚠ Could not add tracking_number column: {e}")
+                        print(f"[WARNING] Could not add tracking_number column: {e}")
                 
                 # Add court_case_number column
                 if not column_exists('cases', 'court_case_number'):
                     try:
                         cursor.execute("ALTER TABLE cases ADD COLUMN court_case_number VARCHAR(255) AFTER tracking_number")
                         connection.commit()
-                        print("✓ Added court_case_number column to cases table")
+                        print("[OK] Added court_case_number column to cases table")
                     except Exception as e:
-                        print(f"⚠ Could not add court_case_number column: {e}")
+                        print(f"[WARNING] Could not add court_case_number column: {e}")
                 
                 # Update status ENUM
                 try:
@@ -1170,9 +1170,9 @@ def apply_migrations(current_version):
                         MODIFY COLUMN status ENUM('Active', 'Closed', 'Archived', 'Mediations', 'Pending', 'Consolidated', 'Pending Approval') DEFAULT 'Pending Approval'
                     """)
                     connection.commit()
-                    print("✓ Updated cases status ENUM")
+                    print("[OK] Updated cases status ENUM")
                 except Exception as e:
-                    print(f"⚠ Could not update status ENUM: {e}")
+                    print(f"[WARNING] Could not update status ENUM: {e}")
                 
                 migrations_applied = True
             
@@ -1226,7 +1226,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created case_proceedings table")
+                    print("[OK] Created case_proceedings table")
                 
                 migrations_applied = True
             
@@ -1252,7 +1252,7 @@ def apply_migrations(current_version):
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                     """)
                     connection.commit()
-                    print("✓ Created case_proceeding_materials table")
+                    print("[OK] Created case_proceeding_materials table")
                 
                 migrations_applied = True
             
@@ -1266,7 +1266,7 @@ def apply_migrations(current_version):
                         ADD COLUMN outcome_details TEXT AFTER outcome_orders
                     """)
                     connection.commit()
-                    print("✓ Added outcome_details column to case_proceedings table")
+                    print("[OK] Added outcome_details column to case_proceedings table")
                 else:
                     print("✓ outcome_details column already exists")
                 
@@ -1282,9 +1282,9 @@ def apply_migrations(current_version):
                         ADD COLUMN next_attendance VARCHAR(50) AFTER attendance
                     """)
                     connection.commit()
-                    print("✓ Added next_attendance column to case_proceedings table")
+                    print("[OK] Added next_attendance column to case_proceedings table")
                 else:
-                    print("✓ next_attendance column already exists")
+                    print("[OK] next_attendance column already exists")
                 
                 migrations_applied = True
             
@@ -1300,7 +1300,7 @@ def apply_migrations(current_version):
                     connection.commit()
                     print("✓ Added virtual_link column to case_proceedings table")
                 else:
-                    print("✓ virtual_link column already exists")
+                    print("[OK] virtual_link column already exists")
                 
                 migrations_applied = True
             
@@ -1318,7 +1318,7 @@ def apply_migrations(current_version):
                     connection.commit()
                     print("✓ Added previous_proceeding_id column to case_proceedings table")
                 else:
-                    print("✓ previous_proceeding_id column already exists")
+                    print("[OK] previous_proceeding_id column already exists")
                 
                 migrations_applied = True
             
@@ -1332,9 +1332,9 @@ def apply_migrations(current_version):
                         MODIFY COLUMN court_activity_type VARCHAR(255) NULL
                     """)
                     connection.commit()
-                    print("✓ Made court_activity_type nullable in case_proceedings table")
+                    print("[OK] Made court_activity_type nullable in case_proceedings table")
                 except Exception as e:
-                    print(f"⚠ Could not modify court_activity_type column: {e}")
+                    print(f"[WARNING] Could not modify court_activity_type column: {e}")
                 
                 migrations_applied = True
             
@@ -1351,7 +1351,7 @@ def apply_migrations(current_version):
             if migrations_applied:
                 connection.commit()
                 update_schema_version(SCHEMA_VERSION)
-                print(f"✓ Migrations applied. Schema version updated to {SCHEMA_VERSION}")
+                print(f"[OK] Migrations applied. Schema version updated to {SCHEMA_VERSION}")
         
         return True
     except Exception as e:
@@ -1371,10 +1371,10 @@ def init_database():
     if not database_exists():
         print(f"Database '{DB_CONFIG['database']}' not found. Creating...")
         if not create_database():
-            print("✗ Failed to create database")
+            print("[ERROR] Failed to create database")
             return False
     else:
-        print(f"✓ Database '{DB_CONFIG['database']}' exists")
+        print(f"[OK] Database '{DB_CONFIG['database']}' exists")
     
     # Step 2: Create schema version table
     if not create_schema_version_table():
@@ -1383,17 +1383,17 @@ def init_database():
     
     # Step 3: Create company_settings table
     if not create_company_settings_table():
-        print("✗ Failed to create/update company_settings table")
+        print("[ERROR] Failed to create/update company_settings table")
         return False
     
     # Step 4: Create employees table
     if not create_employees_table():
-        print("✗ Failed to create/update employees table")
+        print("[ERROR] Failed to create/update employees table")
         return False
     
     # Step 5: Create clients table
     if not create_clients_table():
-        print("✗ Failed to create/update clients table")
+        print("[ERROR] Failed to create/update clients table")
         return False
     
     # Step 6: Create case management tables
@@ -1403,12 +1403,12 @@ def init_database():
     
     # Step 7: Create matters table
     if not create_matters_table():
-        print("✗ Failed to create/update matters table")
+        print("[ERROR] Failed to create/update matters table")
         return False
     
     # Step 8: Create email tables
     if not create_email_tables():
-        print("✗ Failed to create/update email tables")
+        print("[ERROR] Failed to create/update email tables")
         return False
     
     # Step 9: Check schema version and apply migrations
@@ -1422,12 +1422,12 @@ def init_database():
             print("✗ Failed to apply migrations")
             return False
     elif current_version == SCHEMA_VERSION:
-        print("✓ Database schema is up to date")
+        print("[OK] Database schema is up to date")
     else:
-        print(f"⚠ Warning: Database schema version ({current_version}) is newer than application version ({SCHEMA_VERSION})")
+        print(f"[WARNING] Database schema version ({current_version}) is newer than application version ({SCHEMA_VERSION})")
     
     print("="*50)
-    print("✓ Database initialization completed successfully")
+    print("[OK] Database initialization completed successfully")
     print("="*50 + "\n")
     return True
 
@@ -6928,7 +6928,7 @@ def google_drive_callback():
                         id_info.get('picture')
                     ))
                     connection.commit()
-                    print("✓ Google Drive credentials saved to database")
+                    print("[OK] Google Drive credentials saved to database")
             except Exception as e:
                 print(f"Error saving Google Drive credentials to database: {e}")
             finally:
@@ -7068,7 +7068,7 @@ def google_drive_disconnect():
                     WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
                 """)
                 connection.commit()
-                print("✓ Google Drive credentials cleared from database")
+                print("[OK] Google Drive credentials cleared from database")
         except Exception as e:
             print(f"Error clearing Google Drive credentials from database: {e}")
         finally:

@@ -118,21 +118,8 @@ def get_db_config():
     # Method 3: Check FLASK_ENV to determine default behavior
     flask_env = os.environ.get('FLASK_ENV', '').lower()
     
-    # If in production mode, default to cPanel configuration
-    if flask_env == 'production':
-        print("[OK] Using cPanel database configuration (production mode default)")
-        return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-            'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
-            'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
-            'charset': 'utf8mb4'
-        }
-    
-    # Method 4: Try to detect by testing local connection (development only)
-    # This is a fallback for local development when env vars are not set
-    # Only use this if FLASK_ENV is development or not set (assumes local dev)
-    if flask_env in ('development', '') or flask_env == '':
+    # If explicitly in development mode, try local configuration
+    if flask_env == 'development':
         try:
             test_connection = pymysql.connect(
                 host='localhost',
@@ -162,11 +149,16 @@ def get_db_config():
                 'charset': 'utf8mb4'
             }
     
-    # If no configuration found, raise an error
-    raise ValueError(
-        "Database configuration not found. Please set DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME "
-        "environment variables, or set DB_ENV=local/cpanel or FLASK_ENV=production/development."
-    )
+    # Default to cPanel configuration (for production or when FLASK_ENV is not set)
+    # This is safer for hosted environments where FLASK_ENV might not be explicitly set
+    print("[OK] Using cPanel database configuration (default for hosted/production)")
+    return {
+        'host': os.environ.get('DB_HOST', 'localhost'),
+        'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
+        'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
+        'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
+        'charset': 'utf8mb4'
+    }
 
 # Initialize DB_CONFIG
 DB_CONFIG = get_db_config()

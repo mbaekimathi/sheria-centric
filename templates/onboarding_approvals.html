@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Onboarding & Approvals - CASELY{% endblock %}
+{% block title %}Onboarding & Approvals - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
@@ -38,8 +38,246 @@
     </div>
 </div>
 
+<!-- Employee Details Modal -->
+<div id="employeeDetailsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+        <div class="mt-3">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+                <h3 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-user-check text-green-600 mr-3"></i>
+                    Employee Onboarding Details
+                </h3>
+                <button onclick="closeEmployeeDetailsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div id="employeeDetailsContent" class="mt-4">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button 
+                    onclick="closeEmployeeDetailsModal()"
+                    class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                >
+                    Close
+                </button>
+                <button 
+                    id="approveFromModalBtn"
+                    onclick="approveFromModal()"
+                    class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold hidden"
+                >
+                    <i class="fas fa-check mr-2"></i>Approve Employee
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    function loadPendingApprovals() {
+let currentEmployeeId = null;
+
+function viewEmployeeDetails(id) {
+    currentEmployeeId = id;
+    const modal = document.getElementById('employeeDetailsModal');
+    const content = document.getElementById('employeeDetailsContent');
+    const approveBtn = document.getElementById('approveFromModalBtn');
+    
+    content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4"></i><p class="text-gray-500">Loading details...</p></div>';
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    
+    fetch(`{{ url_for('get_employee_onboarding_details') }}?id=${id}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                content.innerHTML = `<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>${data.error}</p></div>`;
+                return;
+            }
+            
+            const emp = data.employee;
+            const formatDate = (dateStr) => {
+                if (!dateStr) return 'N/A';
+                try {
+                    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                } catch {
+                    return dateStr;
+                }
+            };
+            
+            let html = `
+                <div class="space-y-6">
+                    <!-- Basic Information -->
+                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-blue-200">
+                        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-user text-blue-600 mr-2"></i>
+                            Basic Information
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Full Name</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.full_name || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Employee Code</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.employee_code || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Email</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.work_email || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Phone Number</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.phone_number || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Role</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.role || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Status</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.status || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Onboarding Completed</p>
+                                <p class="text-sm font-semibold ${emp.onboarding_completed ? 'text-green-600' : 'text-red-600'}">
+                                    ${emp.onboarding_completed ? '<i class="fas fa-check-circle mr-1"></i>Yes' : '<i class="fas fa-times-circle mr-1"></i>No'}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Registration Date</p>
+                                <p class="text-sm font-semibold text-gray-900">${formatDate(emp.created_at)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payroll & Compensation -->
+                    <div class="bg-white rounded-lg p-6 border border-gray-200">
+                        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-money-bill-wave text-green-600 mr-2"></i>
+                            Payroll & Compensation Details
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Account Number</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.account_number || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Account Name</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.account_name || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Tax PIN</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.tax_pin || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Pay Frequency</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.pay_frequency || 'N/A'}</p>
+                            </div>
+                            ${emp.salary ? `
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Salary</p>
+                                <p class="text-sm font-semibold text-gray-900">${emp.salary}</p>
+                            </div>
+                            ` : ''}
+                            ${emp.salary_components ? `
+                            <div class="md:col-span-2">
+                                <p class="text-xs text-gray-500 font-medium mb-1">Salary Components</p>
+                                <p class="text-sm text-gray-900 whitespace-pre-wrap">${emp.salary_components}</p>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Documents -->
+                    <div class="bg-white rounded-lg p-6 border border-gray-200">
+                        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-file-alt text-purple-600 mr-2"></i>
+                            Documents
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${emp.employment_contract ? `
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Employment Contract</p>
+                                <a href="/static/uploads/profile_pictures/${emp.employment_contract}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
+                                    <i class="fas fa-file-pdf mr-2"></i>View Contract
+                                </a>
+                            </div>
+                            ` : '<div><p class="text-xs text-gray-500 font-medium mb-1">Employment Contract</p><p class="text-sm text-gray-400">Not uploaded</p></div>'}
+                            ${emp.id_front ? `
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Front</p>
+                                <a href="/static/uploads/profile_pictures/${emp.id_front}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
+                                    <i class="fas fa-id-card mr-2"></i>View ID Front
+                                </a>
+                            </div>
+                            ` : '<div><p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Front</p><p class="text-sm text-gray-400">Not uploaded</p></div>'}
+                            ${emp.id_back ? `
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Back</p>
+                                <a href="/static/uploads/profile_pictures/${emp.id_back}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
+                                    <i class="fas fa-id-card mr-2"></i>View ID Back
+                                </a>
+                            </div>
+                            ` : '<div><p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Back</p><p class="text-sm text-gray-400">Not uploaded</p></div>'}
+                        </div>
+                    </div>
+                    
+                </div>
+            `;
+            
+            content.innerHTML = html;
+            
+            // Show approve button only if onboarding is completed
+            if (emp.onboarding_completed) {
+                approveBtn.classList.remove('hidden');
+            } else {
+                approveBtn.classList.add('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading employee details:', error);
+            content.innerHTML = '<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>Error loading employee details</p></div>';
+        });
+}
+
+function closeEmployeeDetailsModal() {
+    const modal = document.getElementById('employeeDetailsModal');
+    modal.classList.add('hidden');
+    document.body.style.overflow = 'auto';
+    currentEmployeeId = null;
+}
+
+function approveFromModal() {
+    if (currentEmployeeId) {
+        closeEmployeeDetailsModal();
+        approveEmployee(currentEmployeeId);
+    }
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('employeeDetailsModal');
+    if (event.target === modal) {
+        closeEmployeeDetailsModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('employeeDetailsModal');
+        if (!modal.classList.contains('hidden')) {
+            closeEmployeeDetailsModal();
+        }
+    }
+});
+
+function loadPendingApprovals() {
         fetch('{{ url_for("get_pending_approvals") }}')
             .then(response => response.json())
             .then(data => {
@@ -60,10 +298,18 @@
                                         <h3 class="text-lg font-bold text-gray-900">${emp.full_name}</h3>
                                         <p class="text-sm text-gray-600">${emp.work_email}</p>
                                         <p class="text-xs text-gray-500 mt-1">Code: ${emp.employee_code} | Phone: ${emp.phone_number}</p>
+                                        <p class="text-xs mt-1">
+                                            <span class="px-2 py-1 rounded-full ${emp.onboarding_completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'} font-semibold">
+                                                ${emp.onboarding_completed ? '<i class="fas fa-check-circle mr-1"></i>Onboarding Complete' : '<i class="fas fa-clock mr-1"></i>Onboarding Pending'}
+                                            </span>
+                                        </p>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-3">
-                                    <button onclick="approveEmployee(${emp.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                                    <button onclick="viewEmployeeDetails(${emp.id})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                        <i class="fas fa-eye mr-2"></i>View Details
+                                    </button>
+                                    <button onclick="approveEmployee(${emp.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${emp.onboarding_completed ? '' : 'opacity-50 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled title="Onboarding must be completed before approval"'}">
                                         <i class="fas fa-check mr-2"></i>Approve
                                     </button>
                                     <button onclick="rejectEmployee(${emp.id})" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
@@ -102,10 +348,15 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    alert('Employee approved successfully!');
                     loadPendingApprovals();
                 } else {
-                    alert(data.message || 'Error approving employee');
+                    alert(data.error || 'Error approving employee');
                 }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while approving the employee.');
             });
         }
     }

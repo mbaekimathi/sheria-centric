@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}My Documents - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('client_dashboard') }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-file-alt mr-3"></i>
+                        My Documents
+                    </h1>
+                    <p class="text-indigo-100">View and manage your documents</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Profile Card -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
+            <!-- Profile Picture -->
+            <div class="flex-shrink-0">
+                {% if client.profile_picture %}
+                    {% if client.profile_picture.startswith('http') %}
+                    <img src="{{ client.profile_picture }}" alt="{{ client.full_name }}" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% endif %}
+                {% else %}
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl md:text-4xl font-bold border-4 border-indigo-200 shadow-lg">
+                    {{ client.full_name[0] if client.full_name else 'C' }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Client Information -->
+            <div class="flex-1 min-w-0">
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{{ client.full_name or 'N/A' }}</h2>
+                <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 mb-4">
+                    <span class="flex items-center">
+                        <i class="fas fa-phone mr-2 text-indigo-600"></i>
+                        {{ client.phone_number or 'N/A' }}
+                    </span>
+                    <span class="flex items-center">
+                        <i class="fas fa-envelope mr-2 text-indigo-600"></i>
+                        {{ client.email or 'N/A' }}
+                    </span>
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
+                        {{ client.client_type or 'Pending' }} Client
+                    </span>
+                    {% if client.status == 'Active' %}
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                        <i class="fas fa-circle text-xs mr-1"></i>Active
+                    </span>
+                    {% else %}
+                    <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-semibold">
+                        <i class="fas fa-circle text-xs mr-1"></i>Inactive
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Section -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+            <i class="fas fa-folder-open text-indigo-600 mr-3"></i>
+            Documents
+        </h2>
+        
+        <div class="text-center py-12">
+            <i class="fas fa-file-alt text-gray-300 text-5xl mb-4"></i>
+            <p class="text-gray-600 font-semibold mb-2">No Documents Available</p>
+            <p class="text-gray-500 text-sm">Use the sidebar links to navigate to Personal Documents or Case Documents.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

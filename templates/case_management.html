@@ -1,20 +1,332 @@
 {% extends "base.html" %}
 
-{% block title %}Case Management - CASELY{% endblock %}
+{% block title %}Case Management - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-            <i class="fas fa-briefcase text-indigo-600 mr-3"></i>
-            Case Management
-        </h1>
-        <p class="text-gray-600">Manage legal cases and case files</p>
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-briefcase text-indigo-600 mr-3"></i>
+                    Case Management
+                </h1>
+                <p class="text-gray-600">Search and manage legal cases by client phone number</p>
+            </div>
+        </div>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-        <i class="fas fa-briefcase text-gray-400 text-5xl mb-4"></i>
-        <p class="text-gray-600">Feature coming soon</p>
-    </div>
-</div>
-{% endblock %}
 
+    <!-- Search Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-search text-green-600 mr-2"></i>
+            Search Cases by Client Phone Number
+        </h2>
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <label for="phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Client Phone Number (Leave empty to show all cases)
+                </label>
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="phone_number" 
+                        name="phone_number"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Type phone number to filter (e.g., 0712345678) or leave empty for all cases"
+                        autocomplete="off"
+                    />
+                    <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Start typing to search live. Leave empty to view all cases.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+        <div class="flex flex-col items-center">
+            <i class="fas fa-spinner fa-spin text-green-600 text-3xl mb-4"></i>
+            <p class="text-gray-600">Loading cases...</p>
+        </div>
+    </div>
+
+    <!-- Client Information -->
+    <div id="clientInfo" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-user text-indigo-600 mr-2"></i>
+            Client Information
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="clientDetails">
+            <!-- Client details will be populated here -->
+        </div>
+    </div>
+
+    <!-- Cases Table -->
+    <div id="casesContainer" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between mb-4">
+            <h3 class="text-xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-list text-indigo-600 mr-2"></i>
+                Cases: <span id="casesCount" class="ml-2 text-green-600">0</span>
+            </h3>
+            <div class="mt-2 md:mt-0">
+                <button 
+                    onclick="loadAllCases()"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold text-sm"
+                >
+                    <i class="fas fa-refresh mr-2"></i>Refresh All
+                </button>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking #</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filing Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Station</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="casesTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Cases will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- No Results Message -->
+    <div id="noResults" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+        <div class="max-w-md mx-auto">
+            <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No Cases Found</h3>
+            <p class="text-gray-600" id="noResultsMessage">No cases found for this search.</p>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div id="errorMessage" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+</div>
+
+<script>
+let searchTimeout;
+
+// Load all cases on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllCases();
+});
+
+// Live search as user types
+document.getElementById('phone_number').addEventListener('input', function(e) {
+    clearTimeout(searchTimeout);
+    const phoneNumber = e.target.value.trim();
+    
+    // Debounce search - wait 500ms after user stops typing
+    searchTimeout = setTimeout(() => {
+        searchCases(phoneNumber);
+    }, 500);
+});
+
+function searchCases(phoneNumber) {
+    // Show loading indicator
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.getElementById('casesContainer').classList.add('hidden');
+    document.getElementById('noResults').classList.add('hidden');
+    document.getElementById('clientInfo').classList.add('hidden');
+    
+    // Build URL
+    const url = phoneNumber 
+        ? `/api/cases/search?phone=${encodeURIComponent(phoneNumber)}`
+        : '/api/cases/search';
+    
+    // Search for cases
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            // Show cases container
+            document.getElementById('casesContainer').classList.remove('hidden');
+            
+            // Display client information if found
+            if (data.client) {
+                displayClientInfo(data.client);
+            } else {
+                document.getElementById('clientInfo').classList.add('hidden');
+            }
+            
+            if (data.cases && data.cases.length > 0) {
+                // Display cases
+                document.getElementById('casesCount').textContent = data.cases.length;
+                displayCases(data.cases);
+                document.getElementById('noResults').classList.add('hidden');
+            } else {
+                document.getElementById('casesCount').textContent = '0';
+                document.getElementById('casesTableBody').innerHTML = '';
+                document.getElementById('noResults').classList.remove('hidden');
+                document.getElementById('noResultsMessage').textContent = data.message || 'No cases found.';
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            console.error('Error searching cases:', error);
+            showError('Error searching cases. Please try again.');
+        });
+}
+
+function loadAllCases() {
+    document.getElementById('phone_number').value = '';
+    searchCases('');
+}
+
+function displayClientInfo(client) {
+    const clientDetails = document.getElementById('clientDetails');
+    const profilePicture = client.profile_picture 
+        ? `<img src="${client.profile_picture}" alt="Profile" class="w-16 h-16 rounded-full object-cover border-2 border-green-500">`
+        : `<div class="w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-2xl font-bold border-2 border-green-500">${(client.full_name || 'C')[0].toUpperCase()}</div>`;
+    
+    clientDetails.innerHTML = `
+        <div class="md:col-span-4 flex items-center space-x-4 mb-4 pb-4 border-b border-gray-200">
+            <div>
+                ${profilePicture}
+            </div>
+            <div class="flex-1">
+                <h4 class="text-lg font-bold text-gray-900">${client.full_name || 'N/A'}</h4>
+                <p class="text-sm text-gray-500">${client.client_type || 'N/A'} Client</p>
+            </div>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 mb-1">
+                <i class="fas fa-phone mr-2"></i>Phone Number
+            </p>
+            <p class="font-semibold text-gray-900">${client.phone_number || 'N/A'}</p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 mb-1">
+                <i class="fas fa-envelope mr-2"></i>Email
+            </p>
+            <p class="font-semibold text-gray-900">${client.email || 'N/A'}</p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 mb-1">
+                <i class="fas fa-user-tag mr-2"></i>Client Type
+            </p>
+            <p class="font-semibold text-gray-900">${client.client_type || 'N/A'}</p>
+        </div>
+        <div>
+            <p class="text-sm text-gray-500 mb-1">
+                <i class="fas fa-info-circle mr-2"></i>Status
+            </p>
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${client.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                ${client.status || 'N/A'}
+            </span>
+        </div>
+        ${client.created_at ? `
+        <div>
+            <p class="text-sm text-gray-500 mb-1">
+                <i class="fas fa-calendar mr-2"></i>Registered
+            </p>
+            <p class="font-semibold text-gray-900 text-sm">${new Date(client.created_at).toLocaleDateString()}</p>
+        </div>
+        ` : ''}
+    `;
+    document.getElementById('clientInfo').classList.remove('hidden');
+}
+
+function displayCases(cases) {
+    const tbody = document.getElementById('casesTableBody');
+    tbody.innerHTML = '';
+    
+    if (cases.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                    No cases found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    cases.forEach(caseItem => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-gray-50';
+        
+        // Status badge color
+        const statusColors = {
+            'Active': 'bg-green-100 text-green-800',
+            'Closed': 'bg-gray-100 text-gray-800',
+            'Archived': 'bg-blue-100 text-blue-800',
+            'Mediations': 'bg-yellow-100 text-yellow-800',
+            'Pending': 'bg-orange-100 text-orange-800',
+            'Consolidated': 'bg-purple-100 text-purple-800',
+            'Pending Approval': 'bg-red-100 text-red-800'
+        };
+        const statusColor = statusColors[caseItem.status] || 'bg-gray-100 text-gray-800';
+        
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-semibold text-gray-900">${caseItem.tracking_number || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4">
+                <div class="text-sm font-medium text-gray-900">${caseItem.client_full_name || caseItem.client_name || 'N/A'}</div>
+                <div class="text-sm text-gray-500 mt-1">${caseItem.client_phone || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">${caseItem.case_category || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">${caseItem.filing_date || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm text-gray-900">${caseItem.station || 'N/A'}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">
+                    ${caseItem.status || 'N/A'}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button onclick="viewCaseDetails(${caseItem.id})" class="text-indigo-600 hover:text-indigo-900 mr-3" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function viewCaseDetails(caseId) {
+    window.location.href = `/case_management/${caseId}`;
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.className = 'fixed top-20 right-4 z-50 max-w-md bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg';
+    errorDiv.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-circle mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    errorDiv.classList.remove('hidden');
+    
+    setTimeout(() => {
+        errorDiv.classList.add('hidden');
+    }, 5000);
+}
+</script>
+{% endblock %}

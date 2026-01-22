@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Communication Settings - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('communication_messaging') }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-user-cog mr-3"></i>
+                        Employee Communication Settings
+                    </h1>
+                    <p class="text-indigo-100">Allocate communication channels to employees</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employees Table -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-users text-indigo-600 mr-3"></i>
+                Employees Communication Allocation
+            </h2>
+            <button 
+                onclick="refreshEmployees()"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold text-sm"
+            >
+                <i class="fas fa-sync mr-2"></i>Refresh
+            </button>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMS Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="employeesTableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Employees will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Message Container -->
+    <div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+</div>
+
+<script>
+// Load employees on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadEmployees();
+});
+
+function loadEmployees() {
+    const employees = {{ employees | tojson }};
+    const emailAccounts = {{ email_accounts | tojson }};
+    
+    const tbody = document.getElementById('employeesTableBody');
+    
+    if (!employees || employees.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                    <i class="fas fa-users text-gray-400 text-3xl mb-2 block"></i>
+                    No employees found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = employees.map(employee => {
+        const profilePic = employee.profile_picture ? 
+            `/static/uploads/profile_pictures/${employee.profile_picture}` : 
+            null;
+        
+        // Get initials for fallback
+        const initials = employee.full_name ? 
+            employee.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 
+            '??';
+        
+        const currentEmail = employee.work_email || '';
+        const emailOptions = emailAccounts.map(email => {
+            const emailAddr = email.email_address || email.email || '';
+            const selected = emailAddr === currentEmail ? 'selected' : '';
+            return `<option value="${emailAddr}" ${selected}>${emailAddr}</option>`;
+        }).join('');
+        
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        ${profilePic ? 
+                            `<img class="h-10 w-10 rounded-full object-cover" src="${profilePic}" alt="${employee.full_name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                             <div class="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold text-sm" style="display:none;">${initials}</div>` :
+                            `<div class="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-semibold text-sm">${initials}</div>`
+                        }
+                        <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900">${employee.full_name}</div>
+                            <div class="text-sm text-gray-500">${employee.employee_code} • ${employee.role}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <select 
+                        id="email_${employee.id}" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                        onchange="updateEmployeeEmail(${employee.id}, this.value)"
+                    >
+                        <option value="">-- Select Email --</option>
+                        ${emailOptions}
+                    </select>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center text-sm text-gray-500">
+                        <i class="fab fa-whatsapp text-green-500 mr-2"></i>
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">Coming Soon</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center text-sm text-gray-500">
+                        <i class="fas fa-sms text-blue-500 mr-2"></i>
+                        <span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">Coming Soon</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button 
+                        onclick="viewEmployeeDetails(${employee.id})"
+                        class="text-indigo-600 hover:text-indigo-900 mr-3"
+                        title="View Details"
+                    >
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateEmployeeEmail(employeeId, emailAddress) {
+    if (!emailAddress) {
+        return;
+    }
+    
+    showMessage('Updating employee email...', 'info');
+    
+    fetch('/api/employee/update-email', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            employee_id: employeeId,
+            work_email: emailAddress
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('Employee email updated successfully!', 'success');
+        } else {
+            showMessage(result.error || 'Failed to update email', 'error');
+            // Reload to reset dropdown
+            loadEmployees();
+        }
+    })
+    .catch(error => {
+        showMessage('Error updating email: ' + error.message, 'error');
+        loadEmployees();
+    });
+}
+
+function refreshEmployees() {
+    showMessage('Refreshing employees...', 'info');
+    window.location.reload();
+}
+
+function viewEmployeeDetails(employeeId) {
+    // You can implement a modal or redirect to employee details page
+    window.location.href = `/hr_management?employee_id=${employeeId}`;
+}
+
+function showMessage(message, type) {
+    const container = document.getElementById('messageContainer');
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+    
+    container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white p-4 rounded-lg shadow-lg`;
+    container.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    container.classList.remove('hidden');
+    
+    setTimeout(() => {
+        container.classList.add('hidden');
+    }, 5000);
+}
+</script>
+{% endblock %}
+

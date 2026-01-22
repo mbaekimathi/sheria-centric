@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Change Matter Status - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-exchange-alt text-blue-600 mr-3"></i>
+                    Change Matter Status
+                </h1>
+                <p class="text-gray-600">Reference Number: <span class="font-semibold">{{ matter_data.matter_reference_number }}</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Change Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div class="mb-6">
+            <p class="text-sm text-gray-600 mb-4">Current Status:</p>
+            {% set status_colors = {
+                'Open': 'bg-green-100 text-green-800',
+                'In Progress': 'bg-blue-100 text-blue-800',
+                'Pending Client': 'bg-yellow-100 text-yellow-800',
+                'Completed': 'bg-purple-100 text-purple-800',
+                'On Hold': 'bg-orange-100 text-orange-800',
+                'Closed': 'bg-gray-100 text-gray-800',
+                'Pending Approval': 'bg-red-100 text-red-800'
+            } %}
+            <span class="px-4 py-2 inline-flex text-sm leading-5 font-semibold rounded-lg {{ status_colors.get(matter_data.status, 'bg-gray-100 text-gray-800') }}">
+                <i class="fas fa-circle text-xs mr-2 mt-0.5"></i>
+                {{ matter_data.status or 'N/A' }}
+            </span>
+        </div>
+
+        <form id="statusChangeForm" class="space-y-6">
+            <div>
+                <label for="status" class="block text-sm font-semibold text-gray-700 mb-2">
+                    New Status <span class="text-red-500">*</span>
+                </label>
+                <select 
+                    id="status" 
+                    name="status" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                    <option value="">Select Status</option>
+                    <option value="Open" {% if matter_data.status == 'Open' %}selected{% endif %}>Open</option>
+                    <option value="In Progress" {% if matter_data.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                    <option value="Pending Client" {% if matter_data.status == 'Pending Client' %}selected{% endif %}>Pending Client</option>
+                    <option value="Completed" {% if matter_data.status == 'Completed' %}selected{% endif %}>Completed</option>
+                    <option value="On Hold" {% if matter_data.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                    <option value="Closed" {% if matter_data.status == 'Closed' %}selected{% endif %}>Closed</option>
+                    <option value="Pending Approval" {% if matter_data.status == 'Pending Approval' %}selected{% endif %}>Pending Approval</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-between pt-4">
+                <a href="{{ url_for('matter_details', matter_id=matter_id) }}" class="text-gray-600 hover:text-gray-800 transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Cancel
+                </a>
+                <button 
+                    type="submit" 
+                    class="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
+                >
+                    <i class="fas fa-check mr-2"></i>
+                    Update Status
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('statusChangeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const status = document.getElementById('status').value;
+    
+    if (!status) {
+        alert('Please select a status');
+        return;
+    }
+    
+    if (status === '{{ matter_data.status }}') {
+        alert('Please select a different status');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to change the matter status to "${status}"?`)) {
+        fetch(`/api/update_matter_status/{{ matter_id }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Status updated successfully!');
+                window.location.href = '{{ url_for("matter_details", matter_id=matter_id) }}';
+            } else {
+                alert(data.error || 'Error updating status');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating the status.');
+        });
+    }
+});
+</script>
+{% endblock %}

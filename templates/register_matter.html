@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}Register New Matter - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-plus-circle text-blue-600 mr-3"></i>
+            Register New Matter
+        </h1>
+        <p class="text-gray-600">Register a new matter in the system</p>
+    </div>
+
+    <!-- Matter Registration Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <form id="matterRegistrationForm" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Matter Reference Number (Auto-generated) -->
+                <div>
+                    <label for="matter_reference_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Matter Reference Number
+                    </label>
+                    <input 
+                        type="text" 
+                        id="matter_reference_number" 
+                        name="matter_reference_number"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                        placeholder="Auto-generated"
+                        readonly
+                        disabled
+                    />
+                    <p class="text-xs text-gray-500 mt-1">This will be automatically generated upon submission</p>
+                </div>
+
+                <!-- Status (Hidden - Always Pending Approval) -->
+                <div>
+                    <label for="status" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Status
+                    </label>
+                    <input 
+                        type="text" 
+                        id="status" 
+                        name="status"
+                        value="Pending Approval"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                        readonly
+                        disabled
+                    />
+                    <p class="text-xs text-gray-500 mt-1">Status will be set to "Pending Approval" by default</p>
+                </div>
+
+                <!-- Matter Title -->
+                <div class="md:col-span-2">
+                    <label for="matter_title" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Matter Title <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="matter_title" 
+                        name="matter_title"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                        placeholder="Enter matter title..."
+                        autocomplete="off"
+                        required
+                        oninput="this.value = this.value.toUpperCase()"
+                    />
+                </div>
+
+                <!-- Matter Category -->
+                <div class="md:col-span-2">
+                    <label for="matter_category" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Matter Category <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="matter_category" 
+                            name="matter_category"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                            placeholder="Enter or select matter category..."
+                            autocomplete="off"
+                            required
+                            oninput="this.value = this.value.toUpperCase()"
+                        />
+                        <div id="matter_category_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Client Search by Phone -->
+                <div class="md:col-span-2">
+                    <label for="client_search" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Client (Search by Phone Number) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="client_search" 
+                            name="client_search"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Search client by phone number..."
+                            autocomplete="off"
+                            required
+                        />
+                        <input type="hidden" id="client_id" name="client_id" />
+                        <div id="client_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                        <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
+                    </div>
+                    <div id="selected_client" class="hidden mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p class="text-sm text-gray-700"><strong>Selected:</strong> <span id="selected_client_name"></span></p>
+                        <p class="text-xs text-gray-500"><span id="selected_client_phone"></span></p>
+                    </div>
+                </div>
+
+                <!-- Client Instructions (Optional) -->
+                <div class="md:col-span-2">
+                    <label for="client_instructions" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Client Instructions <span class="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <textarea 
+                        id="client_instructions" 
+                        name="client_instructions"
+                        rows="4"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter client instructions or requirements..."
+                    ></textarea>
+                </div>
+
+                <!-- Assigned Employee (Search by Name) -->
+                <div class="md:col-span-2">
+                    <label for="employee_search" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Assigned Employee (Search by Name) <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="employee_search" 
+                            name="employee_search"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Search employee by name..."
+                            autocomplete="off"
+                            required
+                        />
+                        <input type="hidden" id="assigned_employee_id" name="assigned_employee_id" />
+                        <div id="employee_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                        <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
+                    </div>
+                    <div id="selected_employee" class="hidden mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p class="text-sm text-gray-700"><strong>Selected:</strong> <span id="selected_employee_name"></span></p>
+                        <p class="text-xs text-gray-500"><span id="selected_employee_role"></span></p>
+                    </div>
+                </div>
+
+                <!-- Date Opened -->
+                <div>
+                    <label for="date_opened" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Date Opened <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="date" 
+                        id="date_opened" 
+                        name="date_opened"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                    />
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                <a href="{{ url_for('other_matters') }}" class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </a>
+                <button 
+                    type="submit"
+                    id="submitBtn"
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <i class="fas fa-save mr-2"></i>Register Matter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Success/Error Messages -->
+<div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Set today's date as default
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('date_opened').value = today;
+    });
+
+    // Client search functionality
+    let clientSearchTimeout;
+    const clientSearchInput = document.getElementById('client_search');
+    const clientDropdown = document.getElementById('client_dropdown');
+    const clientIdInput = document.getElementById('client_id');
+    const selectedClientDiv = document.getElementById('selected_client');
+    const selectedClientName = document.getElementById('selected_client_name');
+    const selectedClientPhone = document.getElementById('selected_client_phone');
+
+    clientSearchInput.addEventListener('input', function() {
+        clearTimeout(clientSearchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 1) {
+            clientDropdown.classList.add('hidden');
+            return;
+        }
+
+        clientSearchTimeout = setTimeout(() => {
+            fetch(`/api/matters/clients/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error(data.error);
+                        return;
+                    }
+                    displayClientResults(data.clients);
+                })
+                .catch(error => {
+                    console.error('Error searching clients:', error);
+                });
+        }, 300);
+    });
+
+    function displayClientResults(clients) {
+        if (clients.length === 0) {
+            clientDropdown.innerHTML = '<div class="p-4 text-center text-gray-500">No clients found</div>';
+            clientDropdown.classList.remove('hidden');
+            return;
+        }
+
+        clientDropdown.innerHTML = clients.map(client => `
+            <div class="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 client-option" 
+                 data-client-id="${client.id}" 
+                 data-client-name="${client.full_name}" 
+                 data-client-phone="${client.phone_number || 'N/A'}">
+                <div class="font-semibold text-gray-900">${client.full_name}</div>
+                <div class="text-sm text-gray-600">${client.phone_number || 'No phone'}</div>
+                <div class="text-xs text-gray-500">${client.email || ''}</div>
+            </div>
+        `).join('');
+
+        clientDropdown.classList.remove('hidden');
+
+        // Add click handlers
+        document.querySelectorAll('.client-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const clientId = this.dataset.clientId;
+                const clientName = this.dataset.clientName;
+                const clientPhone = this.dataset.clientPhone;
+                
+                clientIdInput.value = clientId;
+                clientSearchInput.value = clientPhone;
+                selectedClientName.textContent = clientName;
+                selectedClientPhone.textContent = `Phone: ${clientPhone}`;
+                selectedClientDiv.classList.remove('hidden');
+                clientDropdown.classList.add('hidden');
+            });
+        });
+    }
+
+    // Employee search functionality
+    let employeeSearchTimeout;
+    const employeeSearchInput = document.getElementById('employee_search');
+    const employeeDropdown = document.getElementById('employee_dropdown');
+    const assignedEmployeeIdInput = document.getElementById('assigned_employee_id');
+    const selectedEmployeeDiv = document.getElementById('selected_employee');
+    const selectedEmployeeName = document.getElementById('selected_employee_name');
+    const selectedEmployeeRole = document.getElementById('selected_employee_role');
+
+    employeeSearchInput.addEventListener('input', function() {
+        clearTimeout(employeeSearchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 1) {
+            employeeDropdown.classList.add('hidden');
+            return;
+        }
+
+        employeeSearchTimeout = setTimeout(() => {
+            fetch(`/api/matters/employees/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error(data.error);
+                        return;
+                    }
+                    displayEmployeeResults(data.employees);
+                })
+                .catch(error => {
+                    console.error('Error searching employees:', error);
+                });
+        }, 300);
+    });
+
+    function displayEmployeeResults(employees) {
+        if (employees.length === 0) {
+            employeeDropdown.innerHTML = '<div class="p-4 text-center text-gray-500">No employees found</div>';
+            employeeDropdown.classList.remove('hidden');
+            return;
+        }
+
+        employeeDropdown.innerHTML = employees.map(employee => `
+            <div class="p-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 employee-option" 
+                 data-employee-id="${employee.id}" 
+                 data-employee-name="${employee.full_name}" 
+                 data-employee-role="${employee.role || 'N/A'}">
+                <div class="font-semibold text-gray-900">${employee.full_name}</div>
+                <div class="text-sm text-gray-600">${employee.role || 'N/A'}</div>
+                <div class="text-xs text-gray-500">${employee.employee_code || ''}</div>
+            </div>
+        `).join('');
+
+        employeeDropdown.classList.remove('hidden');
+
+        // Add click handlers
+        document.querySelectorAll('.employee-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const employeeId = this.dataset.employeeId;
+                const employeeName = this.dataset.employeeName;
+                const employeeRole = this.dataset.employeeRole;
+                
+                assignedEmployeeIdInput.value = employeeId;
+                employeeSearchInput.value = employeeName;
+                selectedEmployeeName.textContent = employeeName;
+                selectedEmployeeRole.textContent = `Role: ${employeeRole}`;
+                selectedEmployeeDiv.classList.remove('hidden');
+                employeeDropdown.classList.add('hidden');
+            });
+        });
+    }
+
+    // Matter Category search functionality
+    let matterCategorySearchTimeout;
+    const matterCategoryInput = document.getElementById('matter_category');
+    const matterCategoryDropdown = document.getElementById('matter_category_dropdown');
+
+    matterCategoryInput.addEventListener('input', function() {
+        clearTimeout(matterCategorySearchTimeout);
+        const query = this.value.trim().toUpperCase();
+        
+        if (query.length < 1) {
+            matterCategoryDropdown.classList.add('hidden');
+            return;
+        }
+
+        matterCategorySearchTimeout = setTimeout(() => {
+            fetch(`/api/matters/categories/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error(data.error);
+                        matterCategoryDropdown.classList.add('hidden');
+                        return;
+                    }
+                    
+                    matterCategoryDropdown.innerHTML = '';
+                    if (data.categories && data.categories.length > 0) {
+                        data.categories.forEach(category => {
+                            const item = document.createElement('div');
+                            item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100';
+                            item.textContent = category.category_name;
+                            item.addEventListener('click', () => {
+                                matterCategoryInput.value = category.category_name;
+                                matterCategoryDropdown.classList.add('hidden');
+                            });
+                            matterCategoryDropdown.appendChild(item);
+                        });
+                        matterCategoryDropdown.classList.remove('hidden');
+                    } else {
+                        matterCategoryDropdown.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching matter categories:', error);
+                    matterCategoryDropdown.classList.add('hidden');
+                });
+        }, 300);
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#client_search') && !e.target.closest('#client_dropdown')) {
+            clientDropdown.classList.add('hidden');
+        }
+        if (!e.target.closest('#employee_search') && !e.target.closest('#employee_dropdown')) {
+            employeeDropdown.classList.add('hidden');
+        }
+        if (!e.target.closest('#matter_category') && !e.target.closest('#matter_category_dropdown')) {
+            matterCategoryDropdown.classList.add('hidden');
+        }
+    });
+
+    // Form submission
+    document.getElementById('matterRegistrationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('submitBtn');
+        const originalText = submitBtn.innerHTML;
+        
+        // Validate required fields
+        if (!clientIdInput.value) {
+            showMessage('Please select a client', 'error');
+            return;
+        }
+        
+        if (!assignedEmployeeIdInput.value) {
+            showMessage('Please select an assigned employee', 'error');
+            return;
+        }
+
+        const formData = {
+            matter_title: document.getElementById('matter_title').value.trim(),
+            matter_category: document.getElementById('matter_category').value.trim(),
+            client_id: parseInt(clientIdInput.value),
+            assigned_employee_id: parseInt(assignedEmployeeIdInput.value),
+            date_opened: document.getElementById('date_opened').value,
+            status: 'Pending Approval',  // Always set to Pending Approval
+            client_instructions: document.getElementById('client_instructions').value.trim()
+        };
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registering...';
+
+        fetch('/api/matters/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message || 'Matter registered successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/other_matters';
+                }, 2000);
+            } else {
+                showMessage(data.error || 'An error occurred. Please try again.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('An error occurred. Please try again.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    });
+
+    function showMessage(message, type) {
+        const container = document.getElementById('messageContainer');
+        const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg`;
+        container.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas ${icon} mr-3 text-xl"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        container.classList.remove('hidden');
+        
+        setTimeout(() => {
+            container.classList.add('hidden');
+        }, 5000);
+    }
+</script>
+{% endblock %}
+

@@ -1,0 +1,712 @@
+{% extends "base.html" %}
+
+{% block title %}Register Case - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-plus-circle text-green-600 mr-3"></i>
+            Register New Case
+        </h1>
+        <p class="text-gray-600">Register a new legal case in the system</p>
+    </div>
+
+    <!-- Case Registration Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <form id="caseRegistrationForm" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Court Case Number -->
+                <div class="md:col-span-2">
+                    <label for="court_case_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Court Case Number
+                    </label>
+                    <input 
+                        type="text" 
+                        id="court_case_number" 
+                        name="court_case_number"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                        placeholder="Enter court case number (optional)..."
+                        autocomplete="off"
+                    />
+                </div>
+
+                <!-- Client Name -->
+                <div class="md:col-span-2">
+                    <label for="client_name" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Client Name <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="client_name" 
+                            name="client_name"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Search or select client..."
+                            autocomplete="off"
+                            required
+                        />
+                        <input type="hidden" id="client_id" name="client_id" />
+                        <div id="client_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                        <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
+                    </div>
+                </div>
+
+                <!-- Case Type -->
+                <div>
+                    <label for="case_type" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Case Type <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="case_type" 
+                            name="case_type"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Enter or select case type..."
+                            autocomplete="off"
+                            required
+                        />
+                        <div id="case_type_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filing Date -->
+                <div>
+                    <label for="filing_date" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Filing Date <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="date" 
+                        id="filing_date" 
+                        name="filing_date"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                    />
+                </div>
+
+                <!-- Case Category -->
+                <div>
+                    <label for="case_category" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Case Category <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="case_category" 
+                            name="case_category"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Enter or select category..."
+                            autocomplete="off"
+                            required
+                        />
+                        <div id="case_category_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Station -->
+                <div>
+                    <label for="station" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Station <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="station" 
+                            name="station"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Enter or select station..."
+                            autocomplete="off"
+                            required
+                        />
+                        <div id="station_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Created By (Read-only) -->
+                <div>
+                    <label for="created_by" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Created By
+                    </label>
+                    <input 
+                        type="text" 
+                        id="created_by" 
+                        name="created_by"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 uppercase"
+                        value="{{ employee_name }}"
+                        readonly
+                    />
+                </div>
+
+                <!-- Description -->
+                <div class="md:col-span-2">
+                    <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Description
+                    </label>
+                    <textarea 
+                        id="description" 
+                        name="description"
+                        rows="4"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter case description (optional)..."
+                    ></textarea>
+                </div>
+            </div>
+
+            <!-- Parties Section -->
+            <div class="md:col-span-2 border-t border-gray-200 pt-6 mt-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-users text-indigo-600 mr-2"></i>
+                        Parties
+                    </h3>
+                    <button 
+                        type="button" 
+                        onclick="addParty()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold text-sm"
+                    >
+                        <i class="fas fa-plus mr-2"></i>Add Party
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">Add all parties involved in this case. The selected client will be added automatically.</p>
+                
+                <div id="partiesContainer" class="space-y-4">
+                    <!-- Parties will be added here -->
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex justify-end space-x-4 pt-4">
+                <button 
+                    type="button" 
+                    onclick="resetForm()"
+                    class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+                >
+                    <i class="fas fa-redo mr-2"></i>Reset
+                </button>
+                <button 
+                    type="submit"
+                    class="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 font-semibold shadow-md hover:shadow-lg"
+                >
+                    <i class="fas fa-save mr-2"></i>Register Case
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+</div>
+
+<script>
+// Global variables for debouncing
+let clientSearchTimeout;
+let caseTypeSearchTimeout;
+let categorySearchTimeout;
+let stationSearchTimeout;
+
+// Client search functionality
+document.getElementById('client_name').addEventListener('input', function(e) {
+    clearTimeout(clientSearchTimeout);
+    const query = e.target.value.trim();
+    const dropdown = document.getElementById('client_dropdown');
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    clientSearchTimeout = setTimeout(() => {
+        fetch(`/api/clients/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                if (data.clients && data.clients.length > 0) {
+                    data.clients.forEach(client => {
+                        const item = document.createElement('div');
+                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                        item.innerHTML = `
+                            <div class="font-semibold text-gray-900">${client.full_name}</div>
+                            <div class="text-sm text-gray-500">${client.email || ''} ${client.phone_number || ''}</div>
+                        `;
+                        item.addEventListener('click', () => {
+                            document.getElementById('client_name').value = client.full_name.toUpperCase();
+                            document.getElementById('client_id').value = client.id;
+                            dropdown.classList.add('hidden');
+                            
+                            // Auto-add client as first party if not already added
+                            if (!clientAddedAsParty) {
+                                addParty(client.full_name.toUpperCase(), 'CLIENT', '', '');
+                                clientAddedAsParty = true;
+                            }
+                        });
+                        dropdown.appendChild(item);
+                    });
+                    dropdown.classList.remove('hidden');
+                } else {
+                    dropdown.classList.add('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching clients:', error);
+                dropdown.classList.add('hidden');
+            });
+    }, 300);
+});
+
+// Case Type search and auto-create
+document.getElementById('case_type').addEventListener('input', function(e) {
+    clearTimeout(caseTypeSearchTimeout);
+    const query = e.target.value.trim().toUpperCase();
+    const dropdown = document.getElementById('case_type_dropdown');
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    caseTypeSearchTimeout = setTimeout(() => {
+        fetch(`/api/case-types/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                if (data.types && data.types.length > 0) {
+                    data.types.forEach(type => {
+                        const item = document.createElement('div');
+                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                        item.textContent = type.type_name;
+                        item.addEventListener('click', () => {
+                            document.getElementById('case_type').value = type.type_name;
+                            dropdown.classList.add('hidden');
+                        });
+                        dropdown.appendChild(item);
+                    });
+                    dropdown.classList.remove('hidden');
+                } else {
+                    // Show option to create new
+                    const item = document.createElement('div');
+                    item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-blue-600';
+                    item.innerHTML = `<i class="fas fa-plus mr-2"></i>Create "${query}"`;
+                    item.addEventListener('click', () => {
+                        createCaseType(query);
+                    });
+                    dropdown.appendChild(item);
+                    dropdown.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching case types:', error);
+                dropdown.classList.add('hidden');
+            });
+    }, 300);
+});
+
+// Case Category search and auto-create
+document.getElementById('case_category').addEventListener('input', function(e) {
+    clearTimeout(categorySearchTimeout);
+    const query = e.target.value.trim().toUpperCase();
+    const dropdown = document.getElementById('case_category_dropdown');
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    categorySearchTimeout = setTimeout(() => {
+        fetch(`/api/case-categories/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                if (data.categories && data.categories.length > 0) {
+                    data.categories.forEach(category => {
+                        const item = document.createElement('div');
+                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                        item.textContent = category.category_name;
+                        item.addEventListener('click', () => {
+                            document.getElementById('case_category').value = category.category_name;
+                            dropdown.classList.add('hidden');
+                        });
+                        dropdown.appendChild(item);
+                    });
+                    dropdown.classList.remove('hidden');
+                } else {
+                    // Show option to create new
+                    const item = document.createElement('div');
+                    item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-blue-600';
+                    item.innerHTML = `<i class="fas fa-plus mr-2"></i>Create "${query}"`;
+                    item.addEventListener('click', () => {
+                        createCaseCategory(query);
+                    });
+                    dropdown.appendChild(item);
+                    dropdown.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching case categories:', error);
+                dropdown.classList.add('hidden');
+            });
+    }, 300);
+});
+
+// Station search and auto-create
+document.getElementById('station').addEventListener('input', function(e) {
+    clearTimeout(stationSearchTimeout);
+    const query = e.target.value.trim().toUpperCase();
+    const dropdown = document.getElementById('station_dropdown');
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    stationSearchTimeout = setTimeout(() => {
+        fetch(`/api/stations/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage(data.error, 'error');
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                if (data.stations && data.stations.length > 0) {
+                    data.stations.forEach(station => {
+                        const item = document.createElement('div');
+                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                        item.textContent = station.station_name;
+                        item.addEventListener('click', () => {
+                            document.getElementById('station').value = station.station_name;
+                            dropdown.classList.add('hidden');
+                        });
+                        dropdown.appendChild(item);
+                    });
+                    dropdown.classList.remove('hidden');
+                } else {
+                    // Show option to create new
+                    const item = document.createElement('div');
+                    item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-blue-600';
+                    item.innerHTML = `<i class="fas fa-plus mr-2"></i>Create "${query}"`;
+                    item.addEventListener('click', () => {
+                        createStation(query);
+                    });
+                    dropdown.appendChild(item);
+                    dropdown.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching stations:', error);
+                dropdown.classList.add('hidden');
+            });
+    }, 300);
+});
+
+// Helper functions to create new entries
+function createCaseType(typeName) {
+    fetch('/api/case-types/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type_name: typeName})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showMessage(data.error, 'error');
+        } else {
+            document.getElementById('case_type').value = data.type.type_name;
+            document.getElementById('case_type_dropdown').classList.add('hidden');
+            showMessage('Case type created successfully', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error creating case type:', error);
+        showMessage('Error creating case type', 'error');
+    });
+}
+
+function createCaseCategory(categoryName) {
+    fetch('/api/case-categories/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({category_name: categoryName})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showMessage(data.error, 'error');
+        } else {
+            document.getElementById('case_category').value = data.category.category_name;
+            document.getElementById('case_category_dropdown').classList.add('hidden');
+            showMessage('Case category created successfully', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error creating case category:', error);
+        showMessage('Error creating case category', 'error');
+    });
+}
+
+function createStation(stationName) {
+    fetch('/api/stations/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({station_name: stationName})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showMessage(data.error, 'error');
+        } else {
+            document.getElementById('station').value = data.station.station_name;
+            document.getElementById('station_dropdown').classList.add('hidden');
+            showMessage('Station created successfully', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error creating station:', error);
+        showMessage('Error creating station', 'error');
+    });
+}
+
+// Parties management
+let partyCounter = 0;
+let clientAddedAsParty = false;
+
+function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent = '') {
+    const container = document.getElementById('partiesContainer');
+    const partyDiv = document.createElement('div');
+    partyDiv.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
+    partyDiv.id = `party-${partyCounter}`;
+    
+    partyDiv.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Party Name <span class="text-red-500">*</span></label>
+                <input 
+                    type="text" 
+                    name="party_name_${partyCounter}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
+                    placeholder="Party name..."
+                    value="${partyName}"
+                    required
+                />
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Party Type <span class="text-red-500">*</span></label>
+                <input 
+                    type="text" 
+                    name="party_type_${partyCounter}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
+                    placeholder="Type (e.g., Plaintiff, Defendant)..."
+                    value="${partyType}"
+                    required
+                />
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+                <input 
+                    type="text" 
+                    name="party_category_${partyCounter}"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
+                    placeholder="Category..."
+                    value="${partyCategory}"
+                />
+            </div>
+            <div class="flex items-end">
+                <div class="flex-1">
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Firm/Agent</label>
+                    <input 
+                        type="text" 
+                        name="firm_agent_${partyCounter}"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
+                        placeholder="Firm or agent name..."
+                        value="${firmAgent}"
+                    />
+                </div>
+                <button 
+                    type="button" 
+                    onclick="removeParty(${partyCounter})"
+                    class="ml-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm"
+                    title="Remove Party"
+                >
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(partyDiv);
+    partyCounter++;
+}
+
+function removeParty(id) {
+    const partyDiv = document.getElementById(`party-${id}`);
+    if (partyDiv) {
+        partyDiv.remove();
+    }
+}
+
+// Auto-add client as first party when client is selected
+document.getElementById('client_name').addEventListener('change', function() {
+    if (!clientAddedAsParty && this.value.trim()) {
+        addParty(this.value.toUpperCase(), 'CLIENT', '', '');
+        clientAddedAsParty = true;
+    }
+});
+
+// Form submission
+document.getElementById('caseRegistrationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Collect parties data
+    const parties = [];
+    const partyInputs = document.querySelectorAll('[name^="party_name_"]');
+    partyInputs.forEach(input => {
+        const index = input.name.split('_')[2];
+        const partyName = input.value.trim().toUpperCase();
+        const partyTypeInput = document.querySelector(`[name="party_type_${index}"]`);
+        const partyCategoryInput = document.querySelector(`[name="party_category_${index}"]`);
+        const firmAgentInput = document.querySelector(`[name="firm_agent_${index}"]`);
+        
+        if (partyName && partyTypeInput && partyTypeInput.value.trim()) {
+            parties.push({
+                party_name: partyName,
+                party_type: partyTypeInput.value.trim().toUpperCase(),
+                party_category: partyCategoryInput ? partyCategoryInput.value.trim().toUpperCase() || null : null,
+                firm_agent: firmAgentInput ? firmAgentInput.value.trim().toUpperCase() || null : null
+            });
+        }
+    });
+    
+    const formData = {
+        client_id: document.getElementById('client_id').value,
+        client_name: document.getElementById('client_name').value,
+        court_case_number: document.getElementById('court_case_number').value,
+        case_type: document.getElementById('case_type').value,
+        filing_date: document.getElementById('filing_date').value,
+        case_category: document.getElementById('case_category').value,
+        station: document.getElementById('station').value,
+        filled_by_id: document.getElementById('filled_by_id').value,
+        filled_by_name: document.getElementById('filled_by').value,
+        description: document.getElementById('description').value,
+        parties: parties
+    };
+    
+    // Validate required fields
+    if (!formData.client_id || !formData.filled_by_id) {
+        showMessage('Please select a client and employee', 'error');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registering...';
+    
+    fetch('/api/cases/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showMessage(data.error, 'error');
+        } else {
+            const message = data.tracking_number 
+                ? `Case registered successfully! Tracking Number: ${data.tracking_number}`
+                : (data.message || 'Case registered successfully!');
+            showMessage(message, 'success');
+            resetForm();
+        }
+    })
+    .catch(error => {
+        console.error('Error registering case:', error);
+        showMessage('Error registering case. Please try again.', 'error');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+// Reset form
+function resetForm() {
+    document.getElementById('caseRegistrationForm').reset();
+    document.getElementById('client_id').value = '';
+    document.getElementById('created_by').value = '{{ employee_name }}';
+    // Clear parties
+    document.getElementById('partiesContainer').innerHTML = '';
+    partyCounter = 0;
+    clientAddedAsParty = false;
+    // Hide all dropdowns
+    document.querySelectorAll('[id$="_dropdown"]').forEach(dropdown => {
+        dropdown.classList.add('hidden');
+    });
+}
+
+// Show message function
+function showMessage(message, type) {
+    const container = document.getElementById('messageContainer');
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    
+    container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg`;
+    container.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    container.classList.remove('hidden');
+    
+    setTimeout(() => {
+        container.classList.add('hidden');
+    }, 5000);
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.relative')) {
+        document.querySelectorAll('[id$="_dropdown"]').forEach(dropdown => {
+            dropdown.classList.add('hidden');
+        });
+    }
+});
+
+// Convert input to uppercase on blur (except description)
+document.querySelectorAll('input[type="text"]').forEach(input => {
+    if (input.id !== 'description') {
+        input.addEventListener('blur', function() {
+            if (this.id !== 'description') {
+                this.value = this.value.toUpperCase();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+

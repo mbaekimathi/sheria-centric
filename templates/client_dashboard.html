@@ -1,68 +1,192 @@
 {% extends "base.html" %}
 
-{% block title %}Client Dashboard - CASELY{% endblock %}
+{% block title %}Client Dashboard - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<!-- Welcome Section -->
-<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
-    <div class="text-center">
-        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Welcome, {{ session.client_name }}!</h1>
-        <p class="text-gray-600 text-lg">{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}</p>
-    </div>
-</div>
-
-<!-- Client Information Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    <!-- Account Info -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-            Account Information
-        </h2>
-        <div class="space-y-3">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Welcome Section -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
             <div>
-                <p class="text-sm text-gray-500">Email</p>
-                <p class="text-gray-900 font-medium">{{ session.client_email }}</p>
+                <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                    <i class="fas fa-home mr-3"></i>
+                    Welcome, {{ client.full_name or session.client_name }}!
+                </h1>
+                <p class="text-indigo-100">{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}</p>
             </div>
-            <div>
-                <p class="text-sm text-gray-500">Client Type</p>
-                <p class="text-gray-900 font-medium">{{ session.client_type }}</p>
+            <div class="flex items-center space-x-4 mt-4 md:mt-0">
+                <a href="{{ url_for('client_messages') }}" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 text-white font-semibold">
+                    <i class="fas fa-comments"></i>
+                    <span>Contact Support</span>
+                </a>
+                {% if client.profile_picture %}
+                <div>
+                    {% if client.profile_picture.startswith('http') %}
+                    <img src="{{ client.profile_picture }}" alt="{{ client.full_name }}" class="w-20 h-20 rounded-full border-4 border-white shadow-lg object-cover">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-20 h-20 rounded-full border-4 border-white shadow-lg object-cover">
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Cases Section -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-briefcase text-indigo-600 mr-3"></i>
+                My Cases <span class="ml-2 text-gray-500 font-normal">({{ cases|length }})</span>
+            </h2>
+            <a href="{{ url_for('client_cases') }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                View All <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+        
+        {% if cases and cases|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Court Case Number</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Case Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filing Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for case in cases[:5] %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-semibold text-indigo-600">{{ case.tracking_number or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ case.court_case_number or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ case.case_type or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ case.filing_date or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% set status_colors = {
+                                'Active': 'bg-green-100 text-green-800',
+                                'Closed': 'bg-gray-100 text-gray-800',
+                                'Pending': 'bg-yellow-100 text-yellow-800',
+                                'Pending Approval': 'bg-purple-100 text-purple-800'
+                            } %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ status_colors.get(case.status, 'bg-gray-100 text-gray-800') }}">
+                                {{ case.status or 'N/A' }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="{{ url_for('client_case_details', case_id=case.id) }}" class="text-indigo-600 hover:text-indigo-900">
+                                <i class="fas fa-eye mr-1"></i>View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if cases|length > 5 %}
+        <div class="mt-4 text-center">
+            <a href="{{ url_for('client_cases') }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                View {{ cases|length - 5 }} more case(s) <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-briefcase text-gray-400 text-5xl mb-4"></i>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No Cases Found</h3>
+            <p class="text-gray-600">You don't have any cases registered yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Other Matters Section -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <i class="fas fa-bolt text-green-600 mr-2"></i>
-            Quick Actions
-        </h2>
-        <div class="space-y-3">
-            <button class="w-full text-left px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                <i class="fas fa-file-alt text-blue-600 mr-2"></i>
-                View Documents
-            </button>
-            <button class="w-full text-left px-4 py-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
-                <i class="fas fa-calendar text-green-600 mr-2"></i>
-                View Cases
-            </button>
-            <button class="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors">
-                <i class="fas fa-comments text-purple-600 mr-2"></i>
-                Messages
-            </button>
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-folder-open text-indigo-600 mr-3"></i>
+                Other Matters <span class="ml-2 text-gray-500 font-normal">({{ matters|length }})</span>
+            </h2>
+            <a href="{{ url_for('client_document_type', document_type='CLIENT_OTHER_MATTERS') }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                View All <i class="fas fa-arrow-right ml-1"></i>
+            </a>
         </div>
-    </div>
-</div>
-
-<!-- Dashboard Content Area -->
-<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-    <div class="text-center py-12">
-        <div class="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center">
-            <i class="fas fa-briefcase text-4xl text-gray-400"></i>
+        
+        {% if matters and matters|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference #</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matter Title</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Opened</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for matter in matters[:5] %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-semibold text-indigo-600">{{ matter.matter_reference_number or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900">{{ matter.matter_title or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ matter.matter_category or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ matter.date_opened or 'N/A' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% set status_colors = {
+                                'Open': 'bg-green-100 text-green-800',
+                                'In Progress': 'bg-blue-100 text-blue-800',
+                                'Pending Client': 'bg-yellow-100 text-yellow-800',
+                                'Completed': 'bg-gray-100 text-gray-800',
+                                'On Hold': 'bg-orange-100 text-orange-800',
+                                'Closed': 'bg-red-100 text-red-800',
+                                'Pending Approval': 'bg-purple-100 text-purple-800'
+                            } %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ status_colors.get(matter.status, 'bg-gray-100 text-gray-800') }}">
+                                {{ matter.status or 'N/A' }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="{{ url_for('matter_details', matter_id=matter.id) }}" class="text-indigo-600 hover:text-indigo-900">
+                                <i class="fas fa-eye mr-1"></i>View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <h2 class="text-2xl font-semibold text-gray-700 mb-2">Client Dashboard</h2>
-        <p class="text-gray-500">Your client portal content will appear here</p>
+        {% if matters|length > 5 %}
+        <div class="mt-4 text-center">
+            <a href="{{ url_for('client_document_type', document_type='CLIENT_OTHER_MATTERS') }}" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                View {{ matters|length - 5 }} more matter(s) <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-folder-open text-gray-400 text-5xl mb-4"></i>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">No Matters Found</h3>
+            <p class="text-gray-600">You don't have any other matters registered yet.</p>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
-

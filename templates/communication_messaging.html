@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Communication & Messaging - CASELY{% endblock %}
+{% block title %}Communication & Messaging - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
@@ -11,10 +11,364 @@
         </h1>
         <p class="text-gray-600">Manage internal and external communications</p>
     </div>
+
+    {% if communication_type == 'email' %}
+    <!-- Email Communication -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-envelope text-indigo-600 mr-3"></i>
+                Email Accounts
+            </h2>
+            <a href="{{ url_for('employee_communication_settings') }}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-sm flex items-center">
+                <i class="fas fa-cog mr-2"></i>
+                Manage Email Allocation
+            </a>
+        </div>
+
+        {% if email_accounts and email_accounts|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email Address</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Linked Employee</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for email_account in email_accounts %}
+                    {% set email_address = email_account.email_address or email_account.email or '' %}
+                    {% set linked_employee = [] %}
+                    {% for emp in employees %}
+                        {% if emp.work_email == email_address %}
+                            {% set _ = linked_employee.append(emp) %}
+                        {% endif %}
+                    {% endfor %}
+                    {% set linked_employee = linked_employee[0] if linked_employee else none %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <i class="fas fa-envelope text-indigo-600"></i>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">{{ email_address }}</div>
+                                    {% if email_account.display_name %}
+                                    <div class="text-sm text-gray-500">{{ email_account.display_name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if linked_employee %}
+                            <div class="flex items-center">
+                                {% if linked_employee.profile_picture %}
+                                <img src="/static/uploads/profile_pictures/{{ linked_employee.profile_picture }}" 
+                                     alt="{{ linked_employee.full_name }}" 
+                                     class="h-8 w-8 rounded-full object-cover"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                {% endif %}
+                                <div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-xs {% if linked_employee.profile_picture %}hidden{% endif %}">
+                                    {{ linked_employee.full_name[0] if linked_employee.full_name else '?' }}
+                                </div>
+                                <div class="ml-3">
+                                    <div class="text-sm font-medium text-gray-900">{{ linked_employee.full_name }}</div>
+                                    <div class="text-sm text-gray-500">{{ linked_employee.employee_code or '' }} • {{ linked_employee.role or '' }}</div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <span class="text-sm text-gray-400 italic">Not linked to any employee</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if email_account.is_active == False %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                Inactive
+                            </span>
+                            {% else %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Active
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if email_account.is_cpanel %}
+                            <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
+                                cPanel
+                            </span>
+                            {% elif email_account.is_main %}
+                            <span class="px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800">
+                                Main
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
+                                Database
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {% if linked_employee %}
+                            <a href="{{ url_for('employee_communications', employee_id=linked_employee.id) }}" class="text-indigo-600 hover:text-indigo-900">
+                                View Communications
+                            </a>
+                            {% else %}
+                            <a href="{{ url_for('employee_communication_settings') }}" class="text-gray-400 hover:text-gray-600">
+                                Link Employee
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-envelope text-gray-400 text-5xl mb-4"></i>
+            <p class="text-gray-600 text-lg">No email accounts found</p>
+            <p class="text-gray-500 text-sm mt-2">Email accounts will appear here once they are configured</p>
+            <a href="{{ url_for('employee_communication_settings') }}" class="mt-4 inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold">
+                <i class="fas fa-cog mr-2"></i>
+                Configure Email Accounts
+            </a>
+        </div>
+        {% endif %}
+        
+        <!-- All Emails Section -->
+        {% if all_emails and all_emails|length > 0 %}
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mt-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-inbox text-indigo-600 mr-3"></i>
+                    All Emails ({{ all_emails|length }})
+                </h2>
+            </div>
+            
+            <div class="space-y-4 max-h-screen overflow-y-auto">
+                {% for email in all_emails %}
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <div class="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2">
+                                        <h4 class="font-semibold text-gray-900">{{ email.subject or '(No Subject)' }}</h4>
+                                        <span class="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-600">
+                                            {{ email.account_email }}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 mt-1">
+                                        <span class="font-medium">From:</span> {{ email.from }}
+                                    </p>
+                                    <p class="text-sm text-gray-600">
+                                        <span class="font-medium">To:</span> {{ email.to }}
+                                    </p>
+                                </div>
+                            </div>
+                            {% if email.body %}
+                            <div class="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap line-clamp-3">{{ email.body[:300] }}{% if email.body|length > 300 %}...{% endif %}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="text-xs text-gray-500 whitespace-nowrap">{{ email.date }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% elif all_emails is defined and all_emails|length == 0 %}
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mt-6">
+            <div class="text-center py-12">
+                <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
+                <p class="text-gray-600 text-lg">No emails found</p>
+                <p class="text-gray-500 text-sm mt-2">No emails were found in the configured email accounts</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% elif communication_type == 'webapp' %}
+    <!-- Web App Communication -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-globe text-indigo-600 mr-3"></i>
+                Client Messages
+            </h2>
+            <button 
+                onclick="refreshMessages()"
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-sm flex items-center"
+            >
+                <i class="fas fa-sync mr-2"></i>Refresh
+            </button>
+        </div>
+
+        {% if client_messages and client_messages|length > 0 %}
+        <div class="space-y-4">
+            {% for msg in client_messages %}
+            <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-all {% if msg.sender_type == 'employee' %}bg-blue-50 border-blue-200{% else %}bg-gray-50{% endif %}">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3 mb-3">
+                            {% if msg.sender_type == 'employee' and msg.employee_profile_picture %}
+                            <img src="/static/uploads/profile_pictures/{{ msg.employee_profile_picture }}" 
+                                 alt="{{ msg.employee_name or msg.employee_full_name }}" 
+                                 class="h-10 w-10 rounded-full object-cover"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            {% endif %}
+                            <div class="h-10 w-10 rounded-full {% if msg.sender_type == 'employee' %}bg-blue-100{% else %}bg-indigo-100{% endif %} flex items-center justify-center {% if msg.sender_type == 'employee' %}text-blue-600{% else %}text-indigo-600{% endif %} font-semibold {% if msg.sender_type == 'employee' and msg.employee_profile_picture %}hidden{% endif %}">
+                                {{ (msg.employee_name or msg.employee_full_name)[0] if msg.sender_type == 'employee' else msg.client_name[0] if msg.client_name else '?' }}
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">
+                                    {% if msg.sender_type == 'employee' %}
+                                        {{ msg.employee_name or msg.employee_full_name or 'Support Team' }}
+                                    {% else %}
+                                        {{ msg.client_name or 'Client' }}
+                                    {% endif %}
+                                </h4>
+                                {% if msg.subject %}
+                                <p class="text-sm font-medium text-indigo-600">{{ msg.subject }}</p>
+                                {% endif %}
+                                <p class="text-xs text-gray-500">{{ msg.client_email or '' }}</p>
+                            </div>
+                            {% if msg.sender_type == 'client' and not msg.is_read %}
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                New
+                            </span>
+                            {% endif %}
+                        </div>
+                        <p class="text-gray-700 whitespace-pre-wrap mb-4">{{ msg.message }}</p>
+                        
+                        {% if msg.sender_type == 'client' %}
+                        <div class="border-t border-gray-200 pt-4">
+                            <form class="respond-form" data-message-id="{{ msg.id }}" data-client-id="{{ msg.client_id }}">
+                                <div class="mb-3">
+                                    <textarea 
+                                        name="response" 
+                                        rows="3"
+                                        placeholder="Type your response..."
+                                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        required
+                                    ></textarea>
+                                </div>
+                                <button 
+                                    type="submit"
+                                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold text-sm flex items-center"
+                                >
+                                    <i class="fas fa-reply mr-2"></i>
+                                    Respond
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="text-right ml-4">
+                        <p class="text-xs text-gray-500 whitespace-nowrap">{{ msg.created_at }}</p>
+                        {% if msg.sender_type == 'employee' %}
+                        <span class="mt-2 inline-block px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
+                            Response
+                        </span>
+                        {% else %}
+                        <span class="mt-2 inline-block px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
+                            Client
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
+            <p class="text-gray-600 text-lg">No client messages found</p>
+            <p class="text-gray-500 text-sm mt-2">Client messages will appear here when clients send messages</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+    function refreshMessages() {
+        window.location.reload();
+    }
+
+    // Handle response forms
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('.respond-form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const messageId = this.dataset.messageId;
+                const clientId = this.dataset.clientId;
+                const responseTextarea = this.querySelector('textarea[name="response"]');
+                const response = responseTextarea.value.trim();
+                
+                if (!response) {
+                    alert('Please enter a response');
+                    return;
+                }
+                
+                const submitBtn = this.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+                
+                fetch('/api/employee/messages/respond', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message_id: messageId,
+                        client_id: clientId,
+                        message: response
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Response sent successfully!');
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Error sending response');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while sending the response.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+            });
+        });
+    });
+    </script>
+    {% elif communication_type == 'whatsapp' %}
+    <!-- WhatsApp Communication -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+        <i class="fab fa-whatsapp text-gray-400 text-5xl mb-4"></i>
+        <p class="text-gray-600 text-lg">WhatsApp Communication</p>
+        <p class="text-gray-500 text-sm mt-2">Feature coming soon</p>
+    </div>
+    {% else %}
+    <!-- Default / No type selected -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
         <i class="fas fa-comments text-gray-400 text-5xl mb-4"></i>
-        <p class="text-gray-600">Feature coming soon</p>
+        <p class="text-gray-600 text-lg">Select a communication type from the sidebar</p>
+        <p class="text-gray-500 text-sm mt-2">Choose Email, Web App, or WhatsApp communication</p>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
-

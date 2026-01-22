@@ -1,0 +1,1183 @@
+{% extends "base.html" %}
+
+{% block title %}Case Proceedings - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('case_details', case_id=case_id) }}" class="text-gray-600 hover:text-gray-900 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                        <i class="fas fa-file-alt text-indigo-600 mr-3"></i>
+                        Update Case Proceedings
+                    </h1>
+                    <p class="text-gray-600">Tracking Number: <span class="font-semibold">{{ case_data.tracking_number }}</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Proceeding Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+            <i class="fas fa-edit text-indigo-600 mr-3"></i>
+            Update Proceeding
+        </h2>
+        <p class="text-sm text-gray-600 mb-4">
+            <i class="fas fa-info-circle mr-2"></i>
+            {% if proceedings and proceedings|length > 0 %}
+            Form auto-filled with latest proceeding details. Update the information and save.
+            {% else %}
+            Add your first proceeding for this case.
+            {% endif %}
+        </p>
+        
+        <form id="proceedingForm" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Date of Court Appeared -->
+                <div>
+                    <label for="date_of_court_appeared" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Date of Court Appeared <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="date" 
+                        id="date_of_court_appeared" 
+                        name="date_of_court_appeared"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                    />
+                </div>
+
+                <!-- Current Session Attendance -->
+                <div>
+                    <label for="current_attendance" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Current Session Attendance
+                    </label>
+                    <select 
+                        id="current_attendance" 
+                        name="current_attendance"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                        <option value="">Select attendance...</option>
+                        <option value="Present">Present</option>
+                        <option value="Absent">Absent</option>
+                        <option value="Represented">Represented</option>
+                        <option value="Not Required">Not Required</option>
+                    </select>
+                </div>
+
+                <!-- Court Directions -->
+                <div>
+                    <label for="outcome_orders" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Court Directions
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="outcome_orders" 
+                            name="outcome_orders"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Enter court directions..."
+                            maxlength="255"
+                            autocomplete="off"
+                        />
+                        <div id="outcome_orders_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="md:col-span-2">
+                    <label for="outcome_details" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Description
+                    </label>
+                    <textarea 
+                        id="outcome_details" 
+                        name="outcome_details"
+                        rows="4"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter detailed outcome information..."
+                    ></textarea>
+                </div>
+
+                <!-- Next Action -->
+                <div class="md:col-span-2">
+                    <label for="reason" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Next Action
+                    </label>
+                    <textarea 
+                        id="reason" 
+                        name="reason"
+                        rows="3"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter next action..."
+                    ></textarea>
+                </div>
+
+                <!-- Judicial Officer -->
+                <div>
+                    <label for="judicial_officer" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Judicial Officer
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="judicial_officer" 
+                            name="judicial_officer"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Enter judicial officer name..."
+                            autocomplete="off"
+                        />
+                        <div id="judicial_officer_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- Next Court Date -->
+                <div>
+                    <label for="next_court_date" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Next Court Date (if any)
+                    </label>
+                    <input 
+                        type="date" 
+                        id="next_court_date" 
+                        name="next_court_date"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                </div>
+
+                <!-- Next Client Attendance -->
+                <div>
+                    <label for="next_attendance" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Next Client Attendance (optional)
+                    </label>
+                    <select 
+                        id="next_attendance" 
+                        name="next_attendance"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        onchange="toggleVirtualLink()"
+                    >
+                        <option value="">Select attendance...</option>
+                        <option value="Present">Present</option>
+                        <option value="Absent">Absent</option>
+                        <option value="Represented">Represented</option>
+                        <option value="Not Required">Not Required</option>
+                        <option value="Virtual (Represented)">Virtual (Represented)</option>
+                        <option value="Virtual (Client to Attend)">Virtual (Client to Attend)</option>
+                    </select>
+                </div>
+
+                <!-- Virtual Link (conditional) -->
+                <div id="virtual_link_container" class="hidden">
+                    <label for="virtual_link" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Virtual Link (optional)
+                    </label>
+                    <input 
+                        type="url" 
+                        id="virtual_link" 
+                        name="virtual_link"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter virtual meeting link (e.g., https://meet.google.com/...)..."
+                    />
+                </div>
+            </div>
+
+            <!-- Bring up date Section -->
+            <div class="border-t border-gray-200 pt-6 mt-6">
+                <div class="flex items-center mb-4">
+                    <input 
+                        type="checkbox" 
+                        id="materials_required"
+                        class="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        onchange="toggleMaterialsSection()"
+                    />
+                    <label for="materials_required" class="ml-3 text-lg font-semibold text-gray-900">
+                        Bring up date
+                    </label>
+                </div>
+
+                <div id="materialsSection" class="hidden space-y-4">
+                    <div id="materialsContainer">
+                        <!-- Items will be added here dynamically -->
+                    </div>
+                    <button 
+                        type="button"
+                        onclick="addMaterialRow()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold"
+                    >
+                        <i class="fas fa-plus mr-2"></i>Add Item
+                    </button>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex justify-end space-x-4 pt-4">
+                <button 
+                    type="button" 
+                    onclick="resetForm()"
+                    class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+                >
+                    <i class="fas fa-redo mr-2"></i>Reset
+                </button>
+                <button 
+                    type="submit"
+                    class="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 font-semibold shadow-md hover:shadow-lg"
+                >
+                    <i class="fas fa-save mr-2"></i>Update Proceeding
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Existing Proceedings -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+            <i class="fas fa-list text-indigo-600 mr-3"></i>
+            Existing Proceedings <span class="ml-2 text-green-600">({{ proceedings|length }})</span>
+        </h2>
+        
+        {% if proceedings and proceedings|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Next Date</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Outcome</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for proceeding in proceedings %}
+                    <tr class="hover:bg-gray-50 transition-colors {% if proceeding.is_latest == 0 %}opacity-60{% endif %}">
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            {% if proceeding.is_latest == 1 %}
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Current
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">
+                                Previous
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</div>
+                            <div class="text-xs text-gray-500">{{ proceeding.created_at.split(' ')[0] if proceeding.created_at else '' }}</div>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            {% if proceeding.next_court_date %}
+                            <div class="text-sm font-semibold text-green-600">{{ proceeding.next_court_date }}</div>
+                            {% else %}
+                            <span class="text-sm text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% if proceeding.outcome_orders %}
+                            <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ proceeding.outcome_orders }}">
+                                {{ proceeding.outcome_orders }}
+                            </div>
+                            {% else %}
+                            <span class="text-sm text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            <div class="flex items-center space-x-2">
+                                <button 
+                                    onclick="viewProceedingDetails({{ proceeding.id }})"
+                                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition-colors flex items-center"
+                                    title="View Proceeding Details"
+                                >
+                                    <i class="fas fa-eye mr-1"></i>View
+                                </button>
+                                {% if proceeding.is_latest == 1 %}
+                                <button 
+                                    onclick="updateProceeding({{ proceeding.id }})"
+                                    class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition-colors flex items-center"
+                                    title="Edit Current Proceeding"
+                                >
+                                    <i class="fas fa-edit mr-1"></i>Edit
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
+            <p class="text-gray-600">No proceedings added yet. Add your first proceeding above.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+    <!-- Proceeding Details Modal -->
+    <div id="proceedingModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+                    <h3 class="text-2xl font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-file-alt text-indigo-600 mr-3"></i>
+                        Proceeding Details
+                    </h3>
+                    <button onclick="closeProceedingModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div id="proceedingModalContent" class="mt-4 space-y-4">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+                    <button 
+                        onclick="closeProceedingModal()"
+                        class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let materialRowCount = 0;
+let judicialOfficerSearchTimeout;
+let outcomeOrdersSearchTimeout;
+
+// Toggle virtual link field
+function toggleVirtualLink() {
+    const attendanceSelect = document.getElementById('next_attendance');
+    const virtualLinkContainer = document.getElementById('virtual_link_container');
+    const virtualLinkInput = document.getElementById('virtual_link');
+    
+    if (attendanceSelect.value.includes('Virtual')) {
+        virtualLinkContainer.classList.remove('hidden');
+    } else {
+        virtualLinkContainer.classList.add('hidden');
+        virtualLinkInput.value = ''; // Clear the link when not virtual
+    }
+}
+
+// Toggle materials section
+function toggleMaterialsSection() {
+    const checkbox = document.getElementById('materials_required');
+    const section = document.getElementById('materialsSection');
+    
+    if (checkbox.checked) {
+        section.classList.remove('hidden');
+        if (materialRowCount === 0) {
+            addMaterialRow();
+        }
+    } else {
+        section.classList.add('hidden');
+        // Clear all materials
+        document.getElementById('materialsContainer').innerHTML = '';
+        materialRowCount = 0;
+    }
+}
+
+// Add material row
+function addMaterialRow() {
+    materialRowCount++;
+    const container = document.getElementById('materialsContainer');
+    const rowId = `material_${materialRowCount}`;
+    
+    const row = document.createElement('div');
+    row.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
+    row.id = rowId;
+    row.innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+            <h4 class="font-semibold text-gray-900">Item ${materialRowCount}</h4>
+            <button 
+                type="button"
+                onclick="removeMaterialRow('${rowId}')"
+                class="text-red-600 hover:text-red-800 transition-colors"
+                title="Remove Item"
+            >
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Description <span class="text-red-500">*</span>
+                </label>
+                <textarea 
+                    name="material_description_${materialRowCount}"
+                    rows="3"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Enter item description..."
+                    required
+                ></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Frequency to be Reminded
+                </label>
+                <select 
+                    name="material_frequency_${materialRowCount}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                >
+                    <option value="">Select frequency...</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Bi-weekly">Bi-weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Once">Once</option>
+                    <option value="Custom">Custom</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Allocated To
+                </label>
+                <div class="relative">
+                    <input 
+                        type="text"
+                        id="material_allocated_${materialRowCount}"
+                        name="material_allocated_input_${materialRowCount}"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Search employee..."
+                        autocomplete="off"
+                        oninput="searchEmployees(${materialRowCount}, this.value)"
+                    />
+                    <input 
+                        type="hidden"
+                        name="material_allocated_id_${materialRowCount}"
+                        id="material_allocated_id_${materialRowCount}"
+                    />
+                    <div id="employee_dropdown_${materialRowCount}" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(row);
+}
+
+// Remove material row
+function removeMaterialRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+        row.remove();
+        // Update material numbers
+        updateMaterialNumbers();
+    }
+}
+
+// Update material numbers after removal
+function updateMaterialNumbers() {
+    const container = document.getElementById('materialsContainer');
+    const rows = container.querySelectorAll('[id^="material_"]');
+    materialRowCount = rows.length;
+    
+    rows.forEach((row, index) => {
+        const number = index + 1;
+        const header = row.querySelector('h4');
+        if (header) {
+            header.textContent = `Item ${number}`;
+        }
+    });
+}
+
+// Employee search - use per-row timeouts
+const employeeSearchTimeouts = {};
+function searchEmployees(materialIndex, query) {
+    // Clear existing timeout for this row
+    if (employeeSearchTimeouts[materialIndex]) {
+        clearTimeout(employeeSearchTimeouts[materialIndex]);
+    }
+    
+    const dropdown = document.getElementById(`employee_dropdown_${materialIndex}`);
+    if (!dropdown) {
+        console.error(`Dropdown not found for material index ${materialIndex}`);
+        return;
+    }
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    employeeSearchTimeouts[materialIndex] = setTimeout(() => {
+        fetch(`/api/employees/search?q=${encodeURIComponent(query)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                const dropdown = document.getElementById(`employee_dropdown_${materialIndex}`);
+                if (!dropdown) return;
+                
+                dropdown.innerHTML = '';
+                
+                if (data.error) {
+                    dropdown.innerHTML = `<div class="px-4 py-2 text-gray-500">${data.error}</div>`;
+                    dropdown.classList.remove('hidden');
+                    return;
+                }
+                
+                if (!data.employees || data.employees.length === 0) {
+                    dropdown.innerHTML = '<div class="px-4 py-2 text-gray-500">No employees found</div>';
+                    dropdown.classList.remove('hidden');
+                    return;
+                }
+                
+                data.employees.forEach(employee => {
+                    const item = document.createElement('div');
+                    item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                    const employeeName = employee.full_name || employee.name || '';
+                    const employeeCode = employee.employee_code || employee.code || '';
+                    item.textContent = `${employeeName}${employeeCode ? ' (' + employeeCode + ')' : ''}`;
+                    item.onclick = () => {
+                        const inputField = document.getElementById(`material_allocated_${materialIndex}`);
+                        const hiddenField = document.getElementById(`material_allocated_id_${materialIndex}`);
+                        if (inputField) {
+                            inputField.value = `${employeeName}${employeeCode ? ' (' + employeeCode + ')' : ''}`;
+                        }
+                        if (hiddenField) {
+                            hiddenField.value = employee.id;
+                        }
+                        dropdown.classList.add('hidden');
+                    };
+                    dropdown.appendChild(item);
+                });
+                
+                dropdown.classList.remove('hidden');
+            })
+            .catch(error => {
+                console.error('Error searching employees:', error);
+                const dropdown = document.getElementById(`employee_dropdown_${materialIndex}`);
+                if (dropdown) {
+                    dropdown.innerHTML = '<div class="px-4 py-2 text-red-500">Error searching employees</div>';
+                    dropdown.classList.remove('hidden');
+                }
+            });
+    }, 300);
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.relative')) {
+        document.querySelectorAll('[id^="employee_dropdown_"]').forEach(dropdown => {
+            dropdown.classList.add('hidden');
+        });
+        document.querySelectorAll('[id$="_dropdown"]').forEach(dropdown => {
+            dropdown.classList.add('hidden');
+        });
+    }
+});
+
+// Judicial Officer live search with uppercase conversion
+const judicialOfficerInput = document.getElementById('judicial_officer');
+judicialOfficerInput.addEventListener('input', function(e) {
+    // Convert to uppercase
+    const cursorPos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(cursorPos, cursorPos);
+    
+    // Live search
+    clearTimeout(judicialOfficerSearchTimeout);
+    const query = this.value.trim();
+    const dropdown = document.getElementById('judicial_officer_dropdown');
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    judicialOfficerSearchTimeout = setTimeout(() => {
+        fetch(`/api/proceedings/judicial-officers/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    dropdown.classList.add('hidden');
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                if (data.officers && data.officers.length > 0) {
+                    data.officers.forEach(officer => {
+                        const item = document.createElement('div');
+                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                        item.textContent = officer;
+                        item.addEventListener('click', () => {
+                            document.getElementById('judicial_officer').value = officer;
+                            dropdown.classList.add('hidden');
+                        });
+                        dropdown.appendChild(item);
+                    });
+                    dropdown.classList.remove('hidden');
+                } else {
+                    dropdown.classList.add('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching judicial officers:', error);
+                dropdown.classList.add('hidden');
+            });
+    }, 300);
+});
+
+// Close dropdown on blur (when user moves to another field)
+judicialOfficerInput.addEventListener('blur', function(e) {
+    // Delay to allow click on dropdown item to register
+    setTimeout(() => {
+        const dropdown = document.getElementById('judicial_officer_dropdown');
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+        }
+    }, 200);
+});
+
+// Current Case Outcome live search with uppercase conversion
+const outcomeOrdersInput = document.getElementById('outcome_orders');
+outcomeOrdersInput.addEventListener('input', function(e) {
+    // Convert to uppercase
+    const cursorPos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(cursorPos, cursorPos);
+    
+    // Live search
+    clearTimeout(outcomeOrdersSearchTimeout);
+    const query = this.value.trim();
+    const dropdown = document.getElementById('outcome_orders_dropdown');
+    
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    
+    outcomeOrdersSearchTimeout = setTimeout(() => {
+        fetch(`/api/proceedings/outcomes/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    dropdown.classList.add('hidden');
+                    return;
+                }
+                
+                dropdown.innerHTML = '';
+                if (data.outcomes && data.outcomes.length > 0) {
+                    data.outcomes.forEach(outcome => {
+                        const item = document.createElement('div');
+                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                        item.textContent = outcome;
+                        item.addEventListener('click', () => {
+                            document.getElementById('outcome_orders').value = outcome;
+                            dropdown.classList.add('hidden');
+                        });
+                        dropdown.appendChild(item);
+                    });
+                    dropdown.classList.remove('hidden');
+                } else {
+                    dropdown.classList.add('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error searching outcomes:', error);
+                dropdown.classList.add('hidden');
+            });
+    }, 300);
+});
+
+// Close dropdown on blur (when user moves to another field)
+outcomeOrdersInput.addEventListener('blur', function(e) {
+    // Delay to allow click on dropdown item to register
+    setTimeout(() => {
+        const dropdown = document.getElementById('outcome_orders_dropdown');
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+        }
+    }, 200);
+});
+
+// Form submission
+// Update form submission to handle both add and edit
+document.getElementById('proceedingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        case_id: {{ case_id }},
+        judicial_officer: document.getElementById('judicial_officer').value.trim().toUpperCase(),
+        date_of_court_appeared: document.getElementById('date_of_court_appeared').value,
+        outcome_orders: document.getElementById('outcome_orders').value.trim().toUpperCase(),
+        outcome_details: document.getElementById('outcome_details').value.trim() || null,
+        next_court_date: document.getElementById('next_court_date').value || null,
+        attendance: document.getElementById('current_attendance').value || null,
+        next_attendance: document.getElementById('next_attendance').value || null,
+        virtual_link: document.getElementById('virtual_link').value.trim() || null,
+        reason: document.getElementById('reason').value.trim() || null,
+        materials: []
+    };
+    
+    // Collect materials if checkbox is checked
+    if (document.getElementById('materials_required').checked) {
+        const materialRows = document.querySelectorAll('[id^="material_"]');
+        materialRows.forEach((row) => {
+            // Extract number from row ID (e.g., "material_1" -> 1)
+            const rowId = row.id;
+            const match = rowId.match(/material_(\d+)/);
+            if (!match) return;
+            
+            const num = match[1];
+            const description = row.querySelector(`[name="material_description_${num}"]`);
+            const frequency = row.querySelector(`[name="material_frequency_${num}"]`);
+            const allocatedId = document.getElementById(`material_allocated_id_${num}`);
+            const allocatedInput = document.getElementById(`material_allocated_${num}`);
+            
+            if (description && description.value.trim()) {
+                formData.materials.push({
+                    material_description: description.value.trim(),
+                    reminder_frequency: frequency && frequency.value ? frequency.value : null,
+                    allocated_to_id: allocatedId && allocatedId.value ? parseInt(allocatedId.value) : null,
+                    allocated_to_name: allocatedInput && allocatedInput.value ? allocatedInput.value : null
+                });
+            }
+        });
+    }
+    
+    // Validate required fields
+    if (!formData.date_of_court_appeared) {
+        showMessage('Date of Court Appeared is required', 'error');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    
+    // Determine if we're updating or adding
+    const isUpdating = updatingProceedingId !== null;
+    const url = isUpdating 
+        ? `/api/cases/proceedings/update/${updatingProceedingId}`
+        : '/api/cases/proceedings/add';
+    const method = isUpdating ? 'PUT' : 'POST';
+    const loadingText = isUpdating 
+        ? '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...'
+        : '<i class="fas fa-spinner fa-spin mr-2"></i>Adding...';
+    
+    submitBtn.innerHTML = loadingText;
+    
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showMessage(data.error, 'error');
+        } else {
+            const successMsg = isUpdating 
+                ? (data.message || 'Proceeding updated successfully!')
+                : (data.message || 'Proceeding added successfully!');
+            showMessage(successMsg, 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        }
+    })
+    .catch(error => {
+        console.error(`Error ${isUpdating ? 'updating' : 'adding'} proceeding:`, error);
+        showMessage(`Error ${isUpdating ? 'updating' : 'adding'} proceeding. Please try again.`, 'error');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+let updatingProceedingId = null;
+const proceedingsData = {{ proceedings|tojson }};
+
+// Function to populate form with proceeding data
+function populateForm(proceeding) {
+    if (!proceeding) return;
+    
+    updatingProceedingId = proceeding.id;
+    
+    // Reset form first to clear any previous values
+    document.getElementById('proceedingForm').reset();
+    
+    // Auto-fill ALL fields with current proceeding data for editing
+    document.getElementById('date_of_court_appeared').value = proceeding.date_of_court_appeared || '';
+    document.getElementById('current_attendance').value = proceeding.attendance || '';
+    document.getElementById('outcome_orders').value = proceeding.outcome_orders || '';
+    document.getElementById('outcome_details').value = proceeding.outcome_details || '';
+    document.getElementById('reason').value = proceeding.reason || '';
+    document.getElementById('judicial_officer').value = proceeding.judicial_officer || '';
+    document.getElementById('next_court_date').value = proceeding.next_court_date || '';
+    document.getElementById('next_attendance').value = proceeding.next_attendance || '';
+    document.getElementById('virtual_link').value = proceeding.virtual_link || '';
+    
+    // Handle virtual link visibility
+    if (proceeding.next_attendance && proceeding.next_attendance.includes('Virtual')) {
+        document.getElementById('virtual_link_container').classList.remove('hidden');
+    } else {
+        document.getElementById('virtual_link_container').classList.add('hidden');
+    }
+    
+    // Handle materials
+    if (proceeding.materials && proceeding.materials.length > 0) {
+        document.getElementById('materials_required').checked = true;
+        document.getElementById('materialsSection').classList.remove('hidden');
+        const container = document.getElementById('materialsContainer');
+        container.innerHTML = '';
+        materialRowCount = 0;
+        
+        proceeding.materials.forEach(material => {
+            addMaterialRow();
+            // Populate the last added row with material data
+            const lastRow = container.lastElementChild;
+            if (lastRow) {
+                const descInput = lastRow.querySelector(`[name="material_description_${materialRowCount}"]`);
+                const freqSelect = lastRow.querySelector(`[name="material_frequency_${materialRowCount}"]`);
+                const allocInput = document.getElementById(`material_allocated_${materialRowCount}`);
+                const allocIdInput = document.getElementById(`material_allocated_id_${materialRowCount}`);
+                
+                if (descInput) descInput.value = material.material_description || '';
+                if (freqSelect && material.reminder_frequency) freqSelect.value = material.reminder_frequency;
+                if (allocInput && material.allocated_to_name) allocInput.value = material.allocated_to_name;
+                if (allocIdInput && material.allocated_to_id) allocIdInput.value = material.allocated_to_id;
+            }
+        });
+    } else {
+        document.getElementById('materials_required').checked = false;
+        document.getElementById('materialsSection').classList.add('hidden');
+        document.getElementById('materialsContainer').innerHTML = '';
+        materialRowCount = 0;
+    }
+    
+    // Update button text
+    const submitBtn = document.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Update Proceeding';
+        submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        submitBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+    }
+}
+
+function updateProceeding(proceedingId) {
+    const proceeding = proceedingsData.find(p => p.id === proceedingId);
+    if (!proceeding) {
+        showMessage('Proceeding not found', 'error');
+        return;
+    }
+    
+    // Only allow editing current proceedings
+    if (proceeding.is_latest !== 1 && proceeding.is_latest != 1) {
+        showMessage('You can only edit the current proceeding', 'error');
+        return;
+    }
+    
+    populateForm(proceeding);
+    
+    // Scroll to form
+    document.querySelector('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelUpdate() {
+    // Reload the latest proceeding data
+    if (proceedingsData && proceedingsData.length > 0) {
+        const latestProceeding = proceedingsData[0];
+        populateForm(latestProceeding);
+    } else {
+        updatingProceedingId = null;
+        resetForm();
+    }
+}
+
+// Function to pre-fill form with smart defaults (only for initial load)
+function prefillFormForNewUpdate(proceeding) {
+    if (!proceeding) return;
+    
+    updatingProceedingId = proceeding.id;
+    
+    // Reset form first to clear any previous values
+    document.getElementById('proceedingForm').reset();
+    
+    // Only pre-fill these two fields from previous proceeding:
+    // - Date of Court Appeared: Use previous "Next Court Date"
+    // - Current Session Attendance: Use previous "Next Client Attendance"
+    // All other fields remain empty for new updates
+    
+    const nextCourtDate = proceeding.next_court_date ? (typeof proceeding.next_court_date === 'string' ? proceeding.next_court_date.trim() : proceeding.next_court_date) : '';
+    const nextAttendance = proceeding.next_attendance ? (typeof proceeding.next_attendance === 'string' ? proceeding.next_attendance.trim() : proceeding.next_attendance) : '';
+    
+    // Only populate these two fields
+    const dateInput = document.getElementById('date_of_court_appeared');
+    const attendanceSelect = document.getElementById('current_attendance');
+    
+    if (dateInput && nextCourtDate) {
+        dateInput.value = nextCourtDate;
+    }
+    
+    if (attendanceSelect && nextAttendance) {
+        attendanceSelect.value = nextAttendance;
+    }
+    
+    // Ensure materials section is hidden and unchecked
+    document.getElementById('materials_required').checked = false;
+    document.getElementById('materialsSection').classList.add('hidden');
+    document.getElementById('materialsContainer').innerHTML = '';
+    materialRowCount = 0;
+    
+    // Hide virtual link container
+    document.getElementById('virtual_link_container').classList.add('hidden');
+    
+    // Update button text
+    const submitBtn = document.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Update Proceeding';
+        submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        submitBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+    }
+}
+
+// Auto-load latest proceeding on page load (with smart pre-fill)
+document.addEventListener('DOMContentLoaded', function() {
+    if (proceedingsData && proceedingsData.length > 0) {
+        // Get the latest proceeding (one with is_latest === 1 or first one if is_latest not available)
+        const latestProceeding = proceedingsData.find(p => p.is_latest === 1) || 
+                                 proceedingsData.find(p => p.is_latest == 1) || 
+                                 proceedingsData[0];
+        if (latestProceeding) {
+            // Use smart pre-fill for initial load (only next_court_date and next_attendance)
+            prefillFormForNewUpdate(latestProceeding);
+        }
+    }
+});
+
+
+
+function resetForm() {
+    document.getElementById('proceedingForm').reset();
+    document.getElementById('materials_required').checked = false;
+    document.getElementById('materialsSection').classList.add('hidden');
+    document.getElementById('materialsContainer').innerHTML = '';
+    materialRowCount = 0;
+}
+
+function showMessage(message, type) {
+    const container = document.getElementById('messageContainer');
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    
+    container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg`;
+    container.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    container.classList.remove('hidden');
+    
+    setTimeout(() => {
+        container.classList.add('hidden');
+    }, 5000);
+}
+
+// View proceeding details in modal
+function viewProceedingDetails(proceedingId) {
+    const proceeding = proceedingsData.find(p => p.id === proceedingId);
+    if (!proceeding) {
+        showMessage('Proceeding not found', 'error');
+        return;
+    }
+    
+    const modal = document.getElementById('proceedingModal');
+    const content = document.getElementById('proceedingModalContent');
+    
+    // Format date helper
+    const formatDate = (dateStr) => {
+        if (!dateStr) return 'N/A';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        } catch {
+            return dateStr;
+        }
+    };
+    
+    // Build modal content
+    let html = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Status -->
+            <div class="md:col-span-2">
+                <div class="bg-gradient-to-r ${proceeding.is_latest == 1 ? 'from-green-50 to-emerald-50' : 'from-gray-50 to-slate-50'} rounded-lg p-4 border-2 ${proceeding.is_latest == 1 ? 'border-green-200' : 'border-gray-200'}">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium mb-1">Status</p>
+                            <p class="text-lg font-bold ${proceeding.is_latest == 1 ? 'text-green-700' : 'text-gray-600'}">
+                                ${proceeding.is_latest == 1 ? '<i class="fas fa-check-circle mr-2"></i>Current' : '<i class="fas fa-history mr-2"></i>Previous'}
+                            </p>
+                        </div>
+                        ${proceeding.created_at ? `
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500 font-medium mb-1">Created</p>
+                            <p class="text-sm font-semibold text-gray-700">${formatDate(proceeding.created_at)}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Date of Court Appeared -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Date of Court Appeared</p>
+                <p class="text-sm font-semibold text-gray-900">${formatDate(proceeding.date_of_court_appeared)}</p>
+            </div>
+            
+            <!-- Current Session Attendance -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Current Session Attendance</p>
+                <p class="text-sm font-semibold text-gray-900">${proceeding.attendance || '-'}</p>
+            </div>
+            
+            <!-- Judicial Officer -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Judicial Officer</p>
+                <p class="text-sm font-semibold text-gray-900">${proceeding.judicial_officer || '-'}</p>
+            </div>
+            
+            <!-- Next Court Date -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Next Court Date</p>
+                <p class="text-sm font-semibold ${proceeding.next_court_date ? 'text-green-600' : 'text-gray-400'}">${formatDate(proceeding.next_court_date) || '-'}</p>
+            </div>
+            
+            <!-- Next Client Attendance -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Next Client Attendance</p>
+                <p class="text-sm font-semibold text-gray-900">${proceeding.next_attendance || '-'}</p>
+            </div>
+            
+            ${proceeding.virtual_link ? `
+            <!-- Virtual Link -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Virtual Link</p>
+                <a href="${proceeding.virtual_link}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
+                    <i class="fas fa-link mr-2"></i>${proceeding.virtual_link}
+                </a>
+            </div>
+            ` : ''}
+            
+            <!-- Court Directions -->
+            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Court Directions</p>
+                <p class="text-sm font-semibold text-gray-900">${proceeding.outcome_orders || '-'}</p>
+            </div>
+            
+            <!-- Description -->
+            <div class="md:col-span-2 bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Description</p>
+                <p class="text-sm text-gray-900 whitespace-pre-wrap">${proceeding.outcome_details || '-'}</p>
+            </div>
+            
+            <!-- Next Action -->
+            <div class="md:col-span-2 bg-white rounded-lg p-4 border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium mb-1">Next Action</p>
+                <p class="text-sm text-gray-900 whitespace-pre-wrap">${proceeding.reason || '-'}</p>
+            </div>
+    `;
+    
+    // Add Bring up date items if they exist
+    if (proceeding.materials && proceeding.materials.length > 0) {
+        html += `
+            <div class="md:col-span-2 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 border-2 border-indigo-200">
+                <h4 class="text-sm font-bold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-clipboard-list text-indigo-600 mr-2"></i>
+                    Bring up date (${proceeding.materials.length})
+                </h4>
+                <div class="space-y-3">
+        `;
+        
+        proceeding.materials.forEach((material, index) => {
+            html += `
+                <div class="bg-white rounded-lg p-3 border border-indigo-200">
+                    <div class="flex items-start justify-between mb-2">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="text-xs font-semibold text-indigo-600">Item ${index + 1}:</span>
+                                <p class="text-sm font-semibold text-gray-900">${material.material_description || '-'}</p>
+                            </div>
+                        </div>
+                        ${material.reminder_frequency ? `
+                        <span class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
+                            <i class="fas fa-bell mr-1"></i>${material.reminder_frequency}
+                        </span>
+                        ` : ''}
+                    </div>
+                    ${material.allocated_to_name ? `
+                    <div class="text-xs text-gray-600 mt-2">
+                        <i class="fas fa-user-tie mr-1 text-blue-600"></i>
+                        <span class="font-medium">Allocated To:</span> ${material.allocated_to_name}
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `</div>`;
+    
+    content.innerHTML = html;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+}
+
+// Close proceeding modal
+function closeProceedingModal() {
+    const modal = document.getElementById('proceedingModal');
+    modal.classList.add('hidden');
+    document.body.style.overflow = 'auto'; // Restore scrolling
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('proceedingModal');
+    if (event.target === modal) {
+        closeProceedingModal();
+    }
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('proceedingModal');
+        if (!modal.classList.contains('hidden')) {
+            closeProceedingModal();
+        }
+    }
+});
+
+</script>
+{% endblock %}
+

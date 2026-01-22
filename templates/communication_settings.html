@@ -1,0 +1,1052 @@
+{% extends "base.html" %}
+
+{% block title %}Communication Settings - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('communication_messaging') }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-cog mr-3"></i>
+                        Communication Settings
+                    </h1>
+                    <p class="text-indigo-100">Configure email, WhatsApp, and SMS communication settings</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="flex -mb-px" aria-label="Tabs">
+                <button onclick="switchTab('email')" id="tab-email" class="tab-button active flex-1 py-4 px-6 text-center font-semibold text-sm border-b-2 border-indigo-600 text-indigo-600">
+                    <i class="fas fa-envelope mr-2"></i>Email Settings
+                </button>
+                <button onclick="switchTab('whatsapp')" id="tab-whatsapp" class="tab-button flex-1 py-4 px-6 text-center font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <i class="fab fa-whatsapp mr-2"></i>WhatsApp Settings
+                </button>
+                <button onclick="switchTab('sms')" id="tab-sms" class="tab-button flex-1 py-4 px-6 text-center font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <i class="fas fa-sms mr-2"></i>SMS Settings
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Email Settings Tab Content -->
+    <div id="emailTab" class="tab-content">
+        <div class="space-y-6">
+            <!-- cPanel Configuration Section -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <i class="fas fa-server text-indigo-600 mr-3"></i>
+                    cPanel Configuration
+                </h2>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
+                        <div>
+                            <p class="text-sm font-semibold text-blue-900 mb-2">cPanel API Setup</p>
+                            <p class="text-xs text-blue-800">
+                                Configure cPanel API credentials to manage email accounts. All email activities will happen through the web app.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <form id="emailSettingsForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="cpanel_user" class="block text-sm font-semibold text-gray-700 mb-2">
+                                cPanel User <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="cpanel_user" 
+                                name="cpanel_user"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="baunilaw"
+                                value="{% if email_settings %}{{ email_settings.cpanel_user }}{% endif %}"
+                            />
+                        </div>
+                        <div>
+                            <label for="cpanel_domain" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Domain <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="cpanel_domain" 
+                                name="cpanel_domain"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="baunilawgroup.com"
+                                value="{% if email_settings %}{{ email_settings.cpanel_domain }}{% else %}baunilawgroup.com{% endif %}"
+                            />
+                        </div>
+                        <div>
+                            <label for="cpanel_api_token" class="block text-sm font-semibold text-gray-700 mb-2">
+                                cPanel API Token <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="cpanel_api_token" 
+                                name="cpanel_api_token"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="RI0KNFXZDX95A89SJQTIADX02HT8KHK8"
+                                value="{% if email_settings %}{{ email_settings.cpanel_api_token }}{% else %}RI0KNFXZDX95A89SJQTIADX02HT8KHK8{% endif %}"
+                            />
+                        </div>
+                        <div>
+                            <label for="cpanel_api_port" class="block text-sm font-semibold text-gray-700 mb-2">
+                                API Port
+                            </label>
+                            <input 
+                                type="number" 
+                                id="cpanel_api_port" 
+                                name="cpanel_api_port"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                placeholder="2083"
+                                value="{% if email_settings %}{{ email_settings.cpanel_api_port }}{% else %}2083{% endif %}"
+                            />
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-6 mt-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Main Email Account</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="main_email" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Main Email Address <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="email" 
+                                    id="main_email" 
+                                    name="main_email"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="info@baunilawgroup.com"
+                                    value="{% if email_settings %}{{ email_settings.main_email }}{% endif %}"
+                                />
+                            </div>
+                            <div>
+                                <label for="main_email_password" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Main Email Password <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="password" 
+                                    id="main_email_password" 
+                                    name="main_email_password"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="Enter password"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-6 mt-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">SMTP Settings</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="smtp_host" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    SMTP Host <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="smtp_host" 
+                                    name="smtp_host"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="mail.baunilawgroup.com"
+                                    value="{% if email_settings %}{{ email_settings.smtp_host }}{% else %}mail.baunilawgroup.com{% endif %}"
+                                />
+                            </div>
+                            <div>
+                                <label for="smtp_port" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    SMTP Port <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="number" 
+                                    id="smtp_port" 
+                                    name="smtp_port"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="587"
+                                    value="{% if email_settings %}{{ email_settings.smtp_port }}{% else %}587{% endif %}"
+                                />
+                            </div>
+                            <div>
+                                <label for="smtp_use_tls" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Use TLS
+                                </label>
+                                <select 
+                                    id="smtp_use_tls" 
+                                    name="smtp_use_tls"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                >
+                                    <option value="true" {% if not email_settings or email_settings.smtp_use_tls %}selected{% endif %}>Yes</option>
+                                    <option value="false" {% if email_settings and not email_settings.smtp_use_tls %}selected{% endif %}>No</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="sender_name" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Sender Name
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="sender_name" 
+                                    name="sender_name"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="BAUNI LAW GROUP"
+                                    value="{% if email_settings %}{{ email_settings.sender_name }}{% else %}BAUNI LAW GROUP{% endif %}"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-6 mt-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">IMAP Settings (for receiving emails)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="imap_host" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    IMAP Host <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="imap_host" 
+                                    name="imap_host"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="mail.baunilawgroup.com"
+                                    value="{% if email_settings %}{{ email_settings.imap_host }}{% else %}mail.baunilawgroup.com{% endif %}"
+                                />
+                            </div>
+                            <div>
+                                <label for="imap_port" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    IMAP Port <span class="text-red-500">*</span>
+                                </label>
+                                <input 
+                                    type="number" 
+                                    id="imap_port" 
+                                    name="imap_port"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    placeholder="993"
+                                    value="{% if email_settings %}{{ email_settings.imap_port }}{% else %}993{% endif %}"
+                                />
+                            </div>
+                            <div>
+                                <label for="imap_use_ssl" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Use SSL
+                                </label>
+                                <select 
+                                    id="imap_use_ssl" 
+                                    name="imap_use_ssl"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                >
+                                    <option value="true" {% if not email_settings or email_settings.imap_use_ssl %}selected{% endif %}>Yes</option>
+                                    <option value="false" {% if email_settings and not email_settings.imap_use_ssl %}selected{% endif %}>No</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                        <button 
+                            type="button"
+                            onclick="testEmailConnection()"
+                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+                        >
+                            <i class="fas fa-vial mr-2"></i>Test Connection
+                        </button>
+                        <button 
+                            type="submit"
+                            class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold"
+                        >
+                            <i class="fas fa-save mr-2"></i>Save Email Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Sub-Email Management Section -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-users text-indigo-600 mr-3"></i>
+                        Sub-Email Accounts
+                    </h2>
+                    <button 
+                        onclick="openCreateSubEmailModal()"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold"
+                    >
+                        <i class="fas fa-plus mr-2"></i>Create Sub-Email
+                    </button>
+                </div>
+                
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm text-gray-600">Email accounts from database and cPanel</p>
+                    <div class="flex space-x-2">
+                        <button 
+                            onclick="syncCpanelEmails()"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold text-sm"
+                        >
+                            <i class="fas fa-sync mr-2"></i>Sync from cPanel
+                        </button>
+                        <button 
+                            onclick="disconnectAllEmails()"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 font-semibold text-sm"
+                        >
+                            <i class="fas fa-unlink mr-2"></i>Disconnect All
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="subEmailList" class="space-y-4">
+                    <!-- Sub-emails will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create Sub-Email Modal -->
+    <div id="createSubEmailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-900">Create Sub-Email</h3>
+                <button onclick="closeCreateSubEmailModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="createSubEmailForm" class="space-y-4">
+                <div>
+                    <label for="sub_email_address" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Email Address <span class="text-red-500">*</span>
+                    </label>
+                    <div class="flex items-center">
+                        <input 
+                            type="text" 
+                            id="sub_email_address" 
+                            name="sub_email_address"
+                            class="flex-1 px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            placeholder="username"
+                        />
+                        <span class="px-4 py-3 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600">
+                            @baunilawgroup.com
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <label for="sub_email_password" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Password <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="password" 
+                        id="sub_email_password" 
+                        name="sub_email_password"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder="Enter password"
+                    />
+                </div>
+                <div>
+                    <label for="sub_email_display_name" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Display Name
+                    </label>
+                    <input 
+                        type="text" 
+                        id="sub_email_display_name" 
+                        name="sub_email_display_name"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder="John Doe"
+                    />
+                </div>
+                <div class="flex items-center">
+                    <input 
+                        type="checkbox" 
+                        id="sub_email_is_main" 
+                        name="sub_email_is_main"
+                        class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label for="sub_email_is_main" class="ml-2 text-sm text-gray-700">
+                        Set as main email
+                    </label>
+                </div>
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button 
+                        type="button"
+                        onclick="closeCreateSubEmailModal()"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="submit"
+                        class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 font-semibold"
+                    >
+                        <i class="fas fa-plus mr-2"></i>Create
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- WhatsApp Settings Tab Content -->
+    <div id="whatsappTab" class="tab-content hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fab fa-whatsapp text-green-600 mr-3"></i>
+                WhatsApp Settings
+            </h2>
+            <div class="space-y-6">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-green-600 mr-3 mt-1"></i>
+                        <div>
+                            <p class="text-sm font-semibold text-green-900 mb-2">WhatsApp Configuration</p>
+                            <p class="text-xs text-green-800">
+                                Configure WhatsApp Business API settings for sending messages and notifications via WhatsApp.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <form id="whatsappSettingsForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="whatsapp_api_url" class="block text-sm font-semibold text-gray-700 mb-2">
+                                WhatsApp API URL <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="url" 
+                                id="whatsapp_api_url" 
+                                name="whatsapp_api_url"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="https://api.whatsapp.com"
+                            />
+                        </div>
+                        <div>
+                            <label for="whatsapp_api_key" class="block text-sm font-semibold text-gray-700 mb-2">
+                                API Key <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="password" 
+                                id="whatsapp_api_key" 
+                                name="whatsapp_api_key"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="Enter API key"
+                            />
+                        </div>
+                        <div>
+                            <label for="whatsapp_phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
+                                WhatsApp Business Phone Number <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="whatsapp_phone_number" 
+                                name="whatsapp_phone_number"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="+1234567890"
+                            />
+                        </div>
+                        <div>
+                            <label for="whatsapp_business_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Business ID
+                            </label>
+                            <input 
+                                type="text" 
+                                id="whatsapp_business_id" 
+                                name="whatsapp_business_id"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="Enter Business ID"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                        <button 
+                            type="button"
+                            onclick="testWhatsAppConnection()"
+                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+                        >
+                            <i class="fas fa-vial mr-2"></i>Test Connection
+                        </button>
+                        <button 
+                            type="submit"
+                            class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 font-semibold"
+                        >
+                            <i class="fas fa-save mr-2"></i>Save WhatsApp Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- SMS Settings Tab Content -->
+    <div id="smsTab" class="tab-content hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-sms text-blue-600 mr-3"></i>
+                SMS Settings
+            </h2>
+            <div class="space-y-6">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
+                        <div>
+                            <p class="text-sm font-semibold text-blue-900 mb-2">SMS Configuration</p>
+                            <p class="text-xs text-blue-800">
+                                Configure SMS gateway settings for sending text messages and notifications via SMS.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <form id="smsSettingsForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="sms_provider" class="block text-sm font-semibold text-gray-700 mb-2">
+                                SMS Provider <span class="text-red-500">*</span>
+                            </label>
+                            <select 
+                                id="sms_provider" 
+                                name="sms_provider"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                                <option value="">Select Provider</option>
+                                <option value="twilio">Twilio</option>
+                                <option value="africas_talking">Africa's Talking</option>
+                                <option value="nexmo">Vonage (Nexmo)</option>
+                                <option value="custom">Custom API</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sms_api_url" class="block text-sm font-semibold text-gray-700 mb-2">
+                                API URL <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="url" 
+                                id="sms_api_url" 
+                                name="sms_api_url"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="https://api.sms-provider.com"
+                            />
+                        </div>
+                        <div>
+                            <label for="sms_api_key" class="block text-sm font-semibold text-gray-700 mb-2">
+                                API Key <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="password" 
+                                id="sms_api_key" 
+                                name="sms_api_key"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Enter API key"
+                            />
+                        </div>
+                        <div>
+                            <label for="sms_api_secret" class="block text-sm font-semibold text-gray-700 mb-2">
+                                API Secret
+                            </label>
+                            <input 
+                                type="password" 
+                                id="sms_api_secret" 
+                                name="sms_api_secret"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Enter API secret"
+                            />
+                        </div>
+                        <div>
+                            <label for="sms_sender_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Sender ID/Phone Number <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="sms_sender_id" 
+                                name="sms_sender_id"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="+1234567890 or SenderID"
+                            />
+                        </div>
+                        <div>
+                            <label for="sms_country_code" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Default Country Code
+                            </label>
+                            <input 
+                                type="text" 
+                                id="sms_country_code" 
+                                name="sms_country_code"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="+254"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                        <button 
+                            type="button"
+                            onclick="testSMSConnection()"
+                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+                        >
+                            <i class="fas fa-vial mr-2"></i>Test Connection
+                        </button>
+                        <button 
+                            type="submit"
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold"
+                        >
+                            <i class="fas fa-save mr-2"></i>Save SMS Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Messages -->
+<div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tab switching functionality
+function switchTab(tab) {
+    // Update URL without page reload
+    const newUrl = window.location.pathname + '?tab=' + tab + '#' + tab;
+    window.history.pushState({}, '', newUrl);
+    // Update tab buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active', 'text-indigo-600', 'border-indigo-600');
+        btn.classList.add('text-gray-500', 'border-transparent');
+    });
+    
+    const activeTabBtn = document.getElementById(`tab-${tab}`);
+    if (tab === 'email') {
+        activeTabBtn.classList.add('active', 'text-indigo-600', 'border-indigo-600');
+    } else if (tab === 'whatsapp') {
+        activeTabBtn.classList.add('active', 'text-green-600', 'border-green-600');
+    } else if (tab === 'sms') {
+        activeTabBtn.classList.add('active', 'text-blue-600', 'border-blue-600');
+    }
+    activeTabBtn.classList.remove('text-gray-500', 'border-transparent');
+    
+    // Update tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+    document.getElementById(`${tab}Tab`).classList.remove('hidden');
+    
+    // Update sidebar active states
+    document.querySelectorAll('#nav-email-settings, #nav-whatsapp-settings, #nav-sms-settings').forEach(link => {
+        link.classList.remove('active');
+    });
+    const sidebarLink = document.getElementById(`nav-${tab}-settings`);
+    if (sidebarLink) {
+        sidebarLink.classList.add('active');
+    }
+}
+
+// Handle sidebar link clicks
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle sidebar link clicks for tab switching
+    const emailLink = document.getElementById('nav-email-settings');
+    const whatsappLink = document.getElementById('nav-whatsapp-settings');
+    const smsLink = document.getElementById('nav-sms-settings');
+    
+    if (emailLink) {
+        emailLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            switchTab('email');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+    
+    if (whatsappLink) {
+        whatsappLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            switchTab('whatsapp');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+    
+    if (smsLink) {
+        smsLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            switchTab('sms');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+    
+    // Check URL hash or query parameter for initial tab
+    const hash = window.location.hash.substring(1);
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    
+    if (hash && ['email', 'whatsapp', 'sms'].includes(hash)) {
+        switchTab(hash);
+    } else if (tabParam && ['email', 'whatsapp', 'sms'].includes(tabParam)) {
+        switchTab(tabParam);
+    }
+});
+
+// Test Email Connection
+function testEmailConnection() {
+    showMessage('Testing email connection...', 'info');
+    // TODO: Implement email connection test
+    setTimeout(() => {
+        showMessage('Email connection test feature coming soon', 'info');
+    }, 1000);
+}
+
+// Test WhatsApp Connection
+function testWhatsAppConnection() {
+    showMessage('Testing WhatsApp connection...', 'info');
+    // TODO: Implement WhatsApp connection test
+    setTimeout(() => {
+        showMessage('WhatsApp connection test feature coming soon', 'info');
+    }, 1000);
+}
+
+// Test SMS Connection
+function testSMSConnection() {
+    showMessage('Testing SMS connection...', 'info');
+    // TODO: Implement SMS connection test
+    setTimeout(() => {
+        showMessage('SMS connection test feature coming soon', 'info');
+    }, 1000);
+}
+
+// Load email accounts on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSubEmails();
+});
+
+// Form submissions
+document.getElementById('emailSettingsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    saveEmailSettings();
+});
+
+function saveEmailSettings() {
+    const form = document.getElementById('emailSettingsForm');
+    const formData = new FormData(form);
+    
+    // Validate required fields
+    const requiredFields = ['cpanel_user', 'cpanel_domain', 'cpanel_api_token', 'main_email', 'main_email_password'];
+    const missingFields = requiredFields.filter(field => !formData.get(field));
+    
+    if (missingFields.length > 0) {
+        showMessage(`Please fill in all required fields: ${missingFields.join(', ')}`, 'error');
+        return;
+    }
+    
+    const data = {
+        cpanel_user: formData.get('cpanel_user'),
+        cpanel_domain: formData.get('cpanel_domain'),
+        cpanel_api_token: formData.get('cpanel_api_token'),
+        cpanel_api_port: formData.get('cpanel_api_port') || 2083,
+        main_email: formData.get('main_email'),
+        main_email_password: formData.get('main_email_password'),
+        smtp_host: formData.get('smtp_host') || 'mail.baunilawgroup.com',
+        smtp_port: formData.get('smtp_port') || 587,
+        smtp_use_tls: formData.get('smtp_use_tls'),
+        imap_host: formData.get('imap_host') || 'mail.baunilawgroup.com',
+        imap_port: formData.get('imap_port') || 993,
+        imap_use_ssl: formData.get('imap_use_ssl'),
+        sender_name: formData.get('sender_name') || 'BAUNI LAW GROUP'
+    };
+    
+    showMessage('Saving email settings...', 'info');
+    
+    fetch('/api/email/settings/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('Email settings saved successfully!', 'success');
+            // Reload page after 1 second to show updated settings
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showMessage(result.error || 'Failed to save settings', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving settings:', error);
+        showMessage('Error saving settings: ' + error.message, 'error');
+    });
+}
+
+function testEmailConnection() {
+    showMessage('Testing email connection...', 'info');
+    
+    fetch('/api/email/test-connection', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('Email connection test successful!', 'success');
+        } else {
+            showMessage(result.error || 'Connection test failed', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error testing connection: ' + error.message, 'error');
+    });
+}
+
+function loadSubEmails() {
+    fetch('/api/email/sub-email/list')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                displaySubEmails(result.accounts);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading sub-emails:', error);
+        });
+}
+
+function displaySubEmails(accounts) {
+    const container = document.getElementById('subEmailList');
+    
+    if (!accounts || accounts.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-8">No email accounts found. Click "Sync from cPanel" to fetch existing accounts.</p>';
+        return;
+    }
+    
+    container.innerHTML = accounts.map(account => {
+        const emailAddr = account.email_address || account.email || '';
+        return `
+        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-3 mb-2">
+                        <h4 class="font-semibold text-gray-900">${emailAddr}</h4>
+                        ${account.is_main ? '<span class="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full">Main</span>' : ''}
+                        ${account.is_active !== false ? '<span class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">Active</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">Inactive</span>'}
+                        ${account.is_cpanel ? '<span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">From cPanel</span>' : ''}
+                    </div>
+                    ${account.display_name ? `<p class="text-sm text-gray-600">${account.display_name}</p>` : ''}
+                    ${account.disk_used ? `<p class="text-xs text-gray-500 mt-1">Storage: ${account.disk_used} / ${account.disk_quota || 'N/A'}</p>` : ''}
+                    ${account.created_by_name ? `<p class="text-xs text-gray-500 mt-1">Created by: ${account.created_by_name}</p>` : ''}
+                </div>
+                <div class="flex space-x-2">
+                    <button 
+                        onclick="fetchEmails('${emailAddr}')"
+                        class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200 text-sm"
+                        title="Fetch emails"
+                    >
+                        <i class="fas fa-envelope-open"></i>
+                    </button>
+                    <button 
+                        onclick="deleteSubEmail('${emailAddr}')"
+                        class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 text-sm"
+                        title="Delete email"
+                    >
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    }).join('');
+}
+
+function syncCpanelEmails() {
+    showMessage('Syncing emails from cPanel...', 'info');
+    
+    fetch('/api/email/sync-cpanel', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage(result.message || `Synced ${result.synced_count || 0} email accounts from cPanel`, 'success');
+            loadSubEmails();
+        } else {
+            showMessage(result.error || 'Failed to sync from cPanel', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error syncing from cPanel: ' + error.message, 'error');
+    });
+}
+
+function fetchEmails(emailAddress) {
+    showMessage(`Fetching emails for ${emailAddress}...`, 'info');
+    
+    fetch('/api/email/fetch', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            email_address: emailAddress,
+            limit: 50
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage(`Fetched ${result.emails.length} emails for ${emailAddress}`, 'success');
+            // You can display emails in a modal or separate section
+            console.log('Emails:', result.emails);
+        } else {
+            showMessage(result.error || 'Failed to fetch emails', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error fetching emails: ' + error.message, 'error');
+    });
+}
+
+function disconnectAllEmails() {
+    if (!confirm('Are you sure you want to disconnect all email connections?')) {
+        return;
+    }
+    
+    fetch('/api/email/disconnect-all', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('All email connections disconnected', 'success');
+        } else {
+            showMessage(result.error || 'Failed to disconnect', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error disconnecting: ' + error.message, 'error');
+    });
+}
+
+function openCreateSubEmailModal() {
+    document.getElementById('createSubEmailModal').classList.remove('hidden');
+}
+
+function closeCreateSubEmailModal() {
+    document.getElementById('createSubEmailModal').classList.add('hidden');
+    document.getElementById('createSubEmailForm').reset();
+}
+
+document.getElementById('createSubEmailForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    createSubEmail();
+});
+
+function createSubEmail() {
+    const form = document.getElementById('createSubEmailForm');
+    const formData = new FormData(form);
+    
+    const emailAddress = formData.get('sub_email_address') + '@baunilawgroup.com';
+    const password = formData.get('sub_email_password');
+    const displayName = formData.get('sub_email_display_name');
+    const isMain = formData.get('sub_email_is_main') === 'on';
+    
+    if (!emailAddress || !password) {
+        showMessage('Email address and password are required', 'error');
+        return;
+    }
+    
+    const data = {
+        email_address: emailAddress,
+        password: password,
+        display_name: displayName,
+        is_main: isMain
+    };
+    
+    fetch('/api/email/sub-email/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('Sub-email created successfully!', 'success');
+            closeCreateSubEmailModal();
+            loadSubEmails();
+        } else {
+            showMessage(result.error || 'Failed to create sub-email', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error creating sub-email: ' + error.message, 'error');
+    });
+}
+
+function deleteSubEmail(emailAddress) {
+    if (!confirm(`Are you sure you want to delete ${emailAddress}? This action cannot be undone.`)) {
+        return;
+    }
+    
+    fetch('/api/email/sub-email/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email_address: emailAddress })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('Sub-email deleted successfully!', 'success');
+            loadSubEmails();
+        } else {
+            showMessage(result.error || 'Failed to delete sub-email', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Error deleting sub-email: ' + error.message, 'error');
+    });
+}
+
+document.getElementById('whatsappSettingsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    showMessage('WhatsApp settings saved successfully!', 'success');
+    // TODO: Implement save functionality
+});
+
+document.getElementById('smsSettingsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    showMessage('SMS settings saved successfully!', 'success');
+    // TODO: Implement save functionality
+});
+
+// Message display function
+function showMessage(message, type) {
+    const container = document.getElementById('messageContainer');
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+    
+    container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white p-4 rounded-lg shadow-lg`;
+    container.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    container.classList.remove('hidden');
+    
+    setTimeout(() => {
+        container.classList.add('hidden');
+    }, 5000);
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,747 @@
+{% extends "base.html" %}
+
+{% block title %}Email Conversation - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <a href="{{ url_for('employee_communications') }}?employee_id={{ employee.id }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-envelope mr-3"></i>
+                        Email Conversation
+                    </h1>
+                    <p class="text-indigo-100">{{ contact_email }}</p>
+                </div>
+            </div>
+            <button 
+                onclick="composeReply()"
+                class="px-6 py-3 bg-white text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors duration-200 font-semibold"
+            >
+                <i class="fas fa-reply mr-2"></i>Reply
+            </button>
+        </div>
+    </div>
+
+    <!-- Employee Info Card -->
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+        <div class="flex items-center space-x-3 sm:space-x-4">
+            {% if employee.profile_picture %}
+            <img src="/static/uploads/profile_pictures/{{ employee.profile_picture }}" 
+                 alt="{{ employee.full_name }}" 
+                 class="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            {% endif %}
+            <div class="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg sm:text-2xl font-bold flex-shrink-0 {% if employee.profile_picture %}hidden{% endif %}">
+                {{ employee.full_name[0] if employee.full_name else '?' }}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-900 truncate">{{ employee.full_name }}</h2>
+                <p class="text-sm sm:text-base text-gray-600 truncate">{{ employee.role }} • {{ employee.work_email or 'No work email' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modern Email Interface -->
+    <div class="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-gray-100 overflow-hidden" style="min-height: calc(100vh - 300px); max-height: calc(100vh - 200px);">
+        <div class="flex flex-col lg:flex-row h-full">
+            <!-- Left Panel: Email Thread List -->
+            <div id="emailThreadPanel" class="w-full lg:w-96 border-r-0 lg:border-r-2 border-b-2 lg:border-b-0 border-gray-300 flex flex-col bg-gradient-to-b from-gray-50 to-white lg:max-h-[calc(100vh-400px)]">
+                <div class="p-4 md:p-5 border-b-2 border-gray-300 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base md:text-lg font-bold flex items-center">
+                            <i class="fas fa-envelope-open mr-2"></i>
+                            <span class="hidden sm:inline">Messages</span>
+                            <span class="sm:hidden">Inbox</span>
+                        </h3>
+                        <div class="flex items-center space-x-2">
+                            <button 
+                                onclick="toggleThreadPanel()"
+                                class="lg:hidden px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all text-sm font-semibold backdrop-blur-sm"
+                                title="Toggle View"
+                            >
+                                <i class="fas fa-chevron-down" id="threadToggleIcon"></i>
+                            </button>
+                            <button 
+                                onclick="refreshEmails()"
+                                class="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all text-sm font-semibold backdrop-blur-sm"
+                                title="Refresh"
+                            >
+                                <i class="fas fa-sync"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% if emails %}
+                    <p class="text-xs text-indigo-100 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        {{ emails|length }} message{{ 's' if emails|length != 1 else '' }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div id="emailThreadList" class="flex-1 overflow-y-auto hidden lg:block" id="threadListContainer">
+                    {% if emails %}
+                        {% for email in emails %}
+                        <div 
+                            onclick="loadEmailDetails({{ loop.index0 }}); event.stopPropagation(); return false;"
+                            class="email-thread-item p-4 md:p-5 border-b border-gray-200 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 cursor-pointer transition-all duration-200 active:bg-indigo-100 {% if loop.index0 == 0 %}bg-gradient-to-r from-indigo-100 to-purple-100 border-l-4 border-indigo-600 shadow-sm{% endif %}"
+                            data-email-index="{{ loop.index0 }}"
+                            style="cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;"
+                        >
+                            <div class="flex items-start space-x-3 md:space-x-4">
+                                <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                                    <i class="fas fa-envelope text-white text-xs md:text-sm"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-1 sm:gap-0">
+                                        <p class="text-xs md:text-sm font-bold text-gray-900 truncate">
+                                            {% set email_from_lower = (email.from or '')|lower %}
+                                            {% if contact_email.lower() in email_from_lower %}
+                                                {{ email.from.split('<')[0].strip() if '<' in email.from else email.from }}
+                                            {% else %}
+                                                {{ employee.full_name }}
+                                            {% endif %}
+                                        </p>
+                                        <span class="text-xs font-medium text-gray-500 sm:ml-3 whitespace-nowrap bg-gray-100 px-2 py-1 rounded self-start sm:self-auto">
+                                            {% if email.date %}
+                                                {{ email.date[:10] if email.date|length > 10 else email.date }}
+                                            {% else %}
+                                                Unknown
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm md:text-base font-semibold text-gray-900 truncate mb-2">{{ email.subject or 'No Subject' }}</p>
+                                    <p class="text-xs md:text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                                        {% set body_text = (email.body or '')|replace('<[^>]*>', '')|replace('\n', ' ') %}
+                                        {{ body_text[:100] }}{% if body_text|length > 100 %}...{% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-12">
+                            <i class="fas fa-inbox text-gray-400 text-4xl mb-4"></i>
+                            <p class="text-gray-600">No emails found</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right Panel: Email Details -->
+            <div id="emailDetailsPanel" class="flex-1 flex flex-col bg-gradient-to-br from-gray-50 via-white to-indigo-50 lg:max-h-[calc(100vh-400px)]">
+                <div id="emailDetailsContent" class="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+                    <div class="text-center py-24">
+                        <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 mb-6 shadow-lg">
+                            <i class="fas fa-envelope-open text-indigo-400 text-5xl"></i>
+                        </div>
+                        <p class="text-gray-600 text-xl font-semibold mb-2">Select an email to view</p>
+                        <p class="text-gray-400 text-sm">Click on any message from the list to read its contents</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Compose/Reply Modal -->
+<div id="composeModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl flex flex-col" style="max-height: 90vh;">
+        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-2xl">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold">Compose Email</h3>
+                <button 
+                    onclick="closeComposeModal()"
+                    class="p-2 hover:bg-indigo-700 rounded-lg transition-colors"
+                >
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <form id="composeEmailForm" class="flex-1 flex flex-col overflow-hidden">
+            <div class="p-6 space-y-4 flex-1 overflow-y-auto">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">To</label>
+                    <input 
+                        type="email" 
+                        id="composeTo" 
+                        required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        value="{{ contact_email }}"
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
+                    <input 
+                        type="text" 
+                        id="composeSubject" 
+                        required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder="Enter subject..."
+                    />
+                </div>
+                <div class="flex-1 min-h-[400px]">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Message</label>
+                    <textarea 
+                        id="composeBody" 
+                        required
+                        class="w-full h-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none font-mono text-sm"
+                        placeholder="Type your message here..."
+                        style="min-height: 400px;"
+                    ></textarea>
+                    <p class="text-xs text-gray-500 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Tip: Your reply will include the original message below
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Tip: Your reply will include the original message below
+                    </p>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+                <div class="flex justify-end space-x-3">
+                    <button 
+                        type="button"
+                        onclick="closeComposeModal()"
+                        class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="submit"
+                        class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold"
+                    >
+                        <i class="fas fa-paper-plane mr-2"></i>Send
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Message Container -->
+<div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+<script>
+const emails = {{ emails | tojson }};
+const employeeEmail = {{ employee.work_email | tojson if employee.work_email else 'null' }};
+const contactEmail = {{ contact_email | tojson }};
+let selectedEmailIndex = null;
+
+// Email data stored in template
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up compose form
+    document.getElementById('composeEmailForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        sendEmail();
+    });
+    
+    // If there are emails, select the first one
+    if (emails && emails.length > 0) {
+        console.log('Auto-loading first email, total emails:', emails.length);
+        // Wait a bit for DOM to be ready
+        setTimeout(() => {
+            loadEmailDetails(0);
+        }, 200);
+    } else {
+        console.log('No emails found');
+        const detailsPanel = document.getElementById('emailDetailsContent');
+        if (detailsPanel) {
+            detailsPanel.innerHTML = `
+                <div class="text-center py-20">
+                    <i class="fas fa-inbox text-gray-300 text-6xl mb-4"></i>
+                    <p class="text-gray-500 text-lg">No emails found for this contact</p>
+                    <p class="text-gray-400 text-sm mt-2">Try refreshing the page</p>
+                </div>
+            `;
+        }
+    }
+});
+
+function loadEmailDetails(index) {
+    if (!emails || !emails[index]) {
+        console.error('Email not found at index:', index);
+        return;
+    }
+    
+    selectedEmailIndex = index;
+    const email = emails[index];
+    
+    // Update active thread item
+    document.querySelectorAll('.email-thread-item').forEach(item => {
+        item.classList.remove('bg-indigo-100', 'border-l-4', 'border-indigo-600', 'bg-gradient-to-r', 'from-indigo-100', 'to-purple-100', 'shadow-sm');
+    });
+    const activeItem = document.querySelector(`[data-email-index="${index}"]`);
+    if (activeItem) {
+        activeItem.classList.add('bg-gradient-to-r', 'from-indigo-100', 'to-purple-100', 'border-l-4', 'border-indigo-600', 'shadow-sm');
+    }
+    
+    // Hide thread list on mobile/tablet when email is selected
+    if (window.innerWidth < 1024) {
+        const threadList = document.getElementById('emailThreadList');
+        if (threadList) {
+            threadList.classList.add('hidden');
+            const toggleIcon = document.getElementById('threadToggleIcon');
+            if (toggleIcon) {
+                toggleIcon.classList.remove('fa-chevron-down');
+                toggleIcon.classList.add('fa-chevron-up');
+            }
+        }
+        // Scroll to top of details panel
+        setTimeout(() => {
+            detailsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+    
+    // Get the details panel
+    const detailsPanel = document.getElementById('emailDetailsContent');
+    if (!detailsPanel) {
+        console.error('Email details panel not found');
+        return;
+    }
+    
+    // Format date
+    let formattedDate = 'Unknown';
+    if (email.date) {
+        try {
+            const date = new Date(email.date);
+            formattedDate = date.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            formattedDate = email.date;
+        }
+    }
+    
+    // Determine if email is from contact or employee
+    const isFromContact = email.from && email.from.toLowerCase().includes(contactEmail.toLowerCase());
+    const senderName = isFromContact ? 
+        (email.from.includes('<') ? email.from.split('<')[0].trim() : email.from) : 
+        '{{ employee.full_name }}';
+    const senderEmail = isFromContact ? contactEmail : employeeEmail;
+    
+    // Format email body (preserve line breaks and handle HTML)
+    let emailBody = email.body || 'No content';
+    
+    // Escape HTML to prevent XSS, but preserve line breaks
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+    
+    // Check if body contains HTML tags
+    const containsHtml = /<[a-z][\s\S]*>/i.test(emailBody);
+    
+    if (containsHtml) {
+        // If it contains HTML, sanitize it but keep basic formatting
+        emailBody = emailBody.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        emailBody = emailBody.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+    } else {
+        // If plain text, convert line breaks to HTML
+        emailBody = escapeHtml(emailBody).replace(/\n/g, '<br>');
+    }
+    
+    // Display email details
+    detailsPanel.innerHTML = `
+        <div class="max-w-5xl mx-auto">
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                <!-- Email Header -->
+                <div class="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-b-2 border-indigo-200 px-8 py-8">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="flex-1">
+                            <div class="flex items-start space-x-5">
+                                <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg">
+                                    <i class="fas fa-user text-white text-2xl"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h2 class="text-3xl font-bold text-gray-900 mb-4 leading-tight">${escapeHtml(email.subject || 'No Subject')}</h2>
+                                    <div class="space-y-2 bg-white/60 rounded-lg p-4 backdrop-blur-sm">
+                                        <div class="flex items-center">
+                                            <span class="text-xs font-bold text-indigo-700 uppercase tracking-wide w-16 flex-shrink-0">From:</span> 
+                                            <span class="text-sm font-semibold text-gray-800 ml-3">${escapeHtml(senderName)}</span>
+                                            <span class="text-sm text-gray-600 ml-2">&lt;${escapeHtml(senderEmail)}&gt;</span>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <span class="text-xs font-bold text-indigo-700 uppercase tracking-wide w-16 flex-shrink-0">To:</span> 
+                                            <span class="text-sm font-semibold text-gray-800 ml-3">${escapeHtml(isFromContact ? (employeeEmail || 'N/A') : contactEmail)}</span>
+                                        </div>
+                                        <div class="flex items-center pt-2 border-t border-gray-200">
+                                            <i class="far fa-clock text-indigo-600 mr-2"></i>
+                                            <span class="text-sm text-gray-600 font-medium">${escapeHtml(formattedDate)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ml-6 flex-shrink-0">
+                            <button 
+                                onclick="composeReply('${(email.subject || '').replace(/'/g, "\\'")}')"
+                                class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                            >
+                                <i class="fas fa-reply mr-2"></i>Reply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Email Body -->
+                <div class="px-10 py-10 bg-gray-50">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-10">
+                        <div class="prose prose-lg max-w-none">
+                            <div class="email-body-content text-gray-800" style="line-height: 1.9; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1f2937;">
+                                ${emailBody}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reply Button at Bottom -->
+                <div class="border-t-2 border-gray-200 bg-gradient-to-r from-gray-50 to-indigo-50 px-10 py-6">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-600">
+                            <i class="fas fa-info-circle text-indigo-600 mr-2"></i>
+                            <span>Need to respond? Click the button below to reply.</span>
+                        </div>
+                        <button 
+                            onclick="composeReply('${(email.subject || '').replace(/'/g, "\\'")}')"
+                            class="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                        >
+                            <i class="fas fa-reply mr-2"></i>Reply to this Email
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function composeReply(subject = '') {
+    // Clean the subject line
+    let replySubject = subject || '';
+    if (replySubject && !replySubject.toLowerCase().startsWith('re:')) {
+        replySubject = `Re: ${replySubject}`;
+    }
+    
+    // Set the subject
+    document.getElementById('composeSubject').value = replySubject;
+    
+    // Set the recipient (contact email)
+    document.getElementById('composeTo').value = contactEmail;
+    
+    // Optionally add quoted text from original email
+    const composeBody = document.getElementById('composeBody');
+    if (selectedEmailIndex !== null && emails[selectedEmailIndex]) {
+        const originalEmail = emails[selectedEmailIndex];
+        const originalDate = originalEmail.date ? new Date(originalEmail.date).toLocaleString() : 'Unknown date';
+        const originalFrom = originalEmail.from || contactEmail;
+        
+        // Add quoted text
+        const quotedText = `\n\n--- Original Message ---\nFrom: ${originalFrom}\nDate: ${originalDate}\nSubject: ${originalEmail.subject || 'No Subject'}\n\n${(originalEmail.body || '').substring(0, 500)}...`;
+        composeBody.value = quotedText;
+    } else {
+        composeBody.value = '';
+    }
+    
+    // Show the modal
+    document.getElementById('composeModal').classList.remove('hidden');
+    
+    // Focus on the body field
+    setTimeout(() => {
+        composeBody.focus();
+        // Move cursor to the beginning
+        composeBody.setSelectionRange(0, 0);
+    }, 100);
+}
+
+function closeComposeModal() {
+    document.getElementById('composeModal').classList.add('hidden');
+    document.getElementById('composeEmailForm').reset();
+    document.getElementById('composeTo').value = contactEmail;
+}
+
+function sendEmail() {
+    const to = document.getElementById('composeTo').value.trim();
+    const subject = document.getElementById('composeSubject').value.trim();
+    const body = document.getElementById('composeBody').value.trim();
+    
+    if (!to || !subject || !body) {
+        showMessage('Please fill in all fields', 'error');
+        return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+        showMessage('Please enter a valid email address', 'error');
+        return;
+    }
+    
+    if (!employeeEmail) {
+        showMessage('Employee email not found. Please contact administrator.', 'error');
+        return;
+    }
+    
+    // Disable send button to prevent double submission
+    const sendButton = document.querySelector('#composeEmailForm button[type="submit"]');
+    const originalText = sendButton.innerHTML;
+    sendButton.disabled = true;
+    sendButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Sending...';
+    
+    showMessage('Sending email...', 'info');
+    
+    fetch('/api/email/send', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            from_email: employeeEmail,
+            to_email: to,
+            subject: subject,
+            body: body
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('Email sent successfully!', 'success');
+            closeComposeModal();
+            // Refresh emails after a short delay
+            setTimeout(() => {
+                refreshEmails();
+            }, 1500);
+        } else {
+            showMessage(result.error || 'Failed to send email. Please try again.', 'error');
+            sendButton.disabled = false;
+            sendButton.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        showMessage('Error sending email: ' + error.message, 'error');
+        sendButton.disabled = false;
+        sendButton.innerHTML = originalText;
+    });
+}
+
+function toggleThreadPanel() {
+    const threadList = document.getElementById('emailThreadList');
+    const toggleIcon = document.getElementById('threadToggleIcon');
+    if (threadList) {
+        threadList.classList.toggle('hidden');
+        if (toggleIcon) {
+            if (threadList.classList.contains('hidden')) {
+                toggleIcon.classList.remove('fa-chevron-down');
+                toggleIcon.classList.add('fa-chevron-up');
+            } else {
+                toggleIcon.classList.remove('fa-chevron-up');
+                toggleIcon.classList.add('fa-chevron-down');
+            }
+        }
+    }
+}
+
+function refreshEmails() {
+    if (!employeeId) {
+        showMessage('Employee ID not found', 'error');
+        return;
+    }
+    showMessage('Refreshing emails...', 'info');
+    // Reload the page to fetch fresh emails
+    window.location.reload();
+}
+
+
+function showMessage(message, type) {
+    const container = document.getElementById('messageContainer');
+    const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+    const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+    
+    container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white p-4 rounded-lg shadow-lg`;
+    container.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    container.classList.remove('hidden');
+    
+    setTimeout(() => {
+        container.classList.add('hidden');
+    }, 5000);
+}
+</script>
+
+<style>
+.email-thread-item.active {
+    background-color: #eef2ff;
+    border-left: 4px solid #4f46e5;
+}
+
+.email-thread-item:hover {
+    background-color: #f5f5f5;
+    transform: translateX(2px);
+}
+
+/* Enhanced email body styling */
+.email-body-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.email-body-content p {
+    margin-bottom: 1.2em;
+    line-height: 1.8;
+}
+
+.email-body-content a {
+    color: #4f46e5;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.email-body-content a:hover {
+    color: #4338ca;
+}
+
+.email-body-content ul,
+.email-body-content ol {
+    margin-left: 1.5em;
+    margin-bottom: 1em;
+}
+
+.email-body-content li {
+    margin-bottom: 0.5em;
+    line-height: 1.7;
+}
+
+.email-body-content blockquote {
+    border-left: 4px solid #4f46e5;
+    padding-left: 1em;
+    margin: 1em 0;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* Smooth scrolling */
+#emailDetailsContent {
+    scroll-behavior: smooth;
+}
+
+#emailThreadList {
+    scroll-behavior: smooth;
+}
+
+/* Better focus states */
+.email-thread-item:focus {
+    outline: 2px solid #4f46e5;
+    outline-offset: -2px;
+}
+
+/* Improved typography */
+.email-body-content {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Better spacing for email content */
+.email-body-content > *:first-child {
+    margin-top: 0;
+}
+
+.email-body-content > *:last-child {
+    margin-bottom: 0;
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .email-body-content {
+        font-size: 14px !important;
+        line-height: 1.7 !important;
+    }
+    
+    #emailThreadList {
+        max-height: 50vh;
+    }
+    
+    #emailDetailsContent {
+        padding: 1rem !important;
+    }
+    
+    .email-thread-item {
+        padding: 1rem !important;
+        min-height: 80px;
+    }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+    .email-body-content {
+        font-size: 15px !important;
+        line-height: 1.8 !important;
+    }
+    
+    #emailThreadPanel {
+        width: 100%;
+        max-height: 40vh;
+    }
+    
+    #emailThreadList {
+        max-height: 35vh;
+    }
+}
+
+@media (min-width: 1024px) {
+    #emailThreadPanel {
+        width: 24rem;
+        max-height: calc(100vh - 400px);
+    }
+    
+    #emailThreadList {
+        max-height: calc(100vh - 500px);
+    }
+}
+
+/* Mobile touch improvements */
+@media (max-width: 1023px) {
+    .email-thread-item {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+    
+    button {
+        min-height: 44px; /* iOS touch target size */
+    }
+    
+    #composeModal {
+        padding: 0.5rem;
+    }
+}
+
+/* Message container responsive */
+@media (max-width: 640px) {
+    #messageContainer {
+        top: 1rem !important;
+        right: 1rem !important;
+        left: 1rem !important;
+        max-width: calc(100% - 2rem) !important;
+    }
+}
+</style>
+{% endblock %}
+

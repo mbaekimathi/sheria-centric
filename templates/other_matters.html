@@ -1,0 +1,1159 @@
+{% extends "base.html" %}
+
+{% block title %}Other Matters - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                <i class="fas fa-folder-open text-blue-600 mr-3"></i>
+                Other Matters
+            </h1>
+            <p class="text-gray-600">Manage and track other legal matters and administrative tasks</p>
+        </div>
+        <a href="{{ url_for('register_matter') }}" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center">
+            <i class="fas fa-plus-circle mr-2"></i>
+            Register New Matter
+        </a>
+    </div>
+</div>
+
+<!-- View Toggle -->
+<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-700">View By:</h2>
+        <div class="flex space-x-2">
+            <button 
+                id="viewByClientBtn"
+                onclick="switchView('client')"
+                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold flex items-center"
+            >
+                <i class="fas fa-users mr-2"></i>Client
+            </button>
+            <button 
+                id="viewByCategoryBtn"
+                onclick="switchView('category')"
+                class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold flex items-center"
+            >
+                <i class="fas fa-tags mr-2"></i>Category
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
+        <div class="flex-1 w-full">
+            <label for="searchInput" class="block text-sm font-semibold text-gray-700 mb-2">
+                <i class="fas fa-search text-blue-600 mr-2"></i><span id="searchLabel">Search Clients</span>
+            </label>
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Search by client name or phone number..."
+                    autocomplete="off"
+                />
+                <i class="fas fa-search absolute left-3 top-4 text-gray-400"></i>
+                <button 
+                    id="clearSearch"
+                    onclick="clearSearch()"
+                    class="hidden absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="flex items-end">
+            <button 
+                id="refreshBtn"
+                onclick="refreshView()"
+                class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
+            >
+                <i class="fas fa-refresh mr-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Indicator -->
+<div id="loadingIndicator" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+    <div class="flex items-center justify-center">
+        <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mr-3"></i>
+        <span class="text-gray-700">Loading clients...</span>
+    </div>
+</div>
+
+<!-- Clients with Matters -->
+<div id="clientsContainer" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <div class="flex flex-col md:flex-row items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-gray-900 flex items-center">
+            <i class="fas fa-users text-blue-600 mr-2"></i>
+            <span id="containerTitle">Clients with Matters:</span> <span id="itemsCount" class="ml-2 text-green-600">0</span>
+        </h3>
+    </div>
+    
+    <div id="itemsList" class="space-y-4">
+        <!-- Items will be populated here -->
+    </div>
+</div>
+
+<!-- No Results Message -->
+<div id="noResults" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+    <div class="max-w-md mx-auto">
+        <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">No Matters Found</h3>
+        <p class="text-gray-600" id="noResultsMessage">No matters found.</p>
+    </div>
+</div>
+
+<!-- Error Message -->
+<div id="errorMessage" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+<!-- Edit Matter Modal -->
+<div id="editMatterModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-edit text-blue-600 mr-3"></i>
+                Edit Matter Details
+            </h2>
+            <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        
+        <form id="editMatterForm" class="p-6 space-y-6">
+            <input type="hidden" id="edit_matter_id" />
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Matter Title -->
+                <div class="md:col-span-2">
+                    <label for="edit_matter_title" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Matter Title <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="edit_matter_title" 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                        required
+                        oninput="this.value = this.value.toUpperCase()"
+                    />
+                </div>
+
+                <!-- Matter Category -->
+                <div class="md:col-span-2">
+                    <label for="edit_matter_category" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Matter Category <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="edit_matter_category" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                            required
+                            oninput="this.value = this.value.toUpperCase()"
+                        />
+                        <div id="edit_matter_category_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assigned Employee -->
+                <div class="md:col-span-2">
+                    <label for="edit_employee_search" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Assigned Employee <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="edit_employee_search" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Search employee by name..."
+                            required
+                        />
+                        <input type="hidden" id="edit_assigned_employee_id" />
+                        <div id="edit_employee_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <!-- Dropdown items will be populated here -->
+                        </div>
+                        <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
+                    </div>
+                    <div id="edit_selected_employee" class="hidden mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p class="text-sm text-gray-700"><strong>Selected:</strong> <span id="edit_selected_employee_name"></span></p>
+                        <p class="text-xs text-gray-500"><span id="edit_selected_employee_role"></span></p>
+                    </div>
+                </div>
+
+                <!-- Date Opened -->
+                <div>
+                    <label for="edit_date_opened" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Date Opened <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="date" 
+                        id="edit_date_opened" 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                    />
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <label for="edit_status" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Status <span class="text-red-500">*</span>
+                    </label>
+                    <select 
+                        id="edit_status" 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                    >
+                        <option value="Open">Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Pending Client">Pending Client</option>
+                        <option value="Completed">Completed</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Closed">Closed</option>
+                        <option value="Pending Approval">Pending Approval</option>
+                    </select>
+                </div>
+
+                <!-- Client Instructions -->
+                <div class="md:col-span-2">
+                    <label for="edit_client_instructions" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Client Instructions <span class="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <textarea 
+                        id="edit_client_instructions" 
+                        rows="4"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter client instructions or requirements..."
+                    ></textarea>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="flex justify-end space-x-4 pt-6 border-t border-gray-200">
+                <button 
+                    type="button"
+                    onclick="closeEditModal()"
+                    class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                    <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button 
+                    type="submit"
+                    id="editSubmitBtn"
+                    class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <i class="fas fa-save mr-2"></i>Update Matter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let searchTimeout;
+let currentSearchQuery = '';
+let currentView = 'client'; // 'client' or 'category'
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadView();
+    
+    // Setup live search
+    const searchInput = document.getElementById('searchInput');
+    const clearButton = document.getElementById('clearSearch');
+    
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        currentSearchQuery = query;
+        
+        // Show/hide clear button
+        if (query.length > 0) {
+            clearButton.classList.remove('hidden');
+        } else {
+            clearButton.classList.add('hidden');
+        }
+        
+        // Clear previous timeout
+        clearTimeout(searchTimeout);
+        
+        // Debounce search
+        searchTimeout = setTimeout(() => {
+            searchView(query);
+        }, 300);
+    });
+    
+    // Handle Enter key
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(searchTimeout);
+            searchView(this.value.trim());
+        }
+    });
+    
+    // Setup edit modal search functionality (only once)
+    setupEditEmployeeSearch();
+    setupEditCategorySearch();
+});
+
+function switchView(view) {
+    currentView = view;
+    currentSearchQuery = '';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('clearSearch').classList.add('hidden');
+    
+    // Update button styles
+    const clientBtn = document.getElementById('viewByClientBtn');
+    const categoryBtn = document.getElementById('viewByCategoryBtn');
+    
+    if (view === 'client') {
+        clientBtn.className = 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold flex items-center';
+        categoryBtn.className = 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold flex items-center';
+        document.getElementById('searchLabel').textContent = 'Search Clients';
+        document.getElementById('searchInput').placeholder = 'Search by client name or phone number...';
+        document.getElementById('containerTitle').innerHTML = '<i class="fas fa-users text-blue-600 mr-2"></i>Clients with Matters:';
+    } else {
+        clientBtn.className = 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold flex items-center';
+        categoryBtn.className = 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold flex items-center';
+        document.getElementById('searchLabel').textContent = 'Search Categories';
+        document.getElementById('searchInput').placeholder = 'Search by category name...';
+        document.getElementById('containerTitle').innerHTML = '<i class="fas fa-tags text-blue-600 mr-2"></i>Categories with Matters:';
+    }
+    
+    loadView();
+}
+
+function refreshView() {
+    if (currentView === 'client') {
+        loadClients();
+    } else {
+        loadCategories();
+    }
+}
+
+function loadView() {
+    if (currentView === 'client') {
+        loadClients();
+    } else {
+        loadCategories();
+    }
+}
+
+function searchView(query) {
+    if (currentView === 'client') {
+        searchClients(query);
+    } else {
+        searchCategories(query);
+    }
+}
+
+function clearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    searchInput.value = '';
+    currentSearchQuery = '';
+    document.getElementById('clearSearch').classList.add('hidden');
+    loadView();
+}
+
+function searchClients(query) {
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.getElementById('clientsContainer').classList.add('hidden');
+    document.getElementById('noResults').classList.add('hidden');
+    
+    const url = query ? `/api/matters/clients?q=${encodeURIComponent(query)}` : '/api/matters/clients';
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            // Show clients container
+            document.getElementById('clientsContainer').classList.remove('hidden');
+            
+            if (data.clients && data.clients.length > 0) {
+                // Display clients
+                document.getElementById('itemsCount').textContent = data.clients.length;
+                displayClients(data.clients);
+                document.getElementById('noResults').classList.add('hidden');
+            } else {
+                document.getElementById('itemsCount').textContent = '0';
+                document.getElementById('itemsList').innerHTML = '';
+                document.getElementById('noResults').classList.remove('hidden');
+                document.getElementById('noResultsMessage').textContent = query ? 
+                    `No clients found matching "${query}"` : 
+                    'No clients with matters found.';
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            console.error('Error searching clients:', error);
+            showError('Error searching clients. Please try again.');
+        });
+}
+
+function loadClients() {
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.getElementById('clientsContainer').classList.add('hidden');
+    document.getElementById('noResults').classList.add('hidden');
+    
+    fetch('/api/matters/clients')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            // Show clients container
+            document.getElementById('clientsContainer').classList.remove('hidden');
+            
+            if (data.clients && data.clients.length > 0) {
+                // Display clients
+                document.getElementById('itemsCount').textContent = data.clients.length;
+                displayClients(data.clients);
+                document.getElementById('noResults').classList.add('hidden');
+            } else {
+                document.getElementById('itemsCount').textContent = '0';
+                document.getElementById('itemsList').innerHTML = '';
+                document.getElementById('noResults').classList.remove('hidden');
+                document.getElementById('noResultsMessage').textContent = data.message || 'No clients with matters found.';
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            console.error('Error loading clients:', error);
+            showError('Error loading clients. Please try again.');
+        });
+}
+
+function displayClients(clients) {
+    const itemsList = document.getElementById('itemsList');
+    itemsList.innerHTML = '';
+    
+    if (clients.length === 0) {
+        itemsList.innerHTML = '<div class="text-center text-gray-500 py-8">No clients with matters found</div>';
+        return;
+    }
+    
+    clients.forEach(client => {
+        const clientCard = document.createElement('div');
+        clientCard.className = 'border border-gray-200 rounded-lg hover:shadow-md transition-shadow';
+        clientCard.innerHTML = `
+            <div class="p-4 cursor-pointer" onclick="toggleClientMatters(${client.id}, this)">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0">
+                            ${client.profile_picture ? 
+                                `<img class="h-12 w-12 rounded-full" src="/static/uploads/profile_pictures/${client.profile_picture}" alt="${client.full_name || 'Client'}">` :
+                                `<div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fas fa-user text-blue-600 text-xl"></i>
+                                </div>`
+                            }
+                        </div>
+                        <div>
+                            <div class="text-lg font-semibold text-gray-900">${client.full_name || 'N/A'}</div>
+                            <div class="text-sm text-gray-500">${client.phone_number || 'No phone'} ${client.email ? '• ' + client.email : ''}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">Matters</div>
+                            <div class="text-2xl font-bold text-blue-600">${client.matter_count || 0}</div>
+                        </div>
+                        <i class="fas fa-chevron-down text-gray-400 transition-transform" id="chevron-${client.id}"></i>
+                    </div>
+                </div>
+            </div>
+            <div id="matters-${client.id}" class="hidden border-t border-gray-200 bg-gray-50">
+                <div class="p-4">
+                    <div class="flex items-center justify-center py-4">
+                        <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                        <span class="text-gray-700">Loading matters...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        itemsList.appendChild(clientCard);
+    });
+}
+
+function displayCategories(categories) {
+    const itemsList = document.getElementById('itemsList');
+    itemsList.innerHTML = '';
+    
+    if (categories.length === 0) {
+        itemsList.innerHTML = '<div class="text-center text-gray-500 py-8">No categories with matters found</div>';
+        return;
+    }
+    
+    categories.forEach(category => {
+        const categoryCard = document.createElement('div');
+        const categoryId = category.category_name.replace(/[^a-zA-Z0-9]/g, '_');
+        categoryCard.className = 'border border-gray-200 rounded-lg hover:shadow-md transition-shadow';
+        categoryCard.innerHTML = `
+            <div class="p-4 cursor-pointer" onclick="toggleCategoryMatters('${category.category_name}', this)">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex-shrink-0">
+                            <div class="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                                <i class="fas fa-tag text-purple-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-lg font-semibold text-gray-900">${category.category_name || 'N/A'}</div>
+                            <div class="text-sm text-gray-500">Category</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right">
+                            <div class="text-sm text-gray-500">Matters</div>
+                            <div class="text-2xl font-bold text-purple-600">${category.matter_count || 0}</div>
+                        </div>
+                        <i class="fas fa-chevron-down text-gray-400 transition-transform" id="chevron-cat-${categoryId}"></i>
+                    </div>
+                </div>
+            </div>
+            <div id="matters-cat-${categoryId}" class="hidden border-t border-gray-200 bg-gray-50">
+                <div class="p-4">
+                    <div class="flex items-center justify-center py-4">
+                        <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                        <span class="text-gray-700">Loading matters...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        itemsList.appendChild(categoryCard);
+    });
+}
+
+function toggleClientMatters(clientId, element) {
+    const mattersDiv = document.getElementById(`matters-${clientId}`);
+    const chevron = document.getElementById(`chevron-${clientId}`);
+    const isExpanded = !mattersDiv.classList.contains('hidden');
+    
+    if (isExpanded) {
+        // Collapse
+        mattersDiv.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+    } else {
+        // Expand
+        mattersDiv.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+        
+        // Check if matters are already loaded
+        const mattersTable = document.getElementById(`matters-table-${clientId}`);
+        if (!mattersTable) {
+            loadClientMatters(clientId);
+        }
+    }
+}
+
+function loadClientMatters(clientId) {
+    const mattersDiv = document.getElementById(`matters-${clientId}`);
+    
+    fetch(`/api/matters/client/${clientId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                mattersDiv.innerHTML = `
+                    <div class="p-4">
+                        <div class="text-center text-red-600 py-4">
+                            <i class="fas fa-exclamation-circle mr-2"></i>
+                            ${data.error}
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (data.matters && data.matters.length > 0) {
+                mattersDiv.innerHTML = `
+                    <div class="p-4">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200" id="matters-table-${clientId}">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reference #</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Matter Title</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Assigned To</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date Opened</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    ${data.matters.map(matter => {
+                                        const statusColors = {
+                                            'Open': 'bg-green-100 text-green-800',
+                                            'In Progress': 'bg-blue-100 text-blue-800',
+                                            'Pending Client': 'bg-yellow-100 text-yellow-800',
+                                            'Completed': 'bg-gray-100 text-gray-800',
+                                            'On Hold': 'bg-orange-100 text-orange-800',
+                                            'Closed': 'bg-red-100 text-red-800',
+                                            'Pending Approval': 'bg-purple-100 text-purple-800'
+                                        };
+                                        const statusColor = statusColors[matter.status] || 'bg-gray-100 text-gray-800';
+                                        const dateOpened = matter.date_opened ? new Date(matter.date_opened).toLocaleDateString() : 'N/A';
+                                        
+                                        return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_reference_number || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_title || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_category || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.client_full_name || matter.client_name || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.assigned_employee_name || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${dateOpened}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor} cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">
+                                                        ${matter.status || 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <button 
+                                                        onclick="event.stopPropagation(); openEditModal(${matter.id})"
+                                                        class="text-blue-600 hover:text-blue-800 transition-colors"
+                                                        title="Edit Matter"
+                                                    >
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            } else {
+                mattersDiv.innerHTML = `
+                    <div class="p-4">
+                        <div class="text-center text-gray-500 py-4">
+                            No matters found for this client.
+                        </div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading client matters:', error);
+            mattersDiv.innerHTML = `
+                <div class="p-4">
+                    <div class="text-center text-red-600 py-4">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        Error loading matters. Please try again.
+                    </div>
+                </div>
+            `;
+        });
+}
+
+function loadCategories() {
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.getElementById('clientsContainer').classList.add('hidden');
+    document.getElementById('noResults').classList.add('hidden');
+    
+    fetch('/api/matters/categories')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            // Show container
+            document.getElementById('clientsContainer').classList.remove('hidden');
+            
+            if (data.categories && data.categories.length > 0) {
+                // Display categories
+                document.getElementById('itemsCount').textContent = data.categories.length;
+                displayCategories(data.categories);
+                document.getElementById('noResults').classList.add('hidden');
+            } else {
+                document.getElementById('itemsCount').textContent = '0';
+                document.getElementById('itemsList').innerHTML = '';
+                document.getElementById('noResults').classList.remove('hidden');
+                document.getElementById('noResultsMessage').textContent = data.message || 'No categories with matters found.';
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            console.error('Error loading categories:', error);
+            showError('Error loading categories. Please try again.');
+        });
+}
+
+function searchCategories(query) {
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.getElementById('clientsContainer').classList.add('hidden');
+    document.getElementById('noResults').classList.add('hidden');
+    
+    const url = query ? `/api/matters/categories?q=${encodeURIComponent(query)}` : '/api/matters/categories';
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            // Show container
+            document.getElementById('clientsContainer').classList.remove('hidden');
+            
+            if (data.categories && data.categories.length > 0) {
+                // Display categories
+                document.getElementById('itemsCount').textContent = data.categories.length;
+                displayCategories(data.categories);
+                document.getElementById('noResults').classList.add('hidden');
+            } else {
+                document.getElementById('itemsCount').textContent = '0';
+                document.getElementById('itemsList').innerHTML = '';
+                document.getElementById('noResults').classList.remove('hidden');
+                document.getElementById('noResultsMessage').textContent = query ? 
+                    `No categories found matching "${query}"` : 
+                    'No categories with matters found.';
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            console.error('Error searching categories:', error);
+            showError('Error searching categories. Please try again.');
+        });
+}
+
+function toggleCategoryMatters(categoryName, element) {
+    const categoryId = categoryName.replace(/[^a-zA-Z0-9]/g, '_');
+    const mattersDiv = document.getElementById(`matters-cat-${categoryId}`);
+    const chevron = document.getElementById(`chevron-cat-${categoryId}`);
+    const isExpanded = !mattersDiv.classList.contains('hidden');
+    
+    if (isExpanded) {
+        // Collapse
+        mattersDiv.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+    } else {
+        // Expand
+        mattersDiv.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+        
+        // Check if matters are already loaded
+        const mattersTable = document.getElementById(`matters-table-cat-${categoryId}`);
+        if (!mattersTable) {
+            loadCategoryMatters(categoryName, categoryId);
+        }
+    }
+}
+
+function loadCategoryMatters(categoryName, categoryId) {
+    const mattersDiv = document.getElementById(`matters-cat-${categoryId}`);
+    
+    fetch(`/api/matters/category/${encodeURIComponent(categoryName)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                mattersDiv.innerHTML = `
+                    <div class="p-4">
+                        <div class="text-center text-red-600 py-4">
+                            <i class="fas fa-exclamation-circle mr-2"></i>
+                            ${data.error}
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            if (data.matters && data.matters.length > 0) {
+                mattersDiv.innerHTML = `
+                    <div class="p-4">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200" id="matters-table-cat-${categoryId}">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Reference #</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Matter Title</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Assigned To</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date Opened</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    ${data.matters.map(matter => {
+                                        const statusColors = {
+                                            'Open': 'bg-green-100 text-green-800',
+                                            'In Progress': 'bg-blue-100 text-blue-800',
+                                            'Pending Client': 'bg-yellow-100 text-yellow-800',
+                                            'Completed': 'bg-gray-100 text-gray-800',
+                                            'On Hold': 'bg-orange-100 text-orange-800',
+                                            'Closed': 'bg-red-100 text-red-800',
+                                            'Pending Approval': 'bg-purple-100 text-purple-800'
+                                        };
+                                        const statusColor = statusColors[matter.status] || 'bg-gray-100 text-gray-800';
+                                        const dateOpened = matter.date_opened ? new Date(matter.date_opened).toLocaleDateString() : 'N/A';
+                                        
+                                        return `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_reference_number || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_title || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.client_full_name || matter.client_name || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.assigned_employee_name || 'N/A'}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${dateOpened}</div>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor} cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">
+                                                        ${matter.status || 'N/A'}
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap">
+                                                    <button 
+                                                        onclick="event.stopPropagation(); openEditModal(${matter.id})"
+                                                        class="text-blue-600 hover:text-blue-800 transition-colors"
+                                                        title="Edit Matter"
+                                                    >
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            } else {
+                mattersDiv.innerHTML = `
+                    <div class="p-4">
+                        <div class="text-center text-gray-500 py-4">
+                            No matters found for this category.
+                        </div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading category matters:', error);
+            mattersDiv.innerHTML = `
+                <div class="p-4">
+                    <div class="text-center text-red-600 py-4">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        Error loading matters. Please try again.
+                    </div>
+                </div>
+            `;
+        });
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.className = 'fixed top-20 right-4 z-50 max-w-md bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg';
+    errorDiv.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-circle mr-3 text-xl"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    errorDiv.classList.remove('hidden');
+    
+    setTimeout(() => {
+        errorDiv.classList.add('hidden');
+    }, 5000);
+}
+
+// Edit Modal Functions
+let editEmployeeSearchTimeout;
+let editCategorySearchTimeout;
+
+function openEditModal(matterId) {
+    const modal = document.getElementById('editMatterModal');
+    modal.classList.remove('hidden');
+    
+    // Fetch matter details
+    fetch(`/api/matters/${matterId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showError(data.error);
+                closeEditModal();
+                return;
+            }
+            
+            const matter = data.matter;
+            if (!matter) {
+                showError('Matter not found');
+                closeEditModal();
+                return;
+            }
+            
+            // Populate form
+            document.getElementById('edit_matter_id').value = matter.id;
+            document.getElementById('edit_matter_title').value = matter.matter_title || '';
+            document.getElementById('edit_matter_category').value = matter.matter_category || '';
+            document.getElementById('edit_date_opened').value = matter.date_opened || '';
+            document.getElementById('edit_status').value = matter.status || 'Pending Approval';
+            document.getElementById('edit_client_instructions').value = matter.client_instructions || '';
+            
+            // Set employee
+            if (matter.assigned_employee_id) {
+                document.getElementById('edit_assigned_employee_id').value = matter.assigned_employee_id;
+                document.getElementById('edit_employee_search').value = matter.assigned_employee_name || '';
+                document.getElementById('edit_selected_employee_name').textContent = matter.assigned_employee_name || '';
+                document.getElementById('edit_selected_employee_role').textContent = 'Employee';
+                document.getElementById('edit_selected_employee').classList.remove('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading matter:', error);
+            showError('Error loading matter details');
+            closeEditModal();
+        });
+}
+
+function closeEditModal() {
+    const modal = document.getElementById('editMatterModal');
+    modal.classList.add('hidden');
+    document.getElementById('editMatterForm').reset();
+    document.getElementById('edit_selected_employee').classList.add('hidden');
+    document.getElementById('edit_employee_dropdown').classList.add('hidden');
+    document.getElementById('edit_matter_category_dropdown').classList.add('hidden');
+}
+
+function setupEditEmployeeSearch() {
+    const employeeSearchInput = document.getElementById('edit_employee_search');
+    const employeeDropdown = document.getElementById('edit_employee_dropdown');
+    const selectedEmployeeDiv = document.getElementById('edit_selected_employee');
+    const selectedEmployeeName = document.getElementById('edit_selected_employee_name');
+    const selectedEmployeeRole = document.getElementById('edit_selected_employee_role');
+    const assignedEmployeeIdInput = document.getElementById('edit_assigned_employee_id');
+    
+    employeeSearchInput.addEventListener('input', function() {
+        clearTimeout(editEmployeeSearchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            employeeDropdown.classList.add('hidden');
+            return;
+        }
+        
+        editEmployeeSearchTimeout = setTimeout(() => {
+            fetch(`/api/matters/employees/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        employeeDropdown.classList.add('hidden');
+                        return;
+                    }
+                    
+                    if (data.employees && data.employees.length > 0) {
+                        employeeDropdown.innerHTML = data.employees.map(employee => `
+                            <div class="p-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 employee-option" 
+                                 data-employee-id="${employee.id}" 
+                                 data-employee-name="${employee.full_name}" 
+                                 data-employee-role="${employee.role || 'N/A'}">
+                                <div class="font-semibold text-gray-900">${employee.full_name}</div>
+                                <div class="text-sm text-gray-600">${employee.role || 'N/A'}</div>
+                                <div class="text-xs text-gray-500">${employee.employee_code || ''}</div>
+                            </div>
+                        `).join('');
+                        employeeDropdown.classList.remove('hidden');
+                        
+                        // Add click handlers
+                        document.querySelectorAll('#edit_employee_dropdown .employee-option').forEach(option => {
+                            option.addEventListener('click', function() {
+                                const employeeId = this.dataset.employeeId;
+                                const employeeName = this.dataset.employeeName;
+                                const employeeRole = this.dataset.employeeRole;
+                                
+                                assignedEmployeeIdInput.value = employeeId;
+                                employeeSearchInput.value = employeeName;
+                                selectedEmployeeName.textContent = employeeName;
+                                selectedEmployeeRole.textContent = `Role: ${employeeRole}`;
+                                selectedEmployeeDiv.classList.remove('hidden');
+                                employeeDropdown.classList.add('hidden');
+                            });
+                        });
+                    } else {
+                        employeeDropdown.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching employees:', error);
+                    employeeDropdown.classList.add('hidden');
+                });
+        }, 300);
+    });
+}
+
+function setupEditCategorySearch() {
+    const categoryInput = document.getElementById('edit_matter_category');
+    const categoryDropdown = document.getElementById('edit_matter_category_dropdown');
+    
+    categoryInput.addEventListener('input', function() {
+        clearTimeout(editCategorySearchTimeout);
+        const query = this.value.trim().toUpperCase();
+        
+        if (query.length < 1) {
+            categoryDropdown.classList.add('hidden');
+            return;
+        }
+        
+        editCategorySearchTimeout = setTimeout(() => {
+            fetch(`/api/matters/categories/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        categoryDropdown.classList.add('hidden');
+                        return;
+                    }
+                    
+                    categoryDropdown.innerHTML = '';
+                    if (data.categories && data.categories.length > 0) {
+                        data.categories.forEach(category => {
+                            const item = document.createElement('div');
+                            item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100';
+                            item.textContent = category.category_name;
+                            item.addEventListener('click', () => {
+                                categoryInput.value = category.category_name;
+                                categoryDropdown.classList.add('hidden');
+                            });
+                            categoryDropdown.appendChild(item);
+                        });
+                        categoryDropdown.classList.remove('hidden');
+                    } else {
+                        categoryDropdown.classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching categories:', error);
+                    categoryDropdown.classList.add('hidden');
+                });
+        }, 300);
+    });
+}
+
+// Handle edit form submission
+document.getElementById('editMatterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const matterId = document.getElementById('edit_matter_id').value;
+    const submitBtn = document.getElementById('editSubmitBtn');
+    const originalText = submitBtn.innerHTML;
+    
+    // Validate required fields
+    if (!document.getElementById('edit_assigned_employee_id').value) {
+        showError('Please select an assigned employee');
+        return;
+    }
+    
+    const formData = {
+        matter_title: document.getElementById('edit_matter_title').value.trim(),
+        matter_category: document.getElementById('edit_matter_category').value.trim(),
+        assigned_employee_id: parseInt(document.getElementById('edit_assigned_employee_id').value),
+        date_opened: document.getElementById('edit_date_opened').value,
+        status: document.getElementById('edit_status').value,
+        client_instructions: document.getElementById('edit_client_instructions').value.trim()
+    };
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...';
+    
+    fetch(`/api/matters/update/${matterId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        
+        if (data.success) {
+            // Show success message
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.className = 'fixed top-20 right-4 z-50 max-w-md bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg';
+            errorDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle mr-3 text-xl"></i>
+                    <span>Matter updated successfully</span>
+                </div>
+            `;
+            errorDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 3000);
+            
+            closeEditModal();
+            // Refresh the current view
+            setTimeout(() => {
+                refreshView();
+            }, 1000);
+        } else {
+            showError(data.error || 'Error updating matter');
+        }
+    })
+    .catch(error => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        console.error('Error updating matter:', error);
+        showError('Error updating matter. Please try again.');
+    });
+});
+
+// Close modal when clicking outside
+document.getElementById('editMatterModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEditModal();
+    }
+});
+</script>
+{% endblock %}
+

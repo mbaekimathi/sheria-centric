@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}Case Details - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('case_management') }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-briefcase mr-3"></i>
+                        Case Details
+                    </h1>
+                    <p class="text-indigo-100">Tracking Number: <span class="font-semibold text-white">{{ case_data.tracking_number }}</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Profile Card -->
+    {% if case_data.client_table_id %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
+            <!-- Profile Picture -->
+            <div class="flex-shrink-0">
+                {% if case_data.client_profile_picture %}
+                    {% if case_data.client_profile_picture.startswith('http') %}
+                    <img src="{{ case_data.client_profile_picture }}" alt="Client" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + case_data.client_profile_picture) }}" alt="Client" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% endif %}
+                {% else %}
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl md:text-4xl font-bold border-4 border-indigo-200 shadow-lg">
+                    {{ (case_data.client_full_name or case_data.client_name or 'C')[0] }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Client Information -->
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{{ case_data.client_full_name or case_data.client_name or 'N/A' }}</h2>
+                        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                            <span class="flex items-center">
+                                <i class="fas fa-phone mr-2 text-indigo-600"></i>
+                                {{ case_data.client_phone or 'N/A' }}
+                            </span>
+                            <span class="flex items-center">
+                                <i class="fas fa-envelope mr-2 text-indigo-600"></i>
+                                {{ case_data.client_email or 'N/A' }}
+                            </span>
+                            <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
+                                {{ case_data.client_type or 'N/A' }} Client
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Case Status Badge -->
+                    <div class="mt-4 md:mt-0">
+                        {% set status_colors = {
+                            'Active': 'bg-green-100 text-green-800 border-green-300',
+                            'Closed': 'bg-gray-100 text-gray-800 border-gray-300',
+                            'Archived': 'bg-blue-100 text-blue-800 border-blue-300',
+                            'Mediations': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                            'Pending': 'bg-orange-100 text-orange-800 border-orange-300',
+                            'Consolidated': 'bg-purple-100 text-purple-800 border-purple-300',
+                            'Pending Approval': 'bg-red-100 text-red-800 border-red-300'
+                        } %}
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500 font-medium mb-2">Case Status</p>
+                            <span class="px-4 py-2 inline-flex text-sm leading-5 font-semibold rounded-lg border-2 {{ status_colors.get(case_data.status, 'bg-gray-100 text-gray-800 border-gray-300') }}">
+                                <i class="fas fa-circle text-xs mr-2 mt-0.5"></i>
+                                {{ case_data.status or 'N/A' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Client Status -->
+                <div class="pt-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium mb-1">Client Status</p>
+                            <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if case_data.client_status == 'Active' else 'bg-gray-100 text-gray-800' }}">
+                                {{ case_data.client_status or 'N/A' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <!-- No Client Information -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="text-center py-8">
+            <i class="fas fa-user-slash text-gray-300 text-5xl mb-4"></i>
+            <p class="text-gray-600 font-semibold mb-2">Client Information Not Available</p>
+            <p class="text-gray-500 text-sm">Client details could not be found for this case.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="space-y-6">
+        <!-- Main Case Information -->
+        <div class="space-y-6">
+            <!-- Case Information -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                    <i class="fas fa-info-circle text-indigo-600 mr-3"></i>
+                    Case Information
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Tracking Number</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.tracking_number or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Court Case Number</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.court_case_number or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Case Type</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.case_type or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Case Category</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.case_category or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Filing Date</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.filing_date or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Station</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.station or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium mb-1">Allocated To</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ case_data.filled_by_full_name or case_data.filled_by_name or 'Not Allocated' }}</p>
+                    </div>
+                </div>
+                
+                {% if case_data.description %}
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-sm text-gray-700 font-semibold">Description</p>
+                        <button onclick="toggleDescription()" id="description-toggle" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center shadow-sm">
+                            <i class="fas fa-eye mr-2" id="description-toggle-icon"></i>
+                            <span id="description-toggle-text">View Description</span>
+                        </button>
+                    </div>
+                    <div id="description-content" class="hidden mt-4">
+                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <p class="text-gray-900 whitespace-pre-wrap leading-relaxed">{{ case_data.description }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Parties Information -->
+            {% if parties and parties|length > 0 %}
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                    <i class="fas fa-users text-indigo-600 mr-3"></i>
+                    Parties
+                </h2>
+                <div class="space-y-4">
+                    {% for party in parties %}
+                    <div class="bg-gradient-to-r from-gray-50 to-indigo-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Party Name</p>
+                                <p class="text-sm font-semibold text-gray-900">{{ party.party_name or 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Party Type</p>
+                                <p class="text-sm font-semibold text-gray-900">{{ party.party_type or 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Category</p>
+                                <p class="text-sm font-semibold text-gray-900">{{ party.party_category or 'N/A' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Firm/Agent</p>
+                                <p class="text-sm font-semibold text-gray-900">{{ party.firm_agent or 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Case Proceedings -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-gavel text-indigo-600 mr-3"></i>
+                        Case Proceedings <span class="ml-2 text-gray-500 font-normal text-base">({{ proceedings|length }})</span>
+                    </h2>
+                    <a href="/case_management/{{ case_id }}/proceedings" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+                        Update Proceedings <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+                
+                {% if proceedings and proceedings|length > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity Type</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judicial Officer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Court Room</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outcome</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for proceeding in proceedings %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ proceeding.judicial_officer or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">{{ proceeding.court_room or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    {% if proceeding.next_court_date %}
+                                    <div class="text-sm font-semibold text-green-600">{{ proceeding.next_court_date }}</div>
+                                    {% else %}
+                                    <span class="text-sm text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4">
+                                    {% if proceeding.outcome_orders %}
+                                    <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ proceeding.outcome_orders }}">
+                                        {{ proceeding.outcome_orders }}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-sm text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-gavel text-gray-400 text-5xl mb-4"></i>
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">No Proceedings Found</h3>
+                    <p class="text-gray-600 mb-4">No court proceedings have been recorded for this case yet.</p>
+                    <a href="/case_management/{{ case_id }}/proceedings" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        Add First Proceeding
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function toggleDescription() {
+    const content = document.getElementById('description-content');
+    const toggleText = document.getElementById('description-toggle-text');
+    const toggleIcon = document.getElementById('description-toggle-icon');
+    const toggleButton = document.getElementById('description-toggle');
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        toggleText.textContent = 'Hide Description';
+        toggleIcon.classList.remove('fa-eye');
+        toggleIcon.classList.add('fa-eye-slash');
+        toggleButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+        toggleButton.classList.add('bg-gray-600', 'hover:bg-gray-700');
+    } else {
+        content.classList.add('hidden');
+        toggleText.textContent = 'View Description';
+        toggleIcon.classList.remove('fa-eye-slash');
+        toggleIcon.classList.add('fa-eye');
+        toggleButton.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+        toggleButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+    }
+}
+</script>
+{% endblock %}

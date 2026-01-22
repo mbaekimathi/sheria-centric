@@ -65,3 +65,13 @@ logs/
 *.temp
 .cache/
 
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Backup files
+*.bak
+*.backup
+*~

@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Messages - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 h-screen flex flex-col">
+    <!-- Chat Header (WhatsApp style) -->
+    <div class="bg-indigo-600 text-white rounded-t-2xl shadow-lg px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('client_dashboard') }}" class="text-white hover:text-indigo-200 transition-colors">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                    <i class="fas fa-headset text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-semibold">Support Team</h1>
+                    <p class="text-xs text-indigo-100 opacity-75">We're here to help</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="refreshMessages()" class="text-white hover:text-indigo-200 transition-colors p-2">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Messages Container (Scrollable) -->
+    <div id="messagesList" class="flex-1 bg-gray-100 overflow-y-auto p-4 space-y-3" style="background-image: url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.03\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');">
+        {% if messages and messages|length > 0 %}
+            {% for msg in messages %}
+            <!-- Message Bubble -->
+            <div class="flex {% if msg.sender_type == 'client' %}justify-end{% else %}justify-start{% endif %}">
+                <div class="flex items-start space-x-2 max-w-[75%] {% if msg.sender_type == 'client' %}flex-row-reverse space-x-reverse{% endif %}">
+                    <!-- Avatar (only for employee messages) -->
+                    {% if msg.sender_type == 'employee' %}
+                    <div class="flex-shrink-0">
+                        {% if msg.employee_profile_picture %}
+                        <img src="/static/uploads/profile_pictures/{{ msg.employee_profile_picture }}" 
+                             alt="{{ msg.employee_name or msg.employee_full_name }}" 
+                             class="w-8 h-8 rounded-full object-cover"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        {% endif %}
+                        <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm {% if msg.employee_profile_picture %}hidden{% endif %}">
+                            {{ (msg.employee_name or msg.employee_full_name or 'S')[0] }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Message Bubble -->
+                    <div class="{% if msg.sender_type == 'client' %}bg-indigo-500 text-white{% else %}bg-white text-gray-800 shadow-sm{% endif %} rounded-2xl px-4 py-2 {% if msg.sender_type == 'client' %}rounded-br-md{% else %}rounded-bl-md{% endif %}">
+                        {% if msg.subject and msg.sender_type == 'client' %}
+                        <div class="font-semibold text-sm mb-1 opacity-90">{{ msg.subject }}</div>
+                        {% endif %}
+                        
+                        <!-- Attachment (Image or Document) -->
+                        {% if msg.attachment_file %}
+                        <div class="mb-2">
+                            {% if msg.attachment_type == 'image' %}
+                            <a href="/static/uploads/message_attachments/{{ msg.attachment_file }}" target="_blank" class="block">
+                                <img src="/static/uploads/message_attachments/{{ msg.attachment_file }}" 
+                                     alt="Attachment" 
+                                     class="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                     style="max-height: 300px;"
+                                     onerror="this.parentElement.innerHTML='<div class=\\'text-xs opacity-75\\'>Image failed to load</div>'">
+                            </a>
+                            {% else %}
+                            <a href="/static/uploads/message_attachments/{{ msg.attachment_file }}" 
+                               target="_blank"
+                               download
+                               class="flex items-center space-x-2 {% if msg.sender_type == 'client' %}text-indigo-100 hover:text-white{% else %}text-indigo-600 hover:text-indigo-800{% endif %} transition-colors p-2 rounded bg-white/10">
+                                <i class="fas fa-file-alt text-lg"></i>
+                                <span class="text-sm font-medium truncate">{{ msg.attachment_file }}</span>
+                                <i class="fas fa-download text-xs"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Message Text -->
+                        {% if msg.message %}
+                        <div class="text-sm whitespace-pre-wrap break-words">{{ msg.message }}</div>
+                        {% endif %}
+                        
+                        <div class="flex items-center justify-end space-x-1 mt-1">
+                            <span class="text-xs {% if msg.sender_type == 'client' %}text-indigo-100{% else %}text-gray-500{% endif %} opacity-75">
+                                {{ msg.created_at.split(' ')[1][:5] if ' ' in msg.created_at else msg.created_at }}
+                            </span>
+                            {% if msg.sender_type == 'client' %}
+                            <i class="fas fa-check text-xs text-indigo-200"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <!-- Empty State -->
+        <div class="flex items-center justify-center h-full">
+            <div class="text-center">
+                <div class="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-comments text-gray-400 text-3xl"></i>
+                </div>
+                <p class="text-gray-500 text-lg font-medium mb-2">No messages yet</p>
+                <p class="text-gray-400 text-sm">Start a conversation with our support team</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Input Area (WhatsApp style - at bottom) -->
+    <div class="bg-white rounded-b-2xl shadow-lg border-t border-gray-200 p-4">
+        <form id="sendMessageForm" enctype="multipart/form-data" class="space-y-2">
+            <!-- Subject (optional) -->
+            <input 
+                type="text" 
+                id="subject" 
+                name="subject" 
+                placeholder="Subject (optional)"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+            >
+            
+            <!-- File Preview -->
+            <div id="filePreview" class="hidden mb-2">
+                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div class="flex items-center space-x-3 flex-1 min-w-0">
+                        <i id="filePreviewIcon" class="fas fa-file text-gray-400"></i>
+                        <div class="flex-1 min-w-0">
+                            <p id="filePreviewName" class="text-sm font-medium text-gray-700 truncate"></p>
+                            <p id="filePreviewSize" class="text-xs text-gray-500"></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="clearFile()" class="text-red-500 hover:text-red-700 ml-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Image Preview -->
+            <div id="imagePreview" class="hidden mb-2">
+                <div class="relative inline-block">
+                    <img id="imagePreviewImg" src="" alt="Preview" class="max-h-32 rounded-lg border border-gray-200">
+                    <button type="button" onclick="clearImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">
+                        <i class="fas fa-times text-xs"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex items-end space-x-2">
+                <!-- File/Image Input -->
+                <div class="relative">
+                    <input 
+                        type="file" 
+                        id="attachment" 
+                        name="attachment" 
+                        accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+                        class="hidden"
+                        onchange="handleFileSelect(this)"
+                    >
+                    <label for="attachment" class="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-3 cursor-pointer transition-colors flex items-center justify-center">
+                        <i class="fas fa-paperclip text-lg"></i>
+                    </label>
+                </div>
+                
+                <!-- Camera Input (mobile) -->
+                <div class="relative">
+                    <input 
+                        type="file" 
+                        id="cameraInput" 
+                        name="cameraInput" 
+                        accept="image/*"
+                        capture="environment"
+                        class="hidden"
+                        onchange="handleFileSelect(this)"
+                    >
+                    <label for="cameraInput" class="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-3 cursor-pointer transition-colors flex items-center justify-center">
+                        <i class="fas fa-camera text-lg"></i>
+                    </label>
+                </div>
+                
+                <!-- Message Input -->
+                <div class="flex-1 relative">
+                    <textarea 
+                        id="message" 
+                        name="message" 
+                        rows="1"
+                        placeholder="Type a message..."
+                        class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none overflow-hidden"
+                        style="min-height: 48px; max-height: 120px;"
+                        oninput="autoResize(this)"
+                    ></textarea>
+                </div>
+                
+                <!-- Send Button -->
+                <button 
+                    type="submit"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-3 transition-colors flex-shrink-0 shadow-lg hover:shadow-xl"
+                    title="Send message"
+                >
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+#messagesList {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 transparent;
+}
+
+#messagesList::-webkit-scrollbar {
+    width: 6px;
+}
+
+#messagesList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#messagesList::-webkit-scrollbar-thumb {
+    background-color: #cbd5e0;
+    border-radius: 3px;
+}
+
+#messagesList::-webkit-scrollbar-thumb:hover {
+    background-color: #a0aec0;
+}
+</style>
+
+<script>
+let selectedFile = null;
+let selectedImageData = null;
+
+// Auto-resize textarea
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+// Handle file selection
+function handleFileSelect(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    selectedFile = file;
+    
+    // Check if it's an image
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            selectedImageData = e.target.result;
+            document.getElementById('imagePreviewImg').src = e.target.result;
+            document.getElementById('imagePreview').classList.remove('hidden');
+            document.getElementById('filePreview').classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Document file
+        document.getElementById('filePreviewName').textContent = file.name;
+        document.getElementById('filePreviewSize').textContent = formatFileSize(file.size);
+        document.getElementById('filePreviewIcon').className = getFileIcon(file.name);
+        document.getElementById('filePreview').classList.remove('hidden');
+        document.getElementById('imagePreview').classList.add('hidden');
+    }
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'pdf': 'fas fa-file-pdf text-red-500',
+        'doc': 'fas fa-file-word text-blue-500',
+        'docx': 'fas fa-file-word text-blue-500',
+        'txt': 'fas fa-file-alt text-gray-500',
+        'zip': 'fas fa-file-archive text-yellow-500',
+        'rar': 'fas fa-file-archive text-yellow-500'
+    };
+    return icons[ext] || 'fas fa-file text-gray-400';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function clearFile() {
+    selectedFile = null;
+    document.getElementById('attachment').value = '';
+    document.getElementById('filePreview').classList.add('hidden');
+}
+
+function clearImage() {
+    selectedFile = null;
+    selectedImageData = null;
+    document.getElementById('cameraInput').value = '';
+    document.getElementById('imagePreview').classList.add('hidden');
+}
+
+// Scroll to bottom on load
+function scrollToBottom() {
+    const messagesList = document.getElementById('messagesList');
+    if (messagesList) {
+        messagesList.scrollTop = messagesList.scrollHeight;
+    }
+}
+
+// Refresh messages
+function refreshMessages() {
+    window.location.reload();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    scrollToBottom();
+    
+    // Auto-resize on input
+    const messageTextarea = document.getElementById('message');
+    if (messageTextarea) {
+        messageTextarea.addEventListener('input', function() {
+            autoResize(this);
+        });
+    }
+});
+
+document.getElementById('sendMessageForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const subject = document.getElementById('subject').value.trim();
+    const message = document.getElementById('message').value.trim();
+    
+    if (!message && !selectedFile) {
+        alert('Please enter a message or attach a file');
+        return;
+    }
+    
+    // Disable submit button
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalHTML = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('subject', subject || 'Message');
+    formData.append('message', message || '');
+    if (selectedFile) {
+        formData.append('attachment', selectedFile);
+    }
+    
+    fetch('/api/client/messages/send', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Clear form
+            document.getElementById('subject').value = '';
+            document.getElementById('message').value = '';
+            clearFile();
+            clearImage();
+            autoResize(document.getElementById('message'));
+            // Reload page to show new message
+            window.location.reload();
+        } else {
+            alert(data.error || 'Error sending message');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHTML;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while sending the message.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHTML;
+    });
+});
+</script>
+{% endblock %}

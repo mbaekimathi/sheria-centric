@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Case Audit Progress - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <!-- Page Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-history text-indigo-600 mr-3"></i>
+                    Case Audit Progress
+                </h1>
+                <p class="text-gray-600">Tracking Number: <span class="font-semibold">{{ case_data.tracking_number }}</span></p>
+                {% if case_data.court_case_number %}
+                <p class="text-gray-600">Court Case Number: <span class="font-semibold">{{ case_data.court_case_number }}</span></p>
+                {% endif %}
+            </div>
+            <div class="mt-4 md:mt-0">
+                {% set status_colors = {
+                    'Active': 'bg-green-100 text-green-800 border-green-300',
+                    'Closed': 'bg-gray-100 text-gray-800 border-gray-300',
+                    'Archived': 'bg-blue-100 text-blue-800 border-blue-300',
+                    'Mediations': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                    'Pending': 'bg-orange-100 text-orange-800 border-orange-300',
+                    'Consolidated': 'bg-purple-100 text-purple-800 border-purple-300',
+                    'Pending Approval': 'bg-red-100 text-red-800 border-red-300'
+                } %}
+                <span class="px-4 py-2 inline-flex text-sm leading-5 font-semibold rounded-lg border-2 {{ status_colors.get(case_data.status, 'bg-gray-100 text-gray-800 border-gray-300') }}">
+                    <i class="fas fa-circle text-xs mr-2 mt-0.5"></i>
+                    {{ case_data.status or 'N/A' }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Case Summary Card -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Case Summary</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Client Name</p>
+                <p class="text-gray-900 font-semibold">{{ case_data.client_name }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Created By</p>
+                <p class="text-gray-900 font-semibold">{{ case_data.created_by_name or 'Unknown' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Currently Allocated To</p>
+                <p class="text-gray-900 font-semibold">{{ case_data.filled_by_name or 'Not Allocated' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Total Activities</p>
+                <p class="text-gray-900 font-semibold">{{ audit_items|length }} activities recorded</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Timeline -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Complete Audit Trail</h2>
+        
+        {% if audit_items %}
+        <div class="relative">
+            <!-- Timeline line -->
+            <div class="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+            
+            <!-- Timeline items -->
+            <div class="space-y-6">
+                {% for item in audit_items %}
+                <div class="relative flex items-start">
+                    <!-- Timeline dot -->
+                    <div class="relative z-10 flex-shrink-0 w-16 h-16 rounded-full {{ item.color }} flex items-center justify-center border-4 border-white shadow-lg">
+                        <i class="fas {{ item.icon }} text-lg"></i>
+                    </div>
+                    
+                    <!-- Timeline content -->
+                    <div class="ml-6 flex-1 pb-6">
+                        <div class="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-lg font-semibold text-gray-900">{{ item.title }}</h3>
+                                <span class="text-sm text-gray-500">
+                                    <i class="far fa-clock mr-1"></i>
+                                    {{ item.timestamp }}
+                                </span>
+                            </div>
+                            <p class="text-gray-700 mb-2">{{ item.description }}</p>
+                            <div class="flex items-center text-sm text-gray-500">
+                                <i class="fas fa-user mr-2"></i>
+                                <span>By: <strong>{{ item.user }}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-history text-gray-300 text-5xl mb-4"></i>
+            <p class="text-gray-600 font-semibold mb-2">No Audit Records Found</p>
+            <p class="text-gray-500 text-sm">There are no activities recorded for this case yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Back Button -->
+    <div class="mt-6 text-center">
+        <a href="{{ url_for('case_details', case_id=case_id) }}" class="inline-flex items-center px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Back to Case Details
+        </a>
+    </div>
+</div>
+{% endblock %}

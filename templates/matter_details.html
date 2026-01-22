@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Matter Details - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl border border-blue-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                {% if is_client %}
+                <a href="{{ url_for('client_document_type', document_type='CLIENT_OTHER_MATTERS') }}" class="text-white hover:text-blue-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                {% else %}
+                <a href="{{ url_for('other_matters') }}" class="text-white hover:text-blue-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                {% endif %}
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-folder-open mr-3"></i>
+                        Matter Details
+                    </h1>
+                    <p class="text-blue-100">Reference Number: <span class="font-semibold text-white">{{ matter_data.matter_reference_number }}</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Profile Card -->
+    {% if matter_data.client_table_id %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
+            <!-- Profile Picture -->
+            <div class="flex-shrink-0">
+                {% if matter_data.client_profile_picture %}
+                    {% if matter_data.client_profile_picture.startswith('http') %}
+                    <img src="{{ matter_data.client_profile_picture }}" alt="Client" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-blue-200 shadow-lg">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + matter_data.client_profile_picture) }}" alt="Client" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-blue-200 shadow-lg">
+                    {% endif %}
+                {% else %}
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl md:text-4xl font-bold border-4 border-blue-200 shadow-lg">
+                    {{ (matter_data.client_full_name or matter_data.client_name or 'C')[0] }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Client Information -->
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{{ matter_data.client_full_name or matter_data.client_name or 'N/A' }}</h2>
+                        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                            <span class="flex items-center">
+                                <i class="fas fa-phone mr-2 text-blue-600"></i>
+                                {{ matter_data.client_phone_number or matter_data.client_phone or 'N/A' }}
+                            </span>
+                            <span class="flex items-center">
+                                <i class="fas fa-envelope mr-2 text-blue-600"></i>
+                                {{ matter_data.client_email or 'N/A' }}
+                            </span>
+                            <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+                                {{ matter_data.client_type or 'N/A' }} Client
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Matter Status Badge -->
+                    <div class="mt-4 md:mt-0">
+                        {% set status_colors = {
+                            'Open': 'bg-green-100 text-green-800 border-green-300',
+                            'In Progress': 'bg-blue-100 text-blue-800 border-blue-300',
+                            'Pending Client': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+                            'Completed': 'bg-gray-100 text-gray-800 border-gray-300',
+                            'On Hold': 'bg-orange-100 text-orange-800 border-orange-300',
+                            'Closed': 'bg-red-100 text-red-800 border-red-300',
+                            'Pending Approval': 'bg-purple-100 text-purple-800 border-purple-300'
+                        } %}
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500 font-medium mb-2">Matter Status</p>
+                            <span class="px-4 py-2 inline-flex text-sm leading-5 font-semibold rounded-lg border-2 {{ status_colors.get(matter_data.status, 'bg-gray-100 text-gray-800 border-gray-300') }}">
+                                <i class="fas fa-circle text-xs mr-2 mt-0.5"></i>
+                                {{ matter_data.status or 'N/A' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Client Status -->
+                <div class="pt-4 border-t border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium mb-1">Client Status</p>
+                            <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if matter_data.client_status == 'Active' else 'bg-gray-100 text-gray-800' }}">
+                                {{ matter_data.client_status or 'N/A' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Matter Information -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+            Matter Information
+        </h3>
+        <div class="space-y-4">
+            <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">Reference Number</p>
+                <p class="text-lg font-medium text-gray-900">{{ matter_data.matter_reference_number or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">Matter Title</p>
+                <p class="text-lg font-medium text-gray-900">{{ matter_data.matter_title or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">Matter Category</p>
+                <p class="text-lg font-medium text-gray-900">{{ matter_data.matter_category or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">Date Opened</p>
+                <p class="text-lg font-medium text-gray-900">{{ matter_data.date_opened or 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Instructions Card -->
+    {% if matter_data.client_instructions %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-file-alt text-blue-600 mr-2"></i>
+            Client Instructions
+        </h3>
+        <div class="prose max-w-none">
+            <p class="text-gray-700 whitespace-pre-wrap">{{ matter_data.client_instructions }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

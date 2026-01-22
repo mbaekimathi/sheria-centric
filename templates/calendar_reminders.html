@@ -1,20 +1,284 @@
 {% extends "base.html" %}
 
-{% block title %}Calendar & Reminders - CASELY{% endblock %}
+{% block title %}Calendar & Reminders - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-            <i class="fas fa-calendar-alt text-indigo-600 mr-3"></i>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+            <i class="fas fa-calendar-alt mr-3"></i>
             Calendar & Reminders
         </h1>
-        <p class="text-gray-600">Manage schedules, appointments, and reminders</p>
+        <p class="text-indigo-100">Manage all court schedules and case reminders</p>
     </div>
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-        <i class="fas fa-calendar-alt text-gray-400 text-5xl mb-4"></i>
-        <p class="text-gray-600">Feature coming soon</p>
+
+    <!-- Tabs -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="flex -mb-px" aria-label="Tabs">
+                <button onclick="switchTab('calendar')" id="tab-calendar" class="tab-button active flex-1 py-4 px-6 text-center font-semibold text-sm border-b-2 border-indigo-600 text-indigo-600">
+                    <i class="fas fa-calendar-alt mr-2"></i>Calendar
+                </button>
+                <button onclick="switchTab('reminders')" id="tab-reminders" class="tab-button flex-1 py-4 px-6 text-center font-semibold text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <i class="fas fa-bell mr-2"></i>Reminders
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Calendar Tab Content -->
+    <div id="calendar-content" class="tab-content">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
+            <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-calendar-check text-green-600 mr-3"></i>
+                Upcoming Court Dates
+                <span class="ml-3 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
+                    {{ all_upcoming_proceedings|length }}
+                </span>
+            </h2>
+            
+            {% if all_upcoming_proceedings and all_upcoming_proceedings|length > 0 %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Room</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Attendance</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for proceeding in all_upcoming_proceedings %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <div class="bg-green-100 text-green-800 rounded-lg px-2 py-1 text-xs font-bold">
+                                            {{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else 'N/A' }}
+                                        </div>
+                                    </div>
+                                    <div class="ml-2">
+                                        <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
+                                        {% if proceeding.days_until is defined %}
+                                        {% if proceeding.days_until == 0 %}
+                                        <div class="text-xs text-red-600 font-medium">Today</div>
+                                        {% elif proceeding.days_until == 1 %}
+                                        <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
+                                        {% elif proceeding.days_until <= 7 %}
+                                        <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
+                                        {% else %}
+                                        <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
+                                        {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
+                                {% if proceeding.virtual_link %}
+                                <a href="{{ proceeding.virtual_link }}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 flex items-center mt-1">
+                                    <i class="fas fa-link mr-1"></i>Virtual Link
+                                </a>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                <a href="/case_management/{{ proceeding.case_id }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+                                    {{ proceeding.tracking_number }}
+                                </a>
+                                <div class="text-xs text-gray-500">{{ proceeding.client_name or 'N/A' }}</div>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ proceeding.court_room or '-' }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-900">{{ proceeding.next_attendance or '-' }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if proceeding.days_until is defined %}
+                                {% if proceeding.days_until == 0 %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>Today
+                                </span>
+                                {% elif proceeding.days_until == 1 %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                    <i class="fas fa-clock mr-1"></i>Tomorrow
+                                </span>
+                                {% elif proceeding.days_until <= 7 %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    <i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d
+                                </span>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>
+                <p class="text-gray-600 text-lg font-semibold mb-2">No Upcoming Court Dates</p>
+                <p class="text-gray-500 text-sm">There are no scheduled court dates across all cases.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Reminders Tab Content -->
+    <div id="reminders-content" class="tab-content hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
+            <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                <i class="fas fa-bell text-orange-600 mr-3"></i>
+                All Reminders
+                <span class="ml-3 px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold">
+                    {{ all_reminders|length }}
+                </span>
+            </h2>
+            
+            {% if proceedings_with_materials and proceedings_with_materials|length > 0 %}
+            <div class="overflow-x-auto mb-6">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Date</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bring up date</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for proceeding in proceedings_with_materials %}
+                        <tr class="hover:bg-gray-50 transition-colors border-l-4 border-orange-500">
+                            <td class="px-3 py-2 whitespace-nowrap">
+                                <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
+                                {% if proceeding.days_until is defined %}
+                                {% if proceeding.days_until == 0 %}
+                                <div class="text-xs text-red-600 font-medium">Today</div>
+                                {% elif proceeding.days_until == 1 %}
+                                <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
+                                {% elif proceeding.days_until <= 7 %}
+                                <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
+                                {% else %}
+                                <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2">
+                                <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {% if proceeding.court_room %}<span><i class="fas fa-door-open mr-1"></i>{{ proceeding.court_room }}</span>{% endif %}
+                                    {% if proceeding.judicial_officer %}<span class="ml-2"><i class="fas fa-user-tie mr-1"></i>{{ proceeding.judicial_officer }}</span>{% endif %}
+                                </div>
+                            </td>
+                            <td class="px-3 py-2">
+                                <a href="/case_management/{{ proceeding.case_id }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 hover:underline">
+                                    {{ proceeding.tracking_number }}
+                                </a>
+                                <div class="text-xs text-gray-500">{{ proceeding.client_name or 'N/A' }}</div>
+                            </td>
+                            <td class="px-3 py-2">
+                                {% if proceeding.materials and proceeding.materials|length > 0 %}
+                                <div class="space-y-1.5">
+                                    {% for material in proceeding.materials %}
+                                    <div class="flex items-start text-xs bg-orange-50 rounded px-2 py-1.5 border border-orange-200">
+                                        <i class="fas fa-clipboard-list text-orange-600 mr-1.5 mt-0.5 flex-shrink-0"></i>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-sm font-medium text-gray-900">{{ material.material_description }}</div>
+                                            <div class="flex items-center space-x-2 mt-0.5 text-xs text-gray-600">
+                                                {% if material.allocated_to_name %}
+                                                <span><i class="fas fa-user-tie mr-1 text-blue-600"></i>{{ material.allocated_to_name }}</span>
+                                                {% endif %}
+                                                {% if material.reminder_frequency %}
+                                                <span class="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-xs font-semibold">
+                                                    <i class="fas fa-bell mr-0.5"></i>{{ material.reminder_frequency }}
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <span class="text-xs text-gray-400">No items</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2 whitespace-nowrap">
+                                {% if proceeding.days_until is defined %}
+                                {% if proceeding.days_until == 0 %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>Today
+                                </span>
+                                {% elif proceeding.days_until == 1 %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                    <i class="fas fa-clock mr-1"></i>Tomorrow
+                                </span>
+                                {% elif proceeding.days_until <= 7 %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    <i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d
+                                </span>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-bell-slash text-gray-300 text-5xl mb-4"></i>
+                <p class="text-gray-600 text-lg font-semibold mb-2">No Reminders</p>
+                <p class="text-gray-500 text-sm">No items or reminders have been set up for upcoming proceedings.</p>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
-{% endblock %}
 
+<script>
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.getElementById('calendar-content').classList.add('hidden');
+    document.getElementById('reminders-content').classList.add('hidden');
+    
+    // Remove active class from all tabs
+    document.getElementById('tab-calendar').classList.remove('active', 'border-indigo-600', 'text-indigo-600');
+    document.getElementById('tab-calendar').classList.add('border-transparent', 'text-gray-500');
+    document.getElementById('tab-reminders').classList.remove('active', 'border-indigo-600', 'text-indigo-600');
+    document.getElementById('tab-reminders').classList.add('border-transparent', 'text-gray-500');
+    
+    // Show selected tab content
+    if (tabName === 'calendar') {
+        document.getElementById('calendar-content').classList.remove('hidden');
+        document.getElementById('tab-calendar').classList.add('active', 'border-indigo-600', 'text-indigo-600');
+        document.getElementById('tab-calendar').classList.remove('border-transparent', 'text-gray-500');
+        window.location.hash = '';
+    } else if (tabName === 'reminders') {
+        document.getElementById('reminders-content').classList.remove('hidden');
+        document.getElementById('tab-reminders').classList.add('active', 'border-indigo-600', 'text-indigo-600');
+        document.getElementById('tab-reminders').classList.remove('border-transparent', 'text-gray-500');
+        window.location.hash = 'reminders';
+    }
+}
+</script>
+
+<style>
+.tab-button.active {
+    border-bottom-color: #4f46e5;
+    color: #4f46e5;
+}
+</style>
+{% endblock %}

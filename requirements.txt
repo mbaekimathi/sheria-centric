@@ -7,7 +7,10 @@ reportlab>=4.0.0
 google-auth>=2.23.0
 google-auth-oauthlib>=1.1.0
 google-auth-httplib2>=0.1.0
+google-api-python-client>=2.100.0
 python-dotenv>=1.0.0
+requests>=2.31.0
+urllib3>=2.0.0
 # Optional: numpy and scipy for advanced image processing (may fail on Python 3.13)
 # If installation fails, the app will work without them using basic PIL processing
 # numpy>=1.24.0,<2.0.0

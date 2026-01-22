@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Documents - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('document_management') }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-file-alt mr-3"></i>
+                        Employee Documents
+                    </h1>
+                    <p class="text-indigo-100">Viewing documents for: <span class="font-semibold text-white">{{ employee.full_name }}</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee Profile Card -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
+            <!-- Profile Picture -->
+            <div class="flex-shrink-0">
+                {% if employee.profile_picture %}
+                    {% if employee.profile_picture.startswith('http') %}
+                    <img src="{{ employee.profile_picture }}" alt="{{ employee.full_name }}" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + employee.profile_picture) }}" alt="{{ employee.full_name }}" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% endif %}
+                {% else %}
+                <div class="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white text-3xl md:text-4xl font-bold border-4 border-indigo-200 shadow-lg">
+                    {{ employee.full_name[0] if employee.full_name else 'E' }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Employee Information -->
+            <div class="flex-1 min-w-0">
+                <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{{ employee.full_name or 'N/A' }}</h2>
+                <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 mb-4">
+                    <span class="flex items-center">
+                        <i class="fas fa-phone mr-2 text-indigo-600"></i>
+                        {{ employee.phone_number or 'N/A' }}
+                    </span>
+                    <span class="flex items-center">
+                        <i class="fas fa-envelope mr-2 text-indigo-600"></i>
+                        {{ employee.work_email or 'N/A' }}
+                    </span>
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
+                        {{ employee.employee_code or 'N/A' }}
+                    </span>
+                    <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-semibold">
+                        {{ employee.role or 'N/A' }}
+                    </span>
+                    {% if employee.status == 'Active' %}
+                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                        <i class="fas fa-circle text-xs mr-1"></i>Active
+                    </span>
+                    {% elif employee.status == 'Pending Approval' %}
+                    <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">
+                        <i class="fas fa-circle text-xs mr-1"></i>Pending
+                    </span>
+                    {% else %}
+                    <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">
+                        <i class="fas fa-circle text-xs mr-1"></i>Suspended
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Section -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
+            <i class="fas fa-folder-open text-indigo-600 mr-3"></i>
+            Documents
+        </h2>
+        
+        <!-- Registration Documents -->
+        {% if employee.id_front or employee.id_back or employee.employment_contract %}
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Registration Documents</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% if employee.id_front %}
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-gray-700">ID Front</span>
+                        <a href="{{ url_for('download_document', document_type='id_front', filename=employee.id_front) }}" class="text-indigo-600 hover:text-indigo-700">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-500">{{ employee.id_front }}</p>
+                </div>
+                {% endif %}
+                
+                {% if employee.id_back %}
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-gray-700">ID Back</span>
+                        <a href="{{ url_for('download_document', document_type='id_back', filename=employee.id_back) }}" class="text-indigo-600 hover:text-indigo-700">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-500">{{ employee.id_back }}</p>
+                </div>
+                {% endif %}
+                
+                {% if employee.employment_contract %}
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-gray-700">Employment Contract</span>
+                        <a href="{{ url_for('download_document', document_type='employment_contract', filename=employee.employment_contract) }}" class="text-indigo-600 hover:text-indigo-700">
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-500">{{ employee.employment_contract }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Other Documents -->
+        <div class="text-center py-8">
+            <i class="fas fa-file-alt text-gray-300 text-4xl mb-4"></i>
+            <p class="text-gray-600 font-semibold mb-2">Additional Documents</p>
+            <p class="text-gray-500 text-sm">Other documents for this employee will appear here once uploaded.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+
+
+
+
+

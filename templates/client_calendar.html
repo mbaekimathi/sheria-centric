@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}My Calendar - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Page Header -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row items-center justify-between">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <a href="{{ url_for('client_dashboard') }}" class="text-white hover:text-indigo-200 transition-colors">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                        <i class="fas fa-calendar-alt mr-3"></i>
+                        My Calendar
+                    </h1>
+                    <p class="text-indigo-100">View upcoming court dates for your cases</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Profile Card -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
+            <!-- Profile Picture -->
+            <div class="flex-shrink-0">
+                {% if client.profile_picture %}
+                    {% if client.profile_picture.startswith('http') %}
+                    <img src="{{ client.profile_picture }}" alt="{{ client.full_name }}" class="w-20 h-20 md:w-24 md:h-24 rounded-xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-20 h-20 md:w-24 md:h-24 rounded-xl object-cover border-4 border-indigo-200 shadow-lg">
+                    {% endif %}
+                {% else %}
+                <div class="w-20 h-20 md:w-24 md:h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl md:text-3xl font-bold border-4 border-indigo-200 shadow-lg">
+                    {{ client.full_name[0] if client.full_name else 'C' }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Client Information -->
+            <div class="flex-1 min-w-0">
+                <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-2">{{ client.full_name or 'N/A' }}</h2>
+                <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                    <span class="flex items-center">
+                        <i class="fas fa-phone mr-2 text-indigo-600"></i>
+                        {{ client.phone_number or 'N/A' }}
+                    </span>
+                    <span class="flex items-center">
+                        <i class="fas fa-envelope mr-2 text-indigo-600"></i>
+                        {{ client.email or 'N/A' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Content -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
+        <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
+            <i class="fas fa-calendar-check text-indigo-600 mr-3"></i>
+            Upcoming Court Dates
+            <span class="ml-3 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-semibold">
+                {{ all_upcoming_proceedings|length }}
+            </span>
+        </h2>
+        
+        {% if all_upcoming_proceedings and all_upcoming_proceedings|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Room</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Attendance</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for proceeding in all_upcoming_proceedings %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="bg-indigo-100 text-indigo-800 rounded-lg px-2 py-1 text-xs font-bold">
+                                        {{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else 'N/A' }}
+                                    </div>
+                                </div>
+                                <div class="ml-2">
+                                    <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
+                                    {% if proceeding.days_until is defined %}
+                                    {% if proceeding.days_until == 0 %}
+                                    <div class="text-xs text-red-600 font-medium">Today</div>
+                                    {% elif proceeding.days_until == 1 %}
+                                    <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
+                                    {% elif proceeding.days_until <= 7 %}
+                                    <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
+                                    {% else %}
+                                    <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-3 py-2">
+                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
+                            {% if proceeding.virtual_link %}
+                            <a href="{{ proceeding.virtual_link }}" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center mt-1">
+                                <i class="fas fa-link mr-1"></i>Virtual Link
+                            </a>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2">
+                            <div class="text-sm font-semibold text-indigo-600">
+                                {{ proceeding.tracking_number }}
+                            </div>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.court_room or '-' }}</td>
+                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
+                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.next_attendance or '-' }}</td>
+                        <td class="px-3 py-2 whitespace-nowrap">
+                            {% if proceeding.days_until is defined %}
+                            {% if proceeding.days_until == 0 %}
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                <i class="fas fa-exclamation-circle mr-1"></i>Today
+                            </span>
+                            {% elif proceeding.days_until == 1 %}
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                <i class="fas fa-clock mr-1"></i>Tomorrow
+                            </span>
+                            {% elif proceeding.days_until <= 7 %}
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                <i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d
+                            </span>
+                            {% else %}
+                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                <i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d
+                            </span>
+                            {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>
+            <p class="text-gray-600 text-lg font-semibold mb-2">No Upcoming Court Dates</p>
+            <p class="text-gray-500 text-sm">You don't have any scheduled court dates at the moment.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+
+
+
+

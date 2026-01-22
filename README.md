@@ -1,4 +1,4 @@
-# CASELY - Modern Advocates Firm Management System
+# SHERIA CENTRIC - Modern Advocates Firm Management System
 
 A modern, responsive web application for managing advocates firm employees and clients built with Flask, PyMySQL, and Tailwind CSS.
 
@@ -51,7 +51,7 @@ A modern, responsive web application for managing advocates firm employees and c
    ```
 
 5. **Set up MySQL Database:**
-   - Create database: `casely_db` (or configure in `.env`)
+   - Create database: `sheria_centric_db` (or configure in `.env`)
    - The application will auto-initialize the schema on first run
 
 6. **Run the application:**
@@ -90,7 +90,7 @@ For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 ## Usage
 
 1. **Employee Registration:**
-   - Click on the CASELY icon/logo at the top left
+   - Click on the SHERIA CENTRIC icon/logo at the top left
    - Click "Sign Up Here" on the login page
    - Fill in all required fields:
      - Full Name
@@ -118,7 +118,7 @@ For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 ## Project Structure
 
 ```
-CASELY/
+SHERIA CENTRIC/
 ├── app.py                 # Main Flask application
 ├── requirements.txt       # Python dependencies
 ├── README.md             # This file
@@ -171,5 +171,5 @@ Default company name is "BAUNI LAW GROUP". It can be changed in:
 
 ## License
 
-This project is proprietary software for CASELY advocates firm management.
+This project is proprietary software for SHERIA CENTRIC advocates firm management.
 

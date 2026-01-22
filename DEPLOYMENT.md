@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers deploying the CASELY application to production using Git version control.
+This guide covers deploying the SHERIA CENTRIC application to production using Git version control.
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ SECRET_KEY=your-generated-secret-key
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=
-DB_NAME=casely_db
+DB_NAME=sheria_centric_db
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 OAUTHLIB_INSECURE_TRANSPORT=1
@@ -64,9 +64,9 @@ OAUTHLIB_INSECURE_TRANSPORT=1
 FLASK_ENV=production
 SECRET_KEY=your-strong-production-secret-key
 DB_HOST=localhost
-DB_USER=baunilaw_sheria_centric
-DB_PASSWORD=Itskimathi@007
-DB_NAME=baunilaw_sheria_centric
+DB_USER=your_cpanel_db_user
+DB_PASSWORD=your_cpanel_db_password
+DB_NAME=your_cpanel_db_name
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 OAUTHLIB_INSECURE_TRANSPORT=0
@@ -78,7 +78,7 @@ OAUTHLIB_INSECURE_TRANSPORT=0
 
 1. Create MySQL database:
 ```sql
-CREATE DATABASE casely_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE sheria_centric_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
 2. Run the application - it will auto-initialize the database schema:
@@ -223,7 +223,7 @@ chmod -R 775 static/uploads/
 | `DB_HOST` | Database host | Yes | localhost |
 | `DB_USER` | Database username | Yes | root |
 | `DB_PASSWORD` | Database password | Yes | (empty) |
-| `DB_NAME` | Database name | Yes | casely_db |
+| `DB_NAME` | Database name | Yes | sheria_centric_db |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | Yes | - |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Secret | Yes | - |
 | `OAUTHLIB_INSECURE_TRANSPORT` | Allow HTTP for OAuth (dev only) | No | 0 |
@@ -231,4 +231,5 @@ chmod -R 775 static/uploads/
 ## Support
 
 For issues or questions, please contact the development team.
+
 

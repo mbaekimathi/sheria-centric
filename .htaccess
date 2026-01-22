@@ -1,6 +1,3 @@
 PassengerEnabled On
-PassengerAppRoot /home3/baunilaw/repositories/sheria-centric
-PassengerBaseURI /
 PassengerAppType wsgi
 PassengerStartupFile passenger_wsgi.py
-PassengerPython /usr/bin/python3.13

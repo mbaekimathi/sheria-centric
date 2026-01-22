@@ -68,7 +68,31 @@ import socket
 
 def get_db_config():
     """Detect if running locally or on cPanel and return appropriate DB config"""
-    # Method 1: Use environment variables (most secure and reliable)
+    # Method 1: Check DB_ENV first to determine environment (cpanel or local)
+    db_env = os.environ.get('DB_ENV', '').lower()
+    
+    if db_env == 'cpanel':
+        # Use environment variables for cPanel credentials with defaults
+        print("[OK] Using cPanel database configuration (from DB_ENV)")
+        return {
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
+            'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
+            'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
+            'charset': 'utf8mb4'
+        }
+    
+    if db_env == 'local':
+        print("[OK] Using local database configuration (from DB_ENV)")
+        return {
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'user': os.environ.get('DB_USER', 'root'),
+            'password': os.environ.get('DB_PASSWORD', ''),
+            'database': os.environ.get('DB_NAME', 'sheria_centric_db'),
+            'charset': 'utf8mb4'
+        }
+    
+    # Method 2: If DB_ENV not set, check if all DB_* environment variables are provided
     db_host = os.environ.get('DB_HOST', 'localhost')
     db_user = os.environ.get('DB_USER')
     db_password = os.environ.get('DB_PASSWORD', '')  # Default to empty string
@@ -88,29 +112,6 @@ def get_db_config():
             'user': db_user,
             'password': db_password,
             'database': db_name,
-            'charset': 'utf8mb4'
-        }
-    
-    # Method 2: Check DB_ENV environment variable (fallback for quick switching)
-    # Note: For security, prefer using individual DB_* environment variables
-    if os.environ.get('DB_ENV') == 'cpanel':
-        # Use environment variables for cPanel credentials
-        print("[OK] Using cPanel database configuration (from DB_ENV)")
-        return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', ''),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', ''),
-            'charset': 'utf8mb4'
-        }
-    
-    if os.environ.get('DB_ENV') == 'local':
-        print("[OK] Using local database configuration (from DB_ENV)")
-        return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'sheria_centric_db'),
             'charset': 'utf8mb4'
         }
     

@@ -71,7 +71,10 @@ chmod +x deploy.sh
 ```
 
 3. In cPanel **Setup Python App**, set **Application root** to **SHERIA-CENTRIC**. Startup file: **app.py**, Entry point: **app**. Save.
-4. Click **Run Pip Install**, then **RESTART**.
+4. Set **environment variables** (cPanel Setup Python App → Environment variables or `.env` in app root):
+   - **SECRET_KEY** – A fixed random string (e.g. `openssl rand -hex 32`). Required so sessions work across requests.
+   - **APP_BASE_URL** – Your public site URL with no trailing slash, e.g. `https://sheriacentric.com`. Required so Google Drive OAuth redirect URI matches Google Cloud Console and works when hosted.
+5. Click **Run Pip Install**, then **RESTART**.
 
 ---
 
@@ -98,3 +101,4 @@ chmod +x deploy.sh
 | **Permission denied (deploy.sh)** | Run `chmod +x deploy.sh` inside SHERIA-CENTRIC. |
 | **Pull asks for password** | Use a GitHub Personal Access Token as the password. |
 | **App not updating** | Run `touch tmp/restart.txt` inside SHERIA-CENTRIC or click **RESTART** in cPanel. |
+| **Google Drive works on localhost but not when hosted** | Set **APP_BASE_URL** to your site URL (e.g. `https://sheriacentric.com`) and **SECRET_KEY** to a fixed value in cPanel env vars. In Google Cloud Console, add the exact redirect URI: `https://sheriacentric.com/api/auth/google-drive/callback`. |

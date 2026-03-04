@@ -36,8 +36,29 @@ try:
 except ImportError:
     pass  # python-dotenv not installed, will use environment variables directly
 
-# Secret key from environment variable or generate one
+# Secret key from environment variable or generate one (must be fixed in production)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
+
+# Production base URL for OAuth redirects (set on hosted e.g. https://sheriacentric.com)
+# Ensures redirect_uri matches Google Console and session cookie works across redirect
+APP_BASE_URL = (os.environ.get('APP_BASE_URL') or '').strip().rstrip('/') or None
+if APP_BASE_URL:
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# Trust X-Forwarded-* when behind proxy (cPanel/Passenger) so url_for(_external=True) is correct
+try:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=0)
+except ImportError:
+    pass
+
+def get_google_drive_redirect_uri():
+    """Redirect URI for Google Drive OAuth; use APP_BASE_URL when hosted so it matches Google Console."""
+    if APP_BASE_URL:
+        return APP_BASE_URL + '/api/auth/google-drive/callback'
+    return url_for('google_drive_callback', _external=True)
 
 # Configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pictures'
@@ -7224,8 +7245,8 @@ def google_drive_authorize():
             'https://www.googleapis.com/auth/userinfo.profile'
         ]
         
-        # Get the redirect URI using url_for to ensure it matches exactly
-        redirect_uri = url_for('google_drive_callback', _external=True)
+        # Use APP_BASE_URL when hosted so redirect_uri matches Google Console exactly
+        redirect_uri = get_google_drive_redirect_uri()
         
         # Disable PKCE so token exchange works across redirect (session/cookie issues in popup).
         # Confidential client (client_secret) does not require PKCE.
@@ -7285,8 +7306,8 @@ def google_drive_callback():
             'https://www.googleapis.com/auth/userinfo.profile'
         ]
         
-        # Get the redirect URI using url_for to ensure it matches exactly
-        redirect_uri = url_for('google_drive_callback', _external=True)
+        # Must match authorize (use APP_BASE_URL when hosted)
+        redirect_uri = get_google_drive_redirect_uri()
         
         # Extract actual scopes from the callback URL and normalize them
         returned_scopes_raw = request.args.get('scope', '').split()

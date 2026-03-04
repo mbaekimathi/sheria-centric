@@ -7227,6 +7227,8 @@ def google_drive_authorize():
         # Get the redirect URI using url_for to ensure it matches exactly
         redirect_uri = url_for('google_drive_callback', _external=True)
         
+        # Disable PKCE so token exchange works across redirect (session/cookie issues in popup).
+        # Confidential client (client_secret) does not require PKCE.
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -7237,7 +7239,8 @@ def google_drive_authorize():
                     "redirect_uris": [redirect_uri]
                 }
             },
-            scopes=drive_scopes
+            scopes=drive_scopes,
+            autogenerate_code_verifier=False
         )
         flow.redirect_uri = redirect_uri
         
@@ -7247,11 +7250,7 @@ def google_drive_authorize():
             include_granted_scopes='true',
             prompt='select_account consent'  # Force account selection and consent
         )
-        # Store state and PKCE code_verifier in session (required for token exchange after redirect)
         session['google_drive_oauth_state'] = state
-        code_verifier = getattr(flow, '_code_verifier', None)
-        if code_verifier:
-            session['google_drive_code_verifier'] = code_verifier
         
         # Return authorization URL for popup window
         return jsonify({
@@ -7305,6 +7304,7 @@ def google_drive_callback():
         # Always use normalized scopes to match what Google actually returned
         scopes_to_use = normalized_scopes if normalized_scopes and len(normalized_scopes) > 0 else drive_scopes
         
+        # Match authorize: no PKCE (autogenerate_code_verifier=False) for confidential client
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -7315,18 +7315,10 @@ def google_drive_callback():
                     "redirect_uris": [redirect_uri]
                 }
             },
-            scopes=scopes_to_use
+            scopes=scopes_to_use,
+            autogenerate_code_verifier=False
         )
         flow.redirect_uri = redirect_uri
-        
-        # Restore PKCE code_verifier from session (required after redirect; otherwise "Missing code verifier")
-        code_verifier = session.get('google_drive_code_verifier')
-        if not code_verifier:
-            return '''<script>
-                window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session lost on redirect. Please try again in the same browser tab and allow cookies."}, "*");
-                window.close();
-            </script>''', 400
-        flow._code_verifier = code_verifier
         
         authorization_response = request.url
         try:
@@ -7345,11 +7337,10 @@ def google_drive_callback():
                             "redirect_uris": [redirect_uri]
                         }
                     },
-                    scopes=normalized_scopes  # Use exact returned scopes from Google
+                    scopes=normalized_scopes,  # Use exact returned scopes from Google
+                    autogenerate_code_verifier=False
                 )
                 flow.redirect_uri = redirect_uri
-                if code_verifier:
-                    flow._code_verifier = code_verifier
                 flow.fetch_token(authorization_response=authorization_response)
             else:
                 raise
@@ -7410,9 +7401,8 @@ def google_drive_callback():
             'picture': id_info.get('picture')
         }
         
-        # Clear state and code_verifier
+        # Clear state
         session.pop('google_drive_oauth_state', None)
-        session.pop('google_drive_code_verifier', None)
         
         # Send success message to opener window
         account_data = {

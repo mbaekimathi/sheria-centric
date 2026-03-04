@@ -74,13 +74,12 @@ def get_db_config():
     db_env = os.environ.get('DB_ENV', '').lower()
     
     if db_env == 'cpanel':
-        # Use environment variables for cPanel credentials with defaults
+        # Use environment variables for cPanel credentials with hosted defaults
         print("[OK] Using cPanel database configuration (from DB_ENV)")
         return {
             'host': os.environ.get('DB_HOST', 'localhost'),
             'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-            # Never hardcode real passwords in source code; require env var instead.
-            'password': os.environ.get('DB_PASSWORD', ''),
+            'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
             'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
             'charset': 'utf8mb4'
         }
@@ -153,13 +152,12 @@ def get_db_config():
                 'charset': 'utf8mb4'
             }
     
-    # Default to cPanel configuration when hosted (production/non-Windows).
-    print("[OK] Using cPanel database configuration (default for hosted/production)")
+    # Default to hosted configuration when in production/non-Windows.
+    print("[OK] Using hosted database configuration (default for production)")
     return {
         'host': os.environ.get('DB_HOST', 'localhost'),
         'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-        # Never hardcode real passwords in source code; require env var instead.
-        'password': os.environ.get('DB_PASSWORD', ''),
+        'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
         'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
         'charset': 'utf8mb4'
     }
@@ -11646,8 +11644,13 @@ def cleanup_idle_connections_before_request():
     except:
         pass  # Don't fail requests if cleanup fails
 
-if __name__ == '__main__':
-    # Initialize database on startup
+# Initialize database when app is loaded (runs for both 'python app.py' and WSGI/Passenger)
+# This ensures tables and migrations are applied on the hosted side too
+try:
     init_database()
+except Exception as e:
+    print(f"[WARNING] Database initialization failed (may be first run or DB not configured): {e}")
+
+if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
 

@@ -68,6 +68,10 @@ logs/
 *.tmp
 *.temp
 .cache/
+tmp/
+
+# Passenger restart (server-only)
+tmp/restart.txt
 
 # Archive files
 *.zip

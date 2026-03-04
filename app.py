@@ -950,11 +950,13 @@ def create_email_tables():
                 connection.commit()
                 print("[OK] Email accounts table created")
             else:
-                print("✓ Email accounts table already exists")
+                print("[OK] Email accounts table already exists")
         
         return True
     except Exception as e:
-        print(f"Error creating email tables: {e}")
+        # Use ASCII-safe message for server environments where stdout is ASCII
+        err_msg = str(e).encode('ascii', 'replace').decode('ascii')
+        print(f"Error creating email tables: {err_msg}")
         return False
     finally:
         if connection:
@@ -1299,7 +1301,7 @@ def apply_migrations(current_version):
                         ADD COLUMN virtual_link VARCHAR(500) AFTER next_attendance
                     """)
                     connection.commit()
-                    print("✓ Added virtual_link column to case_proceedings table")
+                    print("[OK] Added virtual_link column to case_proceedings table")
                 else:
                     print("[OK] virtual_link column already exists")
                 
@@ -7245,8 +7247,11 @@ def google_drive_authorize():
             include_granted_scopes='true',
             prompt='select_account consent'  # Force account selection and consent
         )
-        # Store state in session for security
+        # Store state and PKCE code_verifier in session (required for token exchange after redirect)
         session['google_drive_oauth_state'] = state
+        code_verifier = getattr(flow, '_code_verifier', None)
+        if code_verifier:
+            session['google_drive_code_verifier'] = code_verifier
         
         # Return authorization URL for popup window
         return jsonify({
@@ -7314,6 +7319,15 @@ def google_drive_callback():
         )
         flow.redirect_uri = redirect_uri
         
+        # Restore PKCE code_verifier from session (required after redirect; otherwise "Missing code verifier")
+        code_verifier = session.get('google_drive_code_verifier')
+        if not code_verifier:
+            return '''<script>
+                window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session lost on redirect. Please try again in the same browser tab and allow cookies."}, "*");
+                window.close();
+            </script>''', 400
+        flow._code_verifier = code_verifier
+        
         authorization_response = request.url
         try:
             flow.fetch_token(authorization_response=authorization_response)
@@ -7331,9 +7345,11 @@ def google_drive_callback():
                             "redirect_uris": [redirect_uri]
                         }
                     },
-                    scopes=normalized_scopes  # Use exact normalized scopes from Google
+                    scopes=normalized_scopes  # Use exact returned scopes from Google
                 )
                 flow.redirect_uri = redirect_uri
+                if code_verifier:
+                    flow._code_verifier = code_verifier
                 flow.fetch_token(authorization_response=authorization_response)
             else:
                 raise
@@ -7394,8 +7410,9 @@ def google_drive_callback():
             'picture': id_info.get('picture')
         }
         
-        # Clear state
+        # Clear state and code_verifier
         session.pop('google_drive_oauth_state', None)
+        session.pop('google_drive_code_verifier', None)
         
         # Send success message to opener window
         account_data = {

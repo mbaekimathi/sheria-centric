@@ -1,66 +1,77 @@
 # Deploy from GitHub using cPanel Terminal
 
-Use **only** cPanel’s **Terminal**. The app updates in **sheriacentric.com/SHERIA-CENTRIC** (your cPanel Application root).
+Use **only** cPanel’s **Terminal**. The app lives in the **SHERIA-CENTRIC** folder. When your prompt shows:
 
----
-
-## First-time setup (clone into sheriacentric.com/SHERIA-CENTRIC)
-
-1. In cPanel, open **Terminal** (under “Advanced” or “Tools”).
-
-2. Go to the folder that will contain the app (parent of SHERIA-CENTRIC). Create it if needed, then clone the repo into **SHERIA-CENTRIC**:
-
-```bash
-cd ~
-mkdir -p sheriacentric.com
-cd sheriacentric.com
-git clone https://github.com/mbaekimathi/sheria-centric.git SHERIA-CENTRIC
-cd SHERIA-CENTRIC
+```text
+(SHERIA-CENTRIC:3.13) [baunilaw@rs3 SHERIA-CENTRIC]$
 ```
 
-3. Make the deploy script executable (optional, for one-command updates later):
-
-```bash
-chmod +x deploy.sh
-```
-
-4. In cPanel **Setup Python App**, set **Application root** to **sheriacentric.com/SHERIA-CENTRIC**. Startup file: **app.py**, Entry point: **app**. Save.
-
-5. Click **Run Pip Install** in cPanel to install dependencies. Then click **RESTART**.
-
-All app files and folders will be in **sheriacentric.com/SHERIA-CENTRIC**.
+you’re in the right directory and can run the update commands below.
 
 ---
 
 ## Every time you want to update (pull latest code)
 
 1. Open **Terminal** in cPanel.
-2. Go to the app folder and pull:
+2. Go to the app folder (if you’re not already there):
 
 ```bash
-cd ~/sheriacentric.com/SHERIA-CENTRIC
+cd ~/SHERIA-CENTRIC
+```
+
+3. Pull the latest code from GitHub:
+
+```bash
 git pull origin main
 ```
 
-3. Restart the app so changes load:
+4. Restart the app so changes load:
 
 ```bash
 mkdir -p tmp
 touch tmp/restart.txt
 ```
 
-Or in cPanel, click **RESTART** for the Python app.
+Or click **RESTART** in cPanel for the Python app.
+
+**If you’re already in SHERIA-CENTRIC** (prompt shows `[baunilaw@rs3 SHERIA-CENTRIC]$`), you only need:
+
+```bash
+git pull origin main
+mkdir -p tmp
+touch tmp/restart.txt
+```
 
 ---
 
-## One-command deploy (after first-time setup)
+## One-command deploy (when you’re in SHERIA-CENTRIC)
+
+From the **SHERIA-CENTRIC** folder:
 
 ```bash
-cd ~/sheriacentric.com/SHERIA-CENTRIC
 ./deploy.sh
 ```
 
 This runs `git pull origin main` and `touch tmp/restart.txt`. Then use cPanel **RESTART** if needed.
+
+If you get “permission denied”, run once: `chmod +x deploy.sh`
+
+---
+
+## First-time setup (if you still need to clone)
+
+1. Open **Terminal** in cPanel.
+2. Go to your home directory and clone into **SHERIA-CENTRIC**:
+
+```bash
+cd ~
+git clone https://github.com/mbaekimathi/sheria-centric.git SHERIA-CENTRIC
+cd SHERIA-CENTRIC
+chmod +x deploy.sh
+```
+
+3. In cPanel **Setup Python App**, set **Application root** to **SHERIA-CENTRIC**. Startup file: **app.py**, Entry point: **app**. Save.
+4. Click **Run Pip Install**, then **RESTART**.
 
 ---
 
@@ -68,12 +79,12 @@ This runs `git pull origin main` and `touch tmp/restart.txt`. Then use cPanel **
 
 | Task | Commands |
 |------|----------|
-| **First clone** | `cd ~` → `mkdir -p sheriacentric.com` → `cd sheriacentric.com` → `git clone https://github.com/mbaekimathi/sheria-centric.git SHERIA-CENTRIC` → `cd SHERIA-CENTRIC` |
-| **Update code** | `cd ~/sheriacentric.com/SHERIA-CENTRIC` then `git pull origin main` |
-| **Restart app** | `touch tmp/restart.txt` (from inside `~/sheriacentric.com/SHERIA-CENTRIC`) or cPanel **RESTART** |
-| **All-in-one** | `cd ~/sheriacentric.com/SHERIA-CENTRIC` then `./deploy.sh` |
+| **Go to app folder** | `cd ~/SHERIA-CENTRIC` |
+| **Update code** | `git pull origin main` (run from inside SHERIA-CENTRIC) |
+| **Restart app** | `touch tmp/restart.txt` or cPanel **RESTART** |
+| **All-in-one** | `cd ~/SHERIA-CENTRIC` then `./deploy.sh` |
 
-- **Application root**: sheriacentric.com/SHERIA-CENTRIC (folder where `app.py` lives)
+- **App folder**: SHERIA-CENTRIC (prompt: `[baunilaw@rs3 SHERIA-CENTRIC]$`, Python env: SHERIA-CENTRIC:3.13)
 - **Repo**: https://github.com/mbaekimathi/sheria-centric  
 - **Branch**: `main`
 
@@ -83,8 +94,7 @@ This runs `git pull origin main` and `touch tmp/restart.txt`. Then use cPanel **
 
 | Issue | Fix in Terminal |
 |-------|------------------|
-| **`git: command not found`** | Ask your host to enable Git for your account. |
-| **Permission denied** | Run `chmod +x deploy.sh` inside `~/sheriacentric.com/SHERIA-CENTRIC`. |
+| **Not in app folder** | Run `cd ~/SHERIA-CENTRIC` then `pwd` — you should see a path ending in SHERIA-CENTRIC. |
+| **Permission denied (deploy.sh)** | Run `chmod +x deploy.sh` inside SHERIA-CENTRIC. |
 | **Pull asks for password** | Use a GitHub Personal Access Token as the password. |
-| **App not updating** | Run `touch tmp/restart.txt` in `~/sheriacentric.com/SHERIA-CENTRIC` or click **RESTART** in cPanel. |
-| **Wrong directory** | Use `pwd` and `ls`; app must run from the folder that contains `app.py` (sheriacentric.com/SHERIA-CENTRIC). |
+| **App not updating** | Run `touch tmp/restart.txt` inside SHERIA-CENTRIC or click **RESTART** in cPanel. |

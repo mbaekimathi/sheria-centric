@@ -9,3 +9,4 @@ from app import app
 
 # Passenger requires 'application' variable
 application = app
+

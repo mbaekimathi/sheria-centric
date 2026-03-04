@@ -14,6 +14,8 @@ from google.auth.transport import requests as google_requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient import http as googleapiclient_http
 import json
 import requests
 import smtplib
@@ -77,7 +79,8 @@ def get_db_config():
         return {
             'host': os.environ.get('DB_HOST', 'localhost'),
             'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-            'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
+            # Never hardcode real passwords in source code; require env var instead.
+            'password': os.environ.get('DB_PASSWORD', ''),
             'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
             'charset': 'utf8mb4'
         }
@@ -118,8 +121,9 @@ def get_db_config():
     # Method 3: Check FLASK_ENV to determine default behavior
     flask_env = os.environ.get('FLASK_ENV', '').lower()
     
-    # If explicitly in development mode, try local configuration
-    if flask_env == 'development':
+    # Default to local configuration when running on Windows (typical localhost dev)
+    # or when explicitly in development mode.
+    if os.name == 'nt' or flask_env == 'development':
         try:
             test_connection = pymysql.connect(
                 host='localhost',
@@ -129,7 +133,7 @@ def get_db_config():
                 charset='utf8mb4'
             )
             test_connection.close()
-            print("[OK] Using local database configuration (auto-detected for development)")
+            print("[OK] Using local database configuration (auto-detected for localhost/development)")
             return {
                 'host': 'localhost',
                 'user': 'root',
@@ -139,7 +143,7 @@ def get_db_config():
             }
         except Exception as e:
             # For development, still try local config even if connection test fails
-            print("[WARNING] Local database connection test failed, but using local config for development")
+            print("[WARNING] Local database connection test failed, but using local config for localhost/development")
             print(f"   Error: {e}")
             return {
                 'host': 'localhost',
@@ -149,13 +153,13 @@ def get_db_config():
                 'charset': 'utf8mb4'
             }
     
-    # Default to cPanel configuration (for production or when FLASK_ENV is not set)
-    # This is safer for hosted environments where FLASK_ENV might not be explicitly set
+    # Default to cPanel configuration when hosted (production/non-Windows).
     print("[OK] Using cPanel database configuration (default for hosted/production)")
     return {
         'host': os.environ.get('DB_HOST', 'localhost'),
         'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-        'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
+        # Never hardcode real passwords in source code; require env var instead.
+        'password': os.environ.get('DB_PASSWORD', ''),
         'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
         'charset': 'utf8mb4'
     }
@@ -1842,7 +1846,112 @@ def dashboard():
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
             
-            return render_template('dashboard.html', employee=employee, company_settings=company_settings)
+            # Initialize variables
+            individual_clients = []
+            corporate_clients = []
+            pending_clients = []
+            all_employees = []
+            active_clients = []
+            
+            # Check role - handle both string and potential case variations
+            user_role = employee.get('role', '') or session.get('employee_role', '')
+            
+            # Fetch active clients for ALL roles
+            cursor.execute("""
+                SELECT 
+                    id,
+                    full_name,
+                    email,
+                    phone_number,
+                    profile_picture,
+                    client_type,
+                    status,
+                    created_at
+                FROM clients
+                WHERE status = 'Active'
+                ORDER BY created_at DESC
+            """)
+            active_clients_data = cursor.fetchall()
+            
+            # Format active clients
+            for client in active_clients_data:
+                formatted_client = dict(client)
+                if formatted_client.get('created_at'):
+                    formatted_client['created_at'] = formatted_client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                active_clients.append(formatted_client)
+            
+            if user_role == 'Clerk':
+                # Fetch all clients and categorize by type (for Clerk only)
+                cursor.execute("""
+                    SELECT 
+                        id,
+                        full_name,
+                        email,
+                        phone_number,
+                        profile_picture,
+                        client_type,
+                        status,
+                        created_at
+                    FROM clients
+                    ORDER BY created_at DESC
+                """)
+                all_clients = cursor.fetchall()
+                
+                # Format all clients and categorize by type
+                formatted_all_clients = []
+                for client in all_clients:
+                    # Create a copy to avoid modifying the original
+                    formatted_client = dict(client)
+                    
+                    # Format date
+                    if formatted_client.get('created_at'):
+                        formatted_client['created_at'] = formatted_client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Add to formatted list
+                    formatted_all_clients.append(formatted_client)
+                    
+                    # Categorize for separate sections
+                    client_type = formatted_client.get('client_type', 'Pending')
+                    
+                    if client_type == 'Individual':
+                        individual_clients.append(formatted_client)
+                    elif client_type == 'Corporate':
+                        corporate_clients.append(formatted_client)
+                    else:
+                        # Include Pending and any other types
+                        pending_clients.append(formatted_client)
+                
+                # Fetch all employees (for Clerk only)
+                cursor.execute("""
+                    SELECT 
+                        id,
+                        full_name,
+                        work_email,
+                        phone_number,
+                        employee_code,
+                        role,
+                        status,
+                        profile_picture,
+                        created_at
+                    FROM employees
+                    ORDER BY created_at DESC
+                """)
+                all_employees = cursor.fetchall()
+                
+                # Format dates for employees
+                for emp in all_employees:
+                    if emp.get('created_at'):
+                        emp['created_at'] = emp['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            
+            return render_template('dashboard.html', 
+                                 employee=employee, 
+                                 company_settings=company_settings,
+                                 individual_clients=individual_clients,
+                                 corporate_clients=corporate_clients,
+                                 pending_clients=pending_clients,
+                                 all_clients=formatted_all_clients if user_role == 'Clerk' else [],
+                                 all_employees=all_employees,
+                                 active_clients=active_clients)
     except Exception as e:
         print(f"Dashboard error: {e}")
         flash('An error occurred.', 'error')
@@ -1856,12 +1965,12 @@ def user_management():
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
-    # Check if user has permission (IT Support, Firm Administrator, or Managing Partner)
+    # Check if user has permission (IT Support, Firm Administrator, Managing Partner, or Clerk)
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
     
-    # Allow IT Support, Firm Administrator, Managing Partner, or if IT Support is role-switched
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    # Allow IT Support, Firm Administrator, Managing Partner, Clerk, or if IT Support is role-switched
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -1896,7 +2005,7 @@ def employee_management():
     # Check if user has permission
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -2272,7 +2381,7 @@ def roles_permissions():
     # Check if user has permission
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -2307,7 +2416,7 @@ def individual_client_management():
     # Check if user has permission
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -2342,7 +2451,7 @@ def corporate_client_management():
     # Check if user has permission
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -2555,7 +2664,8 @@ def google_callback():
 @app.route('/client_dashboard')
 def client_dashboard():
     """Client dashboard page"""
-    if 'client_id' not in session:
+    # Allow access if client_id is in session OR if viewing as client from employee account
+    if 'client_id' not in session and 'original_employee_id' not in session:
         return redirect(url_for('client_login'))
     
     connection = get_db_connection()
@@ -4023,6 +4133,88 @@ def exit_role_switch():
     flash('Returned to IT Support role', 'success')
     return redirect(url_for('dashboard'))
 
+@app.route('/view_as_client/<int:client_id>')
+def view_as_client(client_id):
+    """Switch to client view - allows employees to view client portal"""
+    if 'employee_id' not in session:
+        flash('You must be logged in as an employee to view client portals', 'error')
+        return redirect(url_for('login'))
+    
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Verify client exists and is active
+            cursor.execute("""
+                SELECT id, full_name, email, status
+                FROM clients
+                WHERE id = %s
+            """, (client_id,))
+            client = cursor.fetchone()
+            
+            if not client:
+                flash('Client not found', 'error')
+                return redirect(url_for('dashboard'))
+            
+            if client.get('status') != 'Active':
+                flash('Can only view active clients', 'error')
+                return redirect(url_for('dashboard'))
+            
+            # Store employee session info for later restoration
+            if 'client_id' not in session:  # Only store if not already in client view
+                session['original_employee_id'] = session.get('employee_id')
+                session['original_employee_name'] = session.get('employee_name')
+                session['original_employee_role'] = session.get('employee_role')
+                session['original_profile_picture'] = session.get('profile_picture')
+            
+            # Switch to client session
+            session['client_id'] = client['id']
+            session['client_name'] = client['full_name']
+            session['client_email'] = client['email']
+            
+            # Clear employee session (but keep original for restoration)
+            session.pop('employee_id', None)
+            session.pop('employee_name', None)
+            session.pop('employee_role', None)
+            session.pop('profile_picture', None)
+            
+            flash(f'Viewing as client: {client["full_name"]}', 'success')
+            return redirect(url_for('client_dashboard'))
+    except Exception as e:
+        print(f"Error switching to client view: {e}")
+        flash('An error occurred while switching to client view', 'error')
+        return redirect(url_for('dashboard'))
+    finally:
+        connection.close()
+
+@app.route('/exit_client_view')
+def exit_client_view():
+    """Exit client view and return to employee dashboard"""
+    if 'original_employee_id' not in session:
+        flash('No active client view session', 'error')
+        return redirect(url_for('client_login'))
+    
+    # Restore employee session
+    session['employee_id'] = session.get('original_employee_id')
+    session['employee_name'] = session.get('original_employee_name')
+    session['employee_role'] = session.get('original_employee_role')
+    session['profile_picture'] = session.get('original_profile_picture')
+    
+    # Clear client session and original employee info
+    session.pop('client_id', None)
+    session.pop('client_name', None)
+    session.pop('client_email', None)
+    session.pop('original_employee_id', None)
+    session.pop('original_employee_name', None)
+    session.pop('original_employee_role', None)
+    session.pop('original_profile_picture', None)
+    
+    flash('Returned to employee dashboard', 'success')
+    return redirect(url_for('dashboard'))
+
 @app.route('/employee_communications')
 def employee_communications():
     """Employee Communications page"""
@@ -4707,7 +4899,7 @@ def case_management():
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -4743,7 +4935,7 @@ def case_details(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -4841,6 +5033,51 @@ def case_details(case_id):
                 if party.get('updated_at'):
                     party['updated_at'] = party['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
             
+            # Fetch proceedings for this case (only latest versions)
+            cursor.execute("""
+                SELECT 
+                    p.id,
+                    p.case_id,
+                    p.court_activity_type,
+                    p.court_room,
+                    p.judicial_officer,
+                    p.date_of_court_appeared,
+                    p.outcome_orders,
+                    p.outcome_details,
+                    p.next_court_date,
+                    p.attendance,
+                    p.next_attendance,
+                    p.virtual_link,
+                    p.reason,
+                    p.created_at,
+                    CASE 
+                        WHEN EXISTS (
+                            SELECT 1 FROM case_proceedings p2 
+                            WHERE p2.previous_proceeding_id = p.id
+                        ) THEN 0
+                        ELSE 1
+                    END as is_latest
+                FROM case_proceedings p
+                WHERE p.case_id = %s
+                ORDER BY date_of_court_appeared DESC, created_at DESC
+            """, (case_id,))
+            all_proceedings = cursor.fetchall()
+            
+            # Filter to only latest proceedings and format dates
+            proceedings = []
+            for proc in all_proceedings:
+                # Only include if it's the latest version (not superseded)
+                is_latest = proc.get('is_latest', 1)
+                if is_latest == 1:
+                    formatted_proc = dict(proc)
+                    if formatted_proc.get('date_of_court_appeared'):
+                        formatted_proc['date_of_court_appeared'] = formatted_proc['date_of_court_appeared'].strftime('%Y-%m-%d')
+                    if formatted_proc.get('next_court_date'):
+                        formatted_proc['next_court_date'] = formatted_proc['next_court_date'].strftime('%Y-%m-%d')
+                    if formatted_proc.get('created_at'):
+                        formatted_proc['created_at'] = formatted_proc['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    proceedings.append(formatted_proc)
+            
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
@@ -4849,6 +5086,7 @@ def case_details(case_id):
                                  case_data=case_data, 
                                  case_id=case_id,
                                  parties=parties,
+                                 proceedings=proceedings,
                                  company_settings=company_settings)
     except Exception as e:
         print(f"Error fetching case details: {e}")
@@ -4865,7 +5103,7 @@ def case_edit(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -4945,6 +5183,216 @@ def case_edit(case_id):
     finally:
         connection.close()
 
+@app.route('/case_management/<int:case_id>/documents')
+def case_documents(case_id):
+    """Case Documents page - allows uploading documents for a specific case"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+    
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('case_management'))
+    
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Fetch case details with client information
+            cursor.execute("""
+                SELECT 
+                    c.id,
+                    c.tracking_number,
+                    c.court_case_number,
+                    c.client_id,
+                    c.client_name,
+                    c.case_type,
+                    c.status,
+                    cl.id as client_table_id,
+                    cl.full_name as client_full_name,
+                    cl.phone_number as client_phone,
+                    cl.email as client_email,
+                    cl.profile_picture as client_profile_picture,
+                    cl.client_type
+                FROM cases c
+                LEFT JOIN clients cl ON c.client_id = cl.id
+                WHERE c.id = %s
+            """, (case_id,))
+            case_data = cursor.fetchone()
+            
+            if not case_data:
+                flash('Case not found', 'error')
+                return redirect(url_for('case_management'))
+            
+            # Check if Google Drive is connected and load credentials
+            google_drive_connected = False
+            if 'google_drive_credentials' in session:
+                google_drive_connected = True
+            else:
+                # Check database and load credentials
+                cursor.execute("""
+                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                           google_drive_scopes
+                    FROM company_settings 
+                    ORDER BY id DESC LIMIT 1
+                """)
+                settings = cursor.fetchone()
+                if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
+                    google_drive_connected = True
+                    # Load credentials into session for document fetching
+                    scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                    session['google_drive_credentials'] = {
+                        'token': settings['google_drive_token'],
+                        'refresh_token': settings['google_drive_refresh_token'],
+                        'token_uri': settings.get('google_drive_token_uri'),
+                        'client_id': GOOGLE_CLIENT_ID,
+                        'client_secret': GOOGLE_CLIENT_SECRET,
+                        'scopes': scopes
+                    }
+            
+            # Fetch documents from Google Drive if connected
+            documents = []
+            if google_drive_connected:
+                try:
+                    service = get_google_drive_service()
+                    
+                    if service:
+                        # Get main folder ID
+                        main_folder_id = session.get('google_drive_main_folder_id')
+                        if not main_folder_id:
+                            cursor.execute("""
+                                SELECT google_drive_main_folder_id
+                                FROM company_settings 
+                                ORDER BY id DESC LIMIT 1
+                            """)
+                            settings = cursor.fetchone()
+                            if settings and settings.get('google_drive_main_folder_id'):
+                                main_folder_id = settings['google_drive_main_folder_id']
+                                session['google_drive_main_folder_id'] = main_folder_id
+                        
+                        if main_folder_id and case_data.get('client_table_id'):
+                            # Get client folder
+                            client_folder_name = get_user_folder_name(
+                                case_data.get('client_phone'),
+                                case_data.get('client_full_name'),
+                                'client'
+                            )
+                            
+                            # Escape single quotes in folder name for query
+                            escaped_folder_name = client_folder_name.replace("'", "\\'")
+                            
+                            # Find client folder
+                            query = f"name='{escaped_folder_name}' and '{main_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                            results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+                            client_folders = results.get('files', [])
+                            
+                            if client_folders:
+                                client_folder_id = client_folders[0]['id']
+                            else:
+                                # Create client folder if it doesn't exist
+                                print(f"INFO: Creating client folder: {client_folder_name}")
+                                client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                            
+                            # Find or create CLIENT_CASE_DOCUMENT folder
+                            query = f"name='CLIENT_CASE_DOCUMENT' and '{client_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                            results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+                            case_doc_folders = results.get('files', [])
+                            
+                            if case_doc_folders:
+                                case_doc_folder_id = case_doc_folders[0]['id']
+                            else:
+                                # Create CLIENT_CASE_DOCUMENT folder if it doesn't exist
+                                print(f"INFO: Creating CLIENT_CASE_DOCUMENT folder")
+                                case_doc_folder_id = get_or_create_folder(service, client_folder_id, 'CLIENT_CASE_DOCUMENT')
+                            
+                            if case_doc_folder_id:
+                                # List all files in the folder
+                                query = f"'{case_doc_folder_id}' in parents and trashed=false"
+                                results = service.files().list(
+                                    q=query,
+                                    spaces='drive',
+                                    fields='files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                    orderBy='modifiedTime desc'
+                                ).execute()
+                                
+                                files = results.get('files', [])
+                                for file in files:
+                                    # Skip folders
+                                    if file.get('mimeType') == 'application/vnd.google-apps.folder':
+                                        continue
+                                    
+                                    # Format dates
+                                    created_time = file.get('createdTime', '')
+                                    modified_time = file.get('modifiedTime', '')
+                                    if created_time:
+                                        try:
+                                            from datetime import datetime
+                                            dt = datetime.fromisoformat(created_time.replace('Z', '+00:00'))
+                                            created_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        except:
+                                            pass
+                                    if modified_time:
+                                        try:
+                                            from datetime import datetime
+                                            dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                                            modified_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        except:
+                                            pass
+                                    
+                                    # Format file size
+                                    size = file.get('size', '0')
+                                    if size:
+                                        try:
+                                            size_int = int(size)
+                                            if size_int < 1024:
+                                                size_str = f"{size_int} B"
+                                            elif size_int < 1024 * 1024:
+                                                size_str = f"{size_int / 1024:.2f} KB"
+                                            else:
+                                                size_str = f"{size_int / (1024 * 1024):.2f} MB"
+                                        except:
+                                            size_str = "Unknown"
+                                    else:
+                                        size_str = "Unknown"
+                                    
+                                    documents.append({
+                                        'id': file.get('id'),
+                                        'name': file.get('name', 'Unknown'),
+                                        'created_time': created_time,
+                                        'modified_time': modified_time,
+                                        'url': file.get('webViewLink', ''),
+                                        'size': size_str,
+                                        'mime_type': file.get('mimeType', '')
+                                    })
+                except Exception as e:
+                    print(f"Error fetching documents from Google Drive: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            company_settings = get_company_settings()
+            if not company_settings:
+                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            
+            return render_template('case_documents.html', 
+                                 case_data=case_data, 
+                                 case_id=case_id,
+                                 google_drive_connected=google_drive_connected,
+                                 documents=documents,
+                                 company_settings=company_settings)
+    except Exception as e:
+        print(f"Error fetching case documents page: {e}")
+        flash('An error occurred while fetching case information.', 'error')
+        return redirect(url_for('case_management'))
+    finally:
+        connection.close()
+
 @app.route('/case_management/<int:case_id>/proceedings')
 def case_proceedings(case_id):
     """Case Proceedings page"""
@@ -4953,7 +5401,7 @@ def case_proceedings(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5088,7 +5536,7 @@ def case_reminders(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5197,7 +5645,7 @@ def case_calendar(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5325,7 +5773,7 @@ def case_status(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5377,7 +5825,7 @@ def case_allocate(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5430,7 +5878,7 @@ def case_audit_progress(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -7083,6 +7531,35 @@ def google_drive_disconnect():
         'message': 'Google Drive disconnected successfully'
     })
 
+def get_user_folder_name(phone_number, full_name, user_type='client'):
+    """
+    Generate folder name for clients and employees in format: [Phone Number] - [Name]
+    
+    Args:
+        phone_number: User's phone number (can be None or empty)
+        full_name: User's full name
+        user_type: 'client' or 'employee' (for logging purposes)
+    
+    Returns:
+        str: Folder name in format "[Phone Number] - [Full Name]" or "[Full Name]" if no phone
+    """
+    # Clean phone number - remove spaces and format
+    if phone_number:
+        phone_clean = phone_number.strip().replace(' ', '').replace('-', '')
+        # Format phone number for display (keep original format if it starts with +)
+        if phone_clean.startswith('+'):
+            phone_display = phone_clean
+        elif phone_clean.startswith('254'):
+            phone_display = f"+{phone_clean}"
+        elif phone_clean.startswith('0'):
+            phone_display = f"+254{phone_clean[1:]}"
+        else:
+            phone_display = phone_clean
+        return f"{phone_display} - {full_name}"
+    else:
+        # If no phone number, use just the name
+        return full_name
+
 def get_google_drive_service():
     """Get Google Drive service from stored credentials (database or session)"""
     # First try to load from database if not in session
@@ -7285,6 +7762,249 @@ def create_main_folder():
             'details': str(e)
         }), 500
 
+def get_or_create_folder(service, parent_folder_id, folder_name):
+    """Get or create a folder in Google Drive"""
+    try:
+        # Escape single quotes in folder name for query
+        escaped_folder_name = folder_name.replace("'", "\\'")
+        
+        # Search for existing folder
+        query = f"name='{escaped_folder_name}' and '{parent_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+        folders = results.get('files', [])
+        
+        if folders:
+            return folders[0]['id']
+        
+        # Create folder if it doesn't exist
+        file_metadata = {
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [parent_folder_id]
+        }
+        folder = service.files().create(body=file_metadata, fields='id, name').execute()
+        return folder.get('id')
+    except Exception as e:
+        print(f"Error getting/creating folder {folder_name}: {e}")
+        raise
+
+@app.route('/api/case/<int:case_id>/upload-document', methods=['POST'])
+def upload_case_document(case_id):
+    """Upload a document for a specific case to Google Drive"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        # Get Google Drive service
+        service = get_google_drive_service()
+        if not service:
+            # Try loading from database
+            connection = get_db_connection()
+            if connection:
+                try:
+                    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                        cursor.execute("""
+                            SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                                   google_drive_scopes
+                            FROM company_settings 
+                            ORDER BY id DESC LIMIT 1
+                        """)
+                        settings = cursor.fetchone()
+                        if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
+                            scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                            session['google_drive_credentials'] = {
+                                'token': settings['google_drive_token'],
+                                'refresh_token': settings['google_drive_refresh_token'],
+                                'token_uri': settings.get('google_drive_token_uri'),
+                                'client_id': GOOGLE_CLIENT_ID,
+                                'client_secret': GOOGLE_CLIENT_SECRET,
+                                'scopes': scopes
+                            }
+                            service = get_google_drive_service()
+                except Exception as e:
+                    print(f"Error loading credentials: {e}")
+                finally:
+                    connection.close()
+        
+        if not service:
+            print("ERROR: Google Drive service not available")
+            return jsonify({'success': False, 'error': 'Google Drive not connected. Please connect Google Drive in Documents Settings.'}), 400
+        
+        # Get case and client information
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+        
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT 
+                        c.id,
+                        c.tracking_number,
+                        c.client_id,
+                        cl.id as client_table_id,
+                        cl.full_name as client_full_name,
+                        cl.phone_number as client_phone
+                    FROM cases c
+                    LEFT JOIN clients cl ON c.client_id = cl.id
+                    WHERE c.id = %s
+                """, (case_id,))
+                case_data = cursor.fetchone()
+                
+                if not case_data:
+                    return jsonify({'success': False, 'error': 'Case not found'}), 404
+                
+                if not case_data.get('client_table_id'):
+                    return jsonify({'success': False, 'error': 'Client information not found for this case'}), 404
+                
+                # Get main folder ID
+                main_folder_id = session.get('google_drive_main_folder_id')
+                if not main_folder_id:
+                    cursor.execute("""
+                        SELECT google_drive_main_folder_id
+                        FROM company_settings 
+                        ORDER BY id DESC LIMIT 1
+                    """)
+                    settings = cursor.fetchone()
+                    if settings and settings.get('google_drive_main_folder_id'):
+                        main_folder_id = settings['google_drive_main_folder_id']
+                        session['google_drive_main_folder_id'] = main_folder_id
+                
+                # If folder doesn't exist, create it automatically
+                if not main_folder_id:
+                    print("INFO: SHERIA CENTRIC folder not found, creating it automatically...")
+                    try:
+                        folder_name = 'SHERIA CENTRIC'
+                        file_metadata = {
+                            'name': folder_name,
+                            'mimeType': 'application/vnd.google-apps.folder'
+                        }
+                        folder = service.files().create(
+                            body=file_metadata,
+                            fields='id, name, webViewLink'
+                        ).execute()
+                        
+                        main_folder_id = folder.get('id')
+                        session['google_drive_main_folder_id'] = main_folder_id
+                        
+                        # Save to database
+                        cursor.execute("""
+                            UPDATE company_settings 
+                            SET google_drive_main_folder_id = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                        """, (main_folder_id,))
+                        connection.commit()
+                        print(f"INFO: Created SHERIA CENTRIC folder with ID: {main_folder_id}")
+                    except Exception as create_error:
+                        print(f"ERROR: Failed to create SHERIA CENTRIC folder: {create_error}")
+                        return jsonify({
+                            'success': False, 
+                            'error': f'Failed to create SHERIA CENTRIC folder: {str(create_error)}'
+                        }), 500
+                
+                # Get or create client folder
+                client_folder_name = get_user_folder_name(
+                    case_data.get('client_phone'),
+                    case_data.get('client_full_name'),
+                    'client'
+                )
+                client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                
+                # Get or create CLIENT_CASE_DOCUMENT folder
+                case_doc_folder_id = get_or_create_folder(service, client_folder_id, 'CLIENT_CASE_DOCUMENT')
+                
+                # Handle file upload
+                print(f"DEBUG: request.files keys: {list(request.files.keys())}")
+                print(f"DEBUG: request.form keys: {list(request.form.keys())}")
+                
+                if 'document_file' not in request.files:
+                    print("ERROR: 'document_file' not in request.files")
+                    return jsonify({'success': False, 'error': 'No file provided'}), 400
+                
+                file = request.files['document_file']
+                print(f"DEBUG: file object: {file}, filename: {file.filename if file else 'None'}")
+                
+                if not file or file.filename == '':
+                    print("ERROR: No file selected or empty filename")
+                    return jsonify({'success': False, 'error': 'No file selected'}), 400
+                
+                # Validate file
+                if not allowed_document_file(file.filename):
+                    print(f"ERROR: Invalid file type: {file.filename}")
+                    return jsonify({'success': False, 'error': 'Invalid file type. Allowed: PDF, DOC, DOCX, JPG, JPEG, PNG'}), 400
+                
+                # Read file content
+                file_content = file.read()
+                file_name = secure_filename(file.filename)
+                description = request.form.get('description', '').strip()
+                
+                # Determine MIME type
+                file_ext = file_name.rsplit('.', 1)[1].lower() if '.' in file_name else ''
+                mime_types = {
+                    'pdf': 'application/pdf',
+                    'doc': 'application/msword',
+                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'png': 'image/png'
+                }
+                mime_type = mime_types.get(file_ext, 'application/octet-stream')
+                
+                # Create file metadata
+                file_metadata = {
+                    'name': file_name,
+                    'parents': [case_doc_folder_id]
+                }
+                if description:
+                    file_metadata['description'] = description
+                
+                # Upload to Google Drive
+                media = MediaIoBaseUpload(
+                    BytesIO(file_content),
+                    mimetype=mime_type,
+                    resumable=True
+                )
+                
+                uploaded_file = service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, name, webViewLink, webContentLink'
+                ).execute()
+                
+                file_id = uploaded_file.get('id')
+                file_url = uploaded_file.get('webViewLink', f"https://drive.google.com/file/d/{file_id}/view")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Document uploaded successfully',
+                    'file_id': file_id,
+                    'file_name': file_name,
+                    'file_url': file_url
+                })
+        finally:
+            connection.close()
+            
+    except HttpError as error:
+        print(f"Google Drive API error: {error}")
+        error_details = error.error_details[0] if error.error_details else {}
+        error_reason = error_details.get('reason', str(error))
+        return jsonify({
+            'success': False,
+            'error': f'Google Drive API error: {error_reason}'
+        }), 500
+    except Exception as e:
+        print(f"Error uploading document: {e}")
+        import traceback
+        traceback.print_exc()
+        error_message = str(e)
+        # Return 400 for client errors, 500 for server errors
+        status_code = 400 if 'not found' in error_message.lower() or 'not connected' in error_message.lower() else 500
+        return jsonify({
+            'success': False,
+            'error': f'Upload failed: {error_message}'
+        }), status_code
+
 @app.route('/documents_settings')
 def documents_settings():
     """Documents Settings page"""
@@ -7351,7 +8071,7 @@ def view_client_documents(client_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -7564,7 +8284,7 @@ def view_employee_documents(employee_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -7738,7 +8458,7 @@ def calendar():
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -7822,7 +8542,7 @@ def reminders():
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -7930,7 +8650,7 @@ def calendar_reminders():
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -8419,6 +9139,37 @@ def get_email_connection(email_address, password, smtp_host, smtp_port, use_tls,
     else:
         # Update last used time
         _email_connections[conn_key]['last_used'] = datetime.now()
+        # For IMAP connections, verify the connection is still alive
+        if connection_type == 'imap':
+            conn = _email_connections[conn_key]['connection']
+            try:
+                # Test connection with NOOP command
+                conn.noop()
+            except Exception:
+                # Connection is dead, recreate it
+                try:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                    try:
+                        conn.logout()
+                    except:
+                        pass
+                except:
+                    pass
+                # Remove dead connection and create new one
+                del _email_connections[conn_key]
+                if use_tls:
+                    mail = imaplib.IMAP4_SSL(smtp_host, smtp_port)
+                else:
+                    mail = imaplib.IMAP4(smtp_host, smtp_port)
+                mail.login(email_address, password)
+                _email_connections[conn_key] = {
+                    'connection': mail,
+                    'type': 'imap',
+                    'last_used': datetime.now()
+                }
     
     return _email_connections[conn_key]['connection']
 
@@ -8433,10 +9184,18 @@ def close_email_connection(email_address, smtp_host, smtp_port, connection_type=
             if conn_type == 'smtp':
                 conn.quit()
             elif conn_type == 'imap':
-                conn.close()
-                conn.logout()
-        except:
-            pass
+                try:
+                    # Try to close any selected mailbox first
+                    conn.close()
+                except:
+                    pass  # Ignore errors when closing mailbox
+                try:
+                    conn.logout()
+                except:
+                    pass  # Ignore errors when logging out
+        except Exception as e:
+            # Log but don't raise - connection cleanup should be best effort
+            print(f"Error closing {connection_type} connection: {e}")
         
         del _email_connections[conn_key]
 
@@ -8628,29 +9387,59 @@ def fetch_emails_from_imap(email_address, password, imap_host, imap_port, use_ss
             mail = get_email_connection(email_address, password, imap_host, imap_port, use_ssl, 'imap')
             # Test the connection by selecting INBOX
             try:
+                # Try to check connection state first
+                try:
+                    mail.noop()  # Send a NOOP command to check if connection is alive
+                except:
+                    pass  # If noop fails, connection is likely dead, will be caught below
+                
                 status, data = mail.select('INBOX')
                 if status != 'OK':
                     raise Exception("Failed to select INBOX")
-            except Exception as e:
+            except (imaplib.IMAP4.error, Exception) as e:
                 # Connection might be bad, close it and recreate
-                print(f"Connection test failed, recreating: {e}")
+                error_msg = str(e)
+                # Clean up error message if it contains email data
+                if 'Return-Path' in error_msg or 'unexpected response' in error_msg.lower():
+                    error_msg = "Connection in bad state (received unexpected data)"
+                print(f"Connection test failed, recreating: {error_msg}")
                 close_email_connection(email_address, imap_host, imap_port, 'imap')
-                mail = get_email_connection(email_address, password, imap_host, imap_port, use_ssl, 'imap')
+                # Create fresh connection
+                if use_ssl:
+                    mail = imaplib.IMAP4_SSL(imap_host, imap_port)
+                else:
+                    mail = imaplib.IMAP4(imap_host, imap_port)
+                mail.login(email_address, password)
                 status, data = mail.select('INBOX')
                 if status != 'OK':
                     raise Exception("Failed to select INBOX after reconnect")
         except Exception as e:
             # If persistent connection fails, create a new one
-            print(f"Using persistent connection failed, creating new: {e}")
+            error_msg = str(e)
+            if 'Return-Path' in error_msg or 'unexpected response' in error_msg.lower():
+                error_msg = "Connection in bad state (received unexpected data)"
+            print(f"Using persistent connection failed, creating new: {error_msg}")
             close_email_connection(email_address, imap_host, imap_port, 'imap')
-            if use_ssl:
-                mail = imaplib.IMAP4_SSL(imap_host, imap_port)
-            else:
-                mail = imaplib.IMAP4(imap_host, imap_port)
-            mail.login(email_address, password)
-            status, data = mail.select('INBOX')
-            if status != 'OK':
-                raise Exception("Failed to select INBOX")
+            try:
+                if use_ssl:
+                    mail = imaplib.IMAP4_SSL(imap_host, imap_port)
+                else:
+                    mail = imaplib.IMAP4(imap_host, imap_port)
+                mail.login(email_address, password)
+                status, data = mail.select('INBOX')
+                if status != 'OK':
+                    raise Exception("Failed to select INBOX")
+            except (imaplib.IMAP4.error, ConnectionResetError, OSError) as auth_error:
+                error_msg = str(auth_error)
+                if 'AUTHENTICATIONFAILED' in error_msg or 'Authentication failed' in error_msg:
+                    print(f"Authentication failed: {error_msg}")
+                    raise Exception(f"Email authentication failed. Please check email credentials.")
+                elif 'forcibly closed' in error_msg or 'ConnectionResetError' in str(type(auth_error)):
+                    print(f"Connection reset by server: {error_msg}")
+                    raise Exception(f"Connection to email server was reset. Please try again later.")
+                else:
+                    print(f"Connection error: {error_msg}")
+                    raise Exception(f"Failed to connect to email server: {error_msg}")
         
         # Search for all emails - use a more robust approach
         try:
@@ -8693,62 +9482,192 @@ def fetch_emails_from_imap(email_address, password, imap_host, imap_port, use_ss
         email_ids = email_ids[-limit:] if len(email_ids) > limit else email_ids
         
         emails = []
+        connection_recreated = False
         for email_id in reversed(email_ids):
-            status, msg_data = mail.fetch(email_id, '(RFC822)')
-            if status == 'OK':
-                email_body = msg_data[0][1]
-                email_message = email.message_from_bytes(email_body)
-                
-                # Decode subject
-                subject_header = email_message.get('Subject', '')
-                if subject_header:
-                    decoded_subject = decode_header(subject_header)
-                    if decoded_subject and decoded_subject[0][0]:
-                        subject = decoded_subject[0][0]
-                        if isinstance(subject, bytes):
-                            subject = subject.decode(decoded_subject[0][1] or 'utf-8')
-                    else:
-                        subject = ''
-                else:
-                    subject = '(No Subject)'
-                
-                # Get sender
-                sender = email_message.get('From', 'Unknown')
-                
-                # Get recipient
-                recipient = email_message.get('To', '')
-                
-                # Get date
-                date_str = email_message.get('Date', '')
-                
-                # Get body
-                body = ""
-                if email_message.is_multipart():
-                    for part in email_message.walk():
-                        content_type = part.get_content_type()
-                        if content_type == "text/plain":
-                            try:
-                                body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
-                            except:
-                                body = str(part.get_payload())
-                            break
-                else:
+            # Check connection state before fetching
+            if connection_recreated:
+                # Verify connection is still good
+                try:
+                    mail.noop()
+                except:
+                    # Connection is bad again, try to reconnect
                     try:
-                        body = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
-                    except:
-                        body = str(email_message.get_payload())
+                        close_email_connection(email_address, imap_host, imap_port, 'imap')
+                        if use_ssl:
+                            mail = imaplib.IMAP4_SSL(imap_host, imap_port)
+                        else:
+                            mail = imaplib.IMAP4(imap_host, imap_port)
+                        mail.login(email_address, password)
+                        status, data = mail.select('INBOX')
+                        if status != 'OK':
+                            print("Failed to maintain connection, stopping fetch")
+                            break
+                    except Exception as reconnect_err:
+                        print(f"Failed to maintain connection: {reconnect_err}")
+                        break
+            
+            try:
+                status, msg_data = mail.fetch(email_id, '(RFC822)')
+                if status == 'OK':
+                    email_body = msg_data[0][1]
+                    email_message = email.message_from_bytes(email_body)
+                    
+                    # Decode subject
+                    subject_header = email_message.get('Subject', '')
+                    if subject_header:
+                        decoded_subject = decode_header(subject_header)
+                        if decoded_subject and decoded_subject[0][0]:
+                            subject = decoded_subject[0][0]
+                            if isinstance(subject, bytes):
+                                subject = subject.decode(decoded_subject[0][1] or 'utf-8')
+                        else:
+                            subject = ''
+                    else:
+                        subject = '(No Subject)'
+                    
+                    # Get sender
+                    sender = email_message.get('From', 'Unknown')
+                    
+                    # Get recipient
+                    recipient = email_message.get('To', '')
+                    
+                    # Get date
+                    date_str = email_message.get('Date', '')
+                    
+                    # Get body
+                    body = ""
+                    if email_message.is_multipart():
+                        for part in email_message.walk():
+                            content_type = part.get_content_type()
+                            if content_type == "text/plain":
+                                try:
+                                    body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                except:
+                                    body = str(part.get_payload())
+                                break
+                    else:
+                        try:
+                            body = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        except:
+                            body = str(email_message.get_payload())
+                    
+                    # Get full body (not truncated)
+                    full_body = body if body else ''
+                    
+                    emails.append({
+                        'id': email_id.decode() if isinstance(email_id, bytes) else str(email_id),
+                        'subject': subject,
+                        'from': sender,
+                        'to': recipient,
+                        'date': date_str,
+                        'body': full_body  # Full body for conversation view
+                    })
+            except (imaplib.IMAP4.abort, imaplib.IMAP4.error, ConnectionResetError, OSError) as e:
+                # Connection error during fetch - try to recreate connection once
+                error_msg = str(e)
+                # Check for various connection state errors
+                is_connection_error = (
+                    'Logging out' in error_msg or 
+                    'socket error: EOF' in error_msg or 
+                    'forcibly closed' in error_msg or
+                    'illegal in state LOGOUT' in error_msg or
+                    'illegal in state' in error_msg or
+                    'LOGOUT' in error_msg and 'state' in error_msg
+                )
                 
-                # Get full body (not truncated)
-                full_body = body if body else ''
-                
-                emails.append({
-                    'id': email_id.decode() if isinstance(email_id, bytes) else str(email_id),
-                    'subject': subject,
-                    'from': sender,
-                    'to': recipient,
-                    'date': date_str,
-                    'body': full_body  # Full body for conversation view
-                })
+                if is_connection_error:
+                    if not connection_recreated:
+                        print(f"Connection lost during fetch (state error), attempting to reconnect...")
+                        try:
+                            # Close the bad connection
+                            close_email_connection(email_address, imap_host, imap_port, 'imap')
+                            # Recreate connection
+                            if use_ssl:
+                                mail = imaplib.IMAP4_SSL(imap_host, imap_port)
+                            else:
+                                mail = imaplib.IMAP4(imap_host, imap_port)
+                            mail.login(email_address, password)
+                            status, data = mail.select('INBOX')
+                            if status == 'OK':
+                                connection_recreated = True
+                                print("Connection reestablished, continuing to fetch emails...")
+                                # Retry the fetch for this email
+                                try:
+                                    status, msg_data = mail.fetch(email_id, '(RFC822)')
+                                    if status == 'OK':
+                                        email_body = msg_data[0][1]
+                                        email_message = email.message_from_bytes(email_body)
+                                        
+                                        # Decode subject
+                                        subject_header = email_message.get('Subject', '')
+                                        if subject_header:
+                                            decoded_subject = decode_header(subject_header)
+                                            if decoded_subject and decoded_subject[0][0]:
+                                                subject = decoded_subject[0][0]
+                                                if isinstance(subject, bytes):
+                                                    subject = subject.decode(decoded_subject[0][1] or 'utf-8')
+                                            else:
+                                                subject = ''
+                                        else:
+                                            subject = '(No Subject)'
+                                        
+                                        sender = email_message.get('From', 'Unknown')
+                                        recipient = email_message.get('To', '')
+                                        date_str = email_message.get('Date', '')
+                                        
+                                        body = ""
+                                        if email_message.is_multipart():
+                                            for part in email_message.walk():
+                                                content_type = part.get_content_type()
+                                                if content_type == "text/plain":
+                                                    try:
+                                                        body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                                    except:
+                                                        body = str(part.get_payload())
+                                                    break
+                                        else:
+                                            try:
+                                                body = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+                                            except:
+                                                body = str(email_message.get_payload())
+                                        
+                                        full_body = body if body else ''
+                                        
+                                        emails.append({
+                                            'id': email_id.decode() if isinstance(email_id, bytes) else str(email_id),
+                                            'subject': subject,
+                                            'from': sender,
+                                            'to': recipient,
+                                            'date': date_str,
+                                            'body': full_body
+                                        })
+                                        continue  # Successfully fetched, continue to next email
+                                except Exception as retry_error:
+                                    # Skip this email and continue with next
+                                    continue
+                            else:
+                                print("Failed to select INBOX after reconnect")
+                                # Return what we have so far
+                                break
+                        except Exception as reconnect_error:
+                            error_msg = str(reconnect_error)
+                            if 'AUTHENTICATIONFAILED' in error_msg or 'Authentication failed' in error_msg:
+                                print(f"Authentication failed when reconnecting: {error_msg}")
+                            else:
+                                print(f"Failed to reconnect: {error_msg}")
+                            # Return what we have so far
+                            break
+                    else:
+                        # Already recreated once, connection is still bad - stop trying
+                        print(f"Connection still in bad state after reconnect, stopping fetch operation")
+                        break
+                else:
+                    # Other error, skip this email silently
+                    continue
+            except Exception as e:
+                # Other unexpected error, skip this email
+                print(f"Unexpected error fetching email {email_id}: {e}")
+                continue
         
         # Don't close - keep connection alive (only if using persistent connection)
         # If we created a new temporary connection, close it
@@ -9496,6 +10415,16 @@ def other_matters():
     """Other Matters page"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
+    
+    # Check if user has permission (IT Support, Firm Administrator, Managing Partner, or Clerk)
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
     
     company_settings = get_company_settings()
     if not company_settings:

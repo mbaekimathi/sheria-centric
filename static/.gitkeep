@@ -1,2 +1,3 @@
 # This file ensures the static directory is tracked by git
 # The uploads subdirectory is ignored but the static directory structure is preserved
+

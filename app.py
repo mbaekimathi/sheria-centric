@@ -27,8 +27,19 @@ from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
 from datetime import datetime
 import re
+import sys
 
 app = Flask(__name__)
+
+# Some hosted environments (e.g. cPanel/Passenger) may default stdout/stderr to ASCII.
+# Reconfigure to UTF-8 so any Unicode in logs (e.g. checkmarks) won't crash startup.
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # Load environment variables from .env file if it exists
 try:

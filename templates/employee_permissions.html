@@ -1,0 +1,724 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Permissions - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<form method="post" class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8" id="permissions-form">
+    <!-- Header / Breadcrumbs -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <p class="text-xs uppercase tracking-[0.2em] text-slate-400 mb-1">Access control</p>
+            <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
+                <span>Employee Permissions</span>
+                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-100">
+                    Live preview
+                </span>
+            </h1>
+            <p class="text-xs md:text-sm text-slate-500 mt-1 max-w-xl">
+                Fine-tune what this employee can do across user, matter, finance, calendar and system modules.
+            </p>
+        </div>
+        <div class="flex items-center gap-3 justify-between md:justify-end">
+            <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-500 bg-white/80 border border-slate-100 rounded-full px-3 py-1 shadow-sm">
+                <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>All changes apply instantly once wired to backend checks.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employee summary -->
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-md shadow-emerald-50/60 p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-5 relative overflow-hidden">
+        <div class="absolute inset-y-0 right-0 w-40 pointer-events-none opacity-40 hidden md:block">
+            <div class="w-40 h-40 rounded-full bg-gradient-to-tr from-emerald-100 via-sky-50 to-transparent translate-x-10 -translate-y-6 blur-2xl"></div>
+        </div>
+        {% if employee.profile_picture %}
+            {% if employee.profile_picture.startswith('http') %}
+            <img src="{{ employee.profile_picture }}" alt="{{ employee.full_name }}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-200">
+            {% else %}
+            <img src="{{ url_for('static', filename='uploads/profile_pictures/' ~ employee.profile_picture) }}" alt="{{ employee.full_name }}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-200">
+            {% endif %}
+        {% else %}
+        <div class="w-16 h-16 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xl font-semibold border-2 border-slate-200">
+            {{ employee.full_name[:2] if employee.full_name else '?' }}
+        </div>
+        {% endif %}
+
+        <div class="flex-1 min-w-0">
+            <h2 class="text-lg sm:text-xl font-bold text-slate-900 truncate flex items-center gap-2">
+                {{ employee.full_name }}
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                    ID: {{ employee.id }}
+                </span>
+            </h2>
+            <div class="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-600">
+                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 border border-emerald-100 text-emerald-700">
+                    <i class="fas fa-user-shield"></i>
+                    <span>{{ employee.role or 'Role not set' }}</span>
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 border border-sky-100 text-sky-700">
+                    <i class="fas fa-id-badge"></i>
+                    <span>{{ employee.employee_code or 'No code' }}</span>
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-full
+                             {% if employee.status and employee.status|lower == 'active' %}
+                                 bg-emerald-50 border border-emerald-100 text-emerald-700
+                             {% else %}
+                                 bg-amber-50 border border-amber-100 text-amber-700
+                             {% endif %}">
+                    <i class="fas fa-circle text-[7px]"></i>
+                    <span>{{ employee.status or 'Unknown status' }}</span>
+                </span>
+            </div>
+        </div>
+        <div class="flex flex-col sm:items-end gap-2 sm:ml-4">
+            <div class="flex flex-wrap gap-2 text-[11px] text-slate-500">
+                <span class="inline-flex items-center gap-1">
+                    <i class="fas fa-phone text-slate-400"></i>
+                    <span>{{ employee.phone_number or 'No phone' }}</span>
+                </span>
+                <span class="inline-flex items-center gap-1">
+                    <i class="fas fa-envelope text-slate-400"></i>
+                    <span class="truncate max-w-[180px]">{{ employee.work_email or 'No email' }}</span>
+                </span>
+            </div>
+            <div class="flex gap-2 mt-1">
+                <a href="{{ url_for('employee_management') }}" class="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 transition">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Back to employees</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permissions matrix -->
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-slate-100">
+        <div class="border-b border-slate-100 px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900">Role activities & access</h2>
+                <p class="text-xs text-slate-500 mt-1 max-w-xl">
+                    Toggle activities on or off for this employee. When a permission is off, backend checks should prevent that activity across the system.
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button type="button" id="btn-all-on" class="inline-flex items-center gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 shadow-sm hover:shadow-md transition">
+                    <i class="fas fa-toggle-on text-sm"></i>
+                    <span>Turn all on</span>
+                </button>
+                <button type="button" id="btn-all-off" class="inline-flex items-center gap-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium px-3 py-1.5 border border-slate-200 transition">
+                    <i class="fas fa-toggle-off text-sm"></i>
+                    <span>Turn all off</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="divide-y divide-slate-100">
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-sky-100 text-sky-600">
+                            <i class="fas fa-user-tie text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">User Management – Employees</p>
+                            <p class="text-xs text-slate-500">Control which employee records actions this user can perform.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Create employee</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="employee_create">
+                                        <!-- filled by JS -->
+                                    </span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_employee_create" class="sr-only peer permission-toggle" data-permission-key="employee_create" {% if permissions.get('employee_create', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Approve employee</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="employee_approve"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_employee_approve" class="sr-only peer permission-toggle" data-permission-key="employee_approve" {% if permissions.get('employee_approve', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Edit employee details</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="employee_edit"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_employee_edit" class="sr-only peer permission-toggle" data-permission-key="employee_edit" {% if permissions.get('employee_edit', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Suspend employee</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="employee_suspend"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_employee_suspend" class="sr-only peer permission-toggle" data-permission-key="employee_suspend" {% if permissions.get('employee_suspend', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Delete employee</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="employee_delete"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_employee_delete" class="sr-only peer permission-toggle" data-permission-key="employee_delete" {% if permissions.get('employee_delete', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600">
+                            <i class="fas fa-user-friends text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">User Management – Clients</p>
+                            <p class="text-xs text-slate-500">Control which client management actions this user can perform.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Register client</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="client_register"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_client_register" class="sr-only peer permission-toggle" data-permission-key="client_register" {% if permissions.get('client_register', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Approve onboarded client</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="client_approve"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_client_approve" class="sr-only peer permission-toggle" data-permission-key="client_approve" {% if permissions.get('client_approve', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Edit client details</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="client_edit"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_client_edit" class="sr-only peer permission-toggle" data-permission-key="client_edit" {% if permissions.get('client_edit', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Suspend client</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="client_suspend"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_client_suspend" class="sr-only peer permission-toggle" data-permission-key="client_suspend" {% if permissions.get('client_suspend', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Delete client</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="client_delete"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_client_delete" class="sr-only peer permission-toggle" data-permission-key="client_delete" {% if permissions.get('client_delete', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600">
+                            <i class="fas fa-gavel text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Matter Management</p>
+                            <p class="text-xs text-slate-500">Allocation, status changes, documents and audit for cases and other matters.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Register litigation matter / case</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_register_case"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_register_case" class="sr-only peer permission-toggle" data-permission-key="matter_register_case" {% if permissions.get('matter_register_case', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Register other matters</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_register_other"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_register_other" class="sr-only peer permission-toggle" data-permission-key="matter_register_other" {% if permissions.get('matter_register_other', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Edit matter details</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_edit"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_edit" class="sr-only peer permission-toggle" data-permission-key="matter_edit" {% if permissions.get('matter_edit', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Change matter / case status</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_change_status"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_change_status" class="sr-only peer permission-toggle" data-permission-key="matter_change_status" {% if permissions.get('matter_change_status', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Allocate / re-allocate matters</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_allocate"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_allocate" class="sr-only peer permission-toggle" data-permission-key="matter_allocate" {% if permissions.get('matter_allocate', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Upload & manage case documents</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_documents"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_documents" class="sr-only peer permission-toggle" data-permission-key="matter_documents" {% if permissions.get('matter_documents', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">View matter audit trail / progress</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="matter_audit"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_matter_audit" class="sr-only peer permission-toggle" data-permission-key="matter_audit" {% if permissions.get('matter_audit', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 text-amber-600">
+                            <i class="fas fa-file-invoice-dollar text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Finance & Billing</p>
+                            <p class="text-xs text-slate-500">Billing, invoices, payments and financial reports.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">View finance & billing dashboard</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="finance_view_dashboard"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_finance_view_dashboard" class="sr-only peer permission-toggle" data-permission-key="finance_view_dashboard" {% if permissions.get('finance_view_dashboard', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Create & send invoices</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="finance_create_invoices"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_finance_create_invoices" class="sr-only peer permission-toggle" data-permission-key="finance_create_invoices" {% if permissions.get('finance_create_invoices', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Record payments & adjustments</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="finance_record_payments"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_finance_record_payments" class="sr-only peer permission-toggle" data-permission-key="finance_record_payments" {% if permissions.get('finance_record_payments', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">View financial reports & analytics</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="finance_view_reports"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_finance_view_reports" class="sr-only peer permission-toggle" data-permission-key="finance_view_reports" {% if permissions.get('finance_view_reports', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-cyan-100 text-cyan-600">
+                            <i class="fas fa-calendar-alt text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">Calendar & Reminders</p>
+                            <p class="text-xs text-slate-500">Control which calendar and reminders this user can manage.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Manage personal calendar</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="calendar_personal"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_calendar_personal" class="sr-only peer permission-toggle" data-permission-key="calendar_personal" {% if permissions.get('calendar_personal', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Manage firm / shared calendar</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="calendar_shared"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_calendar_shared" class="sr-only peer permission-toggle" data-permission-key="calendar_shared" {% if permissions.get('calendar_shared', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Create & manage case reminders</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="calendar_case_reminders"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_calendar_case_reminders" class="sr-only peer permission-toggle" data-permission-key="calendar_case_reminders" {% if permissions.get('calendar_case_reminders', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-600">
+                            <i class="fas fa-cog text-sm"></i>
+                        </span>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">System & Communication Settings</p>
+                            <p class="text-xs text-slate-500">Access to system configuration and communication channels.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Manage system settings</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="system_manage_settings"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_system_manage_settings" class="sr-only peer permission-toggle" data-permission-key="system_manage_settings" {% if permissions.get('system_manage_settings', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Manage document settings</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="system_manage_document_settings"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_system_manage_document_settings" class="sr-only peer permission-toggle" data-permission-key="system_manage_document_settings" {% if permissions.get('system_manage_document_settings', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="py-2 pr-4 text-slate-700">Manage communication channels (email, SMS, WhatsApp)</td>
+                                <td class="py-2 pr-4 text-right text-[11px]">
+                                    <span class="inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border"
+                                          data-permission-key="system_manage_channels"></span>
+                                </td>
+                                <td class="py-2 text-right w-20">
+                                    <label class="inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" name="perm_system_manage_channels" class="sr-only peer permission-toggle" data-permission-key="system_manage_channels" {% if permissions.get('system_manage_channels', True) %}checked{% endif %}>
+                                        <div class="w-10 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition-colors relative">
+                                            <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></div>
+                                        </div>
+                                    </label>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-between mt-4 text-xs text-slate-500">
+        <p id="unsaved-indicator" class="hidden sm:inline-flex items-center gap-2">
+            <span class="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Changes are live on save. Use toggles above, then click Save.</span>
+        </p>
+        <button type="submit" class="inline-flex items-center gap-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 shadow-sm hover:shadow-md transition" id="btn-save">
+            <i class="fas fa-save"></i>
+            <span>Save permissions</span>
+        </button>
+    </div>
+</form>
+<script>
+    (function () {
+        const toggles = Array.from(document.querySelectorAll('.permission-toggle'));
+        const allOnBtn = document.getElementById('btn-all-on');
+        const allOffBtn = document.getElementById('btn-all-off');
+        const form = document.getElementById('permissions-form');
+        const unsaved = document.getElementById('unsaved-indicator');
+
+        function updatePill(toggle) {
+            const key = toggle.dataset.permissionKey;
+            if (!key) return;
+            const pill = document.querySelector('.status-pill[data-permission-key="' + key + '"]');
+            if (!pill) return;
+            const on = toggle.checked;
+            pill.textContent = on ? 'Allowed' : 'Blocked';
+            pill.className =
+                'inline-flex items-center status-pill font-medium rounded-full px-2 py-0.5 border ' +
+                (on
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-rose-50 border-rose-200 text-rose-700');
+        }
+
+        function markUnsaved() {
+            if (unsaved) {
+                unsaved.classList.remove('hidden');
+            }
+        }
+
+        toggles.forEach((toggle) => {
+            updatePill(toggle);
+            toggle.addEventListener('change', function () {
+                updatePill(this);
+                markUnsaved();
+            });
+        });
+
+        if (allOnBtn) {
+            allOnBtn.addEventListener('click', function () {
+                toggles.forEach((t) => {
+                    if (!t.checked) {
+                        t.checked = true;
+                        updatePill(t);
+                    }
+                });
+                markUnsaved();
+            });
+        }
+
+        if (allOffBtn) {
+            allOffBtn.addEventListener('click', function () {
+                toggles.forEach((t) => {
+                    if (t.checked) {
+                        t.checked = false;
+                        updatePill(t);
+                    }
+                });
+                markUnsaved();
+            });
+        }
+
+        if (form) {
+            form.addEventListener('submit', function () {
+                if (unsaved) {
+                    unsaved.classList.add('hidden');
+                }
+            });
+        }
+    })();
+</script>
+{% endblock %}

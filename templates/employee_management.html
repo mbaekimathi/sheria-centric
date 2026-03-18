@@ -1,34 +1,596 @@
 {% extends "base.html" %}
 
-{% block title %}Employee Management - SHERIA CENTRIC{% endblock %}
+{% block title %}Employee Records - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto px-2 sm:px-0">
     <!-- Page Header -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-center justify-between">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-                    <i class="fas fa-user-tie text-green-600 mr-3"></i>
-                    Employee Management
+                <h1 class="text-xl sm:text-3xl font-bold text-gray-900 mb-1 flex items-center">
+                    <i class="fas fa-user-tie text-green-600 mr-2 sm:mr-3"></i>
+                    Employee Records
                 </h1>
-                <p class="text-gray-600">Manage employee records, profiles, and organizational structure</p>
+                <p class="text-gray-600 text-xs sm:text-base">All approved employees and their assigned roles</p>
             </div>
+            <button onclick="loadEmployees()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium text-sm flex items-center self-end sm:self-auto">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
         </div>
     </div>
 
-    <!-- Welcome Message -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
-        <div class="max-w-md mx-auto">
-            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-user-tie text-white text-4xl"></i>
+    <!-- Stats Row -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6" id="stats-row">
+        <div class="bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100 p-3 sm:p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Active</p>
+                    <p id="stat-total" class="text-xl sm:text-3xl font-bold text-gray-900 mt-1">-</p>
+                </div>
+                <div class="w-8 h-8 sm:w-12 sm:h-12 bg-green-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                    <i class="fas fa-users text-green-600 text-sm sm:text-xl"></i>
+                </div>
             </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Employee Management</h2>
-            <p class="text-gray-600 mb-6">Access all employee management features from the sidebar</p>
-            <p class="text-sm text-gray-500 italic">Use the sidebar to navigate between employee management sections</p>
+        </div>
+        <div id="stat-roles-container" class="col-span-1 sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+            <!-- Role stat cards populated by JS -->
+        </div>
+    </div>
+
+    <!-- Role Filter Pills + Search -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6">
+        <div class="flex flex-col gap-3 mb-4 sm:mb-6">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <!-- Role filter pills (scrollable) -->
+                <div class="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-shrink-0" id="role-filters">
+                    <button onclick="filterByRole('all')" data-role="all" class="role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all bg-green-600 text-white whitespace-nowrap">
+                        All
+                    </button>
+                </div>
+                <!-- Search -->
+                <div class="relative w-full sm:w-72 flex-shrink-0">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" id="searchInput" placeholder="Search name, email, code, role..."
+                        class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        oninput="renderEmployees()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Desktop Table -->
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full" id="emp-table-desktop">
+                <thead>
+                    <tr class="border-b border-gray-200">
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3 pl-4">Employee</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Contact</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Role</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Status</th>
+                        <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3">Joined</th>
+                        <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-3 pr-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="emp-tbody-desktop">
+                    <tr><td colspan="6" class="text-center py-16">
+                        <i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4 block"></i>
+                        <p class="text-gray-500">Loading employees...</p>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Mobile Cards -->
+        <div class="md:hidden space-y-3" id="emp-list-mobile">
+            <div class="text-center py-12">
+                <i class="fas fa-spinner fa-spin text-gray-400 text-2xl mb-3 block"></i>
+                <p class="text-gray-500 text-sm">Loading employees...</p>
+            </div>
+        </div>
+
+        <!-- Empty / No Results -->
+        <div id="empty-state" class="hidden text-center py-12 sm:py-16">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-users text-gray-300 text-3xl sm:text-4xl"></i>
+            </div>
+            <p class="text-gray-600 text-base sm:text-lg font-medium">No active employees</p>
+            <p class="text-gray-400 text-xs sm:text-sm mt-1">Approve employees from the Onboarding & Approvals page</p>
+        </div>
+        <div id="no-results" class="hidden text-center py-12 sm:py-16">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-search text-gray-300 text-3xl sm:text-4xl"></i>
+            </div>
+            <p class="text-gray-600 text-base sm:text-lg font-medium">No matching employees</p>
+            <p class="text-gray-400 text-xs sm:text-sm mt-1">Try a different search or filter</p>
+        </div>
+
+        <!-- Result count -->
+        <div id="result-count" class="hidden pt-4 text-xs text-gray-400 text-right"></div>
+    </div>
+</div>
+
+<!-- Edit Employee Modal (full details) -->
+<div id="editModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="relative w-full sm:max-w-2xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 flex-shrink-0">
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-user-edit text-green-600 mr-2"></i><span id="editModalTitle">Edit Employee</span>
+            </h3>
+            <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 transition-colors p-2 -mr-2 rounded-lg hover:bg-gray-100">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+        <div id="editModalBody" class="flex-1 overflow-y-auto p-4 sm:p-5 min-h-0">
+            <!-- Filled by JS: loading spinner or full edit form -->
+        </div>
+        <div id="editModalFooter" class="hidden flex gap-3 p-4 sm:p-5 border-t border-gray-200 flex-shrink-0 bg-gray-50/50">
+            <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-semibold text-sm">Cancel</button>
+            <button type="submit" form="employeeFullEditForm" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-sm">
+                <i class="fas fa-save mr-2"></i>Save Changes
+            </button>
+        </div>
+        <div class="h-[env(safe-area-inset-bottom)] sm:hidden"></div>
+    </div>
+</div>
+
+<!-- Employee Detail Modal (full-screen on mobile) -->
+<div id="detailModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50">
+    <div class="absolute inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90vw] sm:max-w-2xl sm:max-h-[90vh] sm:rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0 bg-white">
+            <h3 class="text-lg sm:text-xl font-bold text-gray-900 flex items-center truncate pr-2">
+                <i class="fas fa-user text-green-600 mr-2 flex-shrink-0"></i>
+                <span class="truncate" id="detail-title">Employee Details</span>
+            </h3>
+            <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors p-2 -mr-2 flex-shrink-0">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div id="detailContent" class="flex-1 overflow-y-auto p-4 sm:p-6"></div>
+        <div class="flex justify-end gap-2 p-4 sm:p-6 border-t border-gray-200 flex-shrink-0 bg-white">
+            <button onclick="closeDetailModal()" class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-semibold text-sm">Close</button>
+            <button id="detail-edit-btn" onclick="" class="px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-semibold text-sm">
+                <i class="fas fa-pen mr-1"></i>Edit
+            </button>
         </div>
     </div>
 </div>
+
+<script>
+let allEmployees = [];
+let currentRoleFilter = 'all';
+
+const ROLE_COLORS = {
+    'Firm Administrator': { bg: 'bg-purple-100', text: 'text-purple-800', icon: 'fa-user-shield', dot: 'bg-purple-500' },
+    'Managing Partner': { bg: 'bg-indigo-100', text: 'text-indigo-800', icon: 'fa-gavel', dot: 'bg-indigo-500' },
+    'Finance Office': { bg: 'bg-blue-100', text: 'text-blue-800', icon: 'fa-calculator', dot: 'bg-blue-500' },
+    'Associate Advocate': { bg: 'bg-cyan-100', text: 'text-cyan-800', icon: 'fa-balance-scale', dot: 'bg-cyan-500' },
+    'Clerk': { bg: 'bg-teal-100', text: 'text-teal-800', icon: 'fa-clipboard', dot: 'bg-teal-500' },
+    'IT Support': { bg: 'bg-red-100', text: 'text-red-800', icon: 'fa-laptop-code', dot: 'bg-red-500' },
+    'Employee': { bg: 'bg-gray-100', text: 'text-gray-700', icon: 'fa-user', dot: 'bg-gray-500' }
+};
+
+function rc(role) { return ROLE_COLORS[role] || ROLE_COLORS['Employee']; }
+
+function avatar(emp, size) {
+    const s = size || 'md';
+    const dims = { sm: 'w-10 h-10 text-sm', md: 'w-10 h-10 text-sm', lg: 'w-16 h-16 text-xl sm:w-20 sm:h-20 sm:text-2xl' };
+    const cls = dims[s] || dims.md;
+    if (emp.profile_picture) {
+        return `<img src="/static/uploads/profile_pictures/${emp.profile_picture}" alt="${emp.full_name}" class="${cls} rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" onerror="this.outerHTML='<div class=\\'${cls} rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-bold flex-shrink-0\\'>${getInitials(emp.full_name)}</div>'">`;
+    }
+    return `<div class="${cls} rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-bold flex-shrink-0">${getInitials(emp.full_name)}</div>`;
+}
+
+function formatDate(d) {
+    if (!d) return 'N/A';
+    try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    catch { return d; }
+}
+function getInitials(n) { return n.split(' ').map(w => w.charAt(0).toUpperCase()).slice(0, 2).join(''); }
+
+function loadEmployees() {
+    showLoading();
+    fetch('{{ url_for("get_active_employees") }}')
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { showError(data.error); return; }
+            allEmployees = data.employees || [];
+            updateStats(data);
+            buildRoleFilters(data.role_counts || {});
+            renderEmployees();
+        })
+        .catch(() => showError('Failed to load employees'));
+}
+
+function showLoading() {
+    document.getElementById('emp-tbody-desktop').innerHTML = `<tr><td colspan="6" class="text-center py-16"><i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4 block"></i><p class="text-gray-500">Loading...</p></td></tr>`;
+    document.getElementById('emp-list-mobile').innerHTML = `<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-gray-400 text-2xl mb-3 block"></i><p class="text-gray-500 text-sm">Loading...</p></div>`;
+    hideStates();
+}
+function showError(msg) {
+    const h = `<div class="text-center py-12 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4 block"></i><p>${msg}</p></div>`;
+    document.getElementById('emp-tbody-desktop').innerHTML = `<tr><td colspan="6">${h}</td></tr>`;
+    document.getElementById('emp-list-mobile').innerHTML = h;
+}
+function hideStates() {
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('no-results').classList.add('hidden');
+    document.getElementById('result-count').classList.add('hidden');
+}
+
+function updateStats(data) {
+    document.getElementById('stat-total').textContent = data.total || 0;
+    const rc_data = data.role_counts || {};
+    const container = document.getElementById('stat-roles-container');
+    const topRoles = Object.entries(rc_data).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    container.innerHTML = topRoles.map(([role, count]) => {
+        const c = rc(role);
+        return `<div class="bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100 p-3 sm:p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider truncate">${role}</p>
+                    <p class="text-xl sm:text-3xl font-bold ${c.text} mt-1">${count}</p>
+                </div>
+                <div class="w-8 h-8 sm:w-12 sm:h-12 ${c.bg} rounded-lg sm:rounded-xl flex items-center justify-center">
+                    <i class="fas ${c.icon} ${c.text} text-sm sm:text-xl"></i>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function buildRoleFilters(roleCounts) {
+    const container = document.getElementById('role-filters');
+    const roles = Object.keys(roleCounts).sort();
+    let html = `<button onclick="filterByRole('all')" data-role="all" class="role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-green-600 text-white">All</button>`;
+    roles.forEach(role => {
+        const c = rc(role);
+        html += `<button onclick="filterByRole('${role}')" data-role="${role}" class="role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${c.bg} ${c.text} border border-transparent hover:border-current">${role} <span class="opacity-60 ml-0.5">${roleCounts[role]}</span></button>`;
+    });
+    container.innerHTML = html;
+}
+
+function filterByRole(role) {
+    currentRoleFilter = role;
+    document.querySelectorAll('.role-pill').forEach(btn => {
+        const r = btn.getAttribute('data-role');
+        if (r === role) {
+            if (role === 'all') { btn.className = 'role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-green-600 text-white'; }
+            else { const c = rc(role); btn.className = `role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${c.bg} ${c.text} ring-2 ring-current`; }
+        } else {
+            if (r === 'all') { btn.className = 'role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap bg-gray-100 text-gray-600 hover:bg-gray-200'; }
+            else { const c2 = rc(r); btn.className = `role-pill px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${c2.bg} ${c2.text} border border-transparent hover:border-current`; }
+        }
+    });
+    renderEmployees();
+}
+
+function getFiltered() {
+    let list = allEmployees;
+    if (currentRoleFilter !== 'all') list = list.filter(e => e.role === currentRoleFilter);
+    const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+    if (q) list = list.filter(e =>
+        (e.full_name||'').toLowerCase().includes(q) ||
+        (e.work_email||'').toLowerCase().includes(q) ||
+        (e.employee_code||'').toLowerCase().includes(q) ||
+        (e.phone_number||'').includes(q) ||
+        (e.role||'').toLowerCase().includes(q)
+    );
+    return list;
+}
+
+function renderEmployees() {
+    const filtered = getFiltered();
+    const dtBody = document.getElementById('emp-tbody-desktop');
+    const mbList = document.getElementById('emp-list-mobile');
+    const dtTable = document.getElementById('emp-table-desktop');
+    const emptyEl = document.getElementById('empty-state');
+    const noResEl = document.getElementById('no-results');
+    const countEl = document.getElementById('result-count');
+
+    hideStates();
+
+    if (allEmployees.length === 0) {
+        dtTable.classList.add('hidden'); mbList.classList.add('hidden');
+        emptyEl.classList.remove('hidden'); return;
+    }
+    if (filtered.length === 0) {
+        dtTable.classList.add('hidden'); mbList.classList.add('hidden');
+        noResEl.classList.remove('hidden'); return;
+    }
+
+    dtTable.classList.remove('hidden'); mbList.classList.remove('hidden');
+    countEl.classList.remove('hidden');
+    countEl.textContent = `Showing ${filtered.length} of ${allEmployees.length} employees`;
+
+    /* Desktop rows */
+    dtBody.innerHTML = filtered.map(emp => {
+        const c = rc(emp.role);
+        const eName = emp.full_name.replace(/'/g, "\\'");
+        return `
+        <tr class="border-b border-gray-100 hover:bg-gray-50/50 transition-colors group">
+            <td class="py-3.5 pl-4">
+                <div class="flex items-center gap-3">
+                    ${avatar(emp, 'md')}
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate">${emp.full_name}</p>
+                        <p class="text-xs text-gray-400">${emp.employee_code || '-'}</p>
+                    </div>
+                </div>
+            </td>
+            <td class="py-3.5">
+                <p class="text-sm text-gray-700 truncate max-w-[200px]">${emp.work_email || '-'}</p>
+                <p class="text-xs text-gray-400">${emp.phone_number || '-'}</p>
+            </td>
+            <td class="py-3.5">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${c.bg} ${c.text}">
+                    <i class="fas ${c.icon} text-[10px]"></i>${emp.role || 'Employee'}
+                </span>
+            </td>
+            <td class="py-3.5">
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700">
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>Active
+                </span>
+            </td>
+            <td class="py-3.5"><p class="text-sm text-gray-500">${formatDate(emp.created_at)}</p></td>
+            <td class="py-3.5 pr-4">
+                <div class="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <button onclick="openDetail(${emp.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View"><i class="fas fa-eye"></i></button>
+                    <button onclick="openEditModal(${emp.id})" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Edit"><i class="fas fa-pen"></i></button>
+                    <button onclick="suspendEmployee(${emp.id}, '${eName}')" class="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors" title="Suspend"><i class="fas fa-ban"></i></button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    /* Mobile cards */
+    mbList.innerHTML = filtered.map(emp => {
+        const c = rc(emp.role);
+        const eName = emp.full_name.replace(/'/g, "\\'");
+        return `
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div class="flex items-start gap-3">
+                ${avatar(emp, 'md')}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 truncate">${emp.full_name}</p>
+                            <p class="text-xs text-gray-500 truncate">${emp.work_email || '-'}</p>
+                        </div>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${c.bg} ${c.text} flex-shrink-0">
+                            <i class="fas ${c.icon}" style="font-size:8px"></i>${emp.role || 'Employee'}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-[10px] text-gray-400">
+                        <span>${emp.employee_code || ''}</span>
+                        <span class="text-gray-300">|</span>
+                        <span>${emp.phone_number || '-'}</span>
+                        <span class="text-gray-300">|</span>
+                        <span class="inline-flex items-center gap-1 text-green-600 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Active</span>
+                    </div>
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+                        <p class="text-[10px] text-gray-400">${formatDate(emp.created_at)}</p>
+                        <div class="flex items-center gap-1">
+                            <button onclick="openDetail(${emp.id})" class="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><i class="fas fa-eye text-sm"></i></button>
+                            <button onclick="openEditModal(${emp.id})" class="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors"><i class="fas fa-pen text-sm"></i></button>
+                            <button onclick="suspendEmployee(${emp.id}, '${eName}')" class="p-2 text-yellow-600 hover:bg-yellow-100 rounded-lg transition-colors"><i class="fas fa-ban text-sm"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/* ---- Detail Modal ---- */
+function openDetail(id) {
+    const emp = allEmployees.find(e => e.id === id);
+    if (!emp) return;
+    const c = rc(emp.role);
+    document.getElementById('detail-title').textContent = emp.full_name;
+    document.getElementById('detail-edit-btn').setAttribute('onclick', `closeDetailModal(); openEditModal(${id})`);
+    document.getElementById('detailContent').innerHTML = `
+        <div class="space-y-4 sm:space-y-6">
+            <div class="flex items-center gap-4 pb-4 border-b border-gray-100">
+                ${avatar(emp, 'lg')}
+                <div class="min-w-0">
+                    <h4 class="text-lg sm:text-xl font-bold text-gray-900 truncate">${emp.full_name}</h4>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${c.bg} ${c.text} mt-1"><i class="fas ${c.icon} text-[10px]"></i>${emp.role || 'Employee'}</span>
+                    <div class="flex items-center gap-1.5 mt-1"><span class="w-2 h-2 rounded-full bg-green-500"></span><span class="text-xs text-green-700 font-semibold">Active</span></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div class="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Employee Code</p>
+                    <p class="text-sm font-semibold text-gray-900">${emp.employee_code || 'N/A'}</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Email Address</p>
+                    <p class="text-sm font-semibold text-gray-900 break-all">${emp.work_email || 'N/A'}</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Phone Number</p>
+                    <p class="text-sm font-semibold text-gray-900">${emp.phone_number || 'N/A'}</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 sm:p-4">
+                    <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Date Joined</p>
+                    <p class="text-sm font-semibold text-gray-900">${formatDate(emp.created_at)}</p>
+                </div>
+            </div>
+        </div>`;
+    document.getElementById('detailModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeDetailModal() {
+    document.getElementById('detailModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+/* ---- Edit Modal (full details) ---- */
+function openEditModal(id) {
+    document.getElementById('editModalTitle').textContent = 'Edit Employee';
+    document.getElementById('editModalBody').innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-green-600 text-3xl mb-4"></i><p class="text-gray-500">Loading details...</p></div>';
+    document.getElementById('editModalFooter').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+
+    fetch(`{{ url_for('get_employee_onboarding_details') }}?id=${id}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error || !data.employee) {
+                document.getElementById('editModalBody').innerHTML = `<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>${data.error || 'Employee not found'}</p></div>`;
+                return;
+            }
+            const e = data.employee;
+            document.getElementById('editModalTitle').textContent = (e.full_name || 'Employee') + ' – Edit';
+            const pm = (e.payment_method || '').toString();
+            const showBank = pm === 'Bank';
+            const showMobile = pm === 'Mobile Money';
+            const payFreq = ['daily', 'weekly', 'monthly'];
+            const payFreqOpts = payFreq.map(p => `<option value="${p}" ${(e.pay_frequency || '') === p ? 'selected' : ''}>${p}</option>`).join('');
+            const docLink = (filename) => filename ? `<a href="/static/uploads/profile_pictures/${filename}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-xs">View current</a>` : '<span class="text-gray-400 text-xs">None</span>';
+
+            document.getElementById('editModalBody').innerHTML = `
+            <form id="employeeFullEditForm" class="space-y-5" onsubmit="return submitFullEdit(event)">
+                <input type="hidden" name="employee_id" value="${e.id}">
+                <div class="rounded-xl border border-gray-200 overflow-hidden bg-gray-50/50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-white/80"><h4 class="font-bold text-gray-900 text-sm flex items-center"><i class="fas fa-user text-green-600 mr-2"></i>Basic Information</h4></div>
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Full Name *</label><input type="text" name="full_name" value="${(e.full_name || '').replace(/"/g, '&quot;')}" required class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"></div>
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Employee Code</label><input type="text" name="employee_code" value="${(e.employee_code || '').replace(/"/g, '&quot;')}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500"></div>
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Email *</label><input type="email" name="work_email" value="${(e.work_email || '').replace(/"/g, '&quot;')}" required class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500"></div>
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Phone *</label><input type="text" name="phone_number" value="${(e.phone_number || '').replace(/"/g, '&quot;')}" required class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500"></div>
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Role</label><select name="role" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500"><option value="Firm Administrator" ${(e.role||'')==='Firm Administrator'?'selected':''}>Firm Administrator</option><option value="Managing Partner" ${(e.role||'')==='Managing Partner'?'selected':''}>Managing Partner</option><option value="Finance Office" ${(e.role||'')==='Finance Office'?'selected':''}>Finance Office</option><option value="Associate Advocate" ${(e.role||'')==='Associate Advocate'?'selected':''}>Associate Advocate</option><option value="Clerk" ${(e.role||'')==='Clerk'?'selected':''}>Clerk</option><option value="IT Support" ${(e.role||'')==='IT Support'?'selected':''}>IT Support</option><option value="Employee" ${(e.role||'')==='Employee'?'selected':''}>Employee</option></select></div>
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Status</label><select name="status" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500"><option value="Active" ${(e.status||'')==='Active'?'selected':''}>Active</option><option value="Suspended" ${(e.status||'')==='Suspended'?'selected':''}>Suspended</option><option value="Pending Approval" ${(e.status||'')==='Pending Approval'?'selected':''}>Pending Approval</option></select></div>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-gray-200 overflow-hidden bg-gray-50/50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-white/80"><h4 class="font-bold text-gray-900 text-sm flex items-center"><i class="fas fa-money-bill-wave text-green-600 mr-2"></i>Payment & Account</h4></div>
+                    <div class="p-4 space-y-4">
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Payment Method</label><select name="payment_method" onchange="toggleEmpPayrollSections(this)" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500"><option value="">—</option><option value="Bank" ${pm==='Bank'?'selected':''}>Bank</option><option value="Mobile Money" ${pm==='Mobile Money'?'selected':''}>Mobile Money</option></select></div>
+                        <div id="empEdit-bank" class="rounded-lg p-4 bg-blue-50/80 border border-blue-200 ${showBank?'':'hidden'}"><label class="block text-xs font-semibold text-gray-700 mb-1">Bank Name</label><input type="text" name="bank_name" value="${(e.bank_name||'').replace(/"/g,'&quot;')}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"></div>
+                        <div id="empEdit-mobile" class="rounded-lg p-4 bg-purple-50/80 border border-purple-200 ${showMobile?'':'hidden'}"><label class="block text-xs font-semibold text-gray-700 mb-1">Mobile Money Provider</label><input type="text" name="mobile_money_company" value="${(e.mobile_money_company||'').replace(/"/g,'&quot;')}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" placeholder="e.g. M-Pesa"></div>
+                        <div id="empEdit-account" class="rounded-lg p-4 bg-gray-100/80 border border-gray-200 ${showBank||showMobile?'':'hidden'}"><div class="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label class="block text-xs font-semibold text-gray-600 mb-1">Account Name</label><input type="text" name="account_name" value="${(e.account_name||'').replace(/"/g,'&quot;')}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm"></div><div><label class="block text-xs font-semibold text-gray-600 mb-1">Account Number <span id="empEdit-account-label" class="text-gray-500">${showMobile?'(Phone)':''}</span></label><input type="text" name="account_number" value="${(e.account_number||'').replace(/"/g,'&quot;')}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" placeholder="${showMobile?'e.g. 07XXXXXXXX':''}"></div></div></div>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-gray-200 overflow-hidden bg-gray-50/50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-white/80"><h4 class="font-bold text-gray-900 text-sm flex items-center"><i class="fas fa-calendar-alt text-green-600 mr-2"></i>Payroll</h4></div>
+                    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Pay Frequency</label><select name="pay_frequency" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white"><option value="">—</option>${payFreqOpts}</select></div>
+                        <div><label class="block text-xs font-semibold text-gray-600 mb-1">Salary</label><input type="text" name="salary" value="${String(e.salary ?? '').replace(/"/g,'&quot;')}" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm" placeholder="Amount"></div>
+                        <div class="sm:col-span-2 lg:col-span-1"><label class="block text-xs font-semibold text-gray-600 mb-1">Salary Components</label><textarea name="salary_components" rows="2" class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm resize-y">${(e.salary_components||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea></div>
+                    </div>
+                </div>
+                <div class="rounded-xl border border-gray-200 overflow-hidden bg-gray-50/50">
+                    <div class="px-4 py-3 border-b border-gray-200 bg-white/80"><h4 class="font-bold text-gray-900 text-sm flex items-center"><i class="fas fa-file-alt text-green-600 mr-2"></i>Documents</h4></div>
+                    <div class="p-4 space-y-4">
+                        <p class="text-xs text-gray-500">Upload a new file only to replace; leave empty to keep current.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="border border-gray-200 rounded-lg p-3 bg-white"><p class="text-xs font-semibold text-gray-700 mb-1">Employment Contract</p><p class="text-xs text-gray-500 mb-2">Current: ${e.employment_contract ? docLink(e.employment_contract) : '<span class="text-gray-400">None</span>'}</p><input type="file" name="employment_contract" accept=".pdf,.doc,.docx" class="w-full text-xs"></div>
+                            <div class="border border-gray-200 rounded-lg p-3 bg-white"><p class="text-xs font-semibold text-gray-700 mb-1">ID / Passport</p><p class="text-xs text-gray-500 mb-2">Current: ${e.id_front ? docLink(e.id_front) : '<span class="text-gray-400">None</span>'}</p><input type="file" name="id_front" accept="image/*,.pdf" class="w-full text-xs"></div>
+                            <div class="border border-gray-200 rounded-lg p-3 bg-white"><p class="text-xs font-semibold text-gray-700 mb-1">KRA PIN Certificate</p><p class="text-xs text-gray-500 mb-2">Current: ${e.kra_pin_document ? docLink(e.kra_pin_document) : '<span class="text-gray-400">None</span>'}</p><input type="file" name="kra_pin_document" accept="image/*,.pdf,.doc,.docx" class="w-full text-xs"></div>
+                        </div>
+                    </div>
+                </div>
+            </form>`;
+            document.getElementById('editModalFooter').classList.remove('hidden');
+            toggleEmpPayrollSections(document.querySelector('#employeeFullEditForm select[name="payment_method"]'));
+        })
+        .catch(() => {
+            document.getElementById('editModalBody').innerHTML = '<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>Failed to load employee details.</p></div>';
+        });
+}
+function toggleEmpPayrollSections(selectEl) {
+    if (!selectEl) return;
+    const val = (selectEl.value || '').trim();
+    const bank = document.getElementById('empEdit-bank');
+    const mobile = document.getElementById('empEdit-mobile');
+    const account = document.getElementById('empEdit-account');
+    const label = document.getElementById('empEdit-account-label');
+    const accInput = document.querySelector('#employeeFullEditForm input[name="account_number"]');
+    if (bank) bank.classList.toggle('hidden', val !== 'Bank');
+    if (mobile) mobile.classList.toggle('hidden', val !== 'Mobile Money');
+    const showAcc = val === 'Bank' || val === 'Mobile Money';
+    if (account) account.classList.toggle('hidden', !showAcc);
+    if (label) label.textContent = val === 'Mobile Money' ? '(Phone)' : '';
+    if (accInput) accInput.placeholder = val === 'Mobile Money' ? 'e.g. 07XXXXXXXX' : '';
+}
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+    document.getElementById('editModalBody').innerHTML = '';
+    document.getElementById('editModalFooter').classList.add('hidden');
+}
+function submitFullEdit(e) {
+    e.preventDefault();
+    const form = document.getElementById('employeeFullEditForm');
+    if (!form) return false;
+    const fd = new FormData(form);
+    const btn = form.closest('#editModal').querySelector('button[type="submit"]');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...'; }
+    fetch('{{ url_for("update_employee_onboarding") }}', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+            closeEditModal();
+            if (data.success) { showToast('Employee updated successfully', 'success'); loadEmployees(); }
+            else { showToast(data.error || 'Error updating employee', 'error'); }
+        })
+        .catch(() => {
+            if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+            closeEditModal();
+            showToast('An error occurred', 'error');
+        });
+    return false;
+}
+
+/* ---- Suspend ---- */
+function suspendEmployee(id, name) {
+    if (!confirm(`Suspend ${name}? They will lose access until reactivated.`)) return;
+    fetch(`{{ url_for('update_employee_status') }}?id=${id}&status=Suspended`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { showToast(`${name} has been suspended`, 'success'); loadEmployees(); }
+        else { showToast(data.error || 'Error suspending employee', 'error'); }
+    })
+    .catch(() => showToast('An error occurred', 'error'));
+}
+
+/* ---- Toast ---- */
+function showToast(message, type) {
+    const colors = type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    const t = document.createElement('div');
+    t.className = `fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto ${colors} px-5 py-3 rounded-xl shadow-lg z-[9999] flex items-center gap-3 text-sm font-medium animate-slide-up`;
+    t.innerHTML = `<i class="fas ${icon}"></i>${message}`;
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; }, 2500);
+    setTimeout(() => t.remove(), 2900);
+}
+
+/* ---- Close modals ---- */
+document.addEventListener('click', e => {
+    if (e.target === document.getElementById('editModal')) closeEditModal();
+    if (e.target === document.getElementById('detailModal')) closeDetailModal();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        if (!document.getElementById('editModal').classList.contains('hidden')) closeEditModal();
+        if (!document.getElementById('detailModal').classList.contains('hidden')) closeDetailModal();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', loadEmployees);
+</script>
+
+<style>
+@keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.animate-slide-up { animation: slide-up 0.3s ease-out; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
 {% endblock %}
-
-

@@ -27,28 +27,6 @@
                 <p class="text-sm text-gray-500 mb-6">All fields are required</p>
                 
                 <div class="space-y-6">
-                    <!-- Tax PIN - First Field -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="md:col-span-2">
-                            <label for="tax_pin" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Tax PIN <span class="text-red-500">*</span>
-                            </label>
-                            <div class="relative">
-                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <i class="fas fa-id-card text-gray-400"></i>
-                                </div>
-                                <input 
-                                    type="text" 
-                                    id="tax_pin" 
-                                    name="tax_pin" 
-                                    required
-                                    class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
-                                    placeholder="Enter tax PIN"
-                                >
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Payment Method Selection -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="md:col-span-2">
@@ -315,10 +293,10 @@
                         <p class="text-xs text-gray-500 mt-1.5 ml-1">PDF, DOC, DOCX up to 10MB</p>
                     </div>
 
-                    <!-- ID/Passport Front Upload -->
+                    <!-- National ID or Passport (single upload) -->
                     <div>
                         <label for="id_front" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Identification Card / Passport (Front) <span class="text-red-500">*</span>
+                            National ID or Passport <span class="text-red-500">*</span>
                         </label>
                         <div class="flex items-center space-x-4">
                             <div class="flex-1">
@@ -329,46 +307,46 @@
                                     accept="image/*,.pdf"
                                     required
                                     class="hidden"
-                                    onchange="previewIdFile(this, 'front')"
+                                    onchange="previewIdDocument(this)"
                                 >
                                 <label 
                                     for="id_front" 
                                     class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-sm text-gray-600"
                                 >
                                     <i class="fas fa-upload mr-2"></i>
-                                    <span id="id-front-file-name">Choose file or drag and drop</span>
+                                    <span id="id-document-file-name">Choose file or drag and drop</span>
                                 </label>
                             </div>
                         </div>
                         <p class="text-xs text-gray-500 mt-1.5 ml-1">Image (JPG, PNG) or PDF up to 10MB</p>
                     </div>
 
-                    <!-- ID/Passport Back Upload -->
+                    <!-- KRA PIN Upload -->
                     <div>
-                        <label for="id_back" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Identification Card / Passport (Back) <span class="text-red-500">*</span>
+                        <label for="kra_pin_document" class="block text-sm font-semibold text-gray-700 mb-2">
+                            KRA PIN Certificate <span class="text-red-500">*</span>
                         </label>
                         <div class="flex items-center space-x-4">
                             <div class="flex-1">
                                 <input 
                                     type="file" 
-                                    id="id_back" 
-                                    name="id_back" 
-                                    accept="image/*,.pdf"
+                                    id="kra_pin_document" 
+                                    name="kra_pin_document" 
+                                    accept="image/*,.pdf,.doc,.docx"
                                     required
                                     class="hidden"
-                                    onchange="previewIdFile(this, 'back')"
+                                    onchange="previewKraPinFile(this)"
                                 >
                                 <label 
-                                    for="id_back" 
+                                    for="kra_pin_document" 
                                     class="cursor-pointer flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all duration-200 text-sm text-gray-600"
                                 >
                                     <i class="fas fa-upload mr-2"></i>
-                                    <span id="id-back-file-name">Choose file or drag and drop</span>
+                                    <span id="kra-pin-file-name">Choose file or drag and drop</span>
                                 </label>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1.5 ml-1">Image (JPG, PNG) or PDF up to 10MB</p>
+                        <p class="text-xs text-gray-500 mt-1.5 ml-1">Image (JPG, PNG), PDF, DOC or DOCX up to 10MB</p>
                     </div>
 
                 </div>
@@ -397,8 +375,17 @@
         }
     }
 
-    function previewIdFile(input, side) {
-        const fileName = document.getElementById(`id-${side}-file-name`);
+    function previewIdDocument(input) {
+        const fileName = document.getElementById('id-document-file-name');
+        if (input.files && input.files[0]) {
+            fileName.textContent = input.files[0].name;
+        } else {
+            fileName.textContent = 'Choose file or drag and drop';
+        }
+    }
+
+    function previewKraPinFile(input) {
+        const fileName = document.getElementById('kra-pin-file-name');
         if (input.files && input.files[0]) {
             fileName.textContent = input.files[0].name;
         } else {

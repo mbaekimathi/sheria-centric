@@ -129,22 +129,31 @@
                 </div>
             </div>
 
-            <!-- Post Office Address (Required) -->
+            <!-- Physical Address (Required) -->
             <div>
-                <label for="post_office_address" class="block text-sm font-semibold text-gray-700 mb-2">
-                    Post Office Address <span class="text-red-500">*</span>
+                <label for="physical_address" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-map-marker-alt text-indigo-600 mr-1"></i>Physical Address <span class="text-red-500">*</span>
                 </label>
-                <textarea 
-                    id="post_office_address" 
-                    name="post_office_address" 
-                    required
-                    rows="4"
-                    placeholder="P.O. Box 12345, Nairobi"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"
-                ></textarea>
+                <div class="relative">
+                    <input 
+                        type="text"
+                        id="physical_address" 
+                        name="physical_address" 
+                        required
+                        autocomplete="off"
+                        placeholder="Start typing to search for a location..."
+                        class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                    >
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <input type="hidden" name="address_latitude" id="address_latitude">
+                <input type="hidden" name="address_longitude" id="address_longitude">
+                <div id="addressMapPreview" class="mt-3 rounded-xl overflow-hidden border border-gray-200 shadow-sm hidden">
+                    <div id="regMap" style="height: 200px; width: 100%;"></div>
+                </div>
                 <p class="mt-2 text-sm text-gray-500">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Enter the complete post office address for the company
+                    <i class="fab fa-google text-gray-400 mr-1"></i>
+                    Powered by Google Maps — type to search locations
                 </p>
             </div>
 
@@ -276,5 +285,41 @@ function previewProfilePicture(input) {
         reader.readAsDataURL(input.files[0]);
     }
 }
+
+// Google Maps Autocomplete
+let regAutocomplete;
+let regMap;
+let regMarker;
+
+function initRegAutocomplete() {
+    const input = document.getElementById('physical_address');
+    if (!input) return;
+    regAutocomplete = new google.maps.places.Autocomplete(input, {
+        types: ['establishment', 'geocode'],
+        componentRestrictions: { country: 'ke' }
+    });
+    regAutocomplete.addListener('place_changed', function() {
+        const place = regAutocomplete.getPlace();
+        if (place.geometry) {
+            document.getElementById('address_latitude').value = place.geometry.location.lat();
+            document.getElementById('address_longitude').value = place.geometry.location.lng();
+            showRegMap(place.geometry.location.lat(), place.geometry.location.lng());
+        }
+    });
+}
+
+function showRegMap(lat, lng) {
+    const mapDiv = document.getElementById('addressMapPreview');
+    mapDiv.classList.remove('hidden');
+    const pos = { lat: lat, lng: lng };
+    if (!regMap) {
+        regMap = new google.maps.Map(document.getElementById('regMap'), { zoom: 15, center: pos });
+        regMarker = new google.maps.Marker({ position: pos, map: regMap });
+    } else {
+        regMap.setCenter(pos);
+        regMarker.setPosition(pos);
+    }
+}
 </script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOYVcba3oi7_rCjMCAwWn1FyWV4RvovlQ&libraries=places&callback=initRegAutocomplete" async defer></script>
 {% endblock %}

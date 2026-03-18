@@ -15,10 +15,21 @@
                 <p class="text-indigo-100">{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}</p>
             </div>
             <div class="flex items-center space-x-4 mt-4 md:mt-0">
+                {% if is_employee_viewing %}
                 <a href="{{ url_for('client_messages') }}" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 text-white font-semibold">
-                    <i class="fas fa-comments"></i>
-                    <span>Contact Support</span>
+                    <i class="fas fa-paper-plane"></i>
+                    <span>Send Message</span>
                 </a>
+                <a href="{{ url_for('exit_client_view') }}" class="bg-red-500/80 hover:bg-red-600 backdrop-blur-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 text-white font-semibold">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Exit Client View</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('client_messages') }}" class="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 text-white font-semibold">
+                    <i class="fas fa-inbox"></i>
+                    <span>Inbox</span>
+                </a>
+                {% endif %}
                 {% if client.profile_picture %}
                 <div>
                     {% if client.profile_picture.startswith('http') %}

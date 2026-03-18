@@ -332,7 +332,7 @@
                 <div class="flex items-center space-x-3">
                     <!-- Client Login Link (only when not logged in as employee or client) -->
                     {% if not session.get('employee_id') and not session.get('client_id') %}
-                    <a href="{{ url_for('client_login') }}" class="hidden md:flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/50 hover:from-blue-100 hover:to-blue-200 transition-all duration-300 shadow-sm hover:shadow-md group">
+                    <a href="{{ url_for('google_login') }}" class="hidden md:flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/50 hover:from-blue-100 hover:to-blue-200 transition-all duration-300 shadow-sm hover:shadow-md group">
                         <i class="fas fa-user-tie text-blue-600 text-sm icon-hover-effect"></i>
                         <span class="text-sm font-semibold text-blue-700 group-hover:text-blue-800 transition-colors">Client Login</span>
                     </a>
@@ -441,6 +441,7 @@
         {% if messages %}
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-10">
             {% for category, message in messages %}
+            {% if not (category == 'error' and 'permission' in message|lower) %}
             <div class="mb-3 p-4 rounded-xl border-l-4 shadow-lg glass-effect animate-slide-in {% if category == 'error' %}border-red-500 text-red-800{% elif category == 'success' %}border-green-500 text-green-800{% elif category == 'warning' %}border-yellow-500 text-yellow-800{% else %}border-blue-500 text-blue-800{% endif %}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
@@ -460,8 +461,63 @@
                     </button>
                 </div>
             </div>
+            {% endif %}
             {% endfor %}
         </div>
+        <!-- Permission denied modal (modern padlock popup) -->
+        {% set ns = namespace(permission_shown=false) %}
+        {% for category, message in messages %}
+          {% if category == 'error' and 'permission' in message|lower and not ns.permission_shown %}
+            {% set ns.permission_shown = true %}
+        <div id="permission-denied-modal" class="fixed inset-0 z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="permission-modal-title">
+            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" id="permission-modal-backdrop"></div>
+            <div class="relative w-full max-w-md permission-modal-card rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+                <div class="bg-gradient-to-b from-slate-50 to-white px-8 pt-10 pb-8">
+                    <div class="flex justify-center mb-6">
+                        <div class="relative">
+                            <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 flex items-center justify-center shadow-lg shadow-orange-500/30 ring-4 ring-white/80">
+                                <i class="fas fa-lock text-3xl text-white drop-shadow-sm"></i>
+                            </div>
+                            <div class="absolute -inset-1 rounded-2xl bg-gradient-to-br from-amber-400 to-rose-500 opacity-30 blur-xl"></div>
+                        </div>
+                    </div>
+                    <h2 id="permission-modal-title" class="text-xl font-bold text-slate-800 text-center mb-2">Access denied</h2>
+                    <p class="text-slate-600 text-center text-sm leading-relaxed">{{ message }}</p>
+                    <div class="mt-8 flex justify-center">
+                        <button type="button" id="permission-dismiss-btn" class="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2">
+                            Got it
+                        </button>
+                    </div>
+                </div>
+                <div class="h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500"></div>
+            </div>
+        </div>
+        <style>
+            @keyframes permission-in {
+                0% { opacity: 0; transform: scale(0.92) translateY(-8px); }
+                100% { opacity: 1; transform: scale(1) translateY(0); }
+            }
+            #permission-denied-modal .permission-modal-card { animation: permission-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        </style>
+        <script>
+            (function() {
+                var modal = document.getElementById('permission-denied-modal');
+                if (!modal) return;
+                var btn = document.getElementById('permission-dismiss-btn');
+                var backdrop = document.getElementById('permission-modal-backdrop');
+                function closeModal() {
+                    modal.style.transition = 'opacity 0.2s ease';
+                    modal.style.opacity = '0';
+                    modal.style.pointerEvents = 'none';
+                    setTimeout(function() { modal.style.display = 'none'; }, 200);
+                }
+                if (btn) btn.addEventListener('click', closeModal);
+                if (backdrop) backdrop.addEventListener('click', closeModal);
+                modal.style.display = 'flex';
+            })();
+        </script>
+          {% endif %}
+        {% endfor %}
         {% endif %}
     {% endwith %}
 
@@ -553,7 +609,7 @@
                     </a>
                     {% endif %}
                     
-                    <a href="#" class="sidebar-link" id="nav-client-messages">
+                    <a href="{{ url_for('client_messages') }}" class="sidebar-link {% if request.endpoint == 'client_messages' %}active{% endif %}" id="nav-client-messages">
                         <i class="fas fa-comments"></i>
                         <span>Messages</span>
                     </a>
@@ -571,14 +627,18 @@
                     </a>
                     {% else %}
                     <!-- Employee Sidebar Links -->
-                    <!-- Common Links (All Roles) -->
+                    {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
+                    {% set matter_mgmt_pages = ['matter_management', 'case_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'register_matter', 'approve_matters', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
+                    <!-- Common Links (All Roles) - hidden on case_documents / matter_documents so only Case/Matter Actions show -->
+                    {% if request.endpoint not in user_mgmt_pages and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
                     <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}" id="nav-dashboard">
                         <i class="fas fa-home"></i>
                         <span>Dashboard</span>
                     </a>
+                    {% endif %}
                     
-                    <!-- Role Switch Indicator -->
-                    {% if is_role_switched %}
+                    <!-- Role Switch Indicator (hidden on case_documents / matter_documents) -->
+                    {% if is_role_switched and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
                     <div class="px-4 py-2 mt-2 mb-2">
                         <div class="px-3 py-2 bg-orange-100 border border-orange-300 rounded-lg">
                             <p class="text-xs font-semibold text-orange-700 flex items-center">
@@ -589,56 +649,33 @@
                     </div>
                     {% endif %}
                     
-                    <!-- Firm Administrator & Managing Partner Links -->
-                    {% if user_role in ['Firm Administrator', 'Managing Partner'] %}
+                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management and case_management / matter pages) -->
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administration</p>
                     </div>
-                    <a href="#" class="sidebar-link" id="nav-cases">
+                    <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint in ['user_management', 'employee_management', 'client_management', 'individual_client_management', 'corporate_client_management'] %}active{% endif %}" id="nav-user-management">
+                        <i class="fas fa-users-cog"></i>
+                        <span>User Management</span>
+                    </a>
+                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
-                        <span>All Cases</span>
+                        <span>Matter Management</span>
                     </a>
-                    <a href="#" class="sidebar-link" id="nav-team">
-                        <i class="fas fa-users"></i>
-                        <span>Team Management</span>
+                    {% if user_role in ['Firm Administrator', 'Associate Advocate'] %}
+                    <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Register Case</span>
                     </a>
-                    <a href="#" class="sidebar-link" id="nav-reports">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>Reports & Analytics</span>
-                    </a>
-                    <a href="#" class="sidebar-link" id="nav-settings">
-                        <i class="fas fa-cog"></i>
-                        <span>System Settings</span>
+                    <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %}" id="nav-register-matter">
+                        <i class="fas fa-folder-plus"></i>
+                        <span>Register Matter</span>
                     </a>
                     {% endif %}
-                    
-                    <!-- Managing Partner Links -->
-                    {% if user_role == 'Managing Partner' %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit'] %}active{% endif %}" id="nav-case-management">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Management</span>
-                    </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters'] %}active{% endif %}" id="nav-other-matters">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
-                    </a>
-                    {% endif %}
-                    
-                    <!-- Associate Advocate Links -->
-                    {% if user_role == 'Associate Advocate' %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit'] %}active{% endif %}" id="nav-case-management">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Management</span>
-                    </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters'] %}active{% endif %}" id="nav-other-matters">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
+                    {% if user_role == 'Firm Administrator' %}
+                    <a href="{{ url_for('finance_billing') }}" class="sidebar-link {% if request.endpoint == 'finance_billing' %}active{% endif %}" id="nav-finance-billing">
+                        <i class="fas fa-dollar-sign"></i>
+                        <span>Finance &amp; Billing</span>
                     </a>
                     <a href="{{ url_for('calendar') }}" class="sidebar-link {% if request.endpoint == 'calendar' %}active{% endif %}" id="nav-calendar">
                         <i class="fas fa-calendar-alt"></i>
@@ -649,21 +686,128 @@
                         <span>Reminders</span>
                     </a>
                     {% endif %}
-                    
-                    <!-- Clerk Links -->
-                    {% if user_role == 'Clerk' %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administrative</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit'] %}active{% endif %}" id="nav-case-management">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Management</span>
+                    <a href="#" class="sidebar-link" id="nav-reports">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reports & Analytics</span>
                     </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters'] %}active{% endif %}" id="nav-other-matters">
+                    {% endif %}
+
+                    <!-- Matter Management page only: sidebar shows only Litigation Matters + Other Matters -->
+                    {% if request.endpoint == 'matter_management' and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
+                    </div>
+                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-case-management">
+                        <i class="fas fa-gavel"></i>
+                        <span>Litigation Matters</span>
+                    </a>
+                    <a href="{{ url_for('other_matters') }}" class="sidebar-link" id="nav-other-matters">
                         <i class="fas fa-folder-open"></i>
                         <span>Other Matters</span>
                     </a>
-                    <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint in ['user_management', 'employee_management', 'individual_client_management', 'corporate_client_management'] %}active{% endif %}" id="nav-user-management">
+                    {% endif %}
+
+                    <!-- Case Actions: when viewing a specific case (e.g. /case_management/5) -->
+                    {% set current_case_id = request.view_args.get('case_id', 0) %}
+                    {% if current_case_id and request.endpoint in ['case_details', 'case_proceedings', 'case_documents', 'case_edit', 'case_status', 'case_allocate', 'case_reminders', 'case_calendar', 'case_audit_progress'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Actions</p>
+                    </div>
+                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-back-to-cases">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back to Cases</span>
+                    </a>
+                    <a href="{{ url_for('case_details', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_details' %}active{% endif %}" id="nav-case-details">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Case Details</span>
+                    </a>
+                    <a href="{{ url_for('case_proceedings', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_proceedings' %}active{% endif %}" id="nav-case-proceedings">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Update Proceedings</span>
+                    </a>
+                    <a href="{{ url_for('case_documents', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_documents' %}active{% endif %}" id="nav-case-documents">
+                        <i class="fas fa-upload"></i>
+                        <span>Upload Documents</span>
+                    </a>
+                    <a href="{{ url_for('case_edit', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_edit' %}active{% endif %}" id="nav-case-edit">
+                        <i class="fas fa-edit"></i>
+                        <span>Edit Case</span>
+                    </a>
+                    <a href="{{ url_for('case_status', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_status' %}active{% endif %}" id="nav-case-status">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>Change Status</span>
+                    </a>
+                    <a href="{{ url_for('case_allocate', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_allocate' %}active{% endif %}" id="nav-case-allocate">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Change Allocation</span>
+                    </a>
+                    <a href="{{ url_for('case_audit_progress', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_audit_progress' %}active{% endif %}" id="nav-case-audit">
+                        <i class="fas fa-history"></i>
+                        <span>Case Audit Progress</span>
+                    </a>
+                    <a href="{{ url_for('case_calendar', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_calendar' %}active{% endif %}" id="nav-case-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Case Calendar</span>
+                    </a>
+                    <a href="{{ url_for('case_reminders', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_reminders' %}active{% endif %}" id="nav-case-reminders">
+                        <i class="fas fa-bell"></i>
+                        <span>Reminders</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- Managing Partner Links: Litigation Matters + Other Matters (when not on matter pages) -->
+                    {% if user_role == 'Managing Partner' and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
+                    </div>
+                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case'] %}active{% endif %}" id="nav-case-management">
+                        <i class="fas fa-gavel"></i>
+                        <span>Litigation Matters</span>
+                    </a>
+                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'approve_matters', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Other Matters</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Associate Advocate Links: Litigation Matters + Other Matters (when not on matter pages) -->
+                    {% if user_role == 'Associate Advocate' and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
+                    </div>
+                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case'] %}active{% endif %}" id="nav-case-management">
+                        <i class="fas fa-gavel"></i>
+                        <span>Litigation Matters</span>
+                    </a>
+                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'approve_matters', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Other Matters</span>
+                    </a>
+                    {% endif %}
+
+                    {% if user_role == 'Associate Advocate' and request.endpoint not in user_mgmt_pages and request.endpoint != 'matter_documents' %}
+                    <a href="{{ url_for('calendar') }}" class="sidebar-link {% if request.endpoint == 'calendar' %}active{% endif %}" id="nav-calendar">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Calendar</span>
+                    </a>
+                    <a href="{{ url_for('reminders') }}" class="sidebar-link {% if request.endpoint == 'reminders' %}active{% endif %}" id="nav-reminders">
+                        <i class="fas fa-bell"></i>
+                        <span>Reminders</span>
+                    </a>
+                    {% endif %}
+                    
+                    <!-- Clerk Links (hidden on case_documents / matter_documents) -->
+                    {% if user_role == 'Clerk' and request.endpoint not in user_mgmt_pages and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administrative</p>
+                    </div>
+                    {% if request.endpoint not in matter_mgmt_pages %}
+                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Matter Management</span>
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint in ['user_management', 'employee_management', 'client_management', 'individual_client_management', 'corporate_client_management'] %}active{% endif %}" id="nav-user-management">
                         <i class="fas fa-users"></i>
                         <span>User Management</span>
                     </a>
@@ -700,48 +844,35 @@
                     </a>
                     {% endif %}
                     
-                    <!-- Individual Client Management Section Links -->
-                    {% if request.endpoint in ['individual_client_management'] %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Individual Client Management</p>
-                    </div>
-                    <a href="{{ url_for('individual_client_management') }}" class="sidebar-link {% if request.endpoint == 'individual_client_management' %}active{% endif %}" id="nav-individual-client-management">
-                        <i class="fas fa-user"></i>
-                        <span>Individual Client Management</span>
+                    <!-- Client Management Section Links (standalone) -->
+                    {% if request.endpoint in ['individual_client_management', 'corporate_client_management'] %}
+                    <a href="{{ url_for('user_management') }}" class="sidebar-link" id="nav-user-management">
+                        <i class="fas fa-users-cog"></i>
+                        <span>User Management</span>
                     </a>
-                    {% endif %}
-                    
-                    <!-- Corporate Client Management Section Links -->
-                    {% if request.endpoint in ['corporate_client_management'] %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Corporate Client Management</p>
-                    </div>
-                    <a href="{{ url_for('corporate_client_management') }}" class="sidebar-link {% if request.endpoint == 'corporate_client_management' %}active{% endif %}" id="nav-corporate-client-management">
-                        <i class="fas fa-building"></i>
-                        <span>Corporate Client Management</span>
+                    <a href="{{ url_for('employee_management') }}" class="sidebar-link" id="nav-employee-management">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employee Records</span>
+                    </a>
+                    <a href="{{ url_for('client_management') }}" class="sidebar-link active" id="nav-client-management">
+                        <i class="fas fa-user-friends"></i>
+                        <span>Client Management</span>
                     </a>
                     {% endif %}
                     
                     <!-- User Management Section Links -->
-                    {% if request.endpoint in ['user_management'] %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">User Management</p>
-                    </div>
+                    {% if request.endpoint in ['user_management', 'client_management'] %}
                     <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint == 'user_management' %}active{% endif %}" id="nav-user-management">
-                        <i class="fas fa-users"></i>
+                        <i class="fas fa-users-cog"></i>
                         <span>User Management</span>
                     </a>
                     <a href="{{ url_for('employee_management') }}" class="sidebar-link {% if request.endpoint == 'employee_management' %}active{% endif %}" id="nav-employee-management">
                         <i class="fas fa-user-tie"></i>
-                        <span>Employee Management</span>
+                        <span>Employee Records</span>
                     </a>
-                    <a href="{{ url_for('individual_client_management') }}" class="sidebar-link {% if request.endpoint == 'individual_client_management' %}active{% endif %}" id="nav-individual-client-management">
-                        <i class="fas fa-user"></i>
-                        <span>Individual Client Management</span>
-                    </a>
-                    <a href="{{ url_for('corporate_client_management') }}" class="sidebar-link {% if request.endpoint == 'corporate_client_management' %}active{% endif %}" id="nav-corporate-client-management">
-                        <i class="fas fa-building"></i>
-                        <span>Corporate Client Management</span>
+                    <a href="{{ url_for('client_management') }}" class="sidebar-link {% if request.endpoint == 'client_management' %}active{% endif %}" id="nav-client-management">
+                        <i class="fas fa-user-friends"></i>
+                        <span>Client Management</span>
                     </a>
                     {% endif %}
                     
@@ -761,17 +892,13 @@
                     {% endif %}
 
                     <!-- Employee Management Section Links -->
-                    {% if request.endpoint in ['employee_management', 'employee_communications', 'onboarding_approvals', 'hr_roles_permissions', 'leave_availability', 'case_allocation', 'performance_compliance', 'training_certification', 'payroll_expenses', 'audit_offboarding'] %}
+                    {% if request.endpoint in ['employee_management', 'employee_communications', 'onboarding_approvals', 'hr_roles_permissions', 'leave_availability', 'performance_compliance', 'training_certification', 'payroll_expenses', 'audit_offboarding'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Employee Management</p>
                     </div>
                     <a href="{{ url_for('employee_management') }}" class="sidebar-link {% if request.endpoint == 'employee_management' %}active{% endif %}" id="nav-employee-management">
                         <i class="fas fa-user-tie"></i>
-                        <span>Employee Management</span>
-                    </a>
-                    <a href="{{ url_for('employee_communications') }}" class="sidebar-link {% if request.endpoint == 'employee_communications' %}active{% endif %}" id="nav-employee-communications">
-                        <i class="fas fa-comments"></i>
-                        <span>Employee Communications</span>
+                        <span>Employee Records</span>
                     </a>
                     <a href="{{ url_for('onboarding_approvals') }}" class="sidebar-link {% if request.endpoint == 'onboarding_approvals' %}active{% endif %}" id="nav-onboarding-approvals">
                         <i class="fas fa-user-check"></i>
@@ -781,99 +908,35 @@
                         <i class="fas fa-shield-alt"></i>
                         <span>Roles & Permissions</span>
                     </a>
-                    <a href="{{ url_for('leave_availability') }}" class="sidebar-link {% if request.endpoint == 'leave_availability' %}active{% endif %}" id="nav-leave-availability">
-                        <i class="fas fa-calendar-times"></i>
-                        <span>Leave & Availability</span>
+                    <a href="{{ url_for('training_certification') }}" class="sidebar-link {% if request.endpoint == 'training_certification' %}active{% endif %}" id="nav-training-certification">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Employee Training</span>
                     </a>
-                    <a href="{{ url_for('case_allocation') }}" class="sidebar-link {% if request.endpoint == 'case_allocation' %}active{% endif %}" id="nav-case-allocation">
+                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-case-allocation">
                         <i class="fas fa-briefcase"></i>
-                        <span>Case Allocation & Coverage</span>
+                        <span>Matter Allocation & Coverage</span>
+                    </a>
+                    <a href="{{ url_for('employee_communications') }}" class="sidebar-link {% if request.endpoint == 'employee_communications' %}active{% endif %}" id="nav-employee-communications">
+                        <i class="fas fa-comments"></i>
+                        <span>Employee Communications</span>
                     </a>
                     <a href="{{ url_for('performance_compliance') }}" class="sidebar-link {% if request.endpoint == 'performance_compliance' %}active{% endif %}" id="nav-performance-compliance">
                         <i class="fas fa-chart-line"></i>
                         <span>Performance & Compliance</span>
                     </a>
-                    <a href="{{ url_for('training_certification') }}" class="sidebar-link {% if request.endpoint == 'training_certification' %}active{% endif %}" id="nav-training-certification">
-                        <i class="fas fa-graduation-cap"></i>
-                        <span>Training & Certification</span>
-                    </a>
-                    <a href="{{ url_for('payroll_expenses') }}" class="sidebar-link {% if request.endpoint == 'payroll_expenses' %}active{% endif %}" id="nav-payroll-expenses">
-                        <i class="fas fa-dollar-sign"></i>
-                        <span>Payroll & Expenses</span>
+                    <a href="{{ url_for('leave_availability') }}" class="sidebar-link {% if request.endpoint == 'leave_availability' %}active{% endif %}" id="nav-leave-availability">
+                        <i class="fas fa-calendar-times"></i>
+                        <span>Leave & Availability</span>
                     </a>
                     <a href="{{ url_for('audit_offboarding') }}" class="sidebar-link {% if request.endpoint == 'audit_offboarding' %}active{% endif %}" id="nav-audit-offboarding">
                         <i class="fas fa-clipboard-check"></i>
-                        <span>Audit & Offboarding</span>
+                        <span>Offboarding</span>
                     </a>
                     {% endif %}
 
-                    <!-- Case Management Section Links -->
-                    {% if request.endpoint in ['case_management', 'register_case'] %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint == 'case_management' %}active{% endif %}" id="nav-case-management">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Management</span>
-                    </a>
-                    <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Register Case</span>
-                    </a>
-                    {% endif %}
-
-                    <!-- Case Details Section Links -->
-                    {% if request.endpoint in ['case_details', 'case_calendar', 'case_proceedings', 'case_documents', 'case_edit', 'case_status', 'case_allocate', 'case_reminders'] %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Actions</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-back-to-cases">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back to Cases</span>
-                    </a>
-                    {% set current_case_id = request.view_args.get('case_id', 0) %}
-                    <a href="{{ url_for('case_details', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_details' %}active{% endif %}" id="nav-case-details">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Details</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/proceedings" class="sidebar-link {% if request.endpoint == 'case_proceedings' %}active{% endif %}" id="nav-case-proceedings">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Update Case Proceedings</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/documents" class="sidebar-link {% if request.endpoint == 'case_documents' %}active{% endif %}" id="nav-case-documents">
-                        <i class="fas fa-upload"></i>
-                        <span>Upload Documents</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/edit" class="sidebar-link {% if request.endpoint == 'case_edit' %}active{% endif %}" id="nav-case-edit">
-                        <i class="fas fa-edit"></i>
-                        <span>Edit Case Details</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/status" class="sidebar-link {% if request.endpoint == 'case_status' %}active{% endif %}" id="nav-case-status">
-                        <i class="fas fa-exchange-alt"></i>
-                        <span>Change Status</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/allocate" class="sidebar-link {% if request.endpoint == 'case_allocate' %}active{% endif %}" id="nav-case-allocate">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Change Allocation</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/audit" class="sidebar-link {% if request.endpoint == 'case_audit_progress' %}active{% endif %}" id="nav-case-audit">
-                        <i class="fas fa-history"></i>
-                        <span>Case Audit Progress</span>
-                    </a>
-                    {% if request.endpoint != 'case_details' %}
-                    <a href="/case_management/{{ current_case_id }}/calendar" class="sidebar-link {% if request.endpoint == 'case_calendar' %}active{% endif %}" id="nav-case-calendar">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Case Calendar</span>
-                    </a>
-                    <a href="/case_management/{{ current_case_id }}/reminders" class="sidebar-link {% if request.endpoint == 'case_reminders' %}active{% endif %}" id="nav-case-reminders">
-                        <i class="fas fa-bell"></i>
-                        <span>Reminders</span>
-                    </a>
-                    {% endif %}
-                    {% endif %}
 
 
-                    <!-- IT Support Dashboard Links -->
+                    <!-- IT Support Dashboard Links (only on dashboard, not on system_settings) -->
                     {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'dashboard' %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">IT Support</p>
@@ -892,23 +955,16 @@
                         <i class="fas fa-users"></i>
                         <span>User Management</span>
                     </a>
+                    {% if request.endpoint not in matter_mgmt_pages %}
+                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Matter Management</span>
+                    </a>
+                    {% endif %}
                     <a href="{{ url_for('finance_billing') }}" class="sidebar-link" id="nav-finance-billing">
                         <i class="fas fa-dollar-sign"></i>
                         <span>Finance & Billing</span>
                     </a>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-case-management">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Management</span>
-                    </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint == 'other_matters' %}active{% endif %}" id="nav-other-matters">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
-                    </a>
-                    <a href="{{ url_for('document_management') }}" class="sidebar-link" id="nav-document-management">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Document Management</span>
-                    </a>
-                    {% if request.endpoint not in ['document_management', 'view_client_documents', 'view_employee_documents', 'documents_settings'] %}
                     <a href="{{ url_for('calendar') }}" class="sidebar-link {% if request.endpoint == 'calendar' %}active{% endif %}" id="nav-calendar">
                         <i class="fas fa-calendar-alt"></i>
                         <span>Calendar</span>
@@ -918,9 +974,24 @@
                         <span>Reminders</span>
                     </a>
                     {% endif %}
-                    <a href="{{ url_for('communication_messaging') }}" class="sidebar-link" id="nav-communication-messaging">
+                    {% endif %}
+
+                    <!-- System Settings Page: sidebar shows only system setting links -->
+                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint == 'system_settings' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">System Settings</p>
+                    </div>
+                    <a href="{{ url_for('system_settings') }}" class="sidebar-link active" id="nav-system-settings-current">
+                        <i class="fas fa-cog"></i>
+                        <span>System Settings</span>
+                    </a>
+                    <a href="{{ url_for('documents_settings') }}" class="sidebar-link" id="nav-documents-settings">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Documents Settings</span>
+                    </a>
+                    <a href="{{ url_for('communication_settings') }}" class="sidebar-link" id="nav-communication-settings">
                         <i class="fas fa-comments"></i>
-                        <span>Communication & Messaging</span>
+                        <span>Communication Settings</span>
                     </a>
                     <a href="{{ url_for('compliance_audit') }}" class="sidebar-link" id="nav-compliance-audit">
                         <i class="fas fa-clipboard-list"></i>
@@ -942,7 +1013,6 @@
                         <i class="fas fa-heartbeat"></i>
                         <span>System Health Module</span>
                     </a>
-                    {% endif %}
                     {% endif %}
 
                     <!-- Finance & Billing Page Links -->
@@ -1030,6 +1100,7 @@
                         <i class="fas fa-folder-open"></i>
                         <span>Other Matters</span>
                     </a>
+                    {% if user_role not in ['Firm Administrator', 'Managing Partner'] %}
                     <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %}" id="nav-register-matter">
                         <i class="fas fa-plus-circle"></i>
                         <span>Register Matter</span>
@@ -1039,9 +1110,10 @@
                         <span>Approve Matters</span>
                     </a>
                     {% endif %}
+                    {% endif %}
 
                     <!-- Matter Details Section Links -->
-                    {% if request.endpoint in ['matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}
+                    {% if request.endpoint in ['matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Actions</p>
                     </div>
@@ -1053,6 +1125,10 @@
                     <a href="{{ url_for('matter_details', matter_id=current_matter_id) }}" class="sidebar-link {% if request.endpoint == 'matter_details' %}active{% endif %}" id="nav-matter-details">
                         <i class="fas fa-folder-open"></i>
                         <span>Matter Details</span>
+                    </a>
+                    <a href="{{ url_for('matter_documents', matter_id=current_matter_id) }}" class="sidebar-link {% if request.endpoint == 'matter_documents' %}active{% endif %}" id="nav-matter-documents">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Documents</span>
                     </a>
                     <a href="/other_matters/{{ current_matter_id }}/edit" class="sidebar-link {% if request.endpoint == 'matter_edit' %}active{% endif %}" id="nav-matter-edit">
                         <i class="fas fa-edit"></i>
@@ -1202,6 +1278,12 @@
                     <i class="fas fa-tools"></i>
                     <span>My Tools</span>
                 </a>
+                {% if user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or (session.get('original_role') == 'IT Support') %}
+                <a href="{{ url_for('system_settings') }}" class="sidebar-link {% if request.endpoint == 'system_settings' %}active{% endif %}" id="nav-system-settings-footer">
+                    <i class="fas fa-cog"></i>
+                    <span>System Settings</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('logout') }}" class="sidebar-link text-red-600 hover:bg-red-50 hover:text-red-700">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Logout</span>
@@ -1489,22 +1571,22 @@
     </script>
 
     {% if session.get('client_id') %}
-    <!-- Floating Support Button with Notification -->
+    <!-- Floating Message Button -->
     <a href="{{ url_for('client_messages') }}" 
        id="floating-support-btn" 
-       class="fixed bottom-6 right-6 z-50 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-2xl hover:shadow-indigo-500/50 transition-all duration-300 flex items-center justify-center w-16 h-16 group">
-        <i class="fas fa-comments text-2xl"></i>
+       class="fixed bottom-6 right-6 z-50 {{ 'bg-green-600 hover:bg-green-700 hover:shadow-green-500/50' if session.get('original_employee_id') else 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-500/50' }} text-white rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center w-16 h-16 group">
+        <i class="fas {{ 'fa-paper-plane' if session.get('original_employee_id') else 'fa-comments' }} text-2xl"></i>
         <span id="notification-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-2 hidden">
             <span id="notification-count">0</span>
         </span>
         <span class="absolute right-full mr-4 bg-gray-900 text-white text-sm font-semibold px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-            Contact Support
+            {{ 'Send Message' if session.get('original_employee_id') else 'Messages' }}
             <span class="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900"></span>
         </span>
     </a>
 
+    {% if not session.get('original_employee_id') %}
     <script>
-    // Fetch and update unread message count
     function updateUnreadCount() {
         fetch('/api/client/messages/unread-count')
             .then(response => response.json())
@@ -1527,13 +1609,12 @@
             });
     }
 
-    // Update count on page load
     document.addEventListener('DOMContentLoaded', function() {
         updateUnreadCount();
-        // Update every 30 seconds
         setInterval(updateUnreadCount, 30000);
     });
     </script>
+    {% endif %}
     {% endif %}
 </body>
 </html>

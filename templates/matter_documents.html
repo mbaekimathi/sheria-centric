@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Case Documents - {{ case_data.tracking_number }} - SHERIA CENTRIC{% endblock %}
+{% block title %}Matter Documents - {{ matter_data.matter_reference_number }} - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
 <style>
     .doc-page { background: linear-gradient(160deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%); min-height: 100%; }
     .doc-header-card {
-        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #7c3aed 100%);
-        border-radius: 1rem; box-shadow: 0 10px 40px rgba(79, 70, 229, 0.25);
+        background: linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #6366f1 100%);
+        border-radius: 1rem; box-shadow: 0 10px 40px rgba(37, 99, 235, 0.25);
         border-left: 4px solid rgba(255,255,255,0.3);
     }
     .doc-card {
@@ -71,20 +71,19 @@
     <div class="doc-header-card p-5 sm:p-6 mb-6 text-white">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center gap-4">
-                <a href="{{ url_for('case_details', case_id=case_id) }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to case">
+                <a href="{{ url_for('matter_details', matter_id=matter_id) }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to matter">
                     <i class="fas fa-arrow-left"></i>
                 </a>
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-bold mb-1 flex items-center gap-2">
                         <i class="fas fa-folder-open opacity-90"></i>
-                        Case Documents
+                        Matter Documents
                     </h1>
-                    <p class="text-white/90 text-sm sm:text-base">Tracking: <span class="font-semibold">{{ case_data.tracking_number }}</span>{% if case_data.court_case_number %} · {{ case_data.court_case_number }}{% endif %}</p>
+                    <p class="text-white/90 text-sm sm:text-base">Reference: <span class="font-semibold">{{ matter_data.matter_reference_number }}</span>{% if matter_data.matter_title %} · {{ matter_data.matter_title }}{% endif %}</p>
                 </div>
             </div>
-            <!-- Google Drive status (small) -->
             {% if google_drive_connected %}
-            <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-medium sm:self-center shadow-sm" title="Documents stored in this case folder on Google Drive">
+            <span class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-medium sm:self-center shadow-sm" title="Documents stored in this matter folder on Google Drive">
                 <i class="fab fa-google-drive"></i>
                 <span>Drive connected</span>
             </span>
@@ -97,40 +96,39 @@
         </div>
     </div>
 
-    <!-- Case Information Card -->
+    <!-- Matter / Client Information Card -->
     <div class="doc-card p-5 sm:p-6 mb-6">
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
             <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
                 <i class="fas fa-user-tie text-indigo-600 text-xl"></i>
             </div>
             <div class="flex-1 min-w-0">
-                <h2 class="text-lg font-bold text-gray-900 mb-1 truncate">{{ case_data.client_full_name or case_data.client_name or 'N/A' }}</h2>
+                <h2 class="text-lg font-bold text-gray-900 mb-1 truncate">{{ matter_data.client_full_name or matter_data.client_name or 'N/A' }}</h2>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-                    {% if case_data.client_phone %}
-                    <span class="flex items-center gap-1.5"><i class="fas fa-phone text-indigo-500 text-xs"></i>{{ case_data.client_phone }}</span>
+                    {% if matter_data.client_phone_number or matter_data.client_phone %}
+                    <span class="flex items-center gap-1.5"><i class="fas fa-phone text-indigo-500 text-xs"></i>{{ matter_data.client_phone_number or matter_data.client_phone }}</span>
                     {% endif %}
-                    {% if case_data.client_email %}
-                    <span class="flex items-center gap-1.5 truncate"><i class="fas fa-envelope text-indigo-500 text-xs"></i>{{ case_data.client_email }}</span>
+                    {% if matter_data.client_email %}
+                    <span class="flex items-center gap-1.5 truncate"><i class="fas fa-envelope text-indigo-500 text-xs"></i>{{ matter_data.client_email }}</span>
                     {% endif %}
                 </div>
                 <div class="mt-2 flex flex-wrap gap-2">
-                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-semibold">{{ case_data.case_type or 'N/A' }}</span>
-                    {% if case_data.status %}
-                    <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">{{ case_data.status }}</span>
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-semibold">{{ matter_data.matter_category or 'Matter' }}</span>
+                    {% if matter_data.status %}
+                    <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">{{ matter_data.status }}</span>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Google Drive not connected: show full message + link -->
     {% if not google_drive_connected %}
     <div class="doc-alert bg-amber-50 border border-amber-200 p-4 sm:p-5 mb-6">
         <div class="flex items-start gap-3">
             <i class="fas fa-exclamation-triangle text-amber-600 text-xl flex-shrink-0 mt-0.5"></i>
             <div>
                 <p class="font-semibold text-amber-900 mb-1">Google Drive not connected</p>
-                <p class="text-sm text-amber-800 mb-3">Connect Google Drive in Documents Settings to upload and store case documents.</p>
+                <p class="text-sm text-amber-800 mb-3">Connect Google Drive in Documents Settings to upload and store matter documents.</p>
                 <a href="{{ url_for('documents_settings') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-amber-700 hover:text-amber-900">
                     Go to Documents Settings <i class="fas fa-arrow-right text-xs"></i>
                 </a>
@@ -225,8 +223,8 @@
                                     {% elif doc.url %}
                                     <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800 font-semibold text-sm" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                                     {% endif %}
-                                    <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
-                                    <button type="button" class="case-doc-delete inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                                    <a href="{{ url_for('download_matter_document', matter_id=matter_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
+                                    <button type="button" class="matter-doc-delete inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -234,7 +232,6 @@
                     </tbody>
                 </table>
             </div>
-            <!-- Mobile: document cards -->
             <div class="doc-mobile-cards hidden">
                 {% for doc in documents %}
                 {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
@@ -265,8 +262,8 @@
                             {% elif doc.url %}
                             <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                             {% endif %}
-                            <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
-                            <button type="button" class="case-doc-delete inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                            <a href="{{ url_for('download_matter_document', matter_id=matter_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
+                            <button type="button" class="matter-doc-delete inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                         </div>
                     </div>
                 </div>
@@ -276,7 +273,7 @@
             <div class="doc-empty-state text-center py-12 px-4">
                 <i class="fas fa-folder-open text-slate-300 text-5xl mb-4 block"></i>
                 <p class="text-gray-700 font-semibold mb-1">No documents yet</p>
-                <p class="text-gray-500 text-sm">Uploaded files for this case will appear here and in the case folder on Google Drive.</p>
+                <p class="text-gray-500 text-sm">Uploaded files for this matter will appear here and in the matter folder on Google Drive.</p>
             </div>
             {% endif %}
         </div>
@@ -301,7 +298,7 @@
 </div>
 
 <script>
-const caseId = {{ case_id }};
+const matterId = {{ matter_id }};
 const googleDriveConnected = {{ 'true' if google_drive_connected else 'false' }};
 
 function refreshDocuments() {
@@ -332,7 +329,6 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
         return;
     }
     
-    // Show upload modal
     const modal = document.getElementById('uploadModal');
     const progressBar = document.getElementById('uploadProgress');
     const uploadStatus = document.getElementById('uploadStatus');
@@ -350,10 +346,10 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     const formData = new FormData();
     formData.append('document_file', file);
     formData.append('description', description);
-    formData.append('case_id', caseId);
+    formData.append('matter_id', matterId);
     
     try {
-        const response = await fetch(`/api/case/${caseId}/upload-document`, {
+        const response = await fetch(`/api/matter/${matterId}/upload-document`, {
             method: 'POST',
             body: formData
         });
@@ -379,8 +375,6 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
                 uploadBtnText.textContent = 'Upload Document';
                 fileInput.value = '';
                 document.getElementById('document_description').value = '';
-                
-                // Reload page to show new document
                 window.location.reload();
             }, 1500);
         } else {
@@ -415,14 +409,14 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     }
 });
 
-document.querySelectorAll('.case-doc-delete').forEach(function(btn) {
+document.querySelectorAll('.matter-doc-delete').forEach(function(btn) {
     btn.addEventListener('click', async function() {
         var fileId = this.getAttribute('data-file-id');
         var docName = this.getAttribute('data-doc-name') || 'this document';
         if (!fileId || !confirm('Delete "' + docName + '" from Google Drive? This cannot be undone.')) return;
         this.disabled = true;
         try {
-            var res = await fetch('/api/case/' + caseId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
+            var res = await fetch('/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
             var data = await res.json();
             if (data.success) {
                 window.location.reload();
@@ -439,4 +433,3 @@ document.querySelectorAll('.case-doc-delete').forEach(function(btn) {
 });
 </script>
 {% endblock %}
-

@@ -1,382 +1,476 @@
 {% extends "base.html" %}
 
-{% block title %}Messages - SHERIA CENTRIC{% endblock %}
+{% block title %}{% if is_employee_viewing %}Chat with {{ client_info.full_name if client_info else 'Client' }}{% else %}Messages{% endif %} - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 h-screen flex flex-col">
-    <!-- Chat Header (WhatsApp style) -->
-    <div class="bg-indigo-600 text-white rounded-t-2xl shadow-lg px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-            <a href="{{ url_for('client_dashboard') }}" class="text-white hover:text-indigo-200 transition-colors">
-                <i class="fas fa-arrow-left text-xl"></i>
-            </a>
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                    <i class="fas fa-headset text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-semibold">Support Team</h1>
-                    <p class="text-xs text-indigo-100 opacity-75">We're here to help</p>
-                </div>
-            </div>
-        </div>
-        <div class="flex items-center space-x-3">
-            <button onclick="refreshMessages()" class="text-white hover:text-indigo-200 transition-colors p-2">
-                <i class="fas fa-sync-alt"></i>
-            </button>
-        </div>
-    </div>
+<div class="max-w-5xl mx-auto px-2 sm:px-4 py-4" style="height: calc(100vh - 80px);">
+    <div class="bg-white rounded-2xl shadow-xl overflow-hidden flex h-full border border-gray-200">
 
-    <!-- Messages Container (Scrollable) -->
-    <div id="messagesList" class="flex-1 bg-gray-100 overflow-y-auto p-4 space-y-3" style="background-image: url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%239C92AC\" fill-opacity=\"0.03\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');">
-        {% if messages and messages|length > 0 %}
-            {% for msg in messages %}
-            <!-- Message Bubble -->
-            <div class="flex {% if msg.sender_type == 'client' %}justify-end{% else %}justify-start{% endif %}">
-                <div class="flex items-start space-x-2 max-w-[75%] {% if msg.sender_type == 'client' %}flex-row-reverse space-x-reverse{% endif %}">
-                    <!-- Avatar (only for employee messages) -->
-                    {% if msg.sender_type == 'employee' %}
-                    <div class="flex-shrink-0">
-                        {% if msg.employee_profile_picture %}
-                        <img src="/static/uploads/profile_pictures/{{ msg.employee_profile_picture }}" 
-                             alt="{{ msg.employee_name or msg.employee_full_name }}" 
-                             class="w-8 h-8 rounded-full object-cover"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        {% endif %}
-                        <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm {% if msg.employee_profile_picture %}hidden{% endif %}">
-                            {{ (msg.employee_name or msg.employee_full_name or 'S')[0] }}
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Message Bubble -->
-                    <div class="{% if msg.sender_type == 'client' %}bg-indigo-500 text-white{% else %}bg-white text-gray-800 shadow-sm{% endif %} rounded-2xl px-4 py-2 {% if msg.sender_type == 'client' %}rounded-br-md{% else %}rounded-bl-md{% endif %}">
-                        {% if msg.subject and msg.sender_type == 'client' %}
-                        <div class="font-semibold text-sm mb-1 opacity-90">{{ msg.subject }}</div>
-                        {% endif %}
-                        
-                        <!-- Attachment (Image or Document) -->
-                        {% if msg.attachment_file %}
-                        <div class="mb-2">
-                            {% if msg.attachment_type == 'image' %}
-                            <a href="/static/uploads/message_attachments/{{ msg.attachment_file }}" target="_blank" class="block">
-                                <img src="/static/uploads/message_attachments/{{ msg.attachment_file }}" 
-                                     alt="Attachment" 
-                                     class="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                                     style="max-height: 300px;"
-                                     onerror="this.parentElement.innerHTML='<div class=\\'text-xs opacity-75\\'>Image failed to load</div>'">
-                            </a>
-                            {% else %}
-                            <a href="/static/uploads/message_attachments/{{ msg.attachment_file }}" 
-                               target="_blank"
-                               download
-                               class="flex items-center space-x-2 {% if msg.sender_type == 'client' %}text-indigo-100 hover:text-white{% else %}text-indigo-600 hover:text-indigo-800{% endif %} transition-colors p-2 rounded bg-white/10">
-                                <i class="fas fa-file-alt text-lg"></i>
-                                <span class="text-sm font-medium truncate">{{ msg.attachment_file }}</span>
-                                <i class="fas fa-download text-xs"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        
-                        <!-- Message Text -->
-                        {% if msg.message %}
-                        <div class="text-sm whitespace-pre-wrap break-words">{{ msg.message }}</div>
-                        {% endif %}
-                        
-                        <div class="flex items-center justify-end space-x-1 mt-1">
-                            <span class="text-xs {% if msg.sender_type == 'client' %}text-indigo-100{% else %}text-gray-500{% endif %} opacity-75">
-                                {{ msg.created_at.split(' ')[1][:5] if ' ' in msg.created_at else msg.created_at }}
-                            </span>
-                            {% if msg.sender_type == 'client' %}
-                            <i class="fas fa-check text-xs text-indigo-200"></i>
-                            {% endif %}
-                        </div>
-                    </div>
+        <!-- ===================== LEFT: Conversation List ===================== -->
+        <div id="conversationList" class="w-full md:w-[360px] flex-shrink-0 flex flex-col border-r border-gray-200 {% if is_employee_viewing %}hidden md:flex{% endif %}">
+            <!-- List Header -->
+            <div class="bg-indigo-600 text-white px-5 py-4 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center space-x-3">
+                    <a href="{{ url_for('client_dashboard') }}" class="text-white hover:text-indigo-200 transition-colors">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <h1 class="text-lg font-bold">Messages</h1>
                 </div>
+                <span class="bg-white/20 text-xs px-2.5 py-1 rounded-full font-medium">
+                    {% set total_unread = conversations | sum(attribute='unread_count') if conversations else 0 %}
+                    {% if total_unread > 0 %}{{ total_unread }} new{% else %}All read{% endif %}
+                </span>
             </div>
-            {% endfor %}
-        {% else %}
-        <!-- Empty State -->
-        <div class="flex items-center justify-center h-full">
-            <div class="text-center">
-                <div class="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-comments text-gray-400 text-3xl"></i>
-                </div>
-                <p class="text-gray-500 text-lg font-medium mb-2">No messages yet</p>
-                <p class="text-gray-400 text-sm">Start a conversation with our support team</p>
-            </div>
-        </div>
-        {% endif %}
-    </div>
 
-    <!-- Input Area (WhatsApp style - at bottom) -->
-    <div class="bg-white rounded-b-2xl shadow-lg border-t border-gray-200 p-4">
-        <form id="sendMessageForm" enctype="multipart/form-data" class="space-y-2">
-            <!-- Subject (optional) -->
-            <input 
-                type="text" 
-                id="subject" 
-                name="subject" 
-                placeholder="Subject (optional)"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-            >
-            
-            <!-- File Preview -->
-            <div id="filePreview" class="hidden mb-2">
-                <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <div class="flex items-center space-x-3 flex-1 min-w-0">
-                        <i id="filePreviewIcon" class="fas fa-file text-gray-400"></i>
+            <!-- Conversation Items -->
+            <div class="flex-1 overflow-y-auto">
+                {% if conversations and conversations|length > 0 %}
+                    {% for conv in conversations %}
+                    <div class="conv-item flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 {% if conv.unread_count > 0 %}bg-indigo-50/30{% endif %}"
+                         data-employee-id="{{ conv.employee_id }}"
+                         onclick="openConversation({{ conv.employee_id }})">
+                        <!-- Employee Avatar -->
+                        <div class="flex-shrink-0 relative">
+                            {% if conv.employee_profile_picture %}
+                            <img src="/static/uploads/profile_pictures/{{ conv.employee_profile_picture }}" 
+                                 class="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            {% endif %}
+                            <div class="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-sm {% if conv.employee_profile_picture %}hidden{% endif %}">
+                                {{ (conv.employee_name or 'S')[0] | upper }}
+                            </div>
+                        </div>
+                        <!-- Info -->
                         <div class="flex-1 min-w-0">
-                            <p id="filePreviewName" class="text-sm font-medium text-gray-700 truncate"></p>
-                            <p id="filePreviewSize" class="text-xs text-gray-500"></p>
+                            <div class="flex items-center justify-between mb-0.5">
+                                <span class="font-semibold text-sm text-gray-900 truncate">{{ conv.employee_name }}</span>
+                                <span class="text-[11px] text-gray-400 flex-shrink-0 ml-2 whitespace-nowrap {% if conv.unread_count > 0 %}text-indigo-600 font-semibold{% endif %}">
+                                    {% if conv.last_time %}
+                                        {% set parts = conv.last_time.split(' ') %}
+                                        {{ parts[1][:5] if parts|length > 1 else parts[0] }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs text-gray-500 truncate flex-1 mr-2">
+                                    {% if conv.last_sender_type == 'client' %}<span class="text-gray-400">You: </span>{% endif %}
+                                    {% if conv.has_attachment and not conv.last_message %}<i class="fas fa-paperclip mr-1"></i>Attachment{% else %}{{ conv.last_message[:60] }}{% if conv.last_message|length > 60 %}...{% endif %}{% endif %}
+                                </p>
+                                {% if conv.unread_count > 0 %}
+                                <span class="flex-shrink-0 bg-indigo-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                    {{ conv.unread_count }}
+                                </span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-                    <button type="button" onclick="clearFile()" class="text-red-500 hover:text-red-700 ml-2">
-                        <i class="fas fa-times"></i>
+                    {% endfor %}
+                {% else %}
+                    <div class="flex flex-col items-center justify-center h-full py-20 px-6">
+                        <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                            <i class="fas fa-inbox text-gray-300 text-2xl"></i>
+                        </div>
+                        <p class="text-gray-500 font-medium mb-1">No conversations yet</p>
+                        <p class="text-gray-400 text-xs text-center">Messages from your legal team will appear here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ===================== RIGHT: Chat Area ===================== -->
+        <div id="chatPanel" class="flex-1 flex flex-col {% if not is_employee_viewing %}hidden md:flex{% endif %}">
+
+            <!-- Chat Header (placeholder until conversation is selected) -->
+            <div id="chatHeader" class="bg-indigo-600 text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center space-x-3">
+                    <button id="backToListBtn" onclick="backToList()" class="md:hidden text-white hover:text-indigo-200 transition-colors">
+                        <i class="fas fa-arrow-left"></i>
                     </button>
+                    <div id="chatAvatarContainer">
+                        <div id="chatAvatar" class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm"></div>
+                    </div>
+                    <div>
+                        <h2 id="chatName" class="text-sm font-bold leading-tight">Select a conversation</h2>
+                        <p id="chatStatus" class="text-[11px] text-indigo-200"></p>
+                    </div>
                 </div>
+                {% if is_employee_viewing %}
+                <a href="{{ url_for('exit_client_view') }}" class="text-xs bg-red-500/80 hover:bg-red-600 px-3 py-1.5 rounded-full transition-colors font-medium">
+                    <i class="fas fa-sign-out-alt mr-1"></i>Exit View
+                </a>
+                {% endif %}
             </div>
-            
-            <!-- Image Preview -->
-            <div id="imagePreview" class="hidden mb-2">
-                <div class="relative inline-block">
-                    <img id="imagePreviewImg" src="" alt="Preview" class="max-h-32 rounded-lg border border-gray-200">
-                    <button type="button" onclick="clearImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">
-                        <i class="fas fa-times text-xs"></i>
-                    </button>
+
+            <!-- Chat Messages -->
+            <div id="chatArea" class="flex-1 overflow-y-auto px-4 py-4 space-y-1 bg-gray-50" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%239C92AC&quot; fill-opacity=&quot;0.03&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');">
+                <!-- Placeholder when no conversation selected -->
+                <div id="chatPlaceholder" class="flex items-center justify-center h-full">
+                    <div class="text-center">
+                        <div class="w-24 h-24 rounded-full bg-gray-200/50 flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-comments text-gray-300 text-4xl"></i>
+                        </div>
+                        <p class="text-gray-500 font-medium mb-1">Select a conversation</p>
+                        <p class="text-gray-400 text-sm">Choose from the list to view messages</p>
+                    </div>
                 </div>
+                <!-- Messages will be rendered here by JS -->
+                <div id="chatMessages" class="hidden"></div>
             </div>
-            
-            <div class="flex items-end space-x-2">
-                <!-- File/Image Input -->
-                <div class="relative">
-                    <input 
-                        type="file" 
-                        id="attachment" 
-                        name="attachment" 
-                        accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
-                        class="hidden"
-                        onchange="handleFileSelect(this)"
-                    >
-                    <label for="attachment" class="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-3 cursor-pointer transition-colors flex items-center justify-center">
-                        <i class="fas fa-paperclip text-lg"></i>
-                    </label>
-                </div>
-                
-                <!-- Camera Input (mobile) -->
-                <div class="relative">
-                    <input 
-                        type="file" 
-                        id="cameraInput" 
-                        name="cameraInput" 
-                        accept="image/*"
-                        capture="environment"
-                        class="hidden"
-                        onchange="handleFileSelect(this)"
-                    >
-                    <label for="cameraInput" class="bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full p-3 cursor-pointer transition-colors flex items-center justify-center">
-                        <i class="fas fa-camera text-lg"></i>
-                    </label>
-                </div>
-                
-                <!-- Message Input -->
-                <div class="flex-1 relative">
-                    <textarea 
-                        id="message" 
-                        name="message" 
-                        rows="1"
-                        placeholder="Type a message..."
-                        class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none overflow-hidden"
-                        style="min-height: 48px; max-height: 120px;"
-                        oninput="autoResize(this)"
-                    ></textarea>
-                </div>
-                
-                <!-- Send Button -->
-                <button 
-                    type="submit"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-3 transition-colors flex-shrink-0 shadow-lg hover:shadow-xl"
-                    title="Send message"
-                >
-                    <i class="fas fa-paper-plane"></i>
-                </button>
+
+            <!-- Compose Bar -->
+            <div id="composeBar" class="bg-white border-t border-gray-200 px-3 py-3 flex-shrink-0 hidden">
+                <form id="sendMessageForm" enctype="multipart/form-data">
+                    <input type="hidden" id="replyEmployeeId" name="employee_id" value="">
+                    <!-- File/Image preview -->
+                    <div id="filePreview" class="hidden mb-2">
+                        <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <i class="fas fa-file text-gray-400"></i>
+                                <span id="filePreviewName" class="text-xs text-gray-700 font-medium truncate"></span>
+                                <span id="filePreviewSize" class="text-xs text-gray-400"></span>
+                            </div>
+                            <button type="button" onclick="clearFile()" class="text-red-400 hover:text-red-600 ml-2">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="imagePreview" class="hidden mb-2">
+                        <div class="relative inline-block">
+                            <img id="imagePreviewImg" src="" class="max-h-24 rounded-lg border border-gray-200">
+                            <button type="button" onclick="clearFile()" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 text-[10px]">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-end gap-2">
+                        <input type="file" id="attachment" name="attachment" accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar" class="hidden" onchange="handleFileSelect(this)">
+                        <label for="attachment" class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer transition-colors">
+                            <i class="fas fa-paperclip"></i>
+                        </label>
+
+                        <div class="flex-1">
+                            <textarea id="message" name="message" rows="1" placeholder="Type a message..."
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none overflow-hidden text-sm"
+                                style="min-height: 42px; max-height: 120px;"
+                                oninput="autoResize(this)"
+                                onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); document.getElementById('sendMessageForm').dispatchEvent(new Event('submit'));}"
+                            ></textarea>
+                        </div>
+
+                        {% if is_employee_viewing %}
+                        <label class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full cursor-pointer" title="Also send via WhatsApp">
+                            <input type="checkbox" id="send_whatsapp" name="send_whatsapp" value="1" checked class="hidden peer">
+                            <i class="fab fa-whatsapp text-lg text-green-500 opacity-40 peer-checked:opacity-100 transition-all"></i>
+                        </label>
+                        {% endif %}
+
+                        <button type="submit" id="sendBtn" class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg transition-colors">
+                            <i class="fas fa-paper-plane text-sm"></i>
+                        </button>
+                    </div>
+                </form>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
 <style>
-#messagesList {
-    scrollbar-width: thin;
-    scrollbar-color: #cbd5e0 transparent;
-}
-
-#messagesList::-webkit-scrollbar {
-    width: 6px;
-}
-
-#messagesList::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#messagesList::-webkit-scrollbar-thumb {
-    background-color: #cbd5e0;
-    border-radius: 3px;
-}
-
-#messagesList::-webkit-scrollbar-thumb:hover {
-    background-color: #a0aec0;
-}
+#chatArea { scrollbar-width: thin; scrollbar-color: #cbd5e0 transparent; }
+#chatArea::-webkit-scrollbar { width: 5px; }
+#chatArea::-webkit-scrollbar-track { background: transparent; }
+#chatArea::-webkit-scrollbar-thumb { background-color: #cbd5e0; border-radius: 3px; }
+.conv-item.active { background-color: rgb(238 242 255); }
+.conv-item.active:hover { background-color: rgb(238 242 255); }
 </style>
 
 <script>
+const allMessages = {{ messages | tojson }};
+const conversationsData = {{ conversations | tojson }};
+const isEmployeeViewing = {{ 'true' if is_employee_viewing else 'false' }};
+const clientName = {{ (client_info.full_name if client_info else 'Client') | tojson }};
+let currentEmployeeId = null;
 let selectedFile = null;
-let selectedImageData = null;
 
-// Auto-resize textarea
-function autoResize(textarea) {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+function getMessagesForEmployee(employeeId) {
+    return allMessages.filter(m => m.employee_id == employeeId);
 }
 
-// Handle file selection
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function renderMessages(msgs) {
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '';
+    let lastDate = '';
+
+    msgs.forEach(msg => {
+        const msgDate = msg.created_at ? msg.created_at.split(' ')[0] : '';
+        if (msgDate && msgDate !== lastDate) {
+            lastDate = msgDate;
+            container.innerHTML += `<div class="flex justify-center my-3">
+                <span class="bg-white/80 backdrop-blur text-xs text-gray-500 px-3 py-1 rounded-full shadow-sm font-medium">${escapeHtml(msgDate)}</span>
+            </div>`;
+        }
+
+        const isMe = (msg.sender_type === 'client' && !isEmployeeViewing) || (msg.sender_type === 'employee' && isEmployeeViewing);
+        const alignClass = isMe ? 'justify-end' : 'justify-start';
+        const bubbleClass = isMe
+            ? 'bg-indigo-500 text-white rounded-2xl rounded-br-md'
+            : 'bg-white text-gray-800 shadow-sm rounded-2xl rounded-bl-md';
+        const timeClass = isMe ? 'text-indigo-200' : 'text-gray-400';
+        const waIconClass = isMe ? 'text-indigo-200' : 'text-green-500';
+
+        let senderLabel = '';
+        if (!isMe) {
+            if (msg.sender_type === 'employee') senderLabel = escapeHtml(msg.employee_name || 'Staff');
+            else senderLabel = isEmployeeViewing ? escapeHtml(clientName) : '';
+        }
+
+        let attachmentHtml = '';
+        if (msg.attachment_file) {
+            if (msg.attachment_type === 'image') {
+                attachmentHtml = `<div class="mb-1.5">
+                    <a href="/static/uploads/message_attachments/${msg.attachment_file}" target="_blank">
+                        <img src="/static/uploads/message_attachments/${msg.attachment_file}" class="max-w-full rounded-lg max-h-48 cursor-pointer hover:opacity-90 transition-opacity">
+                    </a>
+                </div>`;
+            } else {
+                const fileBg = isMe ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200';
+                attachmentHtml = `<div class="mb-1.5">
+                    <a href="/static/uploads/message_attachments/${msg.attachment_file}" target="_blank" download
+                       class="flex items-center gap-2 p-2 rounded-lg ${fileBg} transition-colors text-xs font-medium">
+                        <i class="fas fa-file-alt"></i>
+                        <span class="truncate">${escapeHtml(msg.attachment_file)}</span>
+                        <i class="fas fa-download text-[10px] opacity-60"></i>
+                    </a>
+                </div>`;
+            }
+        }
+
+        let messageHtml = '';
+        if (msg.message) {
+            messageHtml = `<p class="text-sm whitespace-pre-wrap break-words leading-relaxed">${escapeHtml(msg.message)}</p>`;
+        }
+
+        const timeStr = msg.created_at && msg.created_at.includes(' ') ? msg.created_at.split(' ')[1].substring(0, 5) : '';
+
+        let waIcon = '';
+        if (msg.delivery_channel === 'whatsapp') {
+            waIcon = `<i class="fab fa-whatsapp text-[10px] ${waIconClass}"></i>`;
+        }
+
+        let statusIcon = '';
+        if (isMe) {
+            if (msg.delivery_channel === 'whatsapp') {
+                if (msg.whatsapp_status === 'read') statusIcon = '<i class="fas fa-check-double text-[10px] text-blue-300"></i>';
+                else if (msg.whatsapp_status === 'delivered') statusIcon = '<i class="fas fa-check-double text-[10px] text-indigo-200"></i>';
+                else if (msg.whatsapp_status === 'sent') statusIcon = '<i class="fas fa-check text-[10px] text-indigo-200"></i>';
+                else if (msg.whatsapp_status === 'failed') statusIcon = '<i class="fas fa-exclamation-circle text-[10px] text-red-300"></i>';
+                else statusIcon = '<i class="fas fa-check text-[10px] text-indigo-200"></i>';
+            } else {
+                statusIcon = '<i class="fas fa-check text-[10px] text-indigo-200"></i>';
+            }
+        }
+
+        const justifyTime = isMe ? 'justify-end' : 'justify-start';
+
+        container.innerHTML += `
+        <div class="flex ${alignClass} mb-1">
+            <div class="max-w-[80%] sm:max-w-[70%]">
+                ${senderLabel ? `<p class="text-xs text-gray-500 mb-0.5 ml-1 font-medium">${senderLabel}</p>` : ''}
+                <div class="${bubbleClass} px-3.5 py-2 relative">
+                    ${attachmentHtml}
+                    ${messageHtml}
+                    <div class="flex items-center ${justifyTime} gap-1 mt-1 -mb-0.5">
+                        ${waIcon}
+                        <span class="text-[10px] ${timeClass}">${timeStr}</span>
+                        ${statusIcon}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    });
+
+    container.classList.remove('hidden');
+    document.getElementById('chatPlaceholder').classList.add('hidden');
+
+    const chatArea = document.getElementById('chatArea');
+    chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function openConversation(employeeId) {
+    currentEmployeeId = employeeId;
+    document.getElementById('replyEmployeeId').value = employeeId;
+
+    // Highlight active conversation
+    document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+    const activeItem = document.querySelector(`.conv-item[data-employee-id="${employeeId}"]`);
+    if (activeItem) activeItem.classList.add('active');
+
+    // Update chat header
+    const conv = conversationsData.find(c => c.employee_id == employeeId);
+    if (conv) {
+        document.getElementById('chatName').textContent = conv.employee_name;
+        document.getElementById('chatStatus').textContent = conv.total_count + ' message' + (conv.total_count !== 1 ? 's' : '');
+        const avatarEl = document.getElementById('chatAvatar');
+        if (conv.employee_profile_picture) {
+            document.getElementById('chatAvatarContainer').innerHTML = `
+                <img src="/static/uploads/profile_pictures/${conv.employee_profile_picture}" 
+                     class="w-9 h-9 rounded-full object-cover border-2 border-white/30"
+                     onerror="this.outerHTML='<div id=\\'chatAvatar\\' class=\\'w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm\\'>${conv.employee_name[0].toUpperCase()}</div>'">`;
+        } else {
+            document.getElementById('chatAvatarContainer').innerHTML = `
+                <div id="chatAvatar" class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">${conv.employee_name[0].toUpperCase()}</div>`;
+        }
+
+        // Clear unread badge
+        if (activeItem) {
+            const badge = activeItem.querySelector('.bg-indigo-600.rounded-full');
+            if (badge) badge.remove();
+            activeItem.classList.remove('bg-indigo-50/30');
+        }
+    }
+
+    // Render messages
+    const msgs = getMessagesForEmployee(employeeId);
+    renderMessages(msgs);
+
+    // Show compose bar
+    document.getElementById('composeBar').classList.remove('hidden');
+
+    // Mobile: show chat, hide list
+    document.getElementById('conversationList').classList.add('hidden');
+    document.getElementById('conversationList').classList.remove('flex');
+    document.getElementById('chatPanel').classList.remove('hidden');
+    document.getElementById('chatPanel').classList.add('flex');
+
+    // Mark unread as read (client side)
+    if (!isEmployeeViewing) {
+        msgs.forEach(msg => {
+            if (msg.sender_type === 'employee' && !msg.is_read) {
+                fetch('/api/client/messages/' + msg.id + '/read', { method: 'POST' }).catch(() => {});
+                msg.is_read = 1;
+            }
+        });
+    }
+
+    // Focus input
+    setTimeout(() => document.getElementById('message').focus(), 100);
+}
+
+function backToList() {
+    currentEmployeeId = null;
+    document.getElementById('conversationList').classList.remove('hidden');
+    document.getElementById('conversationList').classList.add('flex');
+    document.getElementById('chatPanel').classList.add('hidden');
+    document.getElementById('chatPanel').classList.remove('flex');
+    document.getElementById('chatMessages').classList.add('hidden');
+    document.getElementById('chatMessages').innerHTML = '';
+    document.getElementById('chatPlaceholder').classList.remove('hidden');
+    document.getElementById('composeBar').classList.add('hidden');
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
 function handleFileSelect(input) {
     const file = input.files[0];
     if (!file) return;
-    
     selectedFile = file;
-    
-    // Check if it's an image
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = function(e) {
-            selectedImageData = e.target.result;
+        reader.onload = e => {
             document.getElementById('imagePreviewImg').src = e.target.result;
             document.getElementById('imagePreview').classList.remove('hidden');
             document.getElementById('filePreview').classList.add('hidden');
         };
         reader.readAsDataURL(file);
     } else {
-        // Document file
         document.getElementById('filePreviewName').textContent = file.name;
-        document.getElementById('filePreviewSize').textContent = formatFileSize(file.size);
-        document.getElementById('filePreviewIcon').className = getFileIcon(file.name);
+        const sizes = ['B', 'KB', 'MB'];
+        let s = file.size, i = 0;
+        while (s >= 1024 && i < 2) { s /= 1024; i++; }
+        document.getElementById('filePreviewSize').textContent = Math.round(s * 10) / 10 + ' ' + sizes[i];
         document.getElementById('filePreview').classList.remove('hidden');
         document.getElementById('imagePreview').classList.add('hidden');
     }
-}
-
-function getFileIcon(filename) {
-    const ext = filename.split('.').pop().toLowerCase();
-    const icons = {
-        'pdf': 'fas fa-file-pdf text-red-500',
-        'doc': 'fas fa-file-word text-blue-500',
-        'docx': 'fas fa-file-word text-blue-500',
-        'txt': 'fas fa-file-alt text-gray-500',
-        'zip': 'fas fa-file-archive text-yellow-500',
-        'rar': 'fas fa-file-archive text-yellow-500'
-    };
-    return icons[ext] || 'fas fa-file text-gray-400';
-}
-
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
 function clearFile() {
     selectedFile = null;
     document.getElementById('attachment').value = '';
     document.getElementById('filePreview').classList.add('hidden');
-}
-
-function clearImage() {
-    selectedFile = null;
-    selectedImageData = null;
-    document.getElementById('cameraInput').value = '';
     document.getElementById('imagePreview').classList.add('hidden');
 }
 
-// Scroll to bottom on load
-function scrollToBottom() {
-    const messagesList = document.getElementById('messagesList');
-    if (messagesList) {
-        messagesList.scrollTop = messagesList.scrollHeight;
-    }
-}
-
-// Refresh messages
-function refreshMessages() {
-    window.location.reload();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    scrollToBottom();
-    
-    // Auto-resize on input
-    const messageTextarea = document.getElementById('message');
-    if (messageTextarea) {
-        messageTextarea.addEventListener('input', function() {
-            autoResize(this);
-        });
-    }
-});
-
+// Send message
 document.getElementById('sendMessageForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
-    const subject = document.getElementById('subject').value.trim();
     const message = document.getElementById('message').value.trim();
-    
-    if (!message && !selectedFile) {
-        alert('Please enter a message or attach a file');
-        return;
-    }
-    
-    // Disable submit button
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalHTML = submitBtn.innerHTML;
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    
-    // Create FormData for file upload
+    if ((!message && !selectedFile) || !currentEmployeeId) return;
+
+    const sendBtn = document.getElementById('sendBtn');
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-sm"></i>';
+
     const formData = new FormData();
-    formData.append('subject', subject || 'Message');
+    formData.append('subject', 'Message');
     formData.append('message', message || '');
-    if (selectedFile) {
-        formData.append('attachment', selectedFile);
-    }
-    
-    fetch('/api/client/messages/send', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Clear form
-            document.getElementById('subject').value = '';
-            document.getElementById('message').value = '';
-            clearFile();
-            clearImage();
-            autoResize(document.getElementById('message'));
-            // Reload page to show new message
-            window.location.reload();
-        } else {
-            alert(data.error || 'Error sending message');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalHTML;
+    formData.append('employee_id', currentEmployeeId);
+    const waCheck = document.getElementById('send_whatsapp');
+    formData.append('send_whatsapp', waCheck && waCheck.checked ? '1' : '0');
+    if (selectedFile) formData.append('attachment', selectedFile);
+
+    fetch('/api/client/messages/send', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                if (data.whatsapp_error) console.warn('WhatsApp:', data.whatsapp_error);
+                window.location.reload();
+            } else {
+                alert(data.error || 'Error sending message');
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane text-sm"></i>';
+            }
+        })
+        .catch(() => {
+            alert('An error occurred while sending.');
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane text-sm"></i>';
+        });
+});
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    // If employee is viewing, auto-open the single chat
+    if (isEmployeeViewing) {
+        // Employee view: show chat directly with all messages
+        const allMsgs = allMessages;
+        if (allMsgs.length > 0) {
+            document.getElementById('chatName').textContent = clientName;
+            document.getElementById('chatStatus').textContent = allMsgs.length + ' message' + (allMsgs.length !== 1 ? 's' : '');
+            const initial = clientName ? clientName[0].toUpperCase() : 'C';
+            document.getElementById('chatAvatarContainer').innerHTML = `
+                <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">${initial}</div>`;
+            renderMessages(allMsgs);
+            document.getElementById('composeBar').classList.remove('hidden');
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while sending the message.');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalHTML;
+    }
+    // If client view and only one conversation, auto-open it
+    else if (conversationsData.length === 1) {
+        openConversation(conversationsData[0].employee_id);
+    }
+    // Handle browser back on mobile
+    window.addEventListener('popstate', function() {
+        if (currentEmployeeId && window.innerWidth < 768) {
+            backToList();
+        }
     });
 });
 </script>

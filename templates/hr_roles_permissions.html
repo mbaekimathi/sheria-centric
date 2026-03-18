@@ -3,18 +3,82 @@
 {% block title %}HR Roles & Permissions - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-            <i class="fas fa-shield-alt text-green-600 mr-3"></i>
-            HR Roles & Permissions
-        </h1>
-        <p class="text-gray-600">Configure HR-specific roles and permissions</p>
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 mb-4 flex items-center">
+        <i class="fas fa-users-cog text-sky-600 mr-3"></i>
+        HR Roles & Employees
+    </h1>
+
+    {% if roles_with_employees and roles_with_employees|length > 0 %}
+    <div class="bg-white rounded-2xl border border-slate-100 shadow-sm divide-y divide-slate-100">
+        {% for role in roles_with_employees %}
+        <div class="p-4 sm:p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm sm:text-base font-semibold text-slate-900">
+                    {{ role.role_name }}
+                </h2>
+                <span class="text-[11px] font-medium text-slate-500">
+                    {{ role.total_count }} employees{% if role.active_count is defined %}, {{ role.active_count }} active{% endif %}
+                </span>
+            </div>
+
+            {% if role.employees and role.employees|length > 0 %}
+            <ul class="space-y-1.5">
+                {% for emp in role.employees %}
+                <li>
+                    <a href="{{ url_for('employee_permissions') }}?employee_id={{ emp.id }}" class="flex items-center justify-between gap-3 rounded-xl px-3 py-2 hover:bg-slate-50 transition-colors">
+                        <div class="flex items-center gap-3 min-w-0">
+                            {% if emp.profile_picture %}
+                                {% if emp.profile_picture.startswith('http') %}
+                                <img src="{{ emp.profile_picture }}" alt="{{ emp.full_name }}" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                                {% else %}
+                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' ~ emp.profile_picture) }}" alt="{{ emp.full_name }}" class="w-8 h-8 rounded-full object-cover border border-slate-200">
+                                {% endif %}
+                            {% else %}
+                            <div class="w-8 h-8 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center text-xs font-semibold">
+                                {{ emp.full_name[:2] if emp.full_name else '?' }}
+                            </div>
+                            {% endif %}
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-slate-900 truncate">
+                                    {{ emp.full_name }}
+                                    {% if emp.employee_code %}
+                                    <span class="text-[11px] text-slate-500">({{ emp.employee_code }})</span>
+                                    {% endif %}
+                                </p>
+                                <p class="text-[11px] text-slate-500 truncate">
+                                    {{ emp.phone_number or 'No phone' }} · {{ emp.work_email or 'No email' }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-1">
+                            {% if emp.status %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold
+                                {% if emp.status|lower == 'active' %}
+                                    bg-emerald-50 text-emerald-700 border border-emerald-100
+                                {% else %}
+                                    bg-amber-50 text-amber-700 border border-amber-100
+                                {% endif %}">
+                                {{ emp.status }}
+                            </span>
+                            {% endif %}
+                            <span class="hidden sm:inline text-[10px] text-sky-500 font-medium">
+                                Open permissions
+                            </span>
+                        </div>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-xs text-slate-500 italic">No employees assigned.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
     </div>
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-        <i class="fas fa-shield-alt text-gray-400 text-5xl mb-4"></i>
-        <p class="text-gray-600">Feature coming soon</p>
-    </div>
+    {% else %}
+    <p class="text-sm text-slate-600">No roles or employees found.</p>
+    {% endif %}
 </div>
 {% endblock %}
 

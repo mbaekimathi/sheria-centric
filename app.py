@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, send_file
 import pymysql
 import os
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 import hashlib
+import uuid
 from PIL import Image, ImageEnhance, ImageFilter
 import base64
 from io import BytesIO
@@ -14,7 +15,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from googleapiclient import http as googleapiclient_http
 import json
 import requests
@@ -63,12 +64,11 @@ def get_google_drive_redirect_uri():
 # Configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pictures'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'doc', 'docx'}
+ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'}
 ALLOWED_ID_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Allow insecure transport for OAuth only in development
@@ -438,12 +438,56 @@ def create_company_settings_table():
                 # Check and add missing columns
                 columns_to_check = [
                     ('company_name', "VARCHAR(255) NOT NULL DEFAULT 'BAUNI LAW GROUP'"),
+                    ('company_logo', 'VARCHAR(500)'),
+                    ('company_tagline', 'VARCHAR(500)'),
+                    ('registration_number', 'VARCHAR(100)'),
+                    ('tax_pin_vat_number', 'VARCHAR(50)'),
+                    ('year_established', 'VARCHAR(10)'),
                     ('email', 'VARCHAR(255)'),
                     ('contact_number', 'VARCHAR(20)'),
                     ('whatsapp_number', 'VARCHAR(20)'),
-                    ('tiktok_link', 'VARCHAR(500)'),
-                    ('instagram_link', 'VARCHAR(500)'),
+                    ('alternative_phone', 'VARCHAR(20)'),
+                    ('customer_support_email', 'VARCHAR(255)'),
+                    ('country', 'VARCHAR(100)'),
+                    ('county_state', 'VARCHAR(100)'),
+                    ('city_town', 'VARCHAR(100)'),
+                    ('street_building', 'VARCHAR(255)'),
+                    ('office_number_floor', 'VARCHAR(50)'),
+                    ('postal_address', 'VARCHAR(255)'),
+                    ('postal_code', 'VARCHAR(20)'),
+                    ('opening_time', 'VARCHAR(20)'),
+                    ('closing_time', 'VARCHAR(20)'),
+                    ('working_days', 'VARCHAR(100)'),
+                    ('public_holiday_status', 'VARCHAR(255)'),
+                    ('public_holiday_open_time', 'VARCHAR(20)'),
+                    ('public_holiday_close_time', 'VARCHAR(20)'),
+                    ('website_url', 'VARCHAR(500)'),
                     ('fb_link', 'VARCHAR(500)'),
+                    ('linkedin_link', 'VARCHAR(500)'),
+                    ('twitter_link', 'VARCHAR(500)'),
+                    ('instagram_link', 'VARCHAR(500)'),
+                    ('tiktok_link', 'VARCHAR(500)'),
+                    ('law_society_reg_number', 'VARCHAR(100)'),
+                    ('practicing_certificate_number', 'VARCHAR(100)'),
+                    ('lead_advocate_name', 'VARCHAR(255)'),
+                    ('bar_association_membership', 'VARCHAR(255)'),
+                    ('default_letterhead', 'VARCHAR(500)'),
+                    ('document_footer_text', 'TEXT'),
+                    ('stamp_seal_upload', 'VARCHAR(500)'),
+                    ('default_signature_documents', 'VARCHAR(500)'),
+                    ('currency', 'VARCHAR(10)'),
+                    ('invoice_prefix', 'VARCHAR(20)'),
+                    ('payment_terms', 'VARCHAR(100)'),
+                    ('bank_account_details', 'TEXT'),
+                    ('mobile_payment_mpesa', 'VARCHAR(255)'),
+                    ('send_email_notifications', 'TINYINT(1) DEFAULT 1'),
+                    ('send_sms_notifications', 'TINYINT(1) DEFAULT 0'),
+                    ('whatsapp_notifications', 'TINYINT(1) DEFAULT 0'),
+                    ('court_date_reminders', 'TINYINT(1) DEFAULT 1'),
+                    ('primary_brand_color', 'VARCHAR(20)'),
+                    ('secondary_color', 'VARCHAR(20)'),
+                    ('favicon', 'VARCHAR(500)'),
+                    ('login_page_background', 'VARCHAR(500)'),
                     ('location_name', 'VARCHAR(255)'),
                     ('longitude', 'DECIMAL(10, 8)'),
                     ('latitude', 'DECIMAL(10, 8)'),
@@ -569,6 +613,43 @@ def create_employees_table():
         if connection:
             connection.close()
 
+
+def create_employee_permissions_table():
+    """Create table for per-employee fine-grained permissions."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+
+        with connection.cursor() as cursor:
+            if not table_exists('employee_permissions'):
+                cursor.execute("""
+                    CREATE TABLE employee_permissions (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        employee_id INT NOT NULL,
+                        permission_key VARCHAR(100) NOT NULL,
+                        allowed BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        UNIQUE KEY uniq_employee_permission (employee_id, permission_key),
+                        CONSTRAINT fk_employee_permissions_employee
+                            FOREIGN KEY (employee_id) REFERENCES employees(id)
+                            ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] employee_permissions table created")
+            else:
+                print("[OK] employee_permissions table already exists")
+
+        return True
+    except Exception as e:
+        print(f"Error creating/updating employee_permissions table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
 def create_clients_table():
     """Create clients table for Google OAuth authenticated clients"""
     try:
@@ -634,7 +715,7 @@ def create_clients_table():
                     except Exception as e:
                         print(f"[WARNING] Could not add id_back column: {e}")
                 
-                # Add columns for Corporate client requirements (CR-12 and post office address)
+                # Add columns for Corporate client requirements (CR-12 and physical address)
                 if not column_exists('clients', 'cr12_certificate'):
                     try:
                         cursor.execute("ALTER TABLE clients ADD COLUMN cr12_certificate VARCHAR(500)")
@@ -643,13 +724,76 @@ def create_clients_table():
                     except Exception as e:
                         print(f"[WARNING] Could not add cr12_certificate column: {e}")
                 
-                if not column_exists('clients', 'post_office_address'):
+                if column_exists('clients', 'post_office_address'):
                     try:
-                        cursor.execute("ALTER TABLE clients ADD COLUMN post_office_address TEXT")
+                        cursor.execute("ALTER TABLE clients CHANGE COLUMN post_office_address physical_address TEXT")
                         connection.commit()
-                        print("[OK] Added post_office_address column to clients table")
+                        print("[OK] Renamed post_office_address to physical_address in clients table")
                     except Exception as e:
-                        print(f"[WARNING] Could not add post_office_address column: {e}")
+                        print(f"[WARNING] Could not rename post_office_address column: {e}")
+                elif not column_exists('clients', 'physical_address'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN physical_address TEXT")
+                        connection.commit()
+                        print("[OK] Added physical_address column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add physical_address column: {e}")
+
+                if not column_exists('clients', 'national_id'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN national_id VARCHAR(50)")
+                        connection.commit()
+                        print("[OK] Added national_id column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add national_id column: {e}")
+
+                if not column_exists('clients', 'kra_pin'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN kra_pin VARCHAR(50)")
+                        connection.commit()
+                        print("[OK] Added kra_pin column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add kra_pin column: {e}")
+
+                if not column_exists('clients', 'client_address'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN client_address TEXT")
+                        connection.commit()
+                        print("[OK] Added client_address column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add client_address column: {e}")
+
+                if not column_exists('clients', 'address_latitude'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN address_latitude DECIMAL(10, 8)")
+                        connection.commit()
+                        print("[OK] Added address_latitude column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add address_latitude column: {e}")
+
+                if not column_exists('clients', 'address_longitude'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN address_longitude DECIMAL(11, 8)")
+                        connection.commit()
+                        print("[OK] Added address_longitude column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add address_longitude column: {e}")
+
+                if not column_exists('clients', 'instruction_note'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN instruction_note VARCHAR(500)")
+                        connection.commit()
+                        print("[OK] Added instruction_note column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add instruction_note column: {e}")
+
+                if not column_exists('clients', 'corporate_kra_pin'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN corporate_kra_pin VARCHAR(500)")
+                        connection.commit()
+                        print("[OK] Added corporate_kra_pin column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add corporate_kra_pin column: {e}")
             return True
     except Exception as e:
         print(f"Error creating/updating clients table: {e}")
@@ -657,6 +801,38 @@ def create_clients_table():
     finally:
         if connection:
             connection.close()
+
+def create_client_personal_documents_table():
+    """Create table for client personal/registration document uploads"""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('client_personal_documents'):
+                cursor.execute("""
+                    CREATE TABLE client_personal_documents (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        client_id INT NOT NULL,
+                        document_type VARCHAR(255) NOT NULL,
+                        filename VARCHAR(500) NOT NULL,
+                        original_filename VARCHAR(500),
+                        file_size INT DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] Created client_personal_documents table")
+        return True
+    except Exception as e:
+        print(f"Error creating client_personal_documents table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
 
 def create_case_tables():
     """Create tables for case management: cases, case_types, case_categories, stations"""
@@ -843,6 +1019,20 @@ def create_case_tables():
                 print("[OK] Updated cases status ENUM")
             except Exception as e:
                 print(f"[WARNING] Could not update status ENUM: {e}")
+            if not column_exists('cases', 'allocation_description'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN allocation_description TEXT NULL AFTER filled_by_name")
+                    connection.commit()
+                    print("[OK] Added allocation_description column to cases table")
+                except Exception as e:
+                    print(f"[WARNING] Could not add allocation_description column: {e}")
+            if not column_exists('cases', 'allocation_timeline'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN allocation_timeline VARCHAR(500) NULL AFTER allocation_description")
+                    connection.commit()
+                    print("[OK] Added allocation_timeline column to cases table")
+                except Exception as e:
+                    print(f"[WARNING] Could not add allocation_timeline column: {e}")
         
         return True
     except Exception as e:
@@ -1385,6 +1575,102 @@ def apply_migrations(current_version):
         if connection:
             connection.close()
 
+def create_webapp_messages_table():
+    """Create webapp_messages and whatsapp_settings tables for client-employee messaging"""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('webapp_messages'):
+                cursor.execute("""
+                    CREATE TABLE webapp_messages (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        client_id INT NOT NULL,
+                        employee_id INT,
+                        subject VARCHAR(500),
+                        message TEXT,
+                        attachment_file VARCHAR(500),
+                        attachment_type VARCHAR(50),
+                        sender_type ENUM('client', 'employee') NOT NULL DEFAULT 'client',
+                        delivery_channel ENUM('web', 'whatsapp') NOT NULL DEFAULT 'web',
+                        whatsapp_message_id VARCHAR(255),
+                        whatsapp_status VARCHAR(50),
+                        is_read TINYINT(1) DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_client_id (client_id),
+                        INDEX idx_sender_type (sender_type),
+                        INDEX idx_created_at (created_at),
+                        INDEX idx_wa_msg_id (whatsapp_message_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] Created webapp_messages table")
+            else:
+                # Ensure WhatsApp columns exist on older installs
+                for col, defn in [
+                    ('delivery_channel', "ENUM('web','whatsapp') NOT NULL DEFAULT 'web'"),
+                    ('whatsapp_message_id', 'VARCHAR(255)'),
+                    ('whatsapp_status', 'VARCHAR(50)')
+                ]:
+                    if not column_exists('webapp_messages', col):
+                        try:
+                            cursor.execute(f"ALTER TABLE webapp_messages ADD COLUMN {col} {defn}")
+                            connection.commit()
+                            print(f"[OK] Added {col} column to webapp_messages")
+                        except Exception:
+                            pass
+                print("[OK] webapp_messages table exists")
+
+            if not table_exists('whatsapp_settings'):
+                cursor.execute("""
+                    CREATE TABLE whatsapp_settings (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        access_token TEXT NOT NULL,
+                        phone_number_id VARCHAR(255) NOT NULL,
+                        whatsapp_business_account_id VARCHAR(255),
+                        webhook_verify_token VARCHAR(255) NOT NULL,
+                        display_phone_number VARCHAR(30),
+                        api_version VARCHAR(10) NOT NULL DEFAULT 'v21.0',
+                        is_active TINYINT(1) DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] Created whatsapp_settings table")
+            else:
+                print("[OK] whatsapp_settings table exists")
+
+            if not table_exists('sms_settings'):
+                cursor.execute("""
+                    CREATE TABLE sms_settings (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        provider ENUM('africas_talking','twilio','vonage','custom') NOT NULL DEFAULT 'africas_talking',
+                        api_key VARCHAR(500) NOT NULL,
+                        api_secret VARCHAR(500),
+                        sender_id VARCHAR(50),
+                        username VARCHAR(255),
+                        default_country_code VARCHAR(10) DEFAULT '+254',
+                        custom_api_url VARCHAR(500),
+                        is_active TINYINT(1) DEFAULT 1,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] Created sms_settings table")
+            else:
+                print("[OK] sms_settings table exists")
+
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to create messaging tables: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
 def init_database():
     """Initialize database system: check, create, and update as needed"""
     print("\n" + "="*50)
@@ -1414,12 +1700,21 @@ def init_database():
     if not create_employees_table():
         print("[ERROR] Failed to create/update employees table")
         return False
+
+    # Step 4b: Create employee permissions table
+    if not create_employee_permissions_table():
+        print("[ERROR] Failed to create/update employee_permissions table")
+        return False
     
     # Step 5: Create clients table
     if not create_clients_table():
         print("[ERROR] Failed to create/update clients table")
         return False
     
+    # Step 5b: Create client personal documents table
+    if not create_client_personal_documents_table():
+        print("[WARNING] Failed to create client_personal_documents table")
+
     # Step 6: Create case management tables
     if not create_case_tables():
         print("[ERROR] Failed to create/update case management tables")
@@ -1435,7 +1730,12 @@ def init_database():
         print("[ERROR] Failed to create/update email tables")
         return False
     
-    # Step 9: Check schema version and apply migrations
+    # Step 9: Create webapp_messages table
+    if not create_webapp_messages_table():
+        print("[ERROR] Failed to create/update webapp_messages table")
+        return False
+    
+    # Step 10: Check schema version and apply migrations
     current_version = get_schema_version()
     print(f"Current schema version: {current_version}")
     print(f"Target schema version: {SCHEMA_VERSION}")
@@ -1622,6 +1922,265 @@ def get_company_settings():
         if connection:
             connection.close()
 
+# ==================== WHATSAPP CLOUD API HELPERS ====================
+
+def get_whatsapp_settings():
+    """Retrieve active WhatsApp settings from the database"""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return None
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM whatsapp_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1")
+            return cursor.fetchone()
+    except Exception as e:
+        print(f"Error getting WhatsApp settings: {e}")
+        return None
+    finally:
+        if connection:
+            connection.close()
+
+
+def send_whatsapp_message(to_phone, text_body, settings=None):
+    """Send a text message via the WhatsApp Cloud API.
+    Returns (success: bool, wa_message_id_or_error: str)
+    """
+
+    if not settings:
+        settings = get_whatsapp_settings()
+    if not settings:
+        return False, 'WhatsApp not configured'
+
+    # Normalise phone: strip spaces/dashes, ensure leading +
+    phone = to_phone.strip().replace(' ', '').replace('-', '')
+    if not phone.startswith('+'):
+        phone = '+' + phone
+
+    url = f"https://graph.facebook.com/{settings['api_version']}/{settings['phone_number_id']}/messages"
+    headers = {
+        'Authorization': f"Bearer {settings['access_token']}",
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'messaging_product': 'whatsapp',
+        'recipient_type': 'individual',
+        'to': phone.lstrip('+'),
+        'type': 'text',
+        'text': {'preview_url': False, 'body': text_body}
+    }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+        data = resp.json()
+        if resp.status_code in (200, 201) and 'messages' in data:
+            wa_id = data['messages'][0].get('id', '')
+            return True, wa_id
+        error_msg = data.get('error', {}).get('message', resp.text[:200])
+        print(f"WhatsApp API error: {error_msg}")
+        return False, error_msg
+    except Exception as e:
+        print(f"WhatsApp send exception: {e}")
+        return False, str(e)
+
+
+def send_whatsapp_media(to_phone, media_url, caption='', media_type='document', settings=None):
+    """Send an image or document via WhatsApp Cloud API."""
+
+    if not settings:
+        settings = get_whatsapp_settings()
+    if not settings:
+        return False, 'WhatsApp not configured'
+
+    phone = to_phone.strip().replace(' ', '').replace('-', '')
+    if not phone.startswith('+'):
+        phone = '+' + phone
+
+    url = f"https://graph.facebook.com/{settings['api_version']}/{settings['phone_number_id']}/messages"
+    headers = {
+        'Authorization': f"Bearer {settings['access_token']}",
+        'Content-Type': 'application/json'
+    }
+
+    # media_type should be 'image' or 'document'
+    media_obj = {'link': media_url}
+    if caption:
+        media_obj['caption'] = caption
+    if media_type == 'document':
+        media_obj['filename'] = caption or 'attachment'
+
+    payload = {
+        'messaging_product': 'whatsapp',
+        'recipient_type': 'individual',
+        'to': phone.lstrip('+'),
+        'type': media_type,
+        media_type: media_obj
+    }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        data = resp.json()
+        if resp.status_code in (200, 201) and 'messages' in data:
+            return True, data['messages'][0].get('id', '')
+        error_msg = data.get('error', {}).get('message', resp.text[:200])
+        print(f"WhatsApp media API error: {error_msg}")
+        return False, error_msg
+    except Exception as e:
+        print(f"WhatsApp media send exception: {e}")
+        return False, str(e)
+
+
+# ==================== SMS HELPERS ====================
+
+def get_sms_settings():
+    """Retrieve active SMS settings from the database"""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return None
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM sms_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1")
+            return cursor.fetchone()
+    except Exception as e:
+        print(f"Error getting SMS settings: {e}")
+        return None
+    finally:
+        if connection:
+            connection.close()
+
+
+def send_sms(to_phone, text_body, settings=None):
+    """Send an SMS via the configured provider.
+    Returns (success: bool, result_or_error: str)
+    """
+    if not settings:
+        settings = get_sms_settings()
+    if not settings:
+        return False, 'SMS not configured'
+
+    provider = settings.get('provider', '')
+    api_key = settings.get('api_key', '')
+    api_secret = settings.get('api_secret', '')
+    sender_id = settings.get('sender_id', '')
+    username = settings.get('username', '')
+    country_code = settings.get('default_country_code', '+254')
+
+    # Normalise phone
+    phone = to_phone.strip().replace(' ', '').replace('-', '')
+    if not phone.startswith('+') and not phone.startswith('0'):
+        phone = country_code + phone
+    elif phone.startswith('0'):
+        phone = country_code + phone[1:]
+
+    try:
+        if provider == 'africas_talking':
+            return _send_sms_africas_talking(phone, text_body, api_key, username, sender_id)
+        elif provider == 'twilio':
+            return _send_sms_twilio(phone, text_body, api_key, api_secret, sender_id)
+        elif provider == 'vonage':
+            return _send_sms_vonage(phone, text_body, api_key, api_secret, sender_id)
+        elif provider == 'custom':
+            custom_url = settings.get('custom_api_url', '')
+            return _send_sms_custom(phone, text_body, api_key, api_secret, sender_id, custom_url)
+        else:
+            return False, f'Unknown SMS provider: {provider}'
+    except Exception as e:
+        print(f"SMS send exception: {e}")
+        return False, str(e)
+
+
+def _send_sms_africas_talking(phone, text, api_key, username, sender_id):
+    """Send SMS via Africa's Talking API"""
+    url = 'https://api.africastalking.com/version1/messaging'
+    if username == 'sandbox':
+        url = 'https://api.sandbox.africastalking.com/version1/messaging'
+
+    headers = {
+        'apiKey': api_key,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+    }
+    data = {
+        'username': username,
+        'to': phone,
+        'message': text,
+    }
+    if sender_id:
+        data['from'] = sender_id
+
+    resp = requests.post(url, headers=headers, data=data, timeout=15)
+    result = resp.json()
+
+    recipients = result.get('SMSMessageData', {}).get('Recipients', [])
+    if recipients:
+        status = recipients[0].get('status', '')
+        msg_id = recipients[0].get('messageId', '')
+        if status == 'Success':
+            return True, msg_id
+        return False, f"AT status: {status} — {recipients[0].get('statusCode', '')}"
+
+    error_msg = result.get('SMSMessageData', {}).get('Message', resp.text[:200])
+    return False, error_msg
+
+
+def _send_sms_twilio(phone, text, account_sid, auth_token, from_number):
+    """Send SMS via Twilio API"""
+    url = f'https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json'
+    data = {
+        'To': phone,
+        'From': from_number,
+        'Body': text,
+    }
+    resp = requests.post(url, data=data, auth=(account_sid, auth_token), timeout=15)
+    result = resp.json()
+    if resp.status_code in (200, 201):
+        return True, result.get('sid', '')
+    return False, result.get('message', resp.text[:200])
+
+
+def _send_sms_vonage(phone, text, api_key, api_secret, sender_id):
+    """Send SMS via Vonage (Nexmo) API"""
+    url = 'https://rest.nexmo.com/sms/json'
+    payload = {
+        'api_key': api_key,
+        'api_secret': api_secret,
+        'to': phone.lstrip('+'),
+        'from': sender_id or 'SHERIA',
+        'text': text,
+    }
+    resp = requests.post(url, json=payload, timeout=15)
+    result = resp.json()
+    msgs = result.get('messages', [])
+    if msgs and msgs[0].get('status') == '0':
+        return True, msgs[0].get('message-id', '')
+    error = msgs[0].get('error-text', resp.text[:200]) if msgs else resp.text[:200]
+    return False, error
+
+
+def _send_sms_custom(phone, text, api_key, api_secret, sender_id, custom_url):
+    """Send SMS via a custom API endpoint (POST JSON)"""
+    if not custom_url:
+        return False, 'Custom API URL not set'
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'to': phone,
+        'message': text,
+        'from': sender_id,
+        'api_key': api_key,
+        'api_secret': api_secret,
+    }
+    resp = requests.post(custom_url, json=payload, headers=headers, timeout=15)
+    if resp.status_code in (200, 201):
+        try:
+            data = resp.json()
+            return True, data.get('id', data.get('message_id', 'OK'))
+        except Exception:
+            return True, 'OK'
+    return False, resp.text[:200]
+
+
 @app.route('/')
 def index():
     """Home page - redirects to login if not authenticated"""
@@ -1631,9 +2190,11 @@ def index():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Employee login page"""
+    """Login page with employee and client options"""
     if 'employee_id' in session:
         return redirect(url_for('dashboard'))
+    if 'client_id' in session:
+        return redirect(url_for('client_dashboard'))
     
     if request.method == 'POST':
         employee_code = request.form.get('employee_code', '').strip()
@@ -1901,8 +2462,8 @@ def dashboard():
                     formatted_client['created_at'] = formatted_client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
                 active_clients.append(formatted_client)
             
-            if user_role == 'Clerk':
-                # Fetch all clients and categorize by type (for Clerk only)
+            if user_role in ('Clerk', 'Firm Administrator', 'Managing Partner'):
+                # Fetch all clients and categorize by type
                 cursor.execute("""
                     SELECT 
                         id,
@@ -1918,20 +2479,15 @@ def dashboard():
                 """)
                 all_clients = cursor.fetchall()
                 
-                # Format all clients and categorize by type
                 formatted_all_clients = []
                 for client in all_clients:
-                    # Create a copy to avoid modifying the original
                     formatted_client = dict(client)
                     
-                    # Format date
                     if formatted_client.get('created_at'):
                         formatted_client['created_at'] = formatted_client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
                     
-                    # Add to formatted list
                     formatted_all_clients.append(formatted_client)
                     
-                    # Categorize for separate sections
                     client_type = formatted_client.get('client_type', 'Pending')
                     
                     if client_type == 'Individual':
@@ -1939,10 +2495,9 @@ def dashboard():
                     elif client_type == 'Corporate':
                         corporate_clients.append(formatted_client)
                     else:
-                        # Include Pending and any other types
                         pending_clients.append(formatted_client)
                 
-                # Fetch all employees (for Clerk only)
+                # Fetch all employees
                 cursor.execute("""
                     SELECT 
                         id,
@@ -1959,18 +2514,18 @@ def dashboard():
                 """)
                 all_employees = cursor.fetchall()
                 
-                # Format dates for employees
                 for emp in all_employees:
                     if emp.get('created_at'):
                         emp['created_at'] = emp['created_at'].strftime('%Y-%m-%d %H:%M:%S')
             
             return render_template('dashboard.html', 
                                  employee=employee, 
+                                 user_role=user_role,
                                  company_settings=company_settings,
                                  individual_clients=individual_clients,
                                  corporate_clients=corporate_clients,
                                  pending_clients=pending_clients,
-                                 all_clients=formatted_all_clients if user_role == 'Clerk' else [],
+                                 all_clients=formatted_all_clients if user_role in ('Clerk', 'Firm Administrator', 'Managing Partner') else [],
                                  all_employees=all_employees,
                                  active_clients=active_clients)
     except Exception as e:
@@ -2058,7 +2613,6 @@ def get_pending_approvals():
     if 'employee_id' not in session:
         return {'error': 'Unauthorized'}, 401
     
-    # Check permission
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
     allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
@@ -2074,22 +2628,89 @@ def get_pending_approvals():
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
-                SELECT id, full_name, phone_number, work_email, employee_code, role, status, created_at, onboarding_completed
+                SELECT id, full_name, phone_number, work_email, employee_code,
+                       role, status, created_at, onboarding_completed, profile_picture
                 FROM employees 
-                WHERE status = 'Pending Approval' AND onboarding_completed = TRUE
-                ORDER BY created_at DESC
+                WHERE status = 'Pending Approval'
+                ORDER BY onboarding_completed DESC, created_at DESC
             """)
             employees = cursor.fetchall()
             
-            # Convert datetime to string for JSON
             for emp in employees:
                 if emp.get('created_at'):
                     emp['created_at'] = emp['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                emp['onboarding_completed'] = bool(emp.get('onboarding_completed'))
             
-            return {'success': True, 'employees': employees, 'count': len(employees)}
+            total = len(employees)
+            onboarding_done = sum(1 for e in employees if e.get('onboarding_completed'))
+            onboarding_pending = total - onboarding_done
+            
+            return {
+                'success': True,
+                'employees': employees,
+                'count': total,
+                'onboarding_done': onboarding_done,
+                'onboarding_pending': onboarding_pending
+            }
     except Exception as e:
         print(f"Error fetching pending approvals: {e}")
         return {'error': str(e)}, 500
+    finally:
+        connection.close()
+
+@app.route('/api/assign_role_and_approve', methods=['POST'])
+def assign_role_and_approve():
+    """Assign a role to an employee and approve them"""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    
+    if not has_permission:
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    data = request.get_json()
+    employee_id = data.get('employee_id')
+    new_role = data.get('role')
+    
+    if not employee_id:
+        return jsonify({'success': False, 'error': 'Employee ID required'}), 400
+    
+    valid_roles = ['Firm Administrator', 'Managing Partner', 'Finance Office', 'Associate Advocate', 'Clerk', 'IT Support', 'Employee']
+    if new_role and new_role not in valid_roles:
+        return jsonify({'success': False, 'error': 'Invalid role'}), 400
+    
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # Fine-grained permission: approve employee
+    deny = enforce_permission(connection, 'employee_approve')
+    if deny:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT onboarding_completed FROM employees WHERE id = %s", (employee_id,))
+            employee = cursor.fetchone()
+            if not employee:
+                return jsonify({'success': False, 'error': 'Employee not found'}), 404
+            if not employee.get('onboarding_completed'):
+                return jsonify({'success': False, 'error': 'Cannot approve. Onboarding must be completed first.'}), 400
+            
+            if new_role:
+                cursor.execute("UPDATE employees SET role = %s, status = 'Active' WHERE id = %s", (new_role, employee_id))
+            else:
+                cursor.execute("UPDATE employees SET status = 'Active' WHERE id = %s", (employee_id,))
+            connection.commit()
+            
+            return jsonify({'success': True, 'message': 'Employee approved successfully'})
+    except Exception as e:
+        print(f"Error assigning role and approving: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         connection.close()
 
@@ -2099,7 +2720,6 @@ def get_all_employees():
     if 'employee_id' not in session:
         return {'error': 'Unauthorized'}, 401
     
-    # Check permission
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
     allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
@@ -2121,7 +2741,6 @@ def get_all_employees():
             """)
             employees = cursor.fetchall()
             
-            # Convert datetime to string for JSON
             for emp in employees:
                 if emp.get('created_at'):
                     emp['created_at'] = emp['created_at'].strftime('%Y-%m-%d %H:%M:%S')
@@ -2130,6 +2749,54 @@ def get_all_employees():
     except Exception as e:
         print(f"Error fetching employees: {e}")
         return {'error': str(e)}, 500
+    finally:
+        connection.close()
+
+@app.route('/api/get_active_employees')
+def get_active_employees():
+    """Get all approved/active employees with role breakdown"""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    
+    if not has_permission:
+        return jsonify({'error': 'Forbidden'}), 403
+    
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database error'}), 500
+    
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT id, full_name, phone_number, work_email, employee_code,
+                       role, status, profile_picture, created_at
+                FROM employees
+                WHERE status = 'Active'
+                ORDER BY role, full_name
+            """)
+            employees = cursor.fetchall()
+            
+            role_counts = {}
+            for emp in employees:
+                if emp.get('created_at'):
+                    emp['created_at'] = emp['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                r = emp.get('role') or 'Employee'
+                role_counts[r] = role_counts.get(r, 0) + 1
+            
+            return jsonify({
+                'success': True,
+                'employees': employees,
+                'total': len(employees),
+                'role_counts': role_counts
+            })
+    except Exception as e:
+        print(f"Error fetching active employees: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         connection.close()
 
@@ -2200,11 +2867,18 @@ def get_employee_onboarding_details():
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if not column_exists('employees', 'kra_pin_document'):
+                try:
+                    cursor.execute("ALTER TABLE employees ADD COLUMN kra_pin_document VARCHAR(255)")
+                    connection.commit()
+                except Exception as e:
+                    print(f"Could not add kra_pin_document column: {e}")
             cursor.execute("""
                 SELECT 
                     id, full_name, phone_number, work_email, employee_code, role, status,
                     account_number, account_name, salary, salary_components, tax_pin, pay_frequency,
-                    employment_contract, id_front, id_back, signature, stamp,
+                    payment_method, bank_name, mobile_money_company,
+                    employment_contract, id_front, id_back, kra_pin_document, signature, stamp,
                     onboarding_completed, created_at
                 FROM employees 
                 WHERE id = %s
@@ -2222,6 +2896,134 @@ def get_employee_onboarding_details():
     except Exception as e:
         print(f"Error fetching employee onboarding details: {e}")
         return jsonify({'error': str(e)}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/update_employee_onboarding', methods=['POST'])
+def update_employee_onboarding():
+    """Update employee onboarding details (admin from approvals page). Supports multipart form + optional file uploads."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+
+    employee_id = request.form.get('employee_id')
+    if not employee_id:
+        return jsonify({'success': False, 'error': 'Employee ID required'}), 400
+    try:
+        employee_id = int(employee_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Invalid employee ID'}), 400
+
+    full_name = request.form.get('full_name', '').strip()
+    employee_code = request.form.get('employee_code', '').strip()
+    work_email = request.form.get('work_email', '').strip()
+    phone_number = request.form.get('phone_number', '').strip()
+    role = request.form.get('role', 'Employee').strip()
+    status = request.form.get('status', 'Pending Approval').strip()
+    payment_method = request.form.get('payment_method', '').strip() or None
+    bank_name = request.form.get('bank_name', '').strip() or None
+    mobile_money_company = request.form.get('mobile_money_company', '').strip() or None
+    account_number = request.form.get('account_number', '').strip() or None
+    account_name = request.form.get('account_name', '').strip() or None
+    pay_frequency = request.form.get('pay_frequency', '').strip() or None
+    salary = request.form.get('salary', '').strip() or None
+    salary_components = request.form.get('salary_components', '').strip() or None
+    if not full_name or not work_email or not phone_number:
+        return jsonify({'success': False, 'error': 'Full name, email and phone are required'}), 400
+
+    upload_folder = app.config['UPLOAD_FOLDER']
+    employment_contract = None
+    if 'employment_contract' in request.files:
+        f = request.files['employment_contract']
+        if f and f.filename and allowed_document_file(f.filename):
+            ext = f.filename.rsplit('.', 1)[1].lower()
+            name = f"contract_{employee_id}_{secrets.token_hex(8)}.{ext}"
+            f.save(os.path.join(upload_folder, name))
+            employment_contract = name
+
+    id_front = None
+    if 'id_front' in request.files:
+        f = request.files['id_front']
+        if f and f.filename and allowed_id_file(f.filename):
+            ext = f.filename.rsplit('.', 1)[1].lower()
+            name = f"id_document_{employee_id}_{secrets.token_hex(8)}.{ext}"
+            f.save(os.path.join(upload_folder, name))
+            id_front = name
+
+    kra_pin_document = None
+    if 'kra_pin_document' in request.files:
+        f = request.files['kra_pin_document']
+        if f and f.filename and (allowed_id_file(f.filename) or allowed_document_file(f.filename)):
+            ext = f.filename.rsplit('.', 1)[1].lower()
+            name = f"kra_pin_{employee_id}_{secrets.token_hex(8)}.{ext}"
+            f.save(os.path.join(upload_folder, name))
+            kra_pin_document = name
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # Fine-grained permission: edit employee details via onboarding update
+    deny = enforce_permission(connection, 'employee_edit')
+    if deny:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+    try:
+        with connection.cursor() as cur:
+            cur.execute("SELECT id, employment_contract, id_front, kra_pin_document FROM employees WHERE id = %s", (employee_id,))
+            row = cur.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Employee not found'}), 404
+            cur.execute("SELECT id FROM employees WHERE work_email = %s AND id != %s", (work_email, employee_id))
+            if cur.fetchone():
+                return jsonify({'success': False, 'error': 'Work email already in use by another employee'}), 400
+
+            set_parts = [
+                "full_name = %s", "work_email = %s", "phone_number = %s", "role = %s", "status = %s",
+                "payment_method = %s", "bank_name = %s", "mobile_money_company = %s",
+                "account_number = %s", "account_name = %s",
+                "pay_frequency = %s", "salary = %s", "salary_components = %s"
+            ]
+            params = [
+                full_name, work_email, phone_number, role, status,
+                payment_method, bank_name, mobile_money_company,
+                account_number, account_name,
+                pay_frequency, salary, salary_components
+            ]
+            if employee_code:
+                set_parts.append("employee_code = %s")
+                params.append(employee_code)
+            if employment_contract is not None:
+                set_parts.append("employment_contract = %s")
+                params.append(employment_contract)
+            elif row[1]:
+                set_parts.append("employment_contract = %s")
+                params.append(row[1])
+            if id_front is not None:
+                set_parts.append("id_front = %s")
+                params.append(id_front)
+            elif row[2]:
+                set_parts.append("id_front = %s")
+                params.append(row[2])
+            if kra_pin_document is not None:
+                set_parts.append("kra_pin_document = %s")
+                params.append(kra_pin_document)
+            elif len(row) > 3 and row[3]:
+                set_parts.append("kra_pin_document = %s")
+                params.append(row[3])
+            params.append(employee_id)
+            cur.execute(
+                "UPDATE employees SET " + ", ".join(set_parts) + " WHERE id = %s",
+                params
+            )
+            connection.commit()
+        return jsonify({'success': True, 'message': 'Onboarding details updated successfully'})
+    except Exception as e:
+        print(f"Error updating employee onboarding: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         connection.close()
 
@@ -2252,6 +3054,11 @@ def update_employee_status():
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database error'}), 500
+
+    # Fine-grained permission: approve/suspend employees
+    deny = enforce_permission(connection, 'employee_suspend')
+    if deny:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
     
     try:
         # If approving, check if onboarding is completed
@@ -2315,6 +3122,11 @@ def update_employee():
     connection = get_db_connection()
     if not connection:
         return {'error': 'Database error'}, 500
+
+    # Fine-grained permission: edit employee details
+    deny = enforce_permission(connection, 'employee_edit')
+    if deny:
+        return {'error': 'Forbidden'}, 403
     
     try:
         with connection.cursor() as cursor:
@@ -2367,6 +3179,11 @@ def delete_employee():
     connection = get_db_connection()
     if not connection:
         return {'error': 'Database error'}, 500
+
+    # Fine-grained permission: delete employee
+    deny = enforce_permission(connection, 'employee_delete')
+    if deny:
+        return {'error': 'Forbidden'}, 403
     
     try:
         with connection.cursor() as cursor:
@@ -2497,6 +3314,485 @@ def corporate_client_management():
         return redirect(url_for('dashboard'))
     finally:
         connection.close()
+
+@app.route('/client_management')
+def client_management():
+    """Unified Client Management page with Individual/Corporate tabs"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            company_settings = get_company_settings()
+            if not company_settings:
+                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+            cursor.execute("""
+                SELECT id, full_name, email, phone_number, profile_picture,
+                       client_type, status, created_at
+                FROM clients
+                ORDER BY created_at DESC
+            """)
+            all_clients = cursor.fetchall()
+
+            individual_clients = []
+            corporate_clients = []
+            pending_clients = []
+
+            for client in all_clients:
+                formatted = dict(client)
+                if formatted.get('created_at'):
+                    formatted['created_at'] = formatted['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                ctype = formatted.get('client_type', 'Pending')
+                if ctype == 'Individual':
+                    individual_clients.append(formatted)
+                elif ctype == 'Corporate':
+                    corporate_clients.append(formatted)
+                else:
+                    pending_clients.append(formatted)
+
+            return render_template('client_management.html',
+                                   company_settings=company_settings,
+                                   individual_clients=individual_clients,
+                                   corporate_clients=corporate_clients,
+                                   pending_clients=pending_clients,
+                                   total_clients=len(all_clients))
+    except Exception as e:
+        print(f"Client Management error: {e}")
+        flash('An error occurred.', 'error')
+        return redirect(url_for('dashboard'))
+    finally:
+        connection.close()
+
+
+@app.route('/client_management/register', methods=['POST'])
+def register_client():
+    """Register a new client (basic info only, client completes registration via portal)"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to register clients', 'error')
+        return redirect(url_for('client_management'))
+
+    full_name = request.form.get('full_name', '').strip()
+    email_addr = request.form.get('email', '').strip()
+
+    if not full_name or not email_addr:
+        flash('Full name and email are required', 'error')
+        return redirect(url_for('client_management'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error', 'error')
+        return redirect(url_for('client_management'))
+
+    # Fine-grained permission: register client
+    deny = enforce_permission(connection, 'client_register', redirect_endpoint='client_management')
+    if deny:
+        return deny
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM clients WHERE email = %s", (email_addr,))
+            if cursor.fetchone():
+                flash('A client with this email already exists', 'error')
+                return redirect(url_for('client_management'))
+
+            placeholder_google_id = f"manual_{uuid.uuid4().hex}"
+
+            cursor.execute("""
+                INSERT INTO clients (google_id, email, full_name, client_type, status)
+                VALUES (%s, %s, %s, 'Pending', 'Active')
+            """, (placeholder_google_id, email_addr, full_name))
+            connection.commit()
+
+            flash(f'Client "{full_name}" registered successfully. They can complete registration via the client portal.', 'success')
+
+    except Exception as e:
+        print(f"Register client error: {e}")
+        flash('An error occurred while registering the client', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('client_management'))
+
+
+@app.route('/client_management/onboard/<int:client_id>')
+def onboard_client(client_id):
+    """Show onboarding form for a pending client"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to onboard clients', 'error')
+        return redirect(url_for('client_management'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error', 'error')
+        return redirect(url_for('client_management'))
+
+    # Fine-grained permission: approve/onboard client
+    deny = enforce_permission(connection, 'client_approve', redirect_endpoint='client_management')
+    if deny:
+        return deny
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                flash('Client not found', 'error')
+                return redirect(url_for('client_management'))
+
+            company_settings = get_company_settings()
+            if not company_settings:
+                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+            return render_template('client_onboarding.html',
+                                   client=client,
+                                   company_settings=company_settings)
+    except Exception as e:
+        print(f"Onboard client error: {e}")
+        flash('An error occurred', 'error')
+        return redirect(url_for('client_management'))
+    finally:
+        connection.close()
+
+
+@app.route('/client_management/onboard/<int:client_id>', methods=['POST'])
+def submit_onboard_client(client_id):
+    """Process client onboarding form"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to onboard clients', 'error')
+        return redirect(url_for('client_management'))
+
+    client_type = request.form.get('client_type', '').strip()
+    phone_number = request.form.get('phone_number', '').strip().replace(' ', '')
+    kra_pin = request.form.get('kra_pin', '').strip().upper()
+    client_address = request.form.get('client_address', '').strip()
+    national_id = request.form.get('national_id', '').strip()
+    id_number = request.form.get('id_number', '').strip()
+
+    if not client_type or client_type not in ('Individual', 'Corporate'):
+        flash('Please select a valid client type', 'error')
+        return redirect(url_for('onboard_client', client_id=client_id))
+
+    if not phone_number:
+        flash('Phone number is required', 'error')
+        return redirect(url_for('onboard_client', client_id=client_id))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error', 'error')
+        return redirect(url_for('client_management'))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                flash('Client not found', 'error')
+                return redirect(url_for('client_management'))
+
+            update_fields = ['client_type = %s', 'phone_number = %s']
+            update_values = [client_type, phone_number]
+
+            if kra_pin:
+                update_fields.append('kra_pin = %s')
+                update_values.append(kra_pin)
+            if client_address:
+                update_fields.append('client_address = %s')
+                update_values.append(client_address)
+            if national_id or id_number:
+                update_fields.append('national_id = %s')
+                update_values.append(national_id or id_number)
+
+            # Handle file uploads
+            upload_files = {}
+            file_fields = {
+                'id_front': 'id_front',
+                'id_back': 'id_back',
+                'cr12_certificate': 'cr12_certificate',
+                'corporate_kra_pin': 'corporate_kra_pin',
+                'instruction_note': 'instruction_note'
+            }
+            for form_field, label in file_fields.items():
+                if form_field in request.files:
+                    file = request.files[form_field]
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'bin'
+                        unique_filename = f"{label}_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                        file.save(filepath)
+                        upload_files[label] = unique_filename
+
+            for col in ('id_front', 'id_back', 'cr12_certificate', 'instruction_note'):
+                if col in upload_files:
+                    update_fields.append(f'{col} = %s')
+                    update_values.append(upload_files[col])
+
+            update_values.append(client_id)
+            query = f"UPDATE clients SET {', '.join(update_fields)} WHERE id = %s"
+            cursor.execute(query, tuple(update_values))
+            connection.commit()
+
+            flash(f'Client "{client["full_name"]}" has been successfully onboarded as {client_type}', 'success')
+
+    except Exception as e:
+        print(f"Onboard client submit error: {e}")
+        flash('An error occurred during onboarding', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('client_management'))
+
+
+@app.route('/client_management/edit/<int:client_id>')
+def edit_client_page(client_id):
+    """Show edit page for a client with all details and uploads"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to edit clients', 'error')
+        return redirect(url_for('client_management'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error', 'error')
+        return redirect(url_for('client_management'))
+
+    # Fine-grained permission: edit client details (view/edit page)
+    deny = enforce_permission(connection, 'client_edit', redirect_endpoint='client_management')
+    if deny:
+        return deny
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT * FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                flash('Client not found', 'error')
+                return redirect(url_for('client_management'))
+
+            company_settings = get_company_settings()
+            if not company_settings:
+                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+            return render_template('client_edit.html',
+                                   client=client,
+                                   company_settings=company_settings)
+    except Exception as e:
+        print(f"Edit client page error: {e}")
+        flash('An error occurred', 'error')
+        return redirect(url_for('client_management'))
+    finally:
+        connection.close()
+
+
+@app.route('/client_management/edit/<int:client_id>', methods=['POST'])
+def edit_client(client_id):
+    """Process client edit form with all details and uploads"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to perform this action', 'error')
+        return redirect(url_for('client_management'))
+
+    full_name = request.form.get('full_name', '').strip()
+    email_addr = request.form.get('email', '').strip()
+    phone_number = request.form.get('phone_number', '').strip()
+    client_type = request.form.get('client_type', '').strip()
+    kra_pin = request.form.get('kra_pin', '').strip().upper()
+    national_id = request.form.get('national_id', '').strip()
+    client_address = request.form.get('client_address', '').strip()
+
+    if not full_name or not email_addr:
+        flash('Full name and email are required', 'error')
+        return redirect(url_for('edit_client_page', client_id=client_id))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('client_management'))
+
+    # Fine-grained permission: edit client details (submit)
+    deny = enforce_permission(connection, 'client_edit', redirect_endpoint='client_management')
+    if deny:
+        return deny
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM clients WHERE email = %s AND id != %s", (email_addr, client_id))
+            if cursor.fetchone():
+                flash('Another client with this email already exists', 'error')
+                return redirect(url_for('edit_client_page', client_id=client_id))
+
+            update_fields = [
+                'full_name = %s', 'email = %s', 'phone_number = %s',
+                'client_type = %s', 'kra_pin = %s', 'national_id = %s',
+                'client_address = %s'
+            ]
+            update_values = [
+                full_name, email_addr, phone_number or None,
+                client_type or 'Pending', kra_pin or None, national_id or None,
+                client_address or None
+            ]
+
+            file_fields = {
+                'id_front': 'id_front',
+                'id_back': 'id_back',
+                'cr12_certificate': 'cr12_certificate',
+                'corporate_kra_pin': 'corporate_kra_pin',
+                'instruction_note': 'instruction_note'
+            }
+            for form_field, db_col in file_fields.items():
+                if form_field in request.files:
+                    file = request.files[form_field]
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'bin'
+                        unique_filename = f"{db_col}_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                        file.save(filepath)
+                        update_fields.append(f'{db_col} = %s')
+                        update_values.append(unique_filename)
+
+            update_values.append(client_id)
+            query = f"UPDATE clients SET {', '.join(update_fields)} WHERE id = %s"
+            cursor.execute(query, tuple(update_values))
+            connection.commit()
+            flash(f'Client "{full_name}" updated successfully', 'success')
+    except Exception as e:
+        print(f"Edit client error: {e}")
+        flash('An error occurred while updating the client', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('client_management'))
+
+@app.route('/client_management/suspend/<int:client_id>', methods=['POST'])
+def suspend_client(client_id):
+    """Toggle client suspension (Active <-> Inactive)"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to perform this action', 'error')
+        return redirect(url_for('client_management'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('client_management'))
+
+    # Fine-grained permission: suspend client
+    deny = enforce_permission(connection, 'client_suspend', redirect_endpoint='client_management')
+    if deny:
+        return deny
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id, full_name, status FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                flash('Client not found', 'error')
+                return redirect(url_for('client_management'))
+
+            new_status = 'Inactive' if client['status'] == 'Active' else 'Active'
+            cursor.execute("UPDATE clients SET status = %s WHERE id = %s", (new_status, client_id))
+            connection.commit()
+
+            action = 'suspended' if new_status == 'Inactive' else 'reactivated'
+            flash(f'Client "{client["full_name"]}" has been {action}', 'success')
+    except Exception as e:
+        print(f"Suspend client error: {e}")
+        flash('An error occurred while updating client status', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('client_management'))
+
+@app.route('/client_management/delete/<int:client_id>', methods=['POST'])
+def delete_client(client_id):
+    """Permanently delete a client from the system"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to delete clients', 'error')
+        return redirect(url_for('client_management'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('client_management'))
+
+    # Fine-grained permission: delete client
+    deny = enforce_permission(connection, 'client_delete', redirect_endpoint='client_management')
+    if deny:
+        return deny
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id, full_name FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                flash('Client not found', 'error')
+                return redirect(url_for('client_management'))
+
+            cursor.execute("DELETE FROM clients WHERE id = %s", (client_id,))
+            connection.commit()
+            flash(f'Client "{client["full_name"]}" has been permanently deleted', 'success')
+    except Exception as e:
+        print(f"Delete client error: {e}")
+        flash('An error occurred while deleting the client', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('client_management'))
 
 @app.route('/logout')
 def logout():
@@ -2656,17 +3952,10 @@ def google_callback():
                         flash('Please complete your registration', 'info')
                         return redirect(url_for('client_registration'))
                     
-                    # Check Individual client requirements
-                    if client_type == 'Individual':
-                        if not client.get('phone_number') or not client.get('id_front') or not client.get('id_back'):
-                            flash('Please complete your registration by providing phone number and ID documents', 'info')
-                            return redirect(url_for('client_registration'))
-                    
-                    # Check Corporate client requirements
-                    elif client_type == 'Corporate':
-                        if not client.get('phone_number') or not client.get('cr12_certificate') or not client.get('post_office_address'):
-                            flash('Please complete your registration by providing phone number, CR-12 certificate, and post office address', 'info')
-                            return redirect(url_for('client_registration'))
+                    # Check basic registration requirement
+                    if client_type in ('Individual', 'Corporate') and not client.get('phone_number'):
+                        flash('Please complete your registration by providing your phone number', 'info')
+                        return redirect(url_for('client_registration'))
                     
                     flash('Successfully logged in!', 'success')
                     return redirect(url_for('client_dashboard'))
@@ -2710,7 +3999,7 @@ def client_dashboard():
                     id_front,
                     id_back,
                     cr12_certificate,
-                    post_office_address,
+                    physical_address,
                     created_at
                 FROM clients
                 WHERE id = %s
@@ -2726,15 +4015,9 @@ def client_dashboard():
             if client_type == 'Pending':
                 return redirect(url_for('client_registration'))
             
-            # Check Individual client requirements
-            if client_type == 'Individual':
-                if not client.get('phone_number') or not client.get('id_front') or not client.get('id_back'):
-                    return redirect(url_for('client_registration'))
-            
-            # Check Corporate client requirements
-            elif client_type == 'Corporate':
-                if not client.get('phone_number') or not client.get('cr12_certificate') or not client.get('post_office_address'):
-                    return redirect(url_for('client_registration'))
+            # Check basic registration requirement
+            if client_type in ('Individual', 'Corporate') and not client.get('phone_number'):
+                return redirect(url_for('client_registration'))
             
             # Fetch cases for this client
             cursor.execute("""
@@ -2808,11 +4091,14 @@ def client_dashboard():
             # Set company name in session for header display
             session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
             
+            is_employee_viewing = 'original_employee_id' in session
+            
             return render_template('client_dashboard.html', 
                                  client=client,
                                  cases=cases,
                                  matters=matters,
-                                 company_settings=company_settings)
+                                 company_settings=company_settings,
+                                 is_employee_viewing=is_employee_viewing)
     except Exception as e:
         print(f"Error fetching client dashboard data: {e}")
         flash('An error occurred while loading the dashboard.', 'error')
@@ -2998,11 +4284,10 @@ def client_documents():
 
 @app.route('/client_documents/<document_type>')
 def client_document_type(document_type):
-    """View documents for a specific client by document type (client access)"""
+    """View documents for a specific client by document type (client access) - fetched from Google Drive"""
     if 'client_id' not in session:
         return redirect(url_for('client_login'))
     
-    # Validate document type
     valid_types = ['CLIENT_PERSONAL_DOCUMENT', 'CLIENT_CASE_DOCUMENT']
     if document_type not in valid_types:
         flash('Invalid document type', 'error')
@@ -3015,20 +4300,11 @@ def client_document_type(document_type):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch client details
             cursor.execute("""
-                SELECT 
-                    id,
-                    google_id,
-                    full_name,
-                    email,
-                    phone_number,
-                    profile_picture,
-                    client_type,
-                    status,
-                    created_at
-                FROM clients
-                WHERE id = %s
+                SELECT id, google_id, full_name, email, phone_number, profile_picture,
+                       client_type, status, created_at,
+                       id_front, id_back, instruction_note, cr12_certificate, corporate_kra_pin
+                FROM clients WHERE id = %s
             """, (session['client_id'],))
             client = cursor.fetchone()
             
@@ -3036,11 +4312,185 @@ def client_document_type(document_type):
                 flash('Client not found', 'error')
                 return redirect(url_for('client_dashboard'))
             
-            # Convert date objects to strings
             if client.get('created_at'):
                 client['created_at'] = client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+
+            personal_uploads = []
+            if document_type == 'CLIENT_PERSONAL_DOCUMENT':
+                upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+
+                doc_fields = {
+                    'id_front': {'label': 'NATIONAL ID / PASSPORT', 'icon': 'fa-id-card'},
+                    'id_back': {'label': 'KRA PIN DOCUMENT', 'icon': 'fa-file-invoice'},
+                    'instruction_note': {'label': 'SIGNED INSTRUCTION NOTE', 'icon': 'fa-file-signature'},
+                    'cr12_certificate': {'label': 'CR12/CR13 CERTIFICATE', 'icon': 'fa-certificate'},
+                    'corporate_kra_pin': {'label': 'CORPORATE KRA PIN', 'icon': 'fa-file-invoice-dollar'},
+                }
+                for field, meta in doc_fields.items():
+                    filename = client.get(field)
+                    if filename:
+                        filepath = os.path.join(upload_folder, filename)
+                        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+                        size_str = 'N/A'
+                        size_int = 0
+                        if os.path.exists(filepath):
+                            size_int = os.path.getsize(filepath)
+                            if size_int < 1024:
+                                size_str = f"{size_int} B"
+                            elif size_int < 1024 * 1024:
+                                size_str = f"{size_int / 1024:.1f} KB"
+                            else:
+                                size_str = f"{size_int / (1024 * 1024):.1f} MB"
+                        personal_uploads.append({
+                            'id': None,
+                            'field': field,
+                            'label': meta['label'],
+                            'icon': meta['icon'],
+                            'filename': filename,
+                            'file_extension': ext,
+                            'size': size_int,
+                            'size_display': size_str,
+                            'url': url_for('static', filename='uploads/profile_pictures/' + filename),
+                            'source': 'legacy',
+                        })
+
+            custom_uploads = []
+            if document_type == 'CLIENT_PERSONAL_DOCUMENT':
+                cursor.execute("""
+                    SELECT id, document_type, filename, original_filename, file_size, created_at
+                    FROM client_personal_documents
+                    WHERE client_id = %s ORDER BY created_at DESC
+                """, (session['client_id'],))
+                custom_docs = cursor.fetchall()
+                for doc in custom_docs:
+                    filename = doc['filename']
+                    ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+                    size_int = doc.get('file_size', 0) or 0
+                    if size_int < 1024:
+                        size_str = f"{size_int} B"
+                    elif size_int < 1024 * 1024:
+                        size_str = f"{size_int / 1024:.1f} KB"
+                    else:
+                        size_str = f"{size_int / (1024 * 1024):.1f} MB"
+                    created_time = ''
+                    if doc.get('created_at'):
+                        created_time = doc['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    custom_uploads.append({
+                        'id': doc['id'],
+                        'label': doc['document_type'],
+                        'icon': 'fa-file-alt',
+                        'filename': filename,
+                        'file_extension': ext,
+                        'size': size_int,
+                        'size_display': size_str,
+                        'created_time': created_time,
+                        'url': url_for('static', filename='uploads/profile_pictures/' + filename),
+                    })
+
+            # Load Google Drive credentials directly from company_settings
+            google_drive_connected = False
+            cursor.execute("""
+                SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                       google_drive_scopes, google_drive_main_folder_id
+                FROM company_settings ORDER BY id DESC LIMIT 1
+            """)
+            drive_settings = cursor.fetchone()
             
-            # Map document type to display name
+            if drive_settings and drive_settings.get('google_drive_token') and drive_settings.get('google_drive_refresh_token'):
+                google_drive_connected = True
+            
+            documents = []
+            
+            if google_drive_connected:
+                try:
+                    scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+                    credentials = Credentials(
+                        token=drive_settings['google_drive_token'],
+                        refresh_token=drive_settings['google_drive_refresh_token'],
+                        token_uri=drive_settings.get('google_drive_token_uri'),
+                        client_id=GOOGLE_CLIENT_ID,
+                        client_secret=GOOGLE_CLIENT_SECRET,
+                        scopes=scopes
+                    )
+                    
+                    if credentials.expired and credentials.refresh_token:
+                        from google.auth.transport.requests import Request
+                        credentials.refresh(Request())
+                        cursor.execute("""
+                            UPDATE company_settings SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                        """, (credentials.token,))
+                        connection.commit()
+                    
+                    service = build('drive', 'v3', credentials=credentials)
+                    main_folder_id = drive_settings.get('google_drive_main_folder_id')
+                    
+                    if service and main_folder_id:
+                        client_folder_name = get_user_folder_name(client.get('phone_number'), client.get('full_name'), 'client')
+                        client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                        target_folder_id = get_or_create_folder(service, client_folder_id, document_type)
+                        
+                        if target_folder_id:
+                            query = f"'{target_folder_id}' in parents and trashed=false"
+                            results = service.files().list(
+                                q=query, spaces='drive',
+                                fields='files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                orderBy='modifiedTime desc'
+                            ).execute()
+                            
+                            for file in results.get('files', []):
+                                if file.get('mimeType') == 'application/vnd.google-apps.folder':
+                                    continue
+                                
+                                created_time = file.get('createdTime', '')
+                                modified_time = file.get('modifiedTime', '')
+                                if created_time:
+                                    try:
+                                        from datetime import datetime
+                                        dt = datetime.fromisoformat(created_time.replace('Z', '+00:00'))
+                                        created_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                    except:
+                                        pass
+                                if modified_time:
+                                    try:
+                                        from datetime import datetime
+                                        dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                                        modified_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                    except:
+                                        pass
+                                
+                                size_val = file.get('size', '0')
+                                try:
+                                    size_int = int(size_val) if size_val else 0
+                                    if size_int < 1024:
+                                        size_str = f"{size_int} B"
+                                    elif size_int < 1024 * 1024:
+                                        size_str = f"{size_int / 1024:.1f} KB"
+                                    else:
+                                        size_str = f"{size_int / (1024 * 1024):.1f} MB"
+                                except:
+                                    size_int = 0
+                                    size_str = "Unknown"
+                                
+                                fname = file.get('name', 'Unknown')
+                                ext = fname.rsplit('.', 1)[1].lower() if '.' in fname else ''
+                                
+                                documents.append({
+                                    'id': file.get('id'),
+                                    'name': fname,
+                                    'file_extension': ext,
+                                    'created_time': created_time,
+                                    'modified_time': modified_time,
+                                    'url': file.get('webViewLink', ''),
+                                    'size': size_int,
+                                    'size_display': size_str,
+                                    'mime_type': file.get('mimeType', '')
+                                })
+                except Exception as e:
+                    print(f"Error fetching documents from Google Drive: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             document_type_names = {
                 'CLIENT_PERSONAL_DOCUMENT': 'Personal Documents',
                 'CLIENT_CASE_DOCUMENT': 'Case Documents'
@@ -3056,6 +4506,10 @@ def client_document_type(document_type):
                                  client_id=session['client_id'],
                                  document_type=document_type,
                                  document_type_name=document_type_name,
+                                 documents=documents,
+                                 personal_uploads=personal_uploads,
+                                 custom_uploads=custom_uploads,
+                                 google_drive_connected=google_drive_connected,
                                  company_settings=company_settings)
     except Exception as e:
         print(f"Error fetching client documents: {e}")
@@ -3063,6 +4517,515 @@ def client_document_type(document_type):
         return redirect(url_for('client_dashboard'))
     finally:
         connection.close()
+
+@app.route('/api/client_documents/<document_type>/upload', methods=['POST'])
+def client_upload_document(document_type):
+    """Upload a client document to Google Drive using company-level credentials"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    valid_types = ['CLIENT_PERSONAL_DOCUMENT', 'CLIENT_CASE_DOCUMENT']
+    if document_type not in valid_types:
+        return jsonify({'success': False, 'error': 'Invalid document type'}), 400
+    
+    try:
+        # Always load Google Drive credentials from company_settings (not client session)
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+        
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Load Drive credentials from company_settings
+                cursor.execute("""
+                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                           google_drive_scopes, google_drive_main_folder_id
+                    FROM company_settings ORDER BY id DESC LIMIT 1
+                """)
+                settings = cursor.fetchone()
+                
+                if not settings or not settings.get('google_drive_token') or not settings.get('google_drive_refresh_token'):
+                    print("ERROR: Google Drive credentials not found in company_settings")
+                    return jsonify({'success': False, 'error': 'Google Drive not connected. Please ask the administrator to connect Google Drive in Documents Settings.'}), 400
+                
+                # Build credentials and service
+                scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                credentials = Credentials(
+                    token=settings['google_drive_token'],
+                    refresh_token=settings['google_drive_refresh_token'],
+                    token_uri=settings.get('google_drive_token_uri'),
+                    client_id=GOOGLE_CLIENT_ID,
+                    client_secret=GOOGLE_CLIENT_SECRET,
+                    scopes=scopes
+                )
+                
+                # Refresh token if expired
+                if credentials.expired and credentials.refresh_token:
+                    from google.auth.transport.requests import Request
+                    credentials.refresh(Request())
+                    # Save refreshed token back to DB
+                    cursor.execute("""
+                        UPDATE company_settings SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                    """, (credentials.token,))
+                    connection.commit()
+                    print("[OK] Refreshed Google Drive token for client upload")
+                
+                service = build('drive', 'v3', credentials=credentials)
+                
+                # Get main folder ID
+                main_folder_id = settings.get('google_drive_main_folder_id')
+                if not main_folder_id:
+                    print("ERROR: google_drive_main_folder_id not set in company_settings")
+                    return jsonify({'success': False, 'error': 'Google Drive main folder not set up. Please ask the administrator to create the main folder in Documents Settings.'}), 400
+                
+                # Get client info
+                cursor.execute("SELECT id, full_name, phone_number FROM clients WHERE id = %s", (session['client_id'],))
+                client = cursor.fetchone()
+                if not client:
+                    return jsonify({'success': False, 'error': 'Client not found'}), 404
+                
+                # Navigate/create folder structure: SHERIA CENTRIC > [client folder] > [document_type]
+                client_folder_name = get_user_folder_name(client.get('phone_number'), client.get('full_name'), 'client')
+                print(f"INFO: Client upload - folder: {client_folder_name}/{document_type}")
+                client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                target_folder_id = get_or_create_folder(service, client_folder_id, document_type)
+                
+                # Handle file
+                if 'document_file' not in request.files:
+                    return jsonify({'success': False, 'error': 'No file provided'}), 400
+                
+                file = request.files['document_file']
+                if not file or file.filename == '':
+                    return jsonify({'success': False, 'error': 'No file selected'}), 400
+                
+                file_content = file.read()
+                file_name = secure_filename(file.filename)
+                description = request.form.get('description', '').strip()
+                
+                file_ext = file_name.rsplit('.', 1)[1].lower() if '.' in file_name else ''
+                mime_types = {
+                    'pdf': 'application/pdf',
+                    'doc': 'application/msword',
+                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif',
+                    'xls': 'application/vnd.ms-excel',
+                    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'csv': 'text/csv', 'txt': 'text/plain'
+                }
+                mime_type = mime_types.get(file_ext, 'application/octet-stream')
+                
+                file_metadata = {
+                    'name': file_name,
+                    'parents': [target_folder_id]
+                }
+                if description:
+                    file_metadata['description'] = description
+                
+                media = MediaIoBaseUpload(BytesIO(file_content), mimetype=mime_type, resumable=True)
+                
+                uploaded_file = service.files().create(
+                    body=file_metadata, media_body=media,
+                    fields='id, name, webViewLink, webContentLink'
+                ).execute()
+                
+                file_id = uploaded_file.get('id')
+                file_url = uploaded_file.get('webViewLink', f"https://drive.google.com/file/d/{file_id}/view")
+                print(f"[OK] Client uploaded document: {file_name} -> {file_id}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Document uploaded successfully to Google Drive',
+                    'file_id': file_id,
+                    'file_name': file_name,
+                    'file_url': file_url
+                })
+        finally:
+            connection.close()
+    
+    except HttpError as error:
+        print(f"Google Drive API error during client upload: {error}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Google Drive error: {str(error)}'}), 500
+    except Exception as e:
+        print(f"Error uploading client document: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Upload failed: {str(e)}'}), 500
+
+@app.route('/api/client_documents/delete/<file_id>', methods=['POST'])
+def client_delete_document(file_id):
+    """Delete a client document from Google Drive (move to trash) using company credentials"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+        
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                    FROM company_settings ORDER BY id DESC LIMIT 1
+                """)
+                settings = cursor.fetchone()
+                
+                if not settings or not settings.get('google_drive_token') or not settings.get('google_drive_refresh_token'):
+                    return jsonify({'success': False, 'error': 'Google Drive not connected'}), 400
+                
+                scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                credentials = Credentials(
+                    token=settings['google_drive_token'],
+                    refresh_token=settings['google_drive_refresh_token'],
+                    token_uri=settings.get('google_drive_token_uri'),
+                    client_id=GOOGLE_CLIENT_ID,
+                    client_secret=GOOGLE_CLIENT_SECRET,
+                    scopes=scopes
+                )
+                
+                if credentials.expired and credentials.refresh_token:
+                    from google.auth.transport.requests import Request
+                    credentials.refresh(Request())
+                    cursor.execute("""
+                        UPDATE company_settings SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                    """, (credentials.token,))
+                    connection.commit()
+                
+                service = build('drive', 'v3', credentials=credentials)
+                service.files().update(fileId=file_id, body={'trashed': True}).execute()
+                print(f"[OK] Client deleted document: {file_id}")
+                
+                return jsonify({'success': True, 'message': 'Document deleted successfully'})
+        finally:
+            connection.close()
+    except HttpError as error:
+        print(f"Google Drive API error deleting file: {error}")
+        return jsonify({'success': False, 'error': f'Failed to delete: {str(error)}'}), 500
+    except Exception as e:
+        print(f"Error deleting client document: {e}")
+        return jsonify({'success': False, 'error': f'Delete failed: {str(e)}'}), 500
+
+@app.route('/api/client_personal_documents/upload', methods=['POST'])
+def client_upload_personal_document():
+    """Upload a custom registration document with a free-text document type"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    document_type_label = request.form.get('document_type', '').strip().upper()
+    if not document_type_label:
+        return jsonify({'success': False, 'error': 'Document type is required'}), 400
+
+    if 'document_file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+    file = request.files['document_file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            client_id = session['client_id']
+            original_filename = secure_filename(file.filename)
+            file_ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'bin'
+            unique_filename = f"personal_doc_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+            filepath = os.path.join(upload_folder, unique_filename)
+            file.save(filepath)
+
+            file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+
+            cursor.execute("""
+                INSERT INTO client_personal_documents (client_id, document_type, filename, original_filename, file_size)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (client_id, document_type_label, unique_filename, original_filename, file_size))
+            connection.commit()
+
+            return jsonify({'success': True, 'message': 'Document uploaded successfully', 'filename': unique_filename})
+    except Exception as e:
+        print(f"Error uploading personal document: {e}")
+        return jsonify({'success': False, 'error': f'Upload failed: {str(e)}'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/client_personal_documents/delete/<int:doc_id>', methods=['POST'])
+def client_delete_personal_document(doc_id):
+    """Delete a custom registration document"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT filename FROM client_personal_documents WHERE id = %s AND client_id = %s",
+                           (doc_id, session['client_id']))
+            doc = cursor.fetchone()
+            if not doc:
+                return jsonify({'success': False, 'error': 'Document not found'}), 404
+
+            cursor.execute("DELETE FROM client_personal_documents WHERE id = %s AND client_id = %s",
+                           (doc_id, session['client_id']))
+            connection.commit()
+
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+            old_path = os.path.join(upload_folder, doc['filename'])
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+
+            return jsonify({'success': True, 'message': 'Document deleted successfully'})
+    except Exception as e:
+        print(f"Error deleting personal document: {e}")
+        return jsonify({'success': False, 'error': f'Delete failed: {str(e)}'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/client_personal_documents/update/<int:doc_id>', methods=['POST'])
+def client_update_personal_document(doc_id):
+    """Replace a custom registration document"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if 'document_file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+    file = request.files['document_file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            client_id = session['client_id']
+            cursor.execute("SELECT filename FROM client_personal_documents WHERE id = %s AND client_id = %s",
+                           (doc_id, client_id))
+            doc = cursor.fetchone()
+            if not doc:
+                return jsonify({'success': False, 'error': 'Document not found'}), 404
+
+            old_filename = doc['filename']
+            original_filename = secure_filename(file.filename)
+            file_ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'bin'
+            unique_filename = f"personal_doc_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+            filepath = os.path.join(upload_folder, unique_filename)
+            file.save(filepath)
+
+            file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+
+            cursor.execute("""
+                UPDATE client_personal_documents SET filename = %s, original_filename = %s, file_size = %s
+                WHERE id = %s AND client_id = %s
+            """, (unique_filename, original_filename, file_size, doc_id, client_id))
+            connection.commit()
+
+            old_path = os.path.join(upload_folder, old_filename)
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+
+            return jsonify({'success': True, 'message': 'Document updated successfully', 'filename': unique_filename})
+    except Exception as e:
+        print(f"Error updating personal document: {e}")
+        return jsonify({'success': False, 'error': f'Update failed: {str(e)}'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/client_personal_documents/download/<int:doc_id>')
+def client_download_personal_document(doc_id):
+    """Download a custom registration document"""
+    if 'client_id' not in session:
+        flash('Unauthorized', 'error')
+        return redirect(url_for('client_login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error', 'error')
+        return redirect(url_for('client_documents'))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT filename, original_filename FROM client_personal_documents WHERE id = %s AND client_id = %s",
+                           (doc_id, session['client_id']))
+            doc = cursor.fetchone()
+            if not doc:
+                flash('Document not found', 'error')
+                return redirect(url_for('client_documents'))
+
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+            return send_from_directory(
+                os.path.abspath(upload_folder),
+                doc['filename'],
+                as_attachment=True,
+                download_name=doc.get('original_filename') or doc['filename']
+            )
+    except Exception as e:
+        print(f"Error downloading personal document: {e}")
+        flash('Download failed', 'error')
+        return redirect(url_for('client_documents'))
+    finally:
+        connection.close()
+
+
+@app.route('/api/client_personal_upload/update/<field>', methods=['POST'])
+def client_update_personal_upload(field):
+    """Replace a personal upload document for the logged-in client"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    valid_fields = ['id_front', 'id_back', 'instruction_note', 'cr12_certificate', 'corporate_kra_pin']
+    if field not in valid_fields:
+        return jsonify({'success': False, 'error': 'Invalid document field'}), 400
+
+    if 'document_file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+    file = request.files['document_file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            client_id = session['client_id']
+            cursor.execute(f"SELECT {field} FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+            old_filename = client.get(field)
+
+            filename = secure_filename(file.filename)
+            file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'bin'
+            unique_filename = f"{field}_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+            filepath = os.path.join(upload_folder, unique_filename)
+            file.save(filepath)
+
+            cursor.execute(f"UPDATE clients SET {field} = %s WHERE id = %s", (unique_filename, client_id))
+            connection.commit()
+
+            if old_filename:
+                old_path = os.path.join(upload_folder, old_filename)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception:
+                        pass
+
+            return jsonify({'success': True, 'message': 'Document updated successfully', 'filename': unique_filename})
+    except Exception as e:
+        print(f"Error updating personal upload: {e}")
+        return jsonify({'success': False, 'error': f'Update failed: {str(e)}'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/client_personal_upload/delete/<field>', methods=['POST'])
+def client_delete_personal_upload(field):
+    """Delete a personal upload document for the logged-in client"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    valid_fields = ['id_front', 'id_back', 'instruction_note', 'cr12_certificate', 'corporate_kra_pin']
+    if field not in valid_fields:
+        return jsonify({'success': False, 'error': 'Invalid document field'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            client_id = session['client_id']
+            cursor.execute(f"SELECT {field} FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+            old_filename = client.get(field)
+
+            cursor.execute(f"UPDATE clients SET {field} = NULL WHERE id = %s", (client_id,))
+            connection.commit()
+
+            if old_filename:
+                upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+                old_path = os.path.join(upload_folder, old_filename)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception:
+                        pass
+
+            return jsonify({'success': True, 'message': 'Document deleted successfully'})
+    except Exception as e:
+        print(f"Error deleting personal upload: {e}")
+        return jsonify({'success': False, 'error': f'Delete failed: {str(e)}'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/client_personal_upload/download/<field>')
+def client_download_personal_upload(field):
+    """Download a personal upload document for the logged-in client"""
+    if 'client_id' not in session:
+        flash('Unauthorized', 'error')
+        return redirect(url_for('client_login'))
+
+    valid_fields = ['id_front', 'id_back', 'instruction_note', 'cr12_certificate', 'corporate_kra_pin']
+    if field not in valid_fields:
+        flash('Invalid document field', 'error')
+        return redirect(url_for('client_documents'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error', 'error')
+        return redirect(url_for('client_documents'))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(f"SELECT {field} FROM clients WHERE id = %s", (session['client_id'],))
+            client = cursor.fetchone()
+            if not client or not client.get(field):
+                flash('Document not found', 'error')
+                return redirect(url_for('client_documents'))
+
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+            return send_from_directory(
+                os.path.abspath(upload_folder),
+                client[field],
+                as_attachment=True
+            )
+    except Exception as e:
+        print(f"Error downloading personal upload: {e}")
+        flash('Download failed', 'error')
+        return redirect(url_for('client_documents'))
+    finally:
+        connection.close()
+
 
 @app.route('/client_cases')
 def client_cases():
@@ -3544,8 +5507,8 @@ def client_reminders():
 
 @app.route('/client_messages')
 def client_messages():
-    """Client messages page - displays messages between client and support team"""
-    if 'client_id' not in session:
+    """Client inbox - displays conversations grouped by employee, plus chat view"""
+    if 'client_id' not in session and 'original_employee_id' not in session:
         return redirect(url_for('client_login'))
     
     connection = get_db_connection()
@@ -3555,9 +5518,8 @@ def client_messages():
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Try to fetch messages from webapp_messages table if it exists
-            # For now, we'll use an empty list if the table doesn't exist
             messages = []
+            conversations = []
             try:
                 cursor.execute("""
                     SELECT 
@@ -3569,9 +5531,12 @@ def client_messages():
                         m.attachment_file,
                         m.attachment_type,
                         m.sender_type,
+                        m.delivery_channel,
+                        m.whatsapp_message_id,
+                        m.whatsapp_status,
+                        m.is_read,
                         m.created_at,
                         e.full_name as employee_name,
-                        e.full_name as employee_full_name,
                         e.profile_picture as employee_profile_picture
                     FROM webapp_messages m
                     LEFT JOIN employees e ON m.employee_id = e.id
@@ -3580,28 +5545,573 @@ def client_messages():
                 """, (session['client_id'],))
                 messages = cursor.fetchall()
                 
-                # Convert date objects to strings
                 for msg in messages:
                     if msg.get('created_at'):
-                        msg['created_at'] = msg['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                        if hasattr(msg['created_at'], 'strftime'):
+                            msg['created_at'] = msg['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                        else:
+                            msg['created_at'] = str(msg['created_at'])
+                    if msg.get('is_read') is None:
+                        msg['is_read'] = 0
+
+                # Build conversation summaries grouped by employee_id
+                conv_map = {}
+                for msg in messages:
+                    eid = msg.get('employee_id')
+                    if not eid:
+                        continue
+                    if eid not in conv_map:
+                        conv_map[eid] = {
+                            'employee_id': eid,
+                            'employee_name': msg.get('employee_name') or 'Staff',
+                            'employee_profile_picture': msg.get('employee_profile_picture'),
+                            'last_message': msg.get('message', ''),
+                            'last_time': msg.get('created_at', ''),
+                            'last_sender_type': msg.get('sender_type', ''),
+                            'unread_count': 0,
+                            'total_count': 0,
+                            'has_attachment': bool(msg.get('attachment_file')),
+                        }
+                    c = conv_map[eid]
+                    c['last_message'] = msg.get('message', '') or ''
+                    c['last_time'] = msg.get('created_at', '')
+                    c['last_sender_type'] = msg.get('sender_type', '')
+                    c['total_count'] += 1
+                    if msg.get('attachment_file'):
+                        c['has_attachment'] = True
+                    if msg.get('sender_type') == 'employee' and not msg.get('is_read'):
+                        c['unread_count'] += 1
+
+                conversations = sorted(conv_map.values(), key=lambda x: x['last_time'], reverse=True)
+
             except Exception as e:
-                # Table doesn't exist or error fetching messages - use empty list
                 print(f"Messages table may not exist or error fetching: {e}")
                 messages = []
+                conversations = []
             
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
             
+            is_employee_viewing = 'original_employee_id' in session
+            employee_name = session.get('original_employee_name', '')
+            
+            client_info = None
+            try:
+                cursor.execute("SELECT id, full_name, email, profile_picture FROM clients WHERE id = %s", (session['client_id'],))
+                client_info = cursor.fetchone()
+            except Exception:
+                pass
+            
             return render_template('client_messages.html',
                                  messages=messages,
-                                 company_settings=company_settings)
+                                 conversations=conversations,
+                                 company_settings=company_settings,
+                                 is_employee_viewing=is_employee_viewing,
+                                 employee_name=employee_name,
+                                 client_info=client_info)
     except Exception as e:
         print(f"Error fetching client messages: {e}")
         flash('An error occurred while loading messages.', 'error')
         return redirect(url_for('client_dashboard'))
     finally:
         connection.close()
+
+@app.route('/api/client/messages/<int:message_id>/read', methods=['POST'])
+def mark_client_message_read(message_id):
+    """Mark a single message as read for the logged-in client"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE webapp_messages SET is_read = 1 WHERE id = %s AND client_id = %s",
+                (message_id, session['client_id'])
+            )
+            connection.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error marking message read: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/client/messages/unread-count')
+def client_unread_count():
+    """Return the unread message count for the logged-in client"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'unread_count': 0})
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': True, 'unread_count': 0})
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM webapp_messages WHERE client_id = %s AND sender_type = 'employee' AND (is_read = 0 OR is_read IS NULL)",
+                (session['client_id'],)
+            )
+            row = cursor.fetchone()
+            count = row['cnt'] if isinstance(row, dict) else (row[0] if row else 0)
+        return jsonify({'success': True, 'unread_count': count})
+    except Exception:
+        return jsonify({'success': True, 'unread_count': 0})
+    finally:
+        connection.close()
+
+@app.route('/api/client/messages/send', methods=['POST'])
+def send_client_message():
+    """Send a message — as client (sender_type=client) or employee viewing as client (sender_type=employee)"""
+    if 'client_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    client_id = session['client_id']
+    is_employee = 'original_employee_id' in session
+    sender_type = 'employee' if is_employee else 'client'
+    if is_employee:
+        employee_id = session.get('original_employee_id')
+    else:
+        employee_id = request.form.get('employee_id')
+        if employee_id:
+            try:
+                employee_id = int(employee_id)
+            except (ValueError, TypeError):
+                employee_id = None
+
+    subject = request.form.get('subject', '').strip() or 'Message'
+    message = request.form.get('message', '').strip()
+    attachment = request.files.get('attachment')
+
+    if not message and not attachment:
+        return jsonify({'success': False, 'error': 'Please enter a message or attach a file'}), 400
+
+    attachment_file = None
+    attachment_type = None
+    if attachment and attachment.filename:
+        import uuid as _uuid
+        ext = os.path.splitext(attachment.filename)[1].lower()
+        safe_name = f"{_uuid.uuid4().hex}{ext}"
+        upload_dir = os.path.join('static', 'uploads', 'message_attachments')
+        os.makedirs(upload_dir, exist_ok=True)
+        attachment.save(os.path.join(upload_dir, safe_name))
+        attachment_file = safe_name
+        attachment_type = 'image' if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp'] else 'document'
+
+    # Determine delivery channel: also send via WhatsApp if configured
+    send_via_whatsapp = request.form.get('send_whatsapp', '1')
+    delivery_channel = 'web'
+    wa_msg_id = None
+    wa_status = None
+    wa_error = None
+
+    print(f"[WhatsApp Debug] send_whatsapp flag = '{send_via_whatsapp}', client_id = {client_id}")
+
+    if send_via_whatsapp == '1':
+        ws = get_whatsapp_settings()
+        if not ws:
+            wa_error = 'WhatsApp not configured — go to Communication Settings to set it up'
+            print(f"[WhatsApp] {wa_error}")
+        else:
+            print(f"[WhatsApp Debug] Settings found, phone_number_id = {ws.get('phone_number_id')}")
+            conn_tmp = get_db_connection()
+            client_phone = None
+            if conn_tmp:
+                try:
+                    with conn_tmp.cursor(pymysql.cursors.DictCursor) as cur:
+                        cur.execute("SELECT phone_number, full_name FROM clients WHERE id = %s", (client_id,))
+                        row = cur.fetchone()
+                        if row:
+                            client_phone = row.get('phone_number')
+                            print(f"[WhatsApp Debug] Client '{row.get('full_name')}' phone = '{client_phone}'")
+                        else:
+                            print(f"[WhatsApp] No client found with id {client_id}")
+                except Exception as e:
+                    print(f"[WhatsApp] Error looking up client phone: {e}")
+                finally:
+                    conn_tmp.close()
+
+            if not client_phone:
+                wa_error = f'Client (id={client_id}) has no phone number — update their profile first'
+                print(f"[WhatsApp] {wa_error}")
+            else:
+                text_to_send = message or ''
+                if subject and subject != 'Message':
+                    text_to_send = f"*{subject}*\n\n{text_to_send}"
+
+                if attachment_file and attachment_type:
+                    base_url = os.environ.get('APP_BASE_URL', request.url_root.rstrip('/'))
+                    media_url = f"{base_url}/static/uploads/message_attachments/{attachment_file}"
+                    print(f"[WhatsApp Debug] Sending media to {client_phone}: {media_url}")
+                    ok, result = send_whatsapp_media(client_phone, media_url, caption=text_to_send, media_type=attachment_type, settings=ws)
+                elif text_to_send:
+                    print(f"[WhatsApp Debug] Sending text to {client_phone}: {text_to_send[:80]}...")
+                    ok, result = send_whatsapp_message(client_phone, text_to_send, ws)
+                else:
+                    ok, result = False, 'Nothing to send'
+
+                if ok:
+                    delivery_channel = 'whatsapp'
+                    wa_msg_id = result
+                    wa_status = 'sent'
+                    print(f"[WhatsApp] Message sent! wa_id = {wa_msg_id}")
+                else:
+                    wa_error = result
+                    print(f"[WhatsApp] FAILED to send to {client_phone}: {result}")
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO webapp_messages
+                    (client_id, employee_id, subject, message, attachment_file, attachment_type,
+                     sender_type, delivery_channel, whatsapp_message_id, whatsapp_status, is_read, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, NOW())
+            """, (client_id, employee_id, subject, message, attachment_file, attachment_type,
+                  sender_type, delivery_channel, wa_msg_id, wa_status))
+            connection.commit()
+        resp = {'success': True, 'delivery_channel': delivery_channel}
+        if wa_error:
+            resp['whatsapp_error'] = wa_error
+        return jsonify(resp)
+    except Exception as e:
+        print(f"Error sending message: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        connection.close()
+
+# ==================== WHATSAPP API ROUTES ====================
+
+@app.route('/api/whatsapp/settings/save', methods=['POST'])
+def save_whatsapp_settings():
+    """Save or update WhatsApp Cloud API settings"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    access_token = data.get('access_token', '').strip()
+    phone_number_id = data.get('phone_number_id', '').strip()
+    webhook_verify_token = data.get('webhook_verify_token', '').strip()
+    waba_id = data.get('whatsapp_business_account_id', '').strip()
+    display_phone = data.get('display_phone_number', '').strip()
+    api_version = data.get('api_version', 'v21.0').strip()
+
+    if not access_token or not phone_number_id or not webhook_verify_token:
+        return jsonify({'success': False, 'error': 'Access Token, Phone Number ID, and Webhook Verify Token are required'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM whatsapp_settings LIMIT 1")
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute("""
+                    UPDATE whatsapp_settings SET
+                        access_token=%s, phone_number_id=%s, whatsapp_business_account_id=%s,
+                        webhook_verify_token=%s, display_phone_number=%s, api_version=%s, is_active=1
+                    WHERE id=%s
+                """, (access_token, phone_number_id, waba_id, webhook_verify_token, display_phone, api_version, existing['id']))
+            else:
+                cursor.execute("""
+                    INSERT INTO whatsapp_settings
+                        (access_token, phone_number_id, whatsapp_business_account_id, webhook_verify_token, display_phone_number, api_version, is_active)
+                    VALUES (%s,%s,%s,%s,%s,%s,1)
+                """, (access_token, phone_number_id, waba_id, webhook_verify_token, display_phone, api_version))
+            connection.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error saving WhatsApp settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/whatsapp/settings', methods=['GET'])
+def get_whatsapp_settings_api():
+    """Return current WhatsApp settings (tokens masked)"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False}), 401
+    ws = get_whatsapp_settings()
+    if not ws:
+        return jsonify({'success': True, 'settings': None})
+    return jsonify({'success': True, 'settings': {
+        'phone_number_id': ws.get('phone_number_id', ''),
+        'whatsapp_business_account_id': ws.get('whatsapp_business_account_id', ''),
+        'display_phone_number': ws.get('display_phone_number', ''),
+        'api_version': ws.get('api_version', 'v21.0'),
+        'webhook_verify_token': ws.get('webhook_verify_token', ''),
+        'has_access_token': bool(ws.get('access_token')),
+        'is_active': bool(ws.get('is_active'))
+    }})
+
+
+@app.route('/api/whatsapp/test', methods=['POST'])
+def test_whatsapp_connection():
+    """Test WhatsApp connection by sending a test message to the configured number"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+    ws = get_whatsapp_settings()
+    if not ws:
+        return jsonify({'success': False, 'error': 'WhatsApp not configured'}), 400
+
+    test_phone = request.get_json().get('test_phone', ws.get('display_phone_number', ''))
+    if not test_phone:
+        return jsonify({'success': False, 'error': 'No phone number to test'}), 400
+
+    ok, result = send_whatsapp_message(test_phone, 'Test message from SHERIA CENTRIC. WhatsApp integration is working!', ws)
+    if ok:
+        return jsonify({'success': True, 'message': f'Test message sent! (ID: {result})'})
+    return jsonify({'success': False, 'error': result}), 400
+
+
+@app.route('/api/whatsapp/send-direct', methods=['POST'])
+def whatsapp_send_direct():
+    """Send a WhatsApp message directly to any phone number"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    phone = data.get('phone', '').strip()
+    msg_text = data.get('message', '').strip()
+
+    if not phone:
+        return jsonify({'success': False, 'error': 'Phone number is required'}), 400
+    if not msg_text:
+        return jsonify({'success': False, 'error': 'Message text is required'}), 400
+
+    ws = get_whatsapp_settings()
+    if not ws:
+        return jsonify({'success': False, 'error': 'WhatsApp is not configured. Fill in and save your settings first.'}), 400
+
+    print(f"[WhatsApp Direct] Sending to {phone}: {msg_text[:80]}...")
+    ok, result = send_whatsapp_message(phone, msg_text, ws)
+    if ok:
+        print(f"[WhatsApp Direct] Sent! ID: {result}")
+        return jsonify({'success': True, 'message': f'Message sent to {phone}! (ID: {result})'})
+
+    print(f"[WhatsApp Direct] FAILED: {result}")
+    return jsonify({'success': False, 'error': result}), 400
+
+
+@app.route('/webhook/whatsapp', methods=['GET'])
+def whatsapp_webhook_verify():
+    """Verify the webhook with Meta (hub.challenge handshake)"""
+    ws = get_whatsapp_settings()
+    verify_token = ws.get('webhook_verify_token', '') if ws else ''
+    mode = request.args.get('hub.mode')
+    token = request.args.get('hub.verify_token')
+    challenge = request.args.get('hub.challenge')
+    if mode == 'subscribe' and token == verify_token and verify_token:
+        print("[WhatsApp] Webhook verified")
+        return challenge, 200
+    return 'Forbidden', 403
+
+
+@app.route('/webhook/whatsapp', methods=['POST'])
+def whatsapp_webhook_receive():
+    """Receive incoming WhatsApp messages and status updates"""
+    payload = request.get_json(silent=True)
+    if not payload:
+        return 'OK', 200
+
+    try:
+        for entry in payload.get('entry', []):
+            for change in entry.get('changes', []):
+                value = change.get('value', {})
+
+                # --- Status updates (sent / delivered / read / failed) ---
+                for status in value.get('statuses', []):
+                    wa_id = status.get('id')
+                    wa_status = status.get('status')  # sent, delivered, read, failed
+                    if wa_id and wa_status:
+                        conn = get_db_connection()
+                        if conn:
+                            try:
+                                with conn.cursor() as cur:
+                                    cur.execute(
+                                        "UPDATE webapp_messages SET whatsapp_status=%s WHERE whatsapp_message_id=%s",
+                                        (wa_status, wa_id))
+                                    conn.commit()
+                            except Exception as e:
+                                print(f"[WhatsApp] Status update error: {e}")
+                            finally:
+                                conn.close()
+
+                # --- Incoming messages ---
+                for msg in value.get('messages', []):
+                    from_phone = msg.get('from', '')  # sender phone without +
+                    wa_msg_id = msg.get('id', '')
+                    msg_type = msg.get('type', '')
+                    timestamp = msg.get('timestamp', '')
+
+                    text_body = ''
+                    attachment_file = None
+                    attachment_type = None
+
+                    if msg_type == 'text':
+                        text_body = msg.get('text', {}).get('body', '')
+                    elif msg_type in ('image', 'document', 'video', 'audio'):
+                        media = msg.get(msg_type, {})
+                        text_body = media.get('caption', '')
+                        attachment_type = 'image' if msg_type == 'image' else 'document'
+
+                    if not from_phone:
+                        continue
+
+                    # Find client by phone number
+                    conn = get_db_connection()
+                    if not conn:
+                        continue
+                    try:
+                        with conn.cursor(pymysql.cursors.DictCursor) as cur:
+                            # Try matching phone (with or without country code prefix)
+                            cur.execute("""
+                                SELECT id FROM clients
+                                WHERE REPLACE(REPLACE(REPLACE(phone_number,' ',''),'-',''),'+','') = %s
+                                   OR REPLACE(REPLACE(REPLACE(phone_number,' ',''),'-',''),'+','') LIKE %s
+                                LIMIT 1
+                            """, (from_phone, '%' + from_phone[-9:]))
+                            client = cur.fetchone()
+
+                            if not client:
+                                print(f"[WhatsApp] No client found for phone {from_phone}")
+                                continue
+
+                            # Check for duplicate
+                            cur.execute("SELECT id FROM webapp_messages WHERE whatsapp_message_id=%s LIMIT 1", (wa_msg_id,))
+                            if cur.fetchone():
+                                continue
+
+                            cur.execute("""
+                                INSERT INTO webapp_messages
+                                    (client_id, subject, message, attachment_file, attachment_type,
+                                     sender_type, delivery_channel, whatsapp_message_id, whatsapp_status, is_read, created_at)
+                                VALUES (%s, %s, %s, %s, %s, 'client', 'whatsapp', %s, 'received', 0, NOW())
+                            """, (client['id'], 'WhatsApp Message', text_body, attachment_file, attachment_type, wa_msg_id))
+                            conn.commit()
+                            print(f"[WhatsApp] Saved incoming message from {from_phone} for client {client['id']}")
+                    except Exception as e:
+                        print(f"[WhatsApp] Error saving incoming message: {e}")
+                    finally:
+                        conn.close()
+    except Exception as e:
+        print(f"[WhatsApp] Webhook processing error: {e}")
+
+    return 'OK', 200
+
+
+# ==================== SMS API ROUTES ====================
+
+@app.route('/api/sms/settings/save', methods=['POST'])
+def save_sms_settings():
+    """Save or update SMS gateway settings"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    provider = data.get('provider', '').strip()
+    api_key = data.get('api_key', '').strip()
+    api_secret = data.get('api_secret', '').strip()
+    sender_id = data.get('sender_id', '').strip()
+    username = data.get('username', '').strip()
+    country_code = data.get('default_country_code', '+254').strip()
+    custom_url = data.get('custom_api_url', '').strip()
+
+    if not provider or not api_key:
+        return jsonify({'success': False, 'error': 'Provider and API Key are required'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM sms_settings LIMIT 1")
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute("""
+                    UPDATE sms_settings SET
+                        provider=%s, api_key=%s, api_secret=%s, sender_id=%s,
+                        username=%s, default_country_code=%s, custom_api_url=%s, is_active=1
+                    WHERE id=%s
+                """, (provider, api_key, api_secret, sender_id, username, country_code, custom_url, existing['id']))
+            else:
+                cursor.execute("""
+                    INSERT INTO sms_settings
+                        (provider, api_key, api_secret, sender_id, username, default_country_code, custom_api_url, is_active)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,1)
+                """, (provider, api_key, api_secret, sender_id, username, country_code, custom_url))
+            connection.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error saving SMS settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/sms/settings', methods=['GET'])
+def get_sms_settings_api():
+    """Return current SMS settings (keys masked)"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False}), 401
+    ss = get_sms_settings()
+    if not ss:
+        return jsonify({'success': True, 'settings': None})
+    return jsonify({'success': True, 'settings': {
+        'provider': ss.get('provider', ''),
+        'sender_id': ss.get('sender_id', ''),
+        'username': ss.get('username', ''),
+        'default_country_code': ss.get('default_country_code', '+254'),
+        'custom_api_url': ss.get('custom_api_url', ''),
+        'has_api_key': bool(ss.get('api_key')),
+        'has_api_secret': bool(ss.get('api_secret')),
+        'is_active': bool(ss.get('is_active'))
+    }})
+
+
+@app.route('/api/sms/send-direct', methods=['POST'])
+def sms_send_direct():
+    """Send an SMS directly to any phone number"""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    phone = data.get('phone', '').strip()
+    msg_text = data.get('message', '').strip()
+
+    if not phone:
+        return jsonify({'success': False, 'error': 'Phone number is required'}), 400
+    if not msg_text:
+        return jsonify({'success': False, 'error': 'Message text is required'}), 400
+
+    ss = get_sms_settings()
+    if not ss:
+        return jsonify({'success': False, 'error': 'SMS is not configured. Fill in and save your settings first.'}), 400
+
+    print(f"[SMS Direct] Sending to {phone} via {ss.get('provider')}: {msg_text[:80]}...")
+    ok, result = send_sms(phone, msg_text, ss)
+    if ok:
+        print(f"[SMS Direct] Sent! ID: {result}")
+        return jsonify({'success': True, 'message': f'SMS sent to {phone}! (ID: {result})'})
+
+    print(f"[SMS Direct] FAILED: {result}")
+    return jsonify({'success': False, 'error': result}), 400
+
 
 @app.route('/client_registration')
 def client_registration():
@@ -3650,11 +6160,14 @@ def submit_client_registration():
             file.save(filepath)
             profile_picture = unique_filename
     
-    # Handle Individual client requirements (ID front and back)
+    # Handle Individual client requirements (all optional uploads)
     id_front = None
     id_back = None
+    id_number = None
+    instruction_note = None
     if client_type == 'Individual':
-        # Handle ID front upload
+        id_number = request.form.get('id_number', '').strip()
+        
         if 'id_front' in request.files:
             file = request.files['id_front']
             if file and file.filename and allowed_id_file(file.filename):
@@ -3665,11 +6178,6 @@ def submit_client_registration():
                 file.save(filepath)
                 id_front = unique_filename
         
-        if not id_front:
-            flash('ID/Passport front image is required for Individual clients', 'error')
-            return redirect(url_for('client_registration'))
-        
-        # Handle ID back upload
         if 'id_back' in request.files:
             file = request.files['id_back']
             if file and file.filename and allowed_id_file(file.filename):
@@ -3680,18 +6188,23 @@ def submit_client_registration():
                 file.save(filepath)
                 id_back = unique_filename
         
-        if not id_back:
-            flash('ID/Passport back image is required for Individual clients', 'error')
-            return redirect(url_for('client_registration'))
+        if 'instruction_note' in request.files:
+            file = request.files['instruction_note']
+            if file and file.filename and allowed_id_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_ext = filename.rsplit('.', 1)[1].lower()
+                unique_filename = f"instruction_note_{session['client_id']}_{secrets.token_hex(8)}.{file_ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(filepath)
+                instruction_note = unique_filename
     
-    # Handle Corporate client requirements (CR-12 certificate and post office address)
+    # Handle Corporate client requirements (all optional uploads)
     cr12_certificate = None
-    post_office_address = None
+    corporate_kra_pin_file = None
     if client_type == 'Corporate':
-        # Handle CR-12 certificate upload
         if 'cr12_certificate' in request.files:
             file = request.files['cr12_certificate']
-            if file and file.filename and allowed_document_file(file.filename):
+            if file and file.filename and allowed_id_file(file.filename):
                 filename = secure_filename(file.filename)
                 file_ext = filename.rsplit('.', 1)[1].lower()
                 unique_filename = f"cr12_{session['client_id']}_{secrets.token_hex(8)}.{file_ext}"
@@ -3699,15 +6212,25 @@ def submit_client_registration():
                 file.save(filepath)
                 cr12_certificate = unique_filename
         
-        if not cr12_certificate:
-            flash('CR-12 certificate is required for Corporate clients', 'error')
-            return redirect(url_for('client_registration'))
+        if 'corporate_kra_pin' in request.files:
+            file = request.files['corporate_kra_pin']
+            if file and file.filename and allowed_id_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_ext = filename.rsplit('.', 1)[1].lower()
+                unique_filename = f"kra_pin_{session['client_id']}_{secrets.token_hex(8)}.{file_ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(filepath)
+                corporate_kra_pin_file = unique_filename
         
-        # Get post office address
-        post_office_address = request.form.get('post_office_address', '').strip()
-        if not post_office_address:
-            flash('Post office address is required for Corporate clients', 'error')
-            return redirect(url_for('client_registration'))
+        if 'instruction_note' in request.files:
+            file = request.files['instruction_note']
+            if file and file.filename and allowed_id_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_ext = filename.rsplit('.', 1)[1].lower()
+                unique_filename = f"instruction_note_{session['client_id']}_{secrets.token_hex(8)}.{file_ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(filepath)
+                instruction_note = unique_filename
     
     # Update client in database
     connection = get_db_connection()
@@ -3717,20 +6240,31 @@ def submit_client_registration():
                 # Build update query based on client type and provided data
                 update_fields = ['phone_number = %s', 'client_type = %s']
                 update_values = [phone_number, client_type]
-                
+
+                physical_address = request.form.get('physical_address', '').strip()
+                if physical_address:
+                    update_fields.append('client_address = %s')
+                    update_values.append(physical_address)
+
                 if profile_picture:
                     update_fields.append('profile_picture = %s')
                     update_values.append(profile_picture)
                     session['client_profile_picture'] = profile_picture
-                
+
                 if client_type == 'Individual':
-                    update_fields.append('id_front = %s')
-                    update_fields.append('id_back = %s')
-                    update_values.extend([id_front, id_back])
+                    if id_number:
+                        update_fields.append('national_id = %s')
+                        update_values.append(id_number)
+                    if id_front:
+                        update_fields.append('id_front = %s')
+                        update_values.append(id_front)
+                    if id_back:
+                        update_fields.append('id_back = %s')
+                        update_values.append(id_back)
                 elif client_type == 'Corporate':
-                    update_fields.append('cr12_certificate = %s')
-                    update_fields.append('post_office_address = %s')
-                    update_values.extend([cr12_certificate, post_office_address])
+                    if cr12_certificate:
+                        update_fields.append('cr12_certificate = %s')
+                        update_values.append(cr12_certificate)
                 
                 update_values.append(session['client_id'])
                 
@@ -3811,7 +6345,11 @@ def update_client_profile():
     try:
         full_name = request.form.get('full_name', '').strip().upper()
         phone_number = request.form.get('phone_number', '').strip().replace(' ', '')
-        client_type = request.form.get('client_type', 'Individual')
+        national_id = request.form.get('national_id', '').strip()
+        kra_pin = request.form.get('kra_pin', '').strip().upper()
+        client_address = request.form.get('client_address', '').strip()
+        address_latitude = request.form.get('address_latitude', '').strip()
+        address_longitude = request.form.get('address_longitude', '').strip()
         
         # Validation
         errors = []
@@ -3819,16 +6357,10 @@ def update_client_profile():
             errors.append('Full name is required')
         if not phone_number:
             errors.append('Phone number is required')
-        if not client_type or client_type not in ['Individual', 'Corporate']:
-            errors.append('Client type is required')
         
         # Validate phone number format (Kenyan format: starts with 07)
         if phone_number and not (phone_number.startswith('07') or phone_number.startswith('+254')):
             errors.append('Please enter a valid Kenyan phone number (starting with 07)')
-        
-        # Validate client_type
-        if client_type and client_type not in ['Individual', 'Corporate']:
-            errors.append('Please select a valid client type')
         
         if errors:
             for error in errors:
@@ -3866,32 +6398,31 @@ def update_client_profile():
                                 print(f"Error deleting old profile picture: {e}")
             
             # Update client in database
+            lat_val = float(address_latitude) if address_latitude else None
+            lng_val = float(address_longitude) if address_longitude else None
+
             if profile_picture:
                 cursor.execute("""
                     UPDATE clients 
-                    SET full_name = %s, phone_number = %s, client_type = %s, profile_picture = %s
+                    SET full_name = %s, phone_number = %s, national_id = %s, kra_pin = %s, 
+                        client_address = %s, address_latitude = %s, address_longitude = %s, profile_picture = %s
                     WHERE id = %s
-                """, (full_name, phone_number, client_type, profile_picture, session['client_id']))
-                # Update session
+                """, (full_name, phone_number, national_id or None, kra_pin or None, client_address or None, lat_val, lng_val, profile_picture, session['client_id']))
                 session['client_profile_picture'] = profile_picture
             else:
                 cursor.execute("""
                     UPDATE clients 
-                    SET full_name = %s, phone_number = %s, client_type = %s
+                    SET full_name = %s, phone_number = %s, national_id = %s, kra_pin = %s, 
+                        client_address = %s, address_latitude = %s, address_longitude = %s
                     WHERE id = %s
-                """, (full_name, phone_number, client_type, session['client_id']))
-                # Keep existing profile picture in session
+                """, (full_name, phone_number, national_id or None, kra_pin or None, client_address or None, lat_val, lng_val, session['client_id']))
                 if old_profile_picture:
-                    if old_profile_picture.startswith('http'):
-                        session['client_profile_picture'] = old_profile_picture
-                    else:
-                        session['client_profile_picture'] = old_profile_picture
+                    session['client_profile_picture'] = old_profile_picture
             
             connection.commit()
             
             # Update session
             session['client_name'] = full_name
-            session['client_type'] = client_type
             
             flash('Profile updated successfully!', 'success')
             return redirect(url_for('client_profile'))
@@ -3911,7 +6442,7 @@ def client_logout():
     session.pop('client_profile_picture', None)
     session.pop('client_type', None)
     flash('You have been logged out successfully', 'success')
-    return redirect(url_for('client_login'))
+    return redirect(url_for('login'))
 
 @app.route('/profile')
 def profile():
@@ -4494,8 +7025,8 @@ def submit_onboarding():
     
     employee_id = session['employee_id']
     
-    # Get form data
-    tax_pin = request.form.get('tax_pin', '').strip().upper()
+    # Get form data (tax_pin removed from form; kept in DB for legacy)
+    tax_pin = request.form.get('tax_pin', '').strip().upper() or None
     payment_method = request.form.get('payment_method', '').strip()
     account_number = request.form.get('account_number', '').strip().upper()
     account_name = request.form.get('account_name', '').strip().upper()
@@ -4504,8 +7035,6 @@ def submit_onboarding():
     
     # Validation
     errors = []
-    if not tax_pin:
-        errors.append('Tax PIN is required')
     if not payment_method:
         errors.append('Payment method is required')
     elif payment_method == 'Bank':
@@ -4553,30 +7082,32 @@ def submit_onboarding():
             filename = secure_filename(file.filename)
             # Create unique filename
             file_ext = filename.rsplit('.', 1)[1].lower()
-            unique_filename = f"id_front_{employee_id}_{secrets.token_hex(8)}.{file_ext}"
+            unique_filename = f"id_document_{employee_id}_{secrets.token_hex(8)}.{file_ext}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
             id_front = unique_filename
     
     if not id_front:
-        flash('ID/Passport front upload is required', 'error')
+        flash('National ID or Passport upload is required', 'error')
         return redirect(url_for('onboarding'))
     
-    # Handle ID back file upload
+    # Single ID document: id_back no longer required (combined into national ID or passport)
     id_back = None
-    if 'id_back' in request.files:
-        file = request.files['id_back']
-        if file and file.filename and allowed_id_file(file.filename):
+    
+    # Handle KRA PIN certificate upload
+    kra_pin_document = None
+    if 'kra_pin_document' in request.files:
+        file = request.files['kra_pin_document']
+        if file and file.filename and (allowed_id_file(file.filename) or allowed_document_file(file.filename)):
             filename = secure_filename(file.filename)
-            # Create unique filename
             file_ext = filename.rsplit('.', 1)[1].lower()
-            unique_filename = f"id_back_{employee_id}_{secrets.token_hex(8)}.{file_ext}"
+            unique_filename = f"kra_pin_{employee_id}_{secrets.token_hex(8)}.{file_ext}"
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
-            id_back = unique_filename
+            kra_pin_document = unique_filename
     
-    if not id_back:
-        flash('ID/Passport back upload is required', 'error')
+    if not kra_pin_document:
+        flash('KRA PIN certificate upload is required', 'error')
         return redirect(url_for('onboarding'))
     
     # Handle signature upload (optional)
@@ -4689,6 +7220,7 @@ def submit_onboarding():
             onboarding_columns = [
                 ('id_front', 'VARCHAR(255)'),
                 ('id_back', 'VARCHAR(255)'),
+                ('kra_pin_document', 'VARCHAR(255)'),
                 ('signature', 'VARCHAR(255)'),
                 ('signature_hash', 'VARCHAR(255)'),
                 ('stamp', 'VARCHAR(255)'),
@@ -4720,6 +7252,7 @@ def submit_onboarding():
                     employment_contract = %s,
                     id_front = %s,
                     id_back = %s,
+                    kra_pin_document = %s,
                     signature = %s,
                     signature_hash = %s,
                     stamp = %s,
@@ -4732,7 +7265,7 @@ def submit_onboarding():
             """, (account_number, account_name, tax_pin, payment_method, 
                   bank_name if payment_method == 'Bank' else None,
                   mobile_money_company if payment_method == 'Mobile Money' else None,
-                  employment_contract, id_front, id_back, signature, signature_hash, 
+                  employment_contract, id_front, id_back, kra_pin_document, signature, signature_hash, 
                   stamp, stamp_hash, employee_id))
             connection.commit()
             flash('Onboarding information submitted successfully!', 'success')
@@ -4759,11 +7292,302 @@ def hr_roles_permissions():
         flash('You do not have permission to access this page', 'error')
         return redirect(url_for('dashboard'))
     
-    company_settings = get_company_settings()
-    if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('dashboard'))
     
-    return render_template('hr_roles_permissions.html', company_settings=company_settings)
+    try:
+        from collections import defaultdict
+        
+        # Get company settings
+        company_settings = get_company_settings()
+        if not company_settings:
+            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        
+        # Fetch all employees with their roles
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    id,
+                    full_name,
+                    phone_number,
+                    work_email,
+                    employee_code,
+                    role,
+                    status,
+                    profile_picture
+                FROM employees
+                ORDER BY 
+                    CASE 
+                        WHEN role IS NULL OR role = '' THEN 1 
+                        ELSE 0 
+                    END,
+                    role ASC,
+                    full_name ASC
+            """)
+            employees = cursor.fetchall()
+        
+        # Group employees by role
+        roles_map = defaultdict(list)
+        for emp in employees:
+            role_name = emp.get('role') or 'Unassigned'
+            roles_map[role_name].append(emp)
+        
+        # Transform into sorted list of role blocks
+        roles_with_employees = []
+        for role_name, emps in roles_map.items():
+            active_count = sum(1 for e in emps if (e.get('status') or '').lower() == 'active')
+            roles_with_employees.append({
+                'role_name': role_name,
+                'employees': emps,
+                'total_count': len(emps),
+                'active_count': active_count,
+            })
+        
+        # Sort: named roles alphabetically, keep "Unassigned" last
+        roles_with_employees.sort(key=lambda r: (r['role_name'] == 'Unassigned', r['role_name'].lower()))
+        
+        return render_template(
+            'hr_roles_permissions.html',
+            company_settings=company_settings,
+            roles_with_employees=roles_with_employees
+        )
+    except Exception as e:
+        print(f"HR Roles & Permissions error: {e}")
+        flash('An error occurred while loading HR roles & permissions.', 'error')
+        return redirect(url_for('dashboard'))
+    finally:
+        connection.close()
+
+PERMISSION_KEYS = [
+    # Employee management
+    'employee_create',
+    'employee_approve',
+    'employee_edit',
+    'employee_suspend',
+    'employee_delete',
+    # Client management
+    'client_register',
+    'client_approve',
+    'client_edit',
+    'client_suspend',
+    'client_delete',
+    # Matter management
+    'matter_register_case',
+    'matter_register_other',
+    'matter_edit',
+    'matter_change_status',
+    'matter_allocate',
+    'matter_documents',
+    'matter_audit',
+    # Finance & billing
+    'finance_view_dashboard',
+    'finance_create_invoices',
+    'finance_record_payments',
+    'finance_view_reports',
+    # Calendar & reminders
+    'calendar_personal',
+    'calendar_shared',
+    'calendar_case_reminders',
+    # System & communication settings
+    'system_manage_settings',
+    'system_manage_document_settings',
+    'system_manage_channels',
+]
+
+
+def get_employee_permissions_map(connection, employee_id):
+    """Return dict(permission_key -> bool) for given employee_id."""
+    permissions = {}
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT permission_key, allowed
+                FROM employee_permissions
+                WHERE employee_id = %s
+                """,
+                (employee_id,),
+            )
+            rows = cursor.fetchall()
+            for row in rows:
+                permissions[row['permission_key']] = bool(row['allowed'])
+    except Exception as e:
+        print(f"Error loading employee permissions for {employee_id}: {e}")
+    return permissions
+
+
+def save_employee_permissions(connection, employee_id, form_data):
+    """Persist permissions from form for a given employee."""
+    try:
+        # Ensure the backing table exists (in case init_database hasn't been run yet)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS employee_permissions (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        employee_id INT NOT NULL,
+                        permission_key VARCHAR(100) NOT NULL,
+                        allowed BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        UNIQUE KEY uniq_employee_permission (employee_id, permission_key),
+                        CONSTRAINT fk_employee_permissions_employee
+                            FOREIGN KEY (employee_id) REFERENCES employees(id)
+                            ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+        except Exception as e:
+            print(f"Error ensuring employee_permissions table exists: {e}")
+
+        with connection.cursor() as cursor:
+            for key in PERMISSION_KEYS:
+                field_name = f"perm_{key}"
+                allowed = 1 if field_name in form_data else 0
+
+                cursor.execute(
+                    """
+                    INSERT INTO employee_permissions (employee_id, permission_key, allowed)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)
+                    """,
+                    (employee_id, key, allowed),
+                )
+        connection.commit()
+    except Exception as e:
+        print(f"Error saving employee permissions for {employee_id}: {e}")
+        connection.rollback()
+
+
+def current_user_has_permission(connection, permission_key):
+    """Check if the logged-in employee has a given permission.
+
+    Falls back to True when:
+      - no employee_id in session, or
+      - no explicit record exists for that permission_key.
+    """
+    employee_id = session.get('employee_id')
+    if not employee_id:
+        return True
+
+    # Non-configured keys are treated as allowed by default
+    if permission_key not in PERMISSION_KEYS:
+        return True
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT allowed
+                FROM employee_permissions
+                WHERE employee_id = %s AND permission_key = %s
+                """,
+                (employee_id, permission_key),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return True
+            return bool(row['allowed'])
+    except Exception as e:
+        print(f"Permission check failed for employee {employee_id}, key {permission_key}: {e}")
+        return True
+
+
+def enforce_permission(connection, permission_key, redirect_endpoint='dashboard'):
+    """Enforce a permission; returns a redirect response or None if allowed.
+    When denied, redirects back to the same page (referrer) when safe, so the user
+    stays in context and sees the permission popup there; otherwise uses redirect_endpoint.
+    """
+    if not current_user_has_permission(connection, permission_key):
+        flash('You do not have permission to perform this action.', 'error')
+        from urllib.parse import urlparse
+        referrer = request.referrer
+        if referrer:
+            try:
+                parsed = urlparse(referrer)
+                if parsed.netloc == request.host and parsed.path.startswith('/'):
+                    return redirect(referrer)
+            except Exception:
+                pass
+        return redirect(url_for(redirect_endpoint))
+    return None
+
+
+@app.route('/employee_permissions', methods=['GET', 'POST'])
+def employee_permissions():
+    """Employee Permissions overview page"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+    
+    employee_id = request.args.get('employee_id')
+    if not employee_id:
+        flash('Employee not specified.', 'error')
+        return redirect(url_for('hr_roles_permissions'))
+    
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        company_settings = get_company_settings()
+        if not company_settings:
+            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT 
+                    id,
+                    full_name,
+                    phone_number,
+                    work_email,
+                    employee_code,
+                    role,
+                    status,
+                    profile_picture
+                FROM employees
+                WHERE id = %s
+                """,
+                (employee_id,),
+            )
+            employee = cursor.fetchone()
+
+        if not employee:
+            flash('Employee not found.', 'error')
+            return redirect(url_for('hr_roles_permissions'))
+
+        # If form was submitted, save permissions
+        if request.method == 'POST':
+            save_employee_permissions(connection, employee['id'], request.form)
+            flash('Permissions updated for this employee.', 'success')
+
+        # Load permissions map (after any updates)
+        permissions_map = get_employee_permissions_map(connection, employee['id'])
+
+        return render_template(
+            'employee_permissions.html',
+            company_settings=company_settings,
+            employee=employee,
+            permissions=permissions_map,
+        )
+    except Exception as e:
+        print(f"Employee permissions error: {e}")
+        flash('An error occurred while loading employee permissions.', 'error')
+        return redirect(url_for('hr_roles_permissions'))
+    finally:
+        connection.close()
 
 @app.route('/leave_availability')
 def leave_availability():
@@ -4785,27 +7609,6 @@ def leave_availability():
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
     
     return render_template('leave_availability.html', company_settings=company_settings)
-
-@app.route('/case_allocation')
-def case_allocation():
-    """Case Allocation & Coverage page"""
-    if 'employee_id' not in session:
-        return redirect(url_for('login'))
-    
-    user_role = session.get('employee_role')
-    original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
-    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
-    
-    if not has_permission:
-        flash('You do not have permission to access this page', 'error')
-        return redirect(url_for('dashboard'))
-    
-    company_settings = get_company_settings()
-    if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    
-    return render_template('case_allocation.html', company_settings=company_settings)
 
 @app.route('/performance_compliance')
 def performance_compliance():
@@ -4909,18 +7712,43 @@ def finance_billing():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    
+
+    # Fine-grained permission: view finance dashboard
+    connection = get_db_connection()
+    if connection:
+        deny = enforce_permission(connection, 'finance_view_dashboard')
+        connection.close()
+        if deny:
+            return deny
+
     return render_template('finance_billing.html', company_settings=company_settings)
+
+@app.route('/matter_management')
+def matter_management():
+    """Matter Management landing page with links to Case Management and Other Matters"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    return render_template('matter_management.html', company_settings=company_settings)
 
 @app.route('/case_management')
 def case_management():
-    """Case Management page"""
+    """Case Management page – shows only cases allocated to the current employee"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -4956,7 +7784,7 @@ def case_details(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5054,7 +7882,7 @@ def case_details(case_id):
                 if party.get('updated_at'):
                     party['updated_at'] = party['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
             
-            # Fetch proceedings for this case (only latest versions)
+            # Fetch all proceedings for this case (including previous versions / full history)
             cursor.execute("""
                 SELECT 
                     p.id,
@@ -5070,45 +7898,135 @@ def case_details(case_id):
                     p.next_attendance,
                     p.virtual_link,
                     p.reason,
-                    p.created_at,
-                    CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM case_proceedings p2 
-                            WHERE p2.previous_proceeding_id = p.id
-                        ) THEN 0
-                        ELSE 1
-                    END as is_latest
+                    p.created_at
                 FROM case_proceedings p
                 WHERE p.case_id = %s
                 ORDER BY date_of_court_appeared DESC, created_at DESC
             """, (case_id,))
             all_proceedings = cursor.fetchall()
             
-            # Filter to only latest proceedings and format dates
+            # Format all proceedings (no filter - show full history including previous ones)
             proceedings = []
             for proc in all_proceedings:
-                # Only include if it's the latest version (not superseded)
-                is_latest = proc.get('is_latest', 1)
-                if is_latest == 1:
-                    formatted_proc = dict(proc)
-                    if formatted_proc.get('date_of_court_appeared'):
-                        formatted_proc['date_of_court_appeared'] = formatted_proc['date_of_court_appeared'].strftime('%Y-%m-%d')
-                    if formatted_proc.get('next_court_date'):
-                        formatted_proc['next_court_date'] = formatted_proc['next_court_date'].strftime('%Y-%m-%d')
-                    if formatted_proc.get('created_at'):
-                        formatted_proc['created_at'] = formatted_proc['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                    proceedings.append(formatted_proc)
+                formatted_proc = dict(proc)
+                if formatted_proc.get('date_of_court_appeared'):
+                    formatted_proc['date_of_court_appeared'] = formatted_proc['date_of_court_appeared'].strftime('%Y-%m-%d')
+                if formatted_proc.get('next_court_date'):
+                    formatted_proc['next_court_date'] = formatted_proc['next_court_date'].strftime('%Y-%m-%d')
+                if formatted_proc.get('created_at'):
+                    formatted_proc['created_at'] = formatted_proc['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                proceedings.append(formatted_proc)
+            
+            # Fetch case documents from Google Drive (for display on case details page)
+            google_drive_connected = False
+            documents = []
+            cursor.execute("""
+                SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                       google_drive_scopes, google_drive_main_folder_id
+                FROM company_settings 
+                ORDER BY id DESC LIMIT 1
+            """)
+            drive_settings = cursor.fetchone()
+            if drive_settings and drive_settings.get('google_drive_token') and drive_settings.get('google_drive_refresh_token'):
+                google_drive_connected = True
+                if 'google_drive_credentials' not in session:
+                    scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+                    session['google_drive_credentials'] = {
+                        'token': drive_settings['google_drive_token'],
+                        'refresh_token': drive_settings['google_drive_refresh_token'],
+                        'token_uri': drive_settings.get('google_drive_token_uri'),
+                        'client_id': GOOGLE_CLIENT_ID,
+                        'client_secret': GOOGLE_CLIENT_SECRET,
+                        'scopes': scopes
+                    }
+                if drive_settings.get('google_drive_main_folder_id'):
+                    session['google_drive_main_folder_id'] = drive_settings['google_drive_main_folder_id']
+            if google_drive_connected and case_data.get('client_table_id'):
+                try:
+                    service = get_google_drive_service()
+                    if service:
+                        main_folder_id = session.get('google_drive_main_folder_id') or (drive_settings and drive_settings.get('google_drive_main_folder_id'))
+                        if main_folder_id:
+                            client_folder_name = get_user_folder_name(
+                                case_data.get('client_phone'),
+                                case_data.get('client_full_name'),
+                                'client'
+                            )
+                            client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                            case_folder_name = get_case_drive_folder_name(case_data, case_id)
+                            case_doc_folder_id = get_or_create_folder(service, client_folder_id, case_folder_name)
+                            if case_doc_folder_id:
+                                query = f"'{case_doc_folder_id}' in parents and trashed=false"
+                                all_files = []
+                                page_token = None
+                                while True:
+                                    results = service.files().list(
+                                        q=query,
+                                        spaces='drive',
+                                        fields='nextPageToken, files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                        orderBy='modifiedTime desc',
+                                        pageSize=100,
+                                        pageToken=page_token
+                                    ).execute()
+                                    all_files.extend(results.get('files', []))
+                                    page_token = results.get('nextPageToken')
+                                    if not page_token:
+                                        break
+                                for file in all_files:
+                                    if file.get('mimeType') == 'application/vnd.google-apps.folder':
+                                        continue
+                                    created_time = file.get('createdTime', '')
+                                    modified_time = file.get('modifiedTime', '')
+                                    if created_time:
+                                        try:
+                                            dt = datetime.fromisoformat(created_time.replace('Z', '+00:00'))
+                                            created_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        except Exception:
+                                            pass
+                                    if modified_time:
+                                        try:
+                                            dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                                            modified_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        except Exception:
+                                            pass
+                                    size = file.get('size', '0')
+                                    try:
+                                        size_int = int(size) if size else 0
+                                        size_str = f"{size_int} B" if size_int < 1024 else (f"{size_int / 1024:.2f} KB" if size_int < 1024 * 1024 else f"{size_int / (1024 * 1024):.2f} MB")
+                                    except Exception:
+                                        size_str = "Unknown"
+                                    documents.append({
+                                        'id': file.get('id'),
+                                        'name': file.get('name', 'Unknown'),
+                                        'created_time': created_time,
+                                        'modified_time': modified_time,
+                                        'url': file.get('webViewLink', ''),
+                                        'size': size_str,
+                                        'mime_type': file.get('mimeType', '')
+                                    })
+                except Exception as e:
+                    print(f"Error fetching documents for case details: {e}")
             
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
-            
+            # Suggested doc title: your name + case tracking (no file created until user saves in app)
+            emp_name = (session.get('employee_name') or '').strip()
+            if not emp_name and session.get('employee_id'):
+                cursor.execute("SELECT full_name FROM employees WHERE id = %s", (session['employee_id'],))
+                emp_row = cursor.fetchone()
+                emp_name = (emp_row.get('full_name') or '').strip() if emp_row else ''
+            tracking = (case_data.get('tracking_number') or '').strip() or f'Case-{case_id}'
+            suggested_doc_title = f"{emp_name or 'Document'} - {tracking}"
             return render_template('case_details.html', 
                                  case_data=case_data, 
                                  case_id=case_id,
                                  parties=parties,
                                  proceedings=proceedings,
-                                 company_settings=company_settings)
+                                 documents=documents,
+                                 google_drive_connected=google_drive_connected,
+                                 company_settings=company_settings,
+                                 suggested_doc_title=suggested_doc_title)
     except Exception as e:
         print(f"Error fetching case details: {e}")
         flash('An error occurred while fetching case details.', 'error')
@@ -5135,6 +8053,11 @@ def case_edit(case_id):
     if not connection:
         flash('Database connection error.', 'error')
         return redirect(url_for('case_management'))
+
+    # Fine-grained permission: edit matter / case details
+    deny = enforce_permission(connection, 'matter_edit', redirect_endpoint='case_management')
+    if deny:
+        return deny
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -5305,45 +8228,29 @@ def case_documents(case_id):
                                 case_data.get('client_full_name'),
                                 'client'
                             )
+                            client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
                             
-                            # Escape single quotes in folder name for query
-                            escaped_folder_name = client_folder_name.replace("'", "\\'")
-                            
-                            # Find client folder
-                            query = f"name='{escaped_folder_name}' and '{main_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-                            results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-                            client_folders = results.get('files', [])
-                            
-                            if client_folders:
-                                client_folder_id = client_folders[0]['id']
-                            else:
-                                # Create client folder if it doesn't exist
-                                print(f"INFO: Creating client folder: {client_folder_name}")
-                                client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
-                            
-                            # Find or create CLIENT_CASE_DOCUMENT folder
-                            query = f"name='CLIENT_CASE_DOCUMENT' and '{client_folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
-                            results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
-                            case_doc_folders = results.get('files', [])
-                            
-                            if case_doc_folders:
-                                case_doc_folder_id = case_doc_folders[0]['id']
-                            else:
-                                # Create CLIENT_CASE_DOCUMENT folder if it doesn't exist
-                                print(f"INFO: Creating CLIENT_CASE_DOCUMENT folder")
-                                case_doc_folder_id = get_or_create_folder(service, client_folder_id, 'CLIENT_CASE_DOCUMENT')
+                            case_folder_name = get_case_drive_folder_name(case_data, case_id)
+                            case_doc_folder_id = get_or_create_folder(service, client_folder_id, case_folder_name)
                             
                             if case_doc_folder_id:
-                                # List all files in the folder
+                                # List all files in the folder (paginate to get every uploaded document)
                                 query = f"'{case_doc_folder_id}' in parents and trashed=false"
-                                results = service.files().list(
-                                    q=query,
-                                    spaces='drive',
-                                    fields='files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
-                                    orderBy='modifiedTime desc'
-                                ).execute()
-                                
-                                files = results.get('files', [])
+                                files = []
+                                page_token = None
+                                while True:
+                                    results = service.files().list(
+                                        q=query,
+                                        spaces='drive',
+                                        fields='nextPageToken, files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                        orderBy='modifiedTime desc',
+                                        pageSize=100,
+                                        pageToken=page_token
+                                    ).execute()
+                                    files.extend(results.get('files', []))
+                                    page_token = results.get('nextPageToken')
+                                    if not page_token:
+                                        break
                                 for file in files:
                                     # Skip folders
                                     if file.get('mimeType') == 'application/vnd.google-apps.folder':
@@ -5422,7 +8329,7 @@ def case_proceedings(case_id):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -5860,21 +8767,31 @@ def case_allocate(case_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch case details
-            cursor.execute("""
-                SELECT 
-                    c.id,
-                    c.tracking_number,
-                    c.filled_by_id,
-                    c.filled_by_name
-                FROM cases c
-                WHERE c.id = %s
-            """, (case_id,))
+            # Fetch case details (include allocation_description, allocation_timeline if columns exist)
+            cursor.execute("SELECT id, tracking_number, filled_by_id, filled_by_name FROM cases WHERE id = %s", (case_id,))
             case_data = cursor.fetchone()
+            if case_data and column_exists('cases', 'allocation_description'):
+                cursor.execute("SELECT allocation_description, allocation_timeline FROM cases WHERE id = %s", (case_id,))
+                extra = cursor.fetchone()
+                if extra:
+                    case_data['allocation_description'] = extra.get('allocation_description') or ''
+                    case_data['allocation_timeline'] = extra.get('allocation_timeline') or ''
+            if case_data and 'allocation_description' not in case_data:
+                case_data['allocation_description'] = ''
+                case_data['allocation_timeline'] = ''
             
             if not case_data:
                 flash('Case not found', 'error')
                 return redirect(url_for('case_management'))
+            
+            # Case handlers: employees whose role is Managing Partner or Associate Advocate (active)
+            cursor.execute("""
+                SELECT id, full_name, employee_code, role
+                FROM employees
+                WHERE status = 'Active' AND role IN ('Managing Partner', 'Associate Advocate')
+                ORDER BY role ASC, full_name ASC
+            """)
+            case_handlers = cursor.fetchall() or []
             
             company_settings = get_company_settings()
             if not company_settings:
@@ -5883,6 +8800,7 @@ def case_allocate(case_id):
             return render_template('case_allocate.html', 
                                  case_data=case_data, 
                                  case_id=case_id,
+                                 case_handlers=case_handlers,
                                  company_settings=company_settings)
     except Exception as e:
         print(f"Error fetching case allocate page: {e}")
@@ -6184,8 +9102,8 @@ def api_add_proceeding():
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 data['case_id'],
-                None,  # court_activity_type set to NULL
-                None,  # court_room set to NULL
+                data.get('court_activity_type') if data.get('court_activity_type') else None,
+                data.get('court_room') if data.get('court_room') else None,
                 data.get('judicial_officer') if data.get('judicial_officer') else None,
                 data['date_of_court_appeared'],
                 data.get('outcome_orders') if data.get('outcome_orders') else None,
@@ -6237,7 +9155,7 @@ def api_add_proceeding():
 
 @app.route('/api/cases/proceedings/update/<int:proceeding_id>', methods=['PUT'])
 def api_update_proceeding(proceeding_id):
-    """API endpoint to update an existing case proceeding"""
+    """API endpoint to update an existing case proceeding in place (no new record created)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -6253,26 +9171,30 @@ def api_update_proceeding(proceeding_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Verify proceeding exists and get case_id
-            cursor.execute("SELECT id, case_id FROM case_proceedings WHERE id = %s", (proceeding_id,))
-            old_proceeding = cursor.fetchone()
-            if not old_proceeding:
+            # Verify proceeding exists
+            cursor.execute("SELECT id FROM case_proceedings WHERE id = %s", (proceeding_id,))
+            if not cursor.fetchone():
                 return jsonify({'error': 'Proceeding not found'}), 404
             
-            case_id = old_proceeding['case_id']
-            
-            # Create new proceeding record with previous_proceeding_id pointing to the old one
+            # Update the existing proceeding in place
             cursor.execute("""
-                INSERT INTO case_proceedings (
-                    case_id, previous_proceeding_id, court_activity_type, court_room, judicial_officer,
-                    date_of_court_appeared, outcome_orders, outcome_details, next_court_date, 
-                    attendance, next_attendance, virtual_link, reason
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                UPDATE case_proceedings SET
+                    court_activity_type = %s,
+                    court_room = %s,
+                    judicial_officer = %s,
+                    date_of_court_appeared = %s,
+                    outcome_orders = %s,
+                    outcome_details = %s,
+                    next_court_date = %s,
+                    attendance = %s,
+                    next_attendance = %s,
+                    virtual_link = %s,
+                    reason = %s,
+                    updated_at = NOW()
+                WHERE id = %s
             """, (
-                case_id,
-                proceeding_id,  # previous_proceeding_id points to the old record
-                None,  # court_activity_type set to NULL
-                None,  # court_room set to NULL
+                data.get('court_activity_type') if data.get('court_activity_type') else None,
+                data.get('court_room') if data.get('court_room') else None,
                 data.get('judicial_officer') if data.get('judicial_officer') else None,
                 data['date_of_court_appeared'],
                 data.get('outcome_orders') if data.get('outcome_orders') else None,
@@ -6281,12 +9203,13 @@ def api_update_proceeding(proceeding_id):
                 data.get('attendance') if data.get('attendance') else None,
                 data.get('next_attendance') if data.get('next_attendance') else None,
                 data.get('virtual_link') if data.get('virtual_link') else None,
-                data.get('reason') if data.get('reason') else None
+                data.get('reason') if data.get('reason') else None,
+                proceeding_id
             ))
             connection.commit()
-            new_proceeding_id = cursor.lastrowid
             
-            # Insert materials if provided
+            # Replace materials: delete existing and insert from form
+            cursor.execute("DELETE FROM case_proceeding_materials WHERE proceeding_id = %s", (proceeding_id,))
             if data.get('materials') and isinstance(data['materials'], list):
                 for material in data['materials']:
                     if material.get('material_description'):
@@ -6296,7 +9219,7 @@ def api_update_proceeding(proceeding_id):
                                 allocated_to_id, allocated_to_name
                             ) VALUES (%s, %s, %s, %s, %s)
                         """, (
-                            new_proceeding_id,
+                            proceeding_id,
                             material['material_description'],
                             material.get('reminder_frequency') if material.get('reminder_frequency') else None,
                             material.get('allocated_to_id') if material.get('allocated_to_id') else None,
@@ -6306,8 +9229,8 @@ def api_update_proceeding(proceeding_id):
             
             return jsonify({
                 'success': True,
-                'message': 'Proceeding updated successfully. Previous record kept.',
-                'proceeding_id': new_proceeding_id
+                'message': 'Proceeding updated successfully',
+                'proceeding_id': proceeding_id
             })
     except Exception as e:
         print(f"Error updating proceeding: {e}")
@@ -6350,11 +9273,12 @@ def api_delete_proceeding(proceeding_id):
 
 @app.route('/api/cases/search', methods=['GET'])
 def api_cases_search():
-    """API endpoint to search cases by client phone number or return all cases"""
+    """API endpoint to search cases by client phone number; returns only cases allocated to the current employee"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
     phone_number = request.args.get('phone', '').strip()
+    current_employee_id = session['employee_id']
     
     connection = get_db_connection()
     if not connection:
@@ -6384,26 +9308,15 @@ def api_cases_search():
                 """, (f'%{phone_number}%',))
                 client = cursor.fetchone()
             
-            # Fetch cases based on whether client was found or not
+            # Fetch cases allocated to current employee only (filled_by_id = current user)
             if phone_number and client:
-                # Fetch cases for specific client with full client details
+                # Fetch cases for this client that are allocated to current employee
+                cols = "c.id, c.tracking_number, c.court_case_number, c.client_id, c.client_name, c.case_type, c.filing_date, c.case_category, c.station, c.filled_by_name, c.created_by_name, c.description, c.status, c.created_at, c.updated_at"
+                if column_exists('cases', 'allocation_description'):
+                    cols += ", c.allocation_description, c.allocation_timeline"
                 cursor.execute("""
                     SELECT 
-                        c.id,
-                        c.tracking_number,
-                        c.court_case_number,
-                        c.client_id,
-                        c.client_name,
-                        c.case_type,
-                        c.filing_date,
-                        c.case_category,
-                        c.station,
-                        c.filled_by_name,
-                        c.created_by_name,
-                        c.description,
-                        c.status,
-                        c.created_at,
-                        c.updated_at,
+                        """ + cols + """,
                         cl.id as client_table_id,
                         cl.full_name as client_full_name,
                         cl.phone_number as client_phone,
@@ -6414,11 +9327,11 @@ def api_cases_search():
                         cl.created_at as client_created_at
                     FROM cases c
                     LEFT JOIN clients cl ON c.client_id = cl.id
-                    WHERE c.client_id = %s
+                    WHERE c.client_id = %s AND c.filled_by_id = %s
                     ORDER BY c.filing_date DESC, c.created_at DESC
-                """, (client['id'],))
+                """, (client['id'], current_employee_id))
                 cases = cursor.fetchall()
-                message = f'Found {len(cases)} case(s) for {client["full_name"]}'
+                message = f'Found {len(cases)} case(s) for {client["full_name"]} (allocated to you)'
             elif phone_number and not client:
                 # Phone number provided but no client found
                 return jsonify({
@@ -6427,24 +9340,13 @@ def api_cases_search():
                     'message': 'No client found with this phone number'
                 })
             else:
-                # No phone number provided, fetch all cases with client details
+                # No phone number: fetch only cases allocated to current employee
+                cols = "c.id, c.tracking_number, c.court_case_number, c.client_id, c.client_name, c.case_type, c.filing_date, c.case_category, c.station, c.filled_by_name, c.created_by_name, c.description, c.status, c.created_at, c.updated_at"
+                if column_exists('cases', 'allocation_description'):
+                    cols += ", c.allocation_description, c.allocation_timeline"
                 cursor.execute("""
                     SELECT 
-                        c.id,
-                        c.tracking_number,
-                        c.court_case_number,
-                        c.client_id,
-                        c.client_name,
-                        c.case_type,
-                        c.filing_date,
-                        c.case_category,
-                        c.station,
-                        c.filled_by_name,
-                        c.created_by_name,
-                        c.description,
-                        c.status,
-                        c.created_at,
-                        c.updated_at,
+                        """ + cols + """,
                         cl.id as client_table_id,
                         cl.full_name as client_full_name,
                         cl.phone_number as client_phone,
@@ -6455,10 +9357,11 @@ def api_cases_search():
                         cl.created_at as client_created_at
                     FROM cases c
                     LEFT JOIN clients cl ON c.client_id = cl.id
+                    WHERE c.filled_by_id = %s
                     ORDER BY c.filing_date DESC, c.created_at DESC
-                """)
+                """, (current_employee_id,))
                 cases = cursor.fetchall()
-                message = f'Displaying all {len(cases)} case(s)'
+                message = f'Displaying {len(cases)} case(s) allocated to you'
             
             # Convert date objects to strings for JSON serialization
             for case in cases:
@@ -6470,6 +9373,8 @@ def api_cases_search():
                     case['updated_at'] = case['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
                 if case.get('client_created_at'):
                     case['client_created_at'] = case['client_created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                case['allocation_description'] = case.get('allocation_description') or ''
+                case['allocation_timeline'] = case.get('allocation_timeline') or ''
             
             # Convert client date objects to strings if client exists
             if client:
@@ -6489,6 +9394,87 @@ def api_cases_search():
     finally:
         connection.close()
 
+@app.route('/api/cases/<int:case_id>/approve', methods=['POST'])
+def api_approve_case(case_id):
+    """Allocated employee approves the case (sets status to Active); only the allocated case handler can approve."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    current_employee_id = session['employee_id']
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id, status, filled_by_id FROM cases WHERE id = %s", (case_id,))
+            case = cursor.fetchone()
+            if not case:
+                return jsonify({'success': False, 'error': 'Case not found'}), 404
+            if str(case.get('filled_by_id')) != str(current_employee_id):
+                return jsonify({'success': False, 'error': 'Only the allocated case handler can approve this case'}), 403
+            if case.get('status') != 'Pending Approval':
+                return jsonify({'success': False, 'error': 'Case is not pending approval'}), 400
+            cursor.execute("UPDATE cases SET status = 'Active', updated_at = NOW() WHERE id = %s", (case_id,))
+            connection.commit()
+            return jsonify({'success': True, 'message': 'Case approved successfully'})
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error approving case: {e}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/api/cases/pending-approval', methods=['GET'])
+def api_cases_pending_approval():
+    """API endpoint to fetch all cases with status Pending Approval (for Case Allocation)"""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    c.id,
+                    c.tracking_number,
+                    c.court_case_number,
+                    c.client_id,
+                    c.client_name,
+                    c.case_type,
+                    c.filing_date,
+                    c.case_category,
+                    c.station,
+                    c.filled_by_name,
+                    c.created_by_name,
+                    c.description,
+                    c.status,
+                    c.created_at,
+                    c.updated_at,
+                    cl.full_name as client_full_name,
+                    cl.phone_number as client_phone,
+                    cl.email as client_email
+                FROM cases c
+                LEFT JOIN clients cl ON c.client_id = cl.id
+                WHERE c.status = 'Pending Approval'
+                ORDER BY c.filing_date DESC, c.created_at DESC
+            """)
+            cases = cursor.fetchall()
+            for case in cases:
+                if case.get('filing_date'):
+                    case['filing_date'] = case['filing_date'].strftime('%Y-%m-%d')
+                if case.get('created_at'):
+                    case['created_at'] = case['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                if case.get('updated_at'):
+                    case['updated_at'] = case['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+            return jsonify({'cases': cases, 'message': f'Found {len(cases)} case(s) pending approval'})
+    except Exception as e:
+        print(f"Error fetching pending approval cases: {e}")
+        return jsonify({'error': 'Server error: ' + str(e)}), 500
+    finally:
+        connection.close()
+
 @app.route('/case_management/register')
 def register_case():
     """Case Registration page"""
@@ -6497,7 +9483,7 @@ def register_case():
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -6508,8 +9494,14 @@ def register_case():
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
     
-    # Get current employee info for the form
     connection = get_db_connection()
+    if connection:
+        # Fine-grained permission: register litigation matter / case
+        deny = enforce_permission(connection, 'matter_register_case')
+        if deny:
+            connection.close()
+            return deny
+
     employee_name = session.get('employee_name', 'Unknown')
     if connection:
         try:
@@ -6518,12 +9510,13 @@ def register_case():
                 employee = cursor.fetchone()
                 if employee:
                     employee_name = employee['full_name']
-        except:
+        except Exception:
             pass
         finally:
             connection.close()
     
-    return render_template('register_case.html', company_settings=company_settings, employee_name=employee_name)
+    employee_id = session.get('employee_id')
+    return render_template('register_case.html', company_settings=company_settings, employee_name=employee_name, employee_id=employee_id)
 
 @app.route('/api/clients/search', methods=['GET'])
 def api_clients_search():
@@ -6597,6 +9590,71 @@ def api_employees_search():
             return jsonify({'employees': employees})
     except Exception as e:
         print(f"Error searching employees: {e}")
+        return jsonify({'error': 'Server error'}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/cases/recent-options', methods=['GET'])
+def api_cases_recent_options():
+    """Return recently used case_type, case_category, station from registered cases (most recent first, up to 50 each)"""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+    max_recent = 50  # max unique values to return per field
+    fetch_limit = 500  # scan this many most recent cases to build "recently used" list
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT case_type FROM cases
+                WHERE case_type IS NOT NULL AND case_type != ''
+                ORDER BY id DESC LIMIT %s
+            """, (fetch_limit,))
+            seen = set()
+            case_types = []
+            for r in cursor.fetchall():
+                v = (r['case_type'] or '').strip()
+                if v and v not in seen:
+                    seen.add(v)
+                    case_types.append(v)
+                    if len(case_types) >= max_recent:
+                        break
+            cursor.execute("""
+                SELECT case_category FROM cases
+                WHERE case_category IS NOT NULL AND case_category != ''
+                ORDER BY id DESC LIMIT %s
+            """, (fetch_limit,))
+            seen = set()
+            case_categories = []
+            for r in cursor.fetchall():
+                v = (r['case_category'] or '').strip()
+                if v and v not in seen:
+                    seen.add(v)
+                    case_categories.append(v)
+                    if len(case_categories) >= max_recent:
+                        break
+            cursor.execute("""
+                SELECT station FROM cases
+                WHERE station IS NOT NULL AND station != ''
+                ORDER BY id DESC LIMIT %s
+            """, (fetch_limit,))
+            seen = set()
+            stations = []
+            for r in cursor.fetchall():
+                v = (r['station'] or '').strip()
+                if v and v not in seen:
+                    seen.add(v)
+                    stations.append(v)
+                    if len(stations) >= max_recent:
+                        break
+            return jsonify({
+                'case_types': case_types,
+                'case_categories': case_categories,
+                'stations': stations
+            })
+    except Exception as e:
+        print(f"Error fetching recent options: {e}")
         return jsonify({'error': 'Server error'}), 500
     finally:
         connection.close()
@@ -7091,21 +10149,35 @@ def api_update_case_status(case_id):
 
 @app.route('/api/allocate_case/<int:case_id>', methods=['POST'])
 def api_allocate_case(case_id):
-    """API endpoint to allocate a case to an employee"""
+    """API endpoint to allocate a case to a case handler (employee) with optional description and timeline"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.get_json()
     if not data or 'employee_id' not in data:
-        return jsonify({'success': False, 'error': 'Employee ID is required'}), 400
+        return jsonify({'success': False, 'error': 'Case handler (employee) ID is required'}), 400
     
     employee_id = data['employee_id']
+    allocation_description = (data.get('allocation_description') or '').strip() or None
+    allocation_timeline = (data.get('allocation_timeline') or '').strip() or None
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database connection error'}), 500
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if not column_exists('cases', 'allocation_description'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN allocation_description TEXT NULL")
+                    connection.commit()
+                except Exception:
+                    pass
+            if not column_exists('cases', 'allocation_timeline'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN allocation_timeline VARCHAR(500) NULL")
+                    connection.commit()
+                except Exception:
+                    pass
             # Check if case exists
             cursor.execute("SELECT id FROM cases WHERE id = %s", (case_id,))
             case = cursor.fetchone()
@@ -7118,18 +10190,20 @@ def api_allocate_case(case_id):
             employee = cursor.fetchone()
             
             if not employee:
-                return jsonify({'success': False, 'error': 'Employee not found'}), 400
+                return jsonify({'success': False, 'error': 'Case handler not found'}), 400
             
             employee_name = employee['full_name']
             
-            # Update the case allocation
+            # Update the case allocation (with optional description and timeline)
             cursor.execute("""
                 UPDATE cases 
                 SET filled_by_id = %s, 
                     filled_by_name = %s,
+                    allocation_description = %s,
+                    allocation_timeline = %s,
                     updated_at = NOW()
                 WHERE id = %s
-            """, (employee_id, employee_name, case_id))
+            """, (employee_id, employee_name, allocation_description, allocation_timeline, case_id))
             connection.commit()
             
             return jsonify({
@@ -7237,10 +10311,11 @@ def google_drive_authorize():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
-        # Google Drive API scopes (openid is automatically added by Google)
+        # Google Drive API scopes + Docs API for inserting company header into new docs
         drive_scopes = [
             'openid',
             'https://www.googleapis.com/auth/drive.file',
+            'https://www.googleapis.com/auth/documents',
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/userinfo.profile'
         ]
@@ -7302,6 +10377,7 @@ def google_drive_callback():
         drive_scopes = [
             'openid',
             'https://www.googleapis.com/auth/drive.file',
+            'https://www.googleapis.com/auth/documents',
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/userinfo.profile'
         ]
@@ -7788,6 +10864,15 @@ def create_main_folder():
             'details': str(e)
         }), 500
 
+def get_case_drive_folder_name(case_data, case_id):
+    """Return the case folder name for Drive: Client Name - Tracking Number (Drive-safe)."""
+    client_name = (case_data.get('client_full_name') or case_data.get('client_name') or 'Case').strip()
+    tracking = (case_data.get('tracking_number') or '').strip() or f'Case-{case_id}'
+    tracking = re.sub(r'[\\/:*?"<>|]', '_', tracking)
+    client_safe = re.sub(r'[\\/:*?"<>|]', '_', client_name).strip()
+    name = f"{client_safe} - {tracking}".strip()
+    return name if name else f"Case {tracking}"
+
 def get_or_create_folder(service, parent_folder_id, folder_name):
     """Get or create a folder in Google Drive"""
     try:
@@ -7924,8 +11009,15 @@ def upload_case_document(case_id):
                         print(f"INFO: Created SHERIA CENTRIC folder with ID: {main_folder_id}")
                     except Exception as create_error:
                         print(f"ERROR: Failed to create SHERIA CENTRIC folder: {create_error}")
+                        err_str = str(create_error).lower()
+                        if 'invalid_grant' in err_str or 'expired' in err_str or 'revoked' in err_str:
+                            return jsonify({
+                                'success': False,
+                                'error': 'Google Drive session expired or revoked. Please reconnect Google Drive in Documents Settings.',
+                                'settings_url': url_for('documents_settings')
+                            }), 400
                         return jsonify({
-                            'success': False, 
+                            'success': False,
                             'error': f'Failed to create SHERIA CENTRIC folder: {str(create_error)}'
                         }), 500
                 
@@ -7937,8 +11029,8 @@ def upload_case_document(case_id):
                 )
                 client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
                 
-                # Get or create CLIENT_CASE_DOCUMENT folder
-                case_doc_folder_id = get_or_create_folder(service, client_folder_id, 'CLIENT_CASE_DOCUMENT')
+                case_folder_name = get_case_drive_folder_name(case_data, case_id)
+                case_doc_folder_id = get_or_create_folder(service, client_folder_id, case_folder_name)
                 
                 # Handle file upload
                 print(f"DEBUG: request.files keys: {list(request.files.keys())}")
@@ -8023,13 +11115,724 @@ def upload_case_document(case_id):
         print(f"Error uploading document: {e}")
         import traceback
         traceback.print_exc()
-        error_message = str(e)
-        # Return 400 for client errors, 500 for server errors
-        status_code = 400 if 'not found' in error_message.lower() or 'not connected' in error_message.lower() else 500
+        error_message = str(e).lower()
+        # Token expired/revoked: tell user to reconnect Google Drive
+        if 'invalid_grant' in error_message or 'token' in error_message and ('expired' in error_message or 'revoked' in error_message):
+            return jsonify({
+                'success': False,
+                'error': 'Google Drive session expired or revoked. Please reconnect Google Drive in Documents Settings.',
+                'settings_url': url_for('documents_settings')
+            }), 400
+        # Other client-friendly errors
+        status_code = 500
+        if 'not found' in error_message or 'not connected' in error_message:
+            status_code = 400
         return jsonify({
             'success': False,
-            'error': f'Upload failed: {error_message}'
+            'error': f'Upload failed: {str(e)}'
         }), status_code
+
+@app.route('/api/case/<int:case_id>/drive-folder')
+def get_case_drive_folder(case_id):
+    """Get or create the case folder in Google Drive and return its URL. No document creation."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    service = get_google_drive_service()
+    if not service:
+        connection = get_db_connection()
+        if connection:
+            try:
+                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                    cursor.execute("""
+                        SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                        FROM company_settings ORDER BY id DESC LIMIT 1
+                    """)
+                    row = cursor.fetchone()
+                    if row and row.get('google_drive_token') and row.get('google_drive_refresh_token'):
+                        scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
+                        session['google_drive_credentials'] = {
+                            'token': row['google_drive_token'],
+                            'refresh_token': row['google_drive_refresh_token'],
+                            'token_uri': row.get('google_drive_token_uri'),
+                            'client_id': GOOGLE_CLIENT_ID,
+                            'client_secret': GOOGLE_CLIENT_SECRET,
+                            'scopes': scopes
+                        }
+                        service = get_google_drive_service()
+            except Exception as e:
+                print(f"Error loading credentials: {e}")
+            finally:
+                connection.close()
+    if not service:
+        return jsonify({'success': False, 'error': 'Google Drive not connected. Connect in Documents Settings.'}), 400
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT c.id, c.tracking_number, c.client_id,
+                       cl.id as client_table_id, cl.full_name as client_full_name, cl.phone_number as client_phone
+                FROM cases c
+                LEFT JOIN clients cl ON c.client_id = cl.id
+                WHERE c.id = %s
+            """, (case_id,))
+            case_data = cursor.fetchone()
+            if not case_data:
+                return jsonify({'success': False, 'error': 'Case not found'}), 404
+            if not case_data.get('client_table_id'):
+                return jsonify({'success': False, 'error': 'Client not found for this case'}), 404
+            main_folder_id = session.get('google_drive_main_folder_id')
+            if not main_folder_id:
+                cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                row = cursor.fetchone()
+                if row and row.get('google_drive_main_folder_id'):
+                    main_folder_id = row['google_drive_main_folder_id']
+                    session['google_drive_main_folder_id'] = main_folder_id
+            if not main_folder_id:
+                return jsonify({'success': False, 'error': 'Google Drive main folder not configured'}), 400
+            client_folder_name = get_user_folder_name(
+                case_data.get('client_phone'),
+                case_data.get('client_full_name'),
+                'client'
+            )
+            client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+            case_folder_name = get_case_drive_folder_name(case_data, case_id)
+            case_doc_folder_id = get_or_create_folder(service, client_folder_id, case_folder_name)
+            folder_url = f'https://drive.google.com/drive/folders/{case_doc_folder_id}'
+            return jsonify({
+                'success': True,
+                'folder_id': case_doc_folder_id,
+                'folder_url': folder_url,
+                'folder_name': case_folder_name
+            })
+    except Exception as e:
+        print(f"Error getting case drive folder: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/case/<int:case_id>/create-google-file', methods=['POST'])
+def create_case_google_file(case_id):
+    """Create a new Google Doc, Sheet, or Slides in the case's Drive folder and return the edit link."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        data = request.get_json() or {}
+        file_type = (data.get('type') or '').strip().lower()
+        file_name = (data.get('name') or '').strip()
+        if file_type not in ('doc', 'sheet', 'slides'):
+            return jsonify({'success': False, 'error': 'Invalid type. Use doc, sheet, or slides.'}), 400
+        service = get_google_drive_service()
+        if not service:
+            connection = get_db_connection()
+            if connection:
+                try:
+                    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                        cursor.execute("""
+                            SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                            FROM company_settings ORDER BY id DESC LIMIT 1
+                        """)
+                        settings = cursor.fetchone()
+                        if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
+                            scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                            session['google_drive_credentials'] = {
+                                'token': settings['google_drive_token'],
+                                'refresh_token': settings['google_drive_refresh_token'],
+                                'token_uri': settings.get('google_drive_token_uri'),
+                                'client_id': GOOGLE_CLIENT_ID,
+                                'client_secret': GOOGLE_CLIENT_SECRET,
+                                'scopes': scopes
+                            }
+                            service = get_google_drive_service()
+                except Exception as e:
+                    print(f"Error loading credentials: {e}")
+                finally:
+                    connection.close()
+        if not service:
+            return jsonify({'success': False, 'error': 'Google Drive not connected. Connect in Documents Settings.'}), 400
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT c.id, c.tracking_number, c.client_id,
+                           cl.id as client_table_id, cl.full_name as client_full_name, cl.phone_number as client_phone
+                    FROM cases c
+                    LEFT JOIN clients cl ON c.client_id = cl.id
+                    WHERE c.id = %s
+                """, (case_id,))
+                case_data = cursor.fetchone()
+                if not case_data:
+                    return jsonify({'success': False, 'error': 'Case not found'}), 404
+                if not case_data.get('client_table_id'):
+                    return jsonify({'success': False, 'error': 'Client not found for this case'}), 404
+                main_folder_id = session.get('google_drive_main_folder_id')
+                if not main_folder_id:
+                    cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                    row = cursor.fetchone()
+                    if row and row.get('google_drive_main_folder_id'):
+                        main_folder_id = row['google_drive_main_folder_id']
+                        session['google_drive_main_folder_id'] = main_folder_id
+                if not main_folder_id:
+                    return jsonify({'success': False, 'error': 'Google Drive main folder not configured'}), 400
+                client_folder_name = get_user_folder_name(
+                    case_data.get('client_phone'),
+                    case_data.get('client_full_name'),
+                    'client'
+                )
+                client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                case_folder_name = get_case_drive_folder_name(case_data, case_id)
+                case_doc_folder_id = get_or_create_folder(service, client_folder_id, case_folder_name)
+                tracking = (case_data.get('tracking_number') or '').strip() or f'Case-{case_id}'
+                tracking = re.sub(r'[\\/:*?"<>|]', '_', tracking)
+                company_settings = get_company_settings()
+                company_name = (company_settings.get('company_name') or 'Company').strip() if company_settings else 'Company'
+                employee_name = session.get('employee_name') or ''
+                if not employee_name and session.get('employee_id'):
+                    cursor.execute("SELECT full_name FROM employees WHERE id = %s", (session['employee_id'],))
+                    emp_row = cursor.fetchone()
+                    employee_name = (emp_row.get('full_name') or '').strip() if emp_row else ''
+                # Document title: user's name - document follow-up number (case tracking)
+                auto_title = f"{employee_name or 'Document'} - {tracking}"
+                mime_and_default = {
+                    'doc': ('application/vnd.google-apps.document', auto_title),
+                    'sheet': ('application/vnd.google-apps.spreadsheet', auto_title),
+                    'slides': ('application/vnd.google-apps.presentation', auto_title),
+                }
+                mime_type, default_name = mime_and_default[file_type]
+                name = file_name if file_name else default_name
+                file_metadata = {
+                    'name': name,
+                    'mimeType': mime_type,
+                    'parents': [case_doc_folder_id]
+                }
+                created = service.files().create(
+                    body=file_metadata,
+                    fields='id, name, webViewLink'
+                ).execute()
+                file_id = created.get('id')
+                docs_message = None
+                docs_content_added = False
+                DOCS_SCOPE = 'https://www.googleapis.com/auth/documents'
+                # For Google Docs: insert company header, footer, letterhead, and logo from company_settings
+                if file_type == 'doc' and company_settings:
+                    creds_dict = session.get('google_drive_credentials')
+                    if not creds_dict and connection:
+                        try:
+                            with connection.cursor(pymysql.cursors.DictCursor) as cur:
+                                cur.execute("""
+                                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                                    FROM company_settings ORDER BY id DESC LIMIT 1
+                                """)
+                                row = cur.fetchone()
+                                if row and row.get('google_drive_token') and row.get('google_drive_refresh_token'):
+                                    scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
+                                    creds_dict = {
+                                        'token': row['google_drive_token'],
+                                        'refresh_token': row['google_drive_refresh_token'],
+                                        'token_uri': row.get('google_drive_token_uri'),
+                                        'client_id': GOOGLE_CLIENT_ID,
+                                        'client_secret': GOOGLE_CLIENT_SECRET,
+                                        'scopes': scopes
+                                    }
+                                    session['google_drive_credentials'] = creds_dict
+                        except Exception:
+                            pass
+                    stored_scopes = (creds_dict or {}).get('scopes') or []
+                    has_docs_scope = DOCS_SCOPE in stored_scopes
+                    if creds_dict and not has_docs_scope:
+                        docs_message = 'Reconnect Google Drive in Documents Settings to add letterhead, footer and logo to new documents.'
+                    elif creds_dict:
+                        try:
+                            credentials = Credentials(
+                                token=creds_dict.get('token'),
+                                refresh_token=creds_dict.get('refresh_token'),
+                                token_uri=creds_dict.get('token_uri'),
+                                client_id=creds_dict.get('client_id'),
+                                client_secret=creds_dict.get('client_secret'),
+                                scopes=creds_dict.get('scopes')
+                            )
+                            docs_service = build('docs', 'v1', credentials=credentials)
+                            doc = docs_service.documents().get(documentId=file_id).execute()
+                            body = doc.get('body', {})
+                            content = body.get('content', [])
+                            insert_index = 1
+                            if content:
+                                for el in content:
+                                    if el.get('startIndex') is not None:
+                                        insert_index = el['startIndex']
+                                        break
+                            # 1) Header text first (company name, prepared by, date) – always run
+                            header_lines = [
+                                company_name,
+                                f"Prepared by: {employee_name or 'N/A'}",
+                                f"Date: {date_str}",
+                                ""
+                            ]
+                            header_text = "\n".join(header_lines)
+                            docs_service.documents().batchUpdate(
+                                documentId=file_id,
+                                body={'requests': [{'insertText': {'location': {'index': insert_index}, 'text': header_text}}]}
+                            ).execute()
+                            docs_content_added = True
+                            # 2) Footer at end of document
+                            footer_text = (company_settings.get('document_footer_text') or '').strip()
+                            if footer_text:
+                                try:
+                                    doc = docs_service.documents().get(documentId=file_id).execute()
+                                    content = doc.get('body', {}).get('content', [])
+                                    end_index = 1
+                                    for el in content:
+                                        if el.get('endIndex') is not None:
+                                            end_index = max(end_index, el['endIndex'])
+                                    footer_index = max(1, end_index - 1)
+                                    docs_service.documents().batchUpdate(
+                                        documentId=file_id,
+                                        body={'requests': [{'insertText': {'location': {'index': footer_index}, 'text': '\n\n' + footer_text}}]}
+                                    ).execute()
+                                except Exception as footer_err:
+                                    print(f"Docs API footer insert failed: {footer_err}")
+                            # 3) Letterhead image at top (index 1) – best effort
+                            letterhead_url = (company_settings.get('default_letterhead') or '').strip()
+                            if letterhead_url and (letterhead_url.startswith('http://') or letterhead_url.startswith('https://')):
+                                try:
+                                    docs_service.documents().batchUpdate(
+                                        documentId=file_id,
+                                        body={'requests': [{
+                                            'insertInlineImage': {
+                                                'uri': letterhead_url,
+                                                'objectId': 'letterhead_' + str(uuid.uuid4()).replace('-', '')[:16],
+                                                'location': {'index': 1}
+                                            }
+                                        }]}
+                                    ).execute()
+                                except Exception as letter_err:
+                                    print(f"Docs API letterhead insert failed (use a public image URL): {letter_err}")
+                            # 4) Company logo after letterhead – best effort
+                            logo_url = (company_settings.get('company_logo') or '').strip()
+                            if logo_url and (logo_url.startswith('http://') or logo_url.startswith('https://')):
+                                try:
+                                    docs_service.documents().batchUpdate(
+                                        documentId=file_id,
+                                        body={'requests': [{
+                                            'insertInlineImage': {
+                                                'uri': logo_url,
+                                                'objectId': 'logo_' + str(uuid.uuid4()).replace('-', '')[:16],
+                                                'location': {'index': 1}
+                                            }
+                                        }]}
+                                    ).execute()
+                                except Exception as logo_err:
+                                    print(f"Docs API logo insert failed (use a public image URL): {logo_err}")
+                        except HttpError as docs_err:
+                            err_msg = str(docs_err).lower()
+                            if '403' in err_msg or 'insufficient' in err_msg or 'scope' in err_msg or 'permission' in err_msg:
+                                docs_message = 'Reconnect Google Drive in Documents Settings to add letterhead, footer and logo to new documents.'
+                            print(f"Docs API insert failed: {docs_err}")
+                        except Exception as docs_err:
+                            print(f"Docs API insert failed: {docs_err}")
+                edit_urls = {
+                    'doc': f'https://docs.google.com/document/d/{file_id}/edit',
+                    'sheet': f'https://docs.google.com/spreadsheets/d/{file_id}/edit',
+                    'slides': f'https://docs.google.com/presentation/d/{file_id}/edit',
+                }
+                payload = {
+                    'success': True,
+                    'file_id': file_id,
+                    'name': created.get('name', name),
+                    'webViewLink': created.get('webViewLink') or f'https://drive.google.com/file/d/{file_id}/view',
+                    'editLink': edit_urls.get(file_type)
+                }
+                if docs_message:
+                    payload['docs_message'] = docs_message
+                    payload['docs_settings_url'] = url_for('documents_settings')
+                if file_type == 'doc':
+                    payload['docs_content_added'] = docs_content_added
+                return jsonify(payload)
+        except Exception as e:
+            err_str = str(e).lower()
+            if 'invalid_grant' in err_str or 'expired' in err_str or 'revoked' in err_str:
+                return jsonify({
+                    'success': False,
+                    'error': 'Google Drive session expired or revoked. Please reconnect in Documents Settings.',
+                    'settings_url': url_for('documents_settings')
+                }), 400
+            raise
+        finally:
+            connection.close()
+    except Exception as e:
+        print(f"Create case google file error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/case_management/<int:case_id>/document/<file_id>/download')
+def download_case_document(case_id, file_id):
+    """Stream a case document from Google Drive as a download (attachment)."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    if (user_role not in allowed_roles) and (original_role != 'IT Support'):
+        flash('You do not have permission to download this document.', 'error')
+        return redirect(url_for('case_management'))
+    connection = get_db_connection()
+    if not connection:
+        return redirect(url_for('case_documents', case_id=case_id))
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM cases WHERE id = %s", (case_id,))
+            if not cursor.fetchone():
+                flash('Case not found.', 'error')
+                return redirect(url_for('case_management'))
+    finally:
+        connection.close()
+    service = get_google_drive_service()
+    if not service:
+        flash('Google Drive is not connected.', 'error')
+        return redirect(url_for('case_documents', case_id=case_id))
+    try:
+        meta = service.files().get(fileId=file_id, fields='name,mimeType').execute()
+        name = meta.get('name', 'document')
+        mime = meta.get('mimeType', '')
+        if mime and mime.startswith('application/vnd.google-apps.'):
+            export_map = {
+                'application/vnd.google-apps.document': ('application/pdf', '.pdf'),
+                'application/vnd.google-apps.spreadsheet': ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'),
+                'application/vnd.google-apps.presentation': ('application/pdf', '.pdf'),
+            }
+            exp_mime, ext = export_map.get(mime, ('application/pdf', '.pdf'))
+            content = service.files().export(fileId=file_id, mimeType=exp_mime).execute()
+            base_name = name.rsplit('.', 1)[0] if '.' in name else name
+            download_name = base_name + ext
+            return send_file(BytesIO(content), as_attachment=True, download_name=download_name, mimetype=exp_mime)
+        request_dl = service.files().get_media(fileId=file_id)
+        buf = BytesIO()
+        downloader = MediaIoBaseDownload(buf, request_dl)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        buf.seek(0)
+        return send_file(buf, as_attachment=True, download_name=name, mimetype=mime or 'application/octet-stream')
+    except HttpError as e:
+        print(f"Drive download error: {e}")
+        flash('Could not download file from Google Drive.', 'error')
+        return redirect(url_for('case_documents', case_id=case_id))
+    except Exception as e:
+        print(f"Download error: {e}")
+        flash('Download failed.', 'error')
+        return redirect(url_for('case_documents', case_id=case_id))
+
+@app.route('/api/case/<int:case_id>/document/<file_id>/delete', methods=['POST', 'DELETE'])
+def delete_case_document_api(case_id, file_id):
+    """Delete a case document from Google Drive. File must be in the case's folder."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    if (user_role not in allowed_roles) and (original_role != 'IT Support'):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT c.id, c.client_id, c.tracking_number, cl.id as client_table_id,
+                       cl.full_name as client_full_name, cl.phone_number as client_phone
+                FROM cases c
+                LEFT JOIN clients cl ON c.client_id = cl.id
+                WHERE c.id = %s
+            """, (case_id,))
+            case_data = cursor.fetchone()
+        if not case_data:
+            return jsonify({'success': False, 'error': 'Case not found'}), 404
+        service = get_google_drive_service()
+        if not service:
+            return jsonify({'success': False, 'error': 'Google Drive not connected'}), 503
+        main_folder_id = session.get('google_drive_main_folder_id')
+        if not main_folder_id:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                row = cursor.fetchone()
+                main_folder_id = row.get('google_drive_main_folder_id') if row else None
+        if not main_folder_id or not case_data.get('client_table_id'):
+            return jsonify({'success': False, 'error': 'Case folder not available'}), 400
+        client_folder_name = get_user_folder_name(
+            case_data.get('client_phone'),
+            case_data.get('client_full_name'),
+            'client'
+        )
+        client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+        case_folder_name = get_case_drive_folder_name(case_data, case_id)
+        case_doc_folder_id = get_or_create_folder(service, client_folder_id, case_folder_name)
+        file_meta = service.files().get(fileId=file_id, fields='parents').execute()
+        parents = file_meta.get('parents') or []
+        if case_doc_folder_id not in parents:
+            return jsonify({'success': False, 'error': 'File is not in this case folder'}), 403
+        service.files().delete(fileId=file_id).execute()
+        return jsonify({'success': True})
+    except HttpError as e:
+        print(f"Drive delete error: {e}")
+        return jsonify({'success': False, 'error': 'Could not delete file from Drive'}), 500
+    except Exception as e:
+        print(f"Delete error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if connection:
+            connection.close()
+
+@app.route('/api/matter/<int:matter_id>/upload-document', methods=['POST'])
+def upload_matter_document(matter_id):
+    """Upload a document for a specific matter to Google Drive (Main -> Client -> Matter {ref})."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        service = get_google_drive_service()
+        if not service:
+            connection = get_db_connection()
+            if connection:
+                try:
+                    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                        cursor.execute("""
+                            SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                            FROM company_settings ORDER BY id DESC LIMIT 1
+                        """)
+                        settings = cursor.fetchone()
+                        if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
+                            scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                            session['google_drive_credentials'] = {
+                                'token': settings['google_drive_token'],
+                                'refresh_token': settings['google_drive_refresh_token'],
+                                'token_uri': settings.get('google_drive_token_uri'),
+                                'client_id': GOOGLE_CLIENT_ID,
+                                'client_secret': GOOGLE_CLIENT_SECRET,
+                                'scopes': scopes
+                            }
+                            service = get_google_drive_service()
+                except Exception as e:
+                    print(f"Error loading credentials: {e}")
+                finally:
+                    connection.close()
+        if not service:
+            return jsonify({'success': False, 'error': 'Google Drive not connected. Please connect Google Drive in Documents Settings.'}), 400
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+        # Fine-grained permission: upload/manage matter documents
+        deny = enforce_permission(connection, 'matter_documents')
+        if deny:
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT m.id, m.matter_reference_number, m.client_id, m.client_name, m.client_phone,
+                           cl.id as client_table_id, cl.full_name as client_full_name, cl.phone_number as client_phone_number
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.id = %s
+                """, (matter_id,))
+                matter_data = cursor.fetchone()
+                if not matter_data:
+                    return jsonify({'success': False, 'error': 'Matter not found'}), 404
+                current_employee_id = session.get('employee_id')
+                cursor.execute("SELECT assigned_employee_id FROM matters WHERE id = %s", (matter_id,))
+                row = cursor.fetchone()
+                assigned_id = row.get('assigned_employee_id') if row else None
+                if assigned_id is None or str(assigned_id) != str(current_employee_id):
+                    return jsonify({'success': False, 'error': 'You do not have access to this matter'}), 403
+                main_folder_id = session.get('google_drive_main_folder_id')
+                if not main_folder_id:
+                    cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                    settings = cursor.fetchone()
+                    if settings and settings.get('google_drive_main_folder_id'):
+                        main_folder_id = settings['google_drive_main_folder_id']
+                        session['google_drive_main_folder_id'] = main_folder_id
+                if not main_folder_id:
+                    err_str = 'Main folder not configured'
+                    return jsonify({'success': False, 'error': err_str}), 400
+                client_phone = matter_data.get('client_phone_number') or matter_data.get('client_phone')
+                client_name = matter_data.get('client_full_name') or matter_data.get('client_name') or ''
+                if client_name or client_phone:
+                    client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
+                    client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                else:
+                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
+                ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
+                matter_folder_name = f"Matter {ref}"
+                matter_doc_folder_id = get_or_create_folder(service, client_folder_id, matter_folder_name)
+                if 'document_file' not in request.files:
+                    return jsonify({'success': False, 'error': 'No file provided'}), 400
+                file = request.files['document_file']
+                if not file or file.filename == '':
+                    return jsonify({'success': False, 'error': 'No file selected'}), 400
+                if not allowed_document_file(file.filename):
+                    return jsonify({'success': False, 'error': 'Invalid file type. Allowed: PDF, DOC, DOCX, JPG, JPEG, PNG'}), 400
+                file_content = file.read()
+                file_name = secure_filename(file.filename)
+                description = request.form.get('description', '').strip()
+                file_ext = file_name.rsplit('.', 1)[1].lower() if '.' in file_name else ''
+                mime_types = {
+                    'pdf': 'application/pdf',
+                    'doc': 'application/msword',
+                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png'
+                }
+                mime_type = mime_types.get(file_ext, 'application/octet-stream')
+                file_metadata = {'name': file_name, 'parents': [matter_doc_folder_id]}
+                if description:
+                    file_metadata['description'] = description
+                media = MediaIoBaseUpload(BytesIO(file_content), mimetype=mime_type, resumable=True)
+                uploaded_file = service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, name, webViewLink'
+                ).execute()
+                return jsonify({
+                    'success': True,
+                    'message': 'Document uploaded successfully',
+                    'file_id': uploaded_file.get('id'),
+                    'file_name': uploaded_file.get('name')
+                })
+        except Exception as e:
+            err_str = str(e).lower()
+            if 'invalid_grant' in err_str or 'expired' in err_str or 'revoked' in err_str:
+                return jsonify({
+                    'success': False,
+                    'error': 'Google Drive session expired or revoked. Please reconnect Google Drive in Documents Settings.',
+                    'settings_url': url_for('documents_settings')
+                }), 400
+            raise
+        finally:
+            connection.close()
+    except Exception as e:
+        print(f"Upload matter document error: {e}")
+        return jsonify({'success': False, 'error': f'Upload failed: {str(e)}'}), 500
+
+@app.route('/other_matters/<int:matter_id>/document/<file_id>/download')
+def download_matter_document(matter_id, file_id):
+    """Stream a matter document from Google Drive as a download."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    connection = get_db_connection()
+    if not connection:
+        return redirect(url_for('matter_documents', matter_id=matter_id))
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id, assigned_employee_id FROM matters WHERE id = %s", (matter_id,))
+            row = cursor.fetchone()
+            if not row:
+                flash('Matter not found.', 'error')
+                return redirect(url_for('other_matters'))
+            current_employee_id = session.get('employee_id')
+            assigned_id = row.get('assigned_employee_id')
+            if assigned_id is None or str(assigned_id) != str(current_employee_id):
+                flash('You do not have permission to download this document.', 'error')
+                return redirect(url_for('other_matters'))
+    finally:
+        connection.close()
+    service = get_google_drive_service()
+    if not service:
+        flash('Google Drive is not connected.', 'error')
+        return redirect(url_for('matter_documents', matter_id=matter_id))
+    try:
+        meta = service.files().get(fileId=file_id, fields='name,mimeType').execute()
+        name = meta.get('name', 'document')
+        mime = meta.get('mimeType', '')
+        if mime and mime.startswith('application/vnd.google-apps.'):
+            export_map = {
+                'application/vnd.google-apps.document': ('application/pdf', '.pdf'),
+                'application/vnd.google-apps.spreadsheet': ('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'),
+                'application/vnd.google-apps.presentation': ('application/pdf', '.pdf'),
+            }
+            exp_mime, ext = export_map.get(mime, ('application/pdf', '.pdf'))
+            content = service.files().export(fileId=file_id, mimeType=exp_mime).execute()
+            base_name = name.rsplit('.', 1)[0] if '.' in name else name
+            download_name = base_name + ext
+            return send_file(BytesIO(content), as_attachment=True, download_name=download_name, mimetype=exp_mime)
+        request_dl = service.files().get_media(fileId=file_id)
+        buf = BytesIO()
+        downloader = MediaIoBaseDownload(buf, request_dl)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        buf.seek(0)
+        return send_file(buf, as_attachment=True, download_name=name, mimetype=mime or 'application/octet-stream')
+    except HttpError as e:
+        print(f"Drive download error: {e}")
+        flash('Could not download file from Google Drive.', 'error')
+        return redirect(url_for('matter_documents', matter_id=matter_id))
+    except Exception as e:
+        print(f"Download error: {e}")
+        flash('Download failed.', 'error')
+        return redirect(url_for('matter_documents', matter_id=matter_id))
+
+@app.route('/api/matter/<int:matter_id>/document/<file_id>/delete', methods=['POST', 'DELETE'])
+def delete_matter_document_api(matter_id, file_id):
+    """Delete a matter document from Google Drive. File must be in the matter's folder."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT m.id, m.matter_reference_number, m.assigned_employee_id,
+                       m.client_id, cl.full_name as client_full_name, cl.phone_number as client_phone_number,
+                       m.client_name as matter_client_name, m.client_phone as matter_client_phone
+                FROM matters m
+                LEFT JOIN clients cl ON m.client_id = cl.id
+                WHERE m.id = %s
+            """, (matter_id,))
+            matter_data = cursor.fetchone()
+        if not matter_data:
+            return jsonify({'success': False, 'error': 'Matter not found'}), 404
+        current_employee_id = session.get('employee_id')
+        assigned_id = matter_data.get('assigned_employee_id')
+        if assigned_id is None or str(assigned_id) != str(current_employee_id):
+            return jsonify({'success': False, 'error': 'You do not have access to this matter'}), 403
+        service = get_google_drive_service()
+        if not service:
+            return jsonify({'success': False, 'error': 'Google Drive not connected'}), 503
+        main_folder_id = session.get('google_drive_main_folder_id')
+        if not main_folder_id:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                row = cursor.fetchone()
+                main_folder_id = row.get('google_drive_main_folder_id') if row else None
+        if not main_folder_id:
+            return jsonify({'success': False, 'error': 'Matter folder not available'}), 400
+        client_phone = matter_data.get('client_phone_number') or matter_data.get('matter_client_phone')
+        client_name = matter_data.get('client_full_name') or matter_data.get('matter_client_name') or ''
+        if client_name or client_phone:
+            client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
+            client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+        else:
+            client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+        ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
+        ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
+        matter_folder_name = f"Matter {ref}"
+        matter_doc_folder_id = get_or_create_folder(service, client_folder_id, matter_folder_name)
+        file_meta = service.files().get(fileId=file_id, fields='parents').execute()
+        parents = file_meta.get('parents') or []
+        if matter_doc_folder_id not in parents:
+            return jsonify({'success': False, 'error': 'File is not in this matter folder'}), 403
+        service.files().delete(fileId=file_id).execute()
+        return jsonify({'success': True})
+    except HttpError as e:
+        print(f"Drive delete error: {e}")
+        return jsonify({'success': False, 'error': 'Could not delete file from Drive'}), 500
+    except Exception as e:
+        print(f"Delete matter document error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        if connection:
+            connection.close()
 
 @app.route('/documents_settings')
 def documents_settings():
@@ -8086,6 +11889,14 @@ def documents_settings():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    # Fine-grained permission: manage document settings
+    connection = get_db_connection()
+    if connection:
+        deny = enforce_permission(connection, 'system_manage_document_settings')
+        connection.close()
+        if deny:
+            return deny
     
     return render_template('documents_settings.html', company_settings=company_settings)
 
@@ -8495,6 +12306,11 @@ def calendar():
     if not connection:
         flash('Database connection error.', 'error')
         return redirect(url_for('dashboard'))
+
+    # Fine-grained permission: firm/shared calendar view
+    deny = enforce_permission(connection, 'calendar_shared')
+    if deny:
+        return deny
     
     try:
         from datetime import date
@@ -8669,25 +12485,8 @@ def reminders():
 
 @app.route('/calendar_reminders')
 def calendar_reminders():
-    """Calendar & Reminders page - redirects to calendar"""
+    """Calendar & Reminders page - currently reuses calendar view with same permission."""
     return redirect(url_for('calendar'))
-    if 'employee_id' not in session:
-        return redirect(url_for('login'))
-    
-    user_role = session.get('employee_role')
-    original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
-    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
-    
-    if not has_permission:
-        flash('You do not have permission to access this page', 'error')
-        return redirect(url_for('dashboard'))
-    
-    connection = get_db_connection()
-    if not connection:
-        flash('Database connection error.', 'error')
-        return redirect(url_for('dashboard'))
-    
     try:
         from datetime import date
         today = date.today()
@@ -8865,41 +12664,46 @@ def communication_messaging():
         # Combine all emails
         all_email_accounts = email_accounts + cpanel_emails
         
-        # Fetch all emails from all email accounts
+        # Fetch all emails from all email accounts (with timeout protection)
+        email_fetch_error = None
         if email_settings:
+            import signal, threading
+
+            def _fetch_account_emails(email_address, password, imap_host, imap_port, imap_ssl, results_list):
+                try:
+                    emails = fetch_emails_from_imap(email_address, password, imap_host, imap_port, imap_ssl, limit=200)
+                    for email in emails:
+                        email['account_email'] = email_address
+                    results_list.extend(emails)
+                except Exception as e:
+                    print(f"Error fetching emails for {email_address}: {e}")
+
             for email_account in all_email_accounts:
                 email_address = email_account.get('email_address') or email_account.get('email', '')
                 if not email_address:
                     continue
-                
-                # Get password for this email account
                 password = email_settings.get('main_email_password', '')
                 if email_account.get('email_password'):
                     password = email_account['email_password']
-                
-                if password:
-                    try:
-                        # Fetch emails from this account
-                        emails = fetch_emails_from_imap(
-                            email_address,
-                            password,
-                            email_settings.get('imap_host', 'mail.baunilawgroup.com'),
-                            int(email_settings.get('imap_port', 993)),
-                            bool(email_settings.get('imap_use_ssl', True)),
-                            limit=200  # Fetch more emails per account
-                        )
-                        
-                        # Add email address to each email for identification
-                        for email in emails:
-                            email['account_email'] = email_address
-                        
-                        all_emails.extend(emails)
-                    except Exception as e:
-                        print(f"Error fetching emails for {email_address}: {e}")
-                        import traceback
-                        print(traceback.format_exc())
-        
-        # Sort all emails by date (newest first)
+                if not password:
+                    continue
+
+                thread_results = []
+                t = threading.Thread(target=_fetch_account_emails, args=(
+                    email_address, password,
+                    email_settings.get('imap_host', 'mail.baunilawgroup.com'),
+                    int(email_settings.get('imap_port', 993)),
+                    bool(email_settings.get('imap_use_ssl', True)),
+                    thread_results
+                ))
+                t.start()
+                t.join(timeout=15)
+                if t.is_alive():
+                    email_fetch_error = f"Timeout fetching emails for {email_address}"
+                    print(f"[WARNING] {email_fetch_error}")
+                else:
+                    all_emails.extend(thread_results)
+
         all_emails.sort(key=lambda x: x.get('date', ''), reverse=True)
         
         return render_template('communication_messaging.html', 
@@ -8907,7 +12711,8 @@ def communication_messaging():
                              communication_type=communication_type,
                              email_accounts=all_email_accounts,
                              employees=employees,
-                             all_emails=all_emails)
+                             all_emails=all_emails,
+                             email_fetch_error=email_fetch_error)
     elif communication_type == 'webapp':
         # Fetch client messages
         connection = get_db_connection()
@@ -9015,6 +12820,14 @@ def employee_communication_settings():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    # Fine-grained permission: manage communication channels / employee mappings
+    connection = get_db_connection()
+    if connection:
+        deny = enforce_permission(connection, 'system_manage_channels')
+        connection.close()
+        if deny:
+            return deny
     
     return render_template('employee_communication_settings.html', 
                          company_settings=company_settings,
@@ -9734,15 +13547,27 @@ def communication_settings():
     
     email_settings = get_email_settings()
     email_accounts = get_email_accounts_from_db()
+    whatsapp_settings = get_whatsapp_settings()
+    sms_settings = get_sms_settings()
     
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    # Fine-grained permission: manage communication channels (email, SMS, WhatsApp)
+    connection = get_db_connection()
+    if connection:
+        deny = enforce_permission(connection, 'system_manage_channels')
+        connection.close()
+        if deny:
+            return deny
     
     return render_template('communication_settings.html', 
                          company_settings=company_settings,
                          email_settings=email_settings,
-                         email_accounts=email_accounts)
+                         email_accounts=email_accounts,
+                         whatsapp_settings=whatsapp_settings,
+                         sms_settings=sms_settings)
 
 # ==================== EMAIL API ROUTES ====================
 
@@ -9751,6 +13576,14 @@ def api_save_email_settings():
     """Save email settings"""
     if 'employee_id' not in session:
         return jsonify({'success': False, 'error': 'Not authenticated'}), 401
+
+    connection = get_db_connection()
+    if connection:
+        # Fine-grained permission: manage communication channels (email settings)
+        deny = enforce_permission(connection, 'system_manage_channels')
+        connection.close()
+        if deny:
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
     
     try:
         data = request.get_json()
@@ -10436,16 +14269,133 @@ def system_health_module():
     
     return render_template('system_health_module.html', company_settings=company_settings)
 
-@app.route('/other_matters')
-def other_matters():
-    """Other Matters page"""
+@app.route('/system_settings')
+def system_settings():
+    """System Settings page"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
-    # Check if user has permission (IT Support, Firm Administrator, Managing Partner, or Clerk)
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+    
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    # Fine-grained permission: view system settings
+    connection = get_db_connection()
+    if connection:
+        deny = enforce_permission(connection, 'system_manage_settings')
+        connection.close()
+        if deny:
+            return deny
+    
+    return render_template('system_settings.html', company_settings=company_settings)
+
+@app.route('/system_settings/update', methods=['POST'])
+def update_company_settings():
+    """Update company settings from the system settings form"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        flash('You do not have permission to update company settings', 'error')
+        return redirect(url_for('dashboard'))
+    connection = get_db_connection()
+    if not connection:
+        flash('Database error.', 'error')
+        return redirect(url_for('system_settings'))
+
+    # Fine-grained permission: update system settings
+    deny = enforce_permission(connection, 'system_manage_settings', redirect_endpoint='system_settings')
+    if deny:
+        return deny
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM company_settings ORDER BY id DESC LIMIT 1")
+            row = cursor.fetchone()
+            if not row:
+                flash('No company settings record found.', 'error')
+                return redirect(url_for('system_settings'))
+            pk = row['id']
+            upload_folder = app.config['UPLOAD_FOLDER']
+            def save_upload(file_key, prefix):
+                f = request.files.get(file_key)
+                if not f or not f.filename:
+                    return None
+                filename = secure_filename(f.filename)
+                if not filename:
+                    return None
+                ext = os.path.splitext(filename)[1] or '.bin'
+                unique = f"{prefix}_{pk}_{secrets.token_hex(4)}{ext}"
+                path = os.path.join(upload_folder, unique)
+                f.save(path)
+                return unique
+            updates = {}
+            text_fields = [
+                'company_name', 'company_tagline', 'registration_number', 'tax_pin_vat_number', 'year_established',
+                'email', 'contact_number', 'whatsapp_number', 'alternative_phone', 'customer_support_email',
+                'country', 'county_state', 'city_town', 'street_building', 'office_number_floor', 'postal_address', 'postal_code',
+                'opening_time', 'closing_time', 'public_holiday_status', 'public_holiday_open_time', 'public_holiday_close_time',
+                'website_url', 'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link',
+                'law_society_reg_number', 'practicing_certificate_number', 'lead_advocate_name', 'bar_association_membership',
+                'document_footer_text', 'currency', 'invoice_prefix', 'payment_terms', 'bank_account_details', 'mobile_payment_mpesa',
+                'primary_brand_color', 'secondary_color'
+            ]
+            for key in text_fields:
+                val = request.form.get(key)
+                if val is not None:
+                    updates[key] = val.strip() if isinstance(val, str) else val
+            # Working days: multiple checkboxes stored as comma-separated
+            wd = request.form.getlist('working_days')
+            if wd is not None:
+                updates['working_days'] = ','.join(wd) if wd else ''
+            for key in ['send_email_notifications', 'send_sms_notifications', 'whatsapp_notifications', 'court_date_reminders']:
+                updates[key] = 1 if request.form.get(key) == 'on' else 0
+            for file_key, col, prefix in [
+                ('company_logo', 'company_logo', 'company_logo'),
+                ('stamp_seal_upload', 'stamp_seal_upload', 'stamp_seal'),
+                ('default_signature_documents', 'default_signature_documents', 'signature'),
+                ('favicon', 'favicon', 'favicon'),
+                ('login_page_background', 'login_page_background', 'login_bg'),
+                ('default_letterhead', 'default_letterhead', 'letterhead')
+            ]:
+                saved = save_upload(file_key, prefix)
+                if saved:
+                    updates[col] = saved
+            if not updates:
+                flash('No changes to save.', 'info')
+                return redirect(url_for('system_settings'))
+            set_clause = ', '.join([f"`{k}` = %s" for k in updates])
+            sql = f"UPDATE company_settings SET {set_clause} WHERE id = %s"
+            cursor.execute(sql, list(updates.values()) + [pk])
+            connection.commit()
+            flash('Company settings updated successfully.', 'success')
+    except Exception as e:
+        print(f"Error updating company settings: {e}")
+        flash('An error occurred while saving.', 'error')
+    finally:
+        connection.close()
+    return redirect(url_for('system_settings'))
+
+@app.route('/other_matters')
+def other_matters():
+    """Other Matters page - shows only matters allocated to the logged-in user"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Check if user has permission (IT Support, Firm Administrator, Managing Partner, Clerk, or Associate Advocate)
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -10590,10 +14540,11 @@ def api_matters_search():
 
 @app.route('/api/matters/clients', methods=['GET'])
 def api_matters_clients():
-    """API endpoint to get clients with their matter counts, with optional search"""
+    """API endpoint to get clients with their matter counts (only matters allocated to current user), with optional search"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
+    current_employee_id = session['employee_id']
     search_query = request.args.get('q', '').strip()
     connection = get_db_connection()
     if not connection:
@@ -10601,9 +14552,8 @@ def api_matters_clients():
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Get clients with their matter counts, with optional search
+            # Get clients that have at least one matter allocated to the current user
             if search_query:
-                # Search by name or phone number
                 cursor.execute("""
                     SELECT 
                         cl.id,
@@ -10615,15 +14565,13 @@ def api_matters_clients():
                         cl.status as client_status,
                         COUNT(m.id) as matter_count
                     FROM clients cl
-                    LEFT JOIN matters m ON cl.id = m.client_id
+                    INNER JOIN matters m ON cl.id = m.client_id AND m.assigned_employee_id = %s
                     WHERE cl.status = 'Active'
                     AND (cl.full_name LIKE %s OR cl.phone_number LIKE %s)
                     GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
-                    HAVING COUNT(m.id) > 0
                     ORDER BY matter_count DESC, cl.full_name ASC
-                """, (f'%{search_query}%', f'%{search_query}%'))
+                """, (current_employee_id, f'%{search_query}%', f'%{search_query}%'))
             else:
-                # Get all clients with matters
                 cursor.execute("""
                     SELECT 
                         cl.id,
@@ -10635,12 +14583,11 @@ def api_matters_clients():
                         cl.status as client_status,
                         COUNT(m.id) as matter_count
                     FROM clients cl
-                    LEFT JOIN matters m ON cl.id = m.client_id
+                    INNER JOIN matters m ON cl.id = m.client_id AND m.assigned_employee_id = %s
                     WHERE cl.status = 'Active'
                     GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
-                    HAVING COUNT(m.id) > 0
                     ORDER BY matter_count DESC, cl.full_name ASC
-                """)
+                """, (current_employee_id,))
             clients = cursor.fetchall()
             
             return jsonify({
@@ -10655,17 +14602,17 @@ def api_matters_clients():
 
 @app.route('/api/matters/client/<int:client_id>', methods=['GET'])
 def api_matters_by_client(client_id):
-    """API endpoint to get all matters for a specific client"""
+    """API endpoint to get matters for a specific client (only matters allocated to current user)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
+    current_employee_id = session['employee_id']
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch all matters for the client
             cursor.execute("""
                 SELECT 
                     m.id,
@@ -10693,9 +14640,9 @@ def api_matters_by_client(client_id):
                     cl.status as client_status
                 FROM matters m
                 LEFT JOIN clients cl ON m.client_id = cl.id
-                WHERE m.client_id = %s
+                WHERE m.client_id = %s AND m.assigned_employee_id = %s
                 ORDER BY m.date_opened DESC, m.created_at DESC
-            """, (client_id,))
+            """, (client_id, current_employee_id))
             matters = cursor.fetchall()
             
             # Convert date objects to strings for JSON serialization
@@ -10719,10 +14666,11 @@ def api_matters_by_client(client_id):
 
 @app.route('/api/matters/categories', methods=['GET'])
 def api_matters_categories():
-    """API endpoint to get categories with their matter counts, with optional search"""
+    """API endpoint to get categories with matter counts (only matters allocated to current user), with optional search"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
+    current_employee_id = session['employee_id']
     search_query = request.args.get('q', '').strip()
     connection = get_db_connection()
     if not connection:
@@ -10730,28 +14678,26 @@ def api_matters_categories():
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Get categories with their matter counts, with optional search
             if search_query:
-                # Search by category name
                 cursor.execute("""
                     SELECT 
                         m.matter_category as category_name,
                         COUNT(m.id) as matter_count
                     FROM matters m
-                    WHERE m.matter_category LIKE %s
+                    WHERE m.assigned_employee_id = %s AND m.matter_category LIKE %s
                     GROUP BY m.matter_category
                     ORDER BY matter_count DESC, m.matter_category ASC
-                """, (f'%{search_query}%',))
+                """, (current_employee_id, f'%{search_query}%'))
             else:
-                # Get all categories with matters
                 cursor.execute("""
                     SELECT 
                         m.matter_category as category_name,
                         COUNT(m.id) as matter_count
                     FROM matters m
+                    WHERE m.assigned_employee_id = %s
                     GROUP BY m.matter_category
                     ORDER BY matter_count DESC, m.matter_category ASC
-                """)
+                """, (current_employee_id,))
             categories = cursor.fetchall()
             
             return jsonify({
@@ -10892,6 +14838,11 @@ def api_update_matter_status(matter_id):
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    # Fine-grained permission: change matter status
+    deny = enforce_permission(connection, 'matter_change_status')
+    if deny:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -10935,6 +14886,11 @@ def api_allocate_matter(matter_id):
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    # Fine-grained permission: allocate matter
+    deny = enforce_permission(connection, 'matter_allocate')
+    if deny:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -10977,17 +14933,17 @@ def api_allocate_matter(matter_id):
 
 @app.route('/api/matters/category/<path:category_name>', methods=['GET'])
 def api_matters_by_category(category_name):
-    """API endpoint to get all matters for a specific category"""
+    """API endpoint to get matters for a specific category (only matters allocated to current user)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
+    current_employee_id = session['employee_id']
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch all matters for the category
             cursor.execute("""
                 SELECT 
                     m.id,
@@ -11015,9 +14971,9 @@ def api_matters_by_category(category_name):
                     cl.status as client_status
                 FROM matters m
                 LEFT JOIN clients cl ON m.client_id = cl.id
-                WHERE m.matter_category = %s
+                WHERE m.matter_category = %s AND m.assigned_employee_id = %s
                 ORDER BY m.date_opened DESC, m.created_at DESC
-            """, (category_name,))
+            """, (category_name, current_employee_id))
             matters = cursor.fetchall()
             
             # Convert date objects to strings for JSON serialization
@@ -11039,6 +14995,45 @@ def api_matters_by_category(category_name):
     finally:
         connection.close()
 
+@app.route('/api/matters/<int:matter_id>/accept', methods=['POST'])
+def api_matter_accept(matter_id):
+    """Allocated user accepts the matter (sets status to Open so they can view it)."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    
+    current_employee_id = session['employee_id']
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                "SELECT id, status, assigned_employee_id FROM matters WHERE id = %s",
+                (matter_id,)
+            )
+            matter = cursor.fetchone()
+            if not matter:
+                return jsonify({'success': False, 'error': 'Matter not found'}), 404
+            if str(matter.get('assigned_employee_id')) != str(current_employee_id):
+                return jsonify({'success': False, 'error': 'Only the allocated person can accept this matter'}), 403
+            if (matter.get('status') or '') != 'Pending Approval':
+                return jsonify({'success': False, 'error': 'Matter is not pending acceptance'}), 400
+            cursor.execute(
+                "UPDATE matters SET status = 'Open', updated_at = NOW() WHERE id = %s",
+                (matter_id,)
+            )
+            connection.commit()
+            return jsonify({'success': True, 'message': 'Matter accepted. You can now view it.'})
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        print(f"Error accepting matter: {e}")
+        return jsonify({'success': False, 'error': 'Server error'}), 500
+    finally:
+        if connection:
+            connection.close()
+
 @app.route('/other_matters/register')
 def register_matter():
     """Register New Matter page"""
@@ -11048,6 +15043,14 @@ def register_matter():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if connection:
+        # Fine-grained permission: register other matters
+        deny = enforce_permission(connection, 'matter_register_other')
+        connection.close()
+        if deny:
+            return deny
     
     return render_template('register_matter.html', company_settings=company_settings)
 
@@ -11112,6 +15115,17 @@ def matter_details(matter_id):
                 flash('Matter not found', 'error')
                 return redirect(url_for('other_matters'))
             
+            # Only the allocated user can view; if Pending Approval they must accept first
+            current_employee_id = session.get('employee_id')
+            assigned_id = matter_data.get('assigned_employee_id')
+            is_assigned = (assigned_id is not None and str(assigned_id) == str(current_employee_id))
+            if not is_assigned:
+                flash('You do not have access to this matter.', 'error')
+                return redirect(url_for('other_matters'))
+            
+            status = matter_data.get('status') or ''
+            pending_accept = (status == 'Pending Approval')
+            
             # Convert date objects to strings
             if matter_data.get('date_opened'):
                 matter_data['date_opened'] = matter_data['date_opened'].strftime('%Y-%m-%d')
@@ -11124,13 +15138,288 @@ def matter_details(matter_id):
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
             
+            # Documents and Google Drive (only when not pending accept)
+            google_drive_connected = False
+            documents = []
+            suggested_doc_title = ''
+            if not pending_accept:
+                if 'google_drive_credentials' in session:
+                    google_drive_connected = True
+                else:
+                    cursor.execute("""
+                        SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                        FROM company_settings ORDER BY id DESC LIMIT 1
+                    """)
+                    settings = cursor.fetchone()
+                    if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
+                        google_drive_connected = True
+                        scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                        session['google_drive_credentials'] = {
+                            'token': settings['google_drive_token'],
+                            'refresh_token': settings['google_drive_refresh_token'],
+                            'token_uri': settings.get('google_drive_token_uri'),
+                            'client_id': GOOGLE_CLIENT_ID,
+                            'client_secret': GOOGLE_CLIENT_SECRET,
+                            'scopes': scopes
+                        }
+                emp_name = (session.get('employee_name') or matter_data.get('assigned_employee_name') or matter_data.get('assigned_employee_full_name') or '').strip()
+                if not emp_name and session.get('employee_id'):
+                    cursor.execute("SELECT full_name FROM employees WHERE id = %s", (session['employee_id'],))
+                    emp_row = cursor.fetchone()
+                    emp_name = (emp_row.get('full_name') or '').strip() if emp_row else ''
+                ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
+                suggested_doc_title = f"{emp_name or 'Document'} - {ref}"
+                if google_drive_connected:
+                    try:
+                        service = get_google_drive_service()
+                        if service:
+                            main_folder_id = session.get('google_drive_main_folder_id')
+                            if not main_folder_id:
+                                cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                                row = cursor.fetchone()
+                                if row and row.get('google_drive_main_folder_id'):
+                                    main_folder_id = row['google_drive_main_folder_id']
+                                    session['google_drive_main_folder_id'] = main_folder_id
+                            if main_folder_id:
+                                client_phone = matter_data.get('client_phone_number') or matter_data.get('client_phone')
+                                client_name = matter_data.get('client_full_name') or matter_data.get('client_name') or ''
+                                if client_name or client_phone:
+                                    client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
+                                    client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                                else:
+                                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                                ref_safe = re.sub(r'[\\/:*?"<>|]', '_', ref)
+                                matter_folder_name = f"Matter {ref_safe}"
+                                matter_doc_folder_id = get_or_create_folder(service, client_folder_id, matter_folder_name)
+                                if matter_doc_folder_id:
+                                    query = f"'{matter_doc_folder_id}' in parents and trashed=false"
+                                    all_files = []
+                                    page_token = None
+                                    while True:
+                                        results = service.files().list(
+                                            q=query,
+                                            spaces='drive',
+                                            fields='nextPageToken, files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                            orderBy='modifiedTime desc',
+                                            pageSize=100,
+                                            pageToken=page_token
+                                        ).execute()
+                                        all_files.extend(results.get('files', []))
+                                        page_token = results.get('nextPageToken')
+                                        if not page_token:
+                                            break
+                                    for file in all_files:
+                                        if file.get('mimeType') == 'application/vnd.google-apps.folder':
+                                            continue
+                                        created_time = file.get('createdTime', '')
+                                        modified_time = file.get('modifiedTime', '')
+                                        if created_time:
+                                            try:
+                                                dt = datetime.fromisoformat(created_time.replace('Z', '+00:00'))
+                                                created_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                            except Exception:
+                                                pass
+                                        if modified_time:
+                                            try:
+                                                dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                                                modified_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                            except Exception:
+                                                pass
+                                        size = file.get('size', '0')
+                                        try:
+                                            size_int = int(size) if size else 0
+                                            size_str = f"{size_int} B" if size_int < 1024 else (f"{size_int / 1024:.2f} KB" if size_int < 1024 * 1024 else f"{size_int / (1024 * 1024):.2f} MB")
+                                        except Exception:
+                                            size_str = "Unknown"
+                                        documents.append({
+                                            'id': file.get('id'),
+                                            'name': file.get('name', 'Unknown'),
+                                            'created_time': created_time,
+                                            'modified_time': modified_time,
+                                            'url': file.get('webViewLink', ''),
+                                            'size': size_str,
+                                            'mime_type': file.get('mimeType', '')
+                                        })
+                    except Exception as e:
+                        print(f"Error fetching matter documents for matter details: {e}")
+            
             return render_template('matter_details.html', 
                                  matter_data=matter_data, 
                                  matter_id=matter_id,
-                                 company_settings=company_settings)
+                                 pending_accept=pending_accept,
+                                 company_settings=company_settings,
+                                 google_drive_connected=google_drive_connected,
+                                 documents=documents,
+                                 suggested_doc_title=suggested_doc_title)
     except Exception as e:
         print(f"Error fetching matter details: {e}")
         flash('An error occurred while fetching matter details.', 'error')
+        return redirect(url_for('other_matters'))
+    finally:
+        connection.close()
+
+@app.route('/other_matters/<int:matter_id>/documents')
+def matter_documents(matter_id):
+    """Matter Documents page - upload and list documents for a specific matter in Google Drive"""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('other_matters'))
+    
+    documents = []
+    google_drive_connected = False
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    m.id,
+                    m.matter_reference_number,
+                    m.matter_title,
+                    m.client_id,
+                    m.client_name,
+                    m.client_phone,
+                    m.status,
+                    m.assigned_employee_id,
+                    cl.id as client_table_id,
+                    cl.full_name as client_full_name,
+                    cl.phone_number as client_phone_number,
+                    cl.email as client_email
+                FROM matters m
+                LEFT JOIN clients cl ON m.client_id = cl.id
+                WHERE m.id = %s
+            """, (matter_id,))
+            matter_data = cursor.fetchone()
+            
+            if not matter_data:
+                flash('Matter not found', 'error')
+                return redirect(url_for('other_matters'))
+            
+            current_employee_id = session.get('employee_id')
+            assigned_id = matter_data.get('assigned_employee_id')
+            if assigned_id is None or str(assigned_id) != str(current_employee_id):
+                flash('You do not have access to this matter.', 'error')
+                return redirect(url_for('other_matters'))
+            
+            # Check Google Drive and load credentials
+            if 'google_drive_credentials' in session:
+                google_drive_connected = True
+            else:
+                cursor.execute("""
+                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                    FROM company_settings ORDER BY id DESC LIMIT 1
+                """)
+                settings = cursor.fetchone()
+                if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
+                    google_drive_connected = True
+                    scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+                    session['google_drive_credentials'] = {
+                        'token': settings['google_drive_token'],
+                        'refresh_token': settings['google_drive_refresh_token'],
+                        'token_uri': settings.get('google_drive_token_uri'),
+                        'client_id': GOOGLE_CLIENT_ID,
+                        'client_secret': GOOGLE_CLIENT_SECRET,
+                        'scopes': scopes
+                    }
+            
+            if google_drive_connected:
+                try:
+                    service = get_google_drive_service()
+                    if service:
+                        main_folder_id = session.get('google_drive_main_folder_id')
+                        if not main_folder_id:
+                            cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
+                            settings = cursor.fetchone()
+                            if settings and settings.get('google_drive_main_folder_id'):
+                                main_folder_id = settings['google_drive_main_folder_id']
+                                session['google_drive_main_folder_id'] = main_folder_id
+                        
+                        if main_folder_id:
+                            client_phone = matter_data.get('client_phone_number') or matter_data.get('client_phone')
+                            client_name = matter_data.get('client_full_name') or matter_data.get('client_name') or ''
+                            if client_name or client_phone:
+                                client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
+                                client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                            else:
+                                client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                            
+                            ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
+                            ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
+                            matter_folder_name = f"Matter {ref}"
+                            matter_doc_folder_id = get_or_create_folder(service, client_folder_id, matter_folder_name)
+                            
+                            if matter_doc_folder_id:
+                                query = f"'{matter_doc_folder_id}' in parents and trashed=false"
+                                files = []
+                                page_token = None
+                                while True:
+                                    results = service.files().list(
+                                        q=query,
+                                        spaces='drive',
+                                        fields='nextPageToken, files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                        orderBy='modifiedTime desc',
+                                        pageSize=100,
+                                        pageToken=page_token
+                                    ).execute()
+                                    files.extend(results.get('files', []))
+                                    page_token = results.get('nextPageToken')
+                                    if not page_token:
+                                        break
+                                for file in files:
+                                    if file.get('mimeType') == 'application/vnd.google-apps.folder':
+                                        continue
+                                    created_time = file.get('createdTime', '')
+                                    modified_time = file.get('modifiedTime', '')
+                                    if created_time:
+                                        try:
+                                            from datetime import datetime
+                                            dt = datetime.fromisoformat(created_time.replace('Z', '+00:00'))
+                                            created_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        except Exception:
+                                            pass
+                                    if modified_time:
+                                        try:
+                                            from datetime import datetime
+                                            dt = datetime.fromisoformat(modified_time.replace('Z', '+00:00'))
+                                            modified_time = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                        except Exception:
+                                            pass
+                                    size = file.get('size', '0')
+                                    if size:
+                                        try:
+                                            size_int = int(size)
+                                            size_str = f"{size_int} B" if size_int < 1024 else (f"{size_int / 1024:.2f} KB" if size_int < 1024 * 1024 else f"{size_int / (1024 * 1024):.2f} MB")
+                                        except Exception:
+                                            size_str = "Unknown"
+                                    else:
+                                        size_str = "Unknown"
+                                    documents.append({
+                                        'id': file.get('id'),
+                                        'name': file.get('name', 'Unknown'),
+                                        'created_time': created_time,
+                                        'modified_time': modified_time,
+                                        'url': file.get('webViewLink', ''),
+                                        'size': size_str,
+                                        'mime_type': file.get('mimeType', '')
+                                    })
+                except Exception as e:
+                    print(f"Error fetching matter documents from Google Drive: {e}")
+            
+            company_settings = get_company_settings()
+            if not company_settings:
+                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            
+            return render_template('matter_documents.html',
+                                 matter_data=matter_data,
+                                 matter_id=matter_id,
+                                 google_drive_connected=google_drive_connected,
+                                 documents=documents,
+                                 company_settings=company_settings)
+    except Exception as e:
+        print(f"Error loading matter documents: {e}")
+        flash('An error occurred.', 'error')
         return redirect(url_for('other_matters'))
     finally:
         connection.close()
@@ -11145,6 +15434,11 @@ def matter_edit(matter_id):
     if not connection:
         flash('Database connection error.', 'error')
         return redirect(url_for('other_matters'))
+
+    # Fine-grained permission: edit matter details
+    deny = enforce_permission(connection, 'matter_edit', redirect_endpoint='other_matters')
+    if deny:
+        return deny
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -11210,6 +15504,11 @@ def matter_status(matter_id):
     if not connection:
         flash('Database connection error.', 'error')
         return redirect(url_for('other_matters'))
+
+    # Fine-grained permission: change matter / case status
+    deny = enforce_permission(connection, 'matter_change_status', redirect_endpoint='other_matters')
+    if deny:
+        return deny
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -11254,6 +15553,11 @@ def matter_allocate(matter_id):
     if not connection:
         flash('Database connection error.', 'error')
         return redirect(url_for('other_matters'))
+
+    # Fine-grained permission: allocate / re-allocate matters
+    deny = enforce_permission(connection, 'matter_allocate', redirect_endpoint='other_matters')
+    if deny:
+        return deny
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -11521,6 +15825,11 @@ def api_register_matter():
         connection = get_db_connection()
         if not connection:
             return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+        # Fine-grained permission: register matter
+        deny = enforce_permission(connection, 'matter_register_other')
+        if deny:
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
         
         try:
             with connection.cursor(pymysql.cursors.DictCursor) as cursor:

@@ -1,304 +1,395 @@
 {% extends "base.html" %}
 
-{% block title %}Case Details - SHERIA CENTRIC{% endblock %}
+{% block title %}Case Details - {{ case_data.tracking_number }} - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<style>
+    .detail-page { background: linear-gradient(160deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%); min-height: 100%; }
+    .detail-header-card {
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #7c3aed 100%);
+        border-radius: 1rem; box-shadow: 0 10px 40px rgba(79, 70, 229, 0.25);
+        border-left: 4px solid rgba(255,255,255,0.3);
+    }
+    .detail-card {
+        background: #ffffff;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        border-left: 4px solid #6366f1;
+    }
+    .detail-card.client-card { border-left-color: #8b5cf6; }
+    .detail-card.info-card { border-left-color: #3b82f6; }
+    .detail-card.parties-card { border-left-color: #ec4899; }
+    .detail-card.proceedings-card { border-left-color: #10b981; }
+    .detail-card.documents-card { border-left-color: #f59e0b; }
+    .detail-label { color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    .detail-value { color: #1e293b; font-size: 0.9375rem; font-weight: 600; }
+    .detail-table th {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 0.75rem 1rem; text-align: left; font-size: 0.75rem; font-weight: 600;
+        color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0;
+    }
+    .detail-table td { padding: 0.875rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+    .detail-table tbody tr:hover { background: #f8fafc; }
+    .doc-row:hover { background: #fffbeb !important; }
+    @media (max-width: 767px) {
+        .detail-table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
+</style>
+
+<div class="detail-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
     <!-- Page Header -->
-    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-            <div class="flex items-center space-x-4 mb-4 md:mb-0">
-                <a href="{{ url_for('case_management') }}" class="text-white hover:text-indigo-200 transition-colors">
-                    <i class="fas fa-arrow-left text-xl"></i>
+    <div class="detail-header-card p-5 sm:p-6 mb-6 text-white">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <a href="{{ url_for('case_management') }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to cases">
+                    <i class="fas fa-arrow-left"></i>
                 </a>
                 <div>
-                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
-                        <i class="fas fa-briefcase mr-3"></i>
+                    <h1 class="text-2xl sm:text-3xl font-bold mb-1 flex items-center gap-2">
+                        <i class="fas fa-briefcase opacity-90"></i>
                         Case Details
                     </h1>
-                    <p class="text-indigo-100">Tracking Number: <span class="font-semibold text-white">{{ case_data.tracking_number }}</span></p>
+                    <p class="text-white/90 text-sm sm:text-base">Tracking: <span class="font-semibold">{{ case_data.tracking_number }}</span>{% if case_data.court_case_number %} · {{ case_data.court_case_number }}{% endif %}</p>
                 </div>
             </div>
+            {% set status_colors = {
+                'Active': 'bg-emerald-500/90',
+                'Closed': 'bg-slate-500/90',
+                'Archived': 'bg-blue-500/90',
+                'Mediations': 'bg-amber-500/90',
+                'Pending': 'bg-orange-500/90',
+                'Consolidated': 'bg-purple-500/90',
+                'Pending Approval': 'bg-red-500/90'
+            } %}
+            <span class="px-4 py-2 rounded-lg text-white text-sm font-semibold {{ status_colors.get(case_data.status, 'bg-slate-500/90') }} sm:self-center">
+                {{ case_data.status or 'N/A' }}
+            </span>
         </div>
     </div>
 
     <!-- Client Profile Card -->
     {% if case_data.client_table_id %}
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-            <!-- Profile Picture -->
+    <div class="detail-card client-card p-5 sm:p-6 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
             <div class="flex-shrink-0">
                 {% if case_data.client_profile_picture %}
                     {% if case_data.client_profile_picture.startswith('http') %}
-                    <img src="{{ case_data.client_profile_picture }}" alt="Client" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    <img src="{{ case_data.client_profile_picture }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
                     {% else %}
-                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + case_data.client_profile_picture) }}" alt="Client" class="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover border-4 border-indigo-200 shadow-lg">
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + case_data.client_profile_picture) }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
                     {% endif %}
                 {% else %}
-                <div class="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl md:text-4xl font-bold border-4 border-indigo-200 shadow-lg">
+                <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-indigo-100 shadow-md">
                     {{ (case_data.client_full_name or case_data.client_name or 'C')[0] }}
                 </div>
                 {% endif %}
             </div>
-            
-            <!-- Client Information -->
             <div class="flex-1 min-w-0">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                    <div>
-                        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{{ case_data.client_full_name or case_data.client_name or 'N/A' }}</h2>
-                        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                            <span class="flex items-center">
-                                <i class="fas fa-phone mr-2 text-indigo-600"></i>
-                                {{ case_data.client_phone or 'N/A' }}
-                            </span>
-                            <span class="flex items-center">
-                                <i class="fas fa-envelope mr-2 text-indigo-600"></i>
-                                {{ case_data.client_email or 'N/A' }}
-                            </span>
-                            <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
-                                {{ case_data.client_type or 'N/A' }} Client
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Case Status Badge -->
-                    <div class="mt-4 md:mt-0">
-                        {% set status_colors = {
-                            'Active': 'bg-green-100 text-green-800 border-green-300',
-                            'Closed': 'bg-gray-100 text-gray-800 border-gray-300',
-                            'Archived': 'bg-blue-100 text-blue-800 border-blue-300',
-                            'Mediations': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-                            'Pending': 'bg-orange-100 text-orange-800 border-orange-300',
-                            'Consolidated': 'bg-purple-100 text-purple-800 border-purple-300',
-                            'Pending Approval': 'bg-red-100 text-red-800 border-red-300'
-                        } %}
-                        <div class="text-right">
-                            <p class="text-xs text-gray-500 font-medium mb-2">Case Status</p>
-                            <span class="px-4 py-2 inline-flex text-sm leading-5 font-semibold rounded-lg border-2 {{ status_colors.get(case_data.status, 'bg-gray-100 text-gray-800 border-gray-300') }}">
-                                <i class="fas fa-circle text-xs mr-2 mt-0.5"></i>
-                                {{ case_data.status or 'N/A' }}
-                            </span>
-                        </div>
-                    </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-1">{{ case_data.client_full_name or case_data.client_name or 'N/A' }}</h2>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+                    {% if case_data.client_phone %}
+                    <span class="flex items-center gap-1.5"><i class="fas fa-phone text-indigo-500 text-xs"></i>{{ case_data.client_phone }}</span>
+                    {% endif %}
+                    {% if case_data.client_email %}
+                    <span class="flex items-center gap-1.5 truncate"><i class="fas fa-envelope text-indigo-500 text-xs"></i>{{ case_data.client_email }}</span>
+                    {% endif %}
                 </div>
-                
-                <!-- Client Status -->
-                <div class="pt-4 border-t border-gray-200">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs text-gray-500 font-medium mb-1">Client Status</p>
-                            <span class="px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if case_data.client_status == 'Active' else 'bg-gray-100 text-gray-800' }}">
-                                {{ case_data.client_status or 'N/A' }}
-                            </span>
-                        </div>
-                    </div>
+                <div class="mt-2 flex flex-wrap gap-2">
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-semibold">{{ case_data.client_type or 'N/A' }} Client</span>
+                    {% if case_data.client_status %}
+                    <span class="px-3 py-1 rounded-lg text-xs font-medium {{ 'bg-emerald-100 text-emerald-800' if case_data.client_status == 'Active' else 'bg-slate-100 text-slate-700' }}">{{ case_data.client_status }}</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
     {% else %}
-    <!-- No Client Information -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <div class="detail-card p-5 sm:p-6 mb-6">
         <div class="text-center py-8">
-            <i class="fas fa-user-slash text-gray-300 text-5xl mb-4"></i>
-            <p class="text-gray-600 font-semibold mb-2">Client Information Not Available</p>
-            <p class="text-gray-500 text-sm">Client details could not be found for this case.</p>
+            <i class="fas fa-user-slash text-slate-300 text-4xl mb-3 block"></i>
+            <p class="text-gray-600 font-semibold">Client information not available</p>
+            <p class="text-gray-500 text-sm mt-1">Client details could not be found for this case.</p>
         </div>
     </div>
     {% endif %}
 
-    <div class="space-y-6">
-        <!-- Main Case Information -->
-        <div class="space-y-6">
-            <!-- Case Information -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                    <i class="fas fa-info-circle text-indigo-600 mr-3"></i>
-                    Case Information
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Tracking Number</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.tracking_number or 'N/A' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Court Case Number</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.court_case_number or 'N/A' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Case Type</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.case_type or 'N/A' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Case Category</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.case_category or 'N/A' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Filing Date</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.filing_date or 'N/A' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Station</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.station or 'N/A' }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 font-medium mb-1">Allocated To</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ case_data.filled_by_full_name or case_data.filled_by_name or 'Not Allocated' }}</p>
-                    </div>
-                </div>
-                
-                {% if case_data.description %}
-                <div class="mt-6 pt-6 border-t border-gray-200">
-                    <div class="flex items-center justify-between mb-3">
-                        <p class="text-sm text-gray-700 font-semibold">Description</p>
-                        <button onclick="toggleDescription()" id="description-toggle" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center shadow-sm">
-                            <i class="fas fa-eye mr-2" id="description-toggle-icon"></i>
-                            <span id="description-toggle-text">View Description</span>
-                        </button>
-                    </div>
-                    <div id="description-content" class="hidden mt-4">
-                        <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <p class="text-gray-900 whitespace-pre-wrap leading-relaxed">{{ case_data.description }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
+    <!-- Case Information -->
+    <div class="detail-card info-card p-5 sm:p-6 mb-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
+            <i class="fas fa-info-circle text-blue-500"></i>
+            Case Information
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            <div><p class="detail-label">Tracking Number</p><p class="detail-value">{{ case_data.tracking_number or '—' }}</p></div>
+            <div><p class="detail-label">Court Case Number</p><p class="detail-value">{{ case_data.court_case_number or '—' }}</p></div>
+            <div><p class="detail-label">Case Type</p><p class="detail-value">{{ case_data.case_type or '—' }}</p></div>
+            <div><p class="detail-label">Case Category</p><p class="detail-value">{{ case_data.case_category or '—' }}</p></div>
+            <div><p class="detail-label">Filing Date</p><p class="detail-value">{{ case_data.filing_date or '—' }}</p></div>
+            <div><p class="detail-label">Station</p><p class="detail-value">{{ case_data.station or '—' }}</p></div>
+            <div><p class="detail-label">Allocated To</p><p class="detail-value">{{ case_data.filled_by_full_name or case_data.filled_by_name or 'Not allocated' }}</p></div>
+        </div>
+        {% if case_data.description %}
+        <div class="mt-6 pt-5 border-t border-gray-200">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <p class="detail-label mb-0">Description</p>
+                <button type="button" onclick="toggleDescription()" id="description-toggle" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2">
+                    <i class="fas fa-eye" id="description-toggle-icon"></i>
+                    <span id="description-toggle-text">View</span>
+                </button>
             </div>
-
-            <!-- Parties Information -->
-            {% if parties and parties|length > 0 %}
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                    <i class="fas fa-users text-indigo-600 mr-3"></i>
-                    Parties
-                </h2>
-                <div class="space-y-4">
-                    {% for party in parties %}
-                    <div class="bg-gradient-to-r from-gray-50 to-indigo-50 rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow">
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Party Name</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ party.party_name or 'N/A' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Party Type</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ party.party_type or 'N/A' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Category</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ party.party_category or 'N/A' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Firm/Agent</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ party.firm_agent or 'N/A' }}</p>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
+            <div id="description-content" class="hidden mt-3">
+                <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <p class="text-gray-900 whitespace-pre-wrap leading-relaxed text-sm">{{ case_data.description }}</p>
                 </div>
-            </div>
-            {% endif %}
-
-            <!-- Case Proceedings -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                        <i class="fas fa-gavel text-indigo-600 mr-3"></i>
-                        Case Proceedings <span class="ml-2 text-gray-500 font-normal text-base">({{ proceedings|length }})</span>
-                    </h2>
-                    <a href="/case_management/{{ case_id }}/proceedings" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
-                        Update Proceedings <i class="fas fa-arrow-right ml-1"></i>
-                    </a>
-                </div>
-                
-                {% if proceedings and proceedings|length > 0 %}
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity Type</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judicial Officer</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Court Room</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outcome</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            {% for proceeding in proceedings %}
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">{{ proceeding.judicial_officer or 'N/A' }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">{{ proceeding.court_room or 'N/A' }}</div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    {% if proceeding.next_court_date %}
-                                    <div class="text-sm font-semibold text-green-600">{{ proceeding.next_court_date }}</div>
-                                    {% else %}
-                                    <span class="text-sm text-gray-400">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="px-6 py-4">
-                                    {% if proceeding.outcome_orders %}
-                                    <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ proceeding.outcome_orders }}">
-                                        {{ proceeding.outcome_orders }}
-                                    </div>
-                                    {% else %}
-                                    <span class="text-sm text-gray-400">-</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-12">
-                    <i class="fas fa-gavel text-gray-400 text-5xl mb-4"></i>
-                    <h3 class="text-xl font-bold text-gray-900 mb-2">No Proceedings Found</h3>
-                    <p class="text-gray-600 mb-4">No court proceedings have been recorded for this case yet.</p>
-                    <a href="/case_management/{{ case_id }}/proceedings" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                        <i class="fas fa-plus mr-2"></i>
-                        Add First Proceeding
-                    </a>
-                </div>
-                {% endif %}
             </div>
         </div>
+        {% endif %}
+    </div>
 
+    <!-- Parties -->
+    {% if parties and parties|length > 0 %}
+    <div class="detail-card parties-card p-5 sm:p-6 mb-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
+            <i class="fas fa-users text-pink-500"></i>
+            Parties ({{ parties|length }})
+        </h2>
+        <div class="space-y-3">
+            {% for party in parties %}
+            <div class="bg-gradient-to-r from-slate-50 to-pink-50/50 rounded-lg p-4 border border-slate-100">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                    <div><p class="detail-label">Party</p><p class="font-semibold text-gray-900">{{ party.party_name or '—' }}</p></div>
+                    <div><p class="detail-label">Type</p><p class="text-gray-700">{{ party.party_type or '—' }}</p></div>
+                    <div><p class="detail-label">Category</p><p class="text-gray-700">{{ party.party_category or '—' }}</p></div>
+                    <div><p class="detail-label">Firm/Agent</p><p class="text-gray-700">{{ party.firm_agent or '—' }}</p></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Case Proceedings -->
+    <div class="detail-card proceedings-card p-5 sm:p-6 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-gavel text-emerald-600"></i>
+                Proceedings <span class="text-gray-500 font-normal text-base">({{ proceedings|length }})</span>
+            </h2>
+            <a href="{{ url_for('case_proceedings', case_id=case_id) }}" class="inline-flex items-center gap-2 text-emerald-700 hover:text-emerald-800 font-semibold text-sm">
+                Update proceedings <i class="fas fa-arrow-right text-xs"></i>
+            </a>
+        </div>
+        {% if proceedings and proceedings|length > 0 %}
+        <div class="detail-table-responsive overflow-x-auto rounded-lg border border-slate-200">
+            <table class="detail-table min-w-full">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Activity</th>
+                        <th>Officer</th>
+                        <th>Court Room</th>
+                        <th>Next Date</th>
+                        <th>Outcome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for proceeding in proceedings %}
+                    <tr>
+                        <td class="font-medium text-gray-900">{{ proceeding.date_of_court_appeared or '—' }}</td>
+                        <td>{{ proceeding.court_activity_type or '—' }}</td>
+                        <td>{{ proceeding.judicial_officer or '—' }}</td>
+                        <td>{{ proceeding.court_room or '—' }}</td>
+                        <td>{% if proceeding.next_court_date %}<span class="font-semibold text-emerald-600">{{ proceeding.next_court_date }}</span>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+                        <td class="max-w-[180px] truncate" title="{{ proceeding.outcome_orders or '' }}">{{ proceeding.outcome_orders or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-10 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+            <i class="fas fa-gavel text-slate-300 text-4xl mb-3 block"></i>
+            <p class="font-semibold text-gray-700 mb-1">No proceedings yet</p>
+            <p class="text-gray-500 text-sm mb-4">Add the first court proceeding for this case.</p>
+            <a href="{{ url_for('case_proceedings', case_id=case_id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-semibold text-sm transition-colors">
+                <i class="fas fa-plus"></i> Add proceeding
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Case Documents (uploaded documents for this case) -->
+    <div class="detail-card documents-card p-5 sm:p-6 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-folder-open text-amber-600"></i>
+                Case Documents <span class="text-gray-500 font-normal text-base">({{ documents|length if documents else 0 }})</span>
+            </h2>
+            <a href="{{ url_for('case_documents', case_id=case_id) }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-semibold text-sm transition-colors">
+                <i class="fas fa-upload"></i> Upload / View all
+            </a>
+        </div>
+        {% if google_drive_connected %}
+        <!-- Create with Google – open case folder to create Doc, Sheet, Slides or Notebook -->
+        <div class="mb-6 p-4 rounded-xl bg-gradient-to-r from-slate-50 to-amber-50/50 border border-amber-100">
+            <p class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+                <i class="fab fa-google-drive text-amber-600"></i>
+                Create with Google
+            </p>
+            <p class="text-xs text-gray-600 mb-2">Opens Google Docs, Sheets or Slides in a new tab. Nothing is saved to Drive until you save in the app.</p>
+            {% if suggested_doc_title %}
+            <p class="text-xs text-gray-700 mb-3">
+                <span class="font-medium">When you save, use this title:</span>
+                <code id="suggested-doc-title" class="ml-1 px-1.5 py-0.5 bg-white rounded border border-amber-200 text-amber-800">{{ suggested_doc_title }}</code>
+                <button type="button" id="copy-suggested-title-btn" class="ml-2 text-xs font-semibold text-amber-700 hover:text-amber-900">Copy</button>
+            </p>
+            {% endif %}
+            <div class="flex flex-wrap gap-3">
+                <button type="button" data-google-app="doc" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow">
+                    <i class="fab fa-google-drive"></i> Google Doc
+                </button>
+                <button type="button" data-google-app="sheet" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow">
+                    <i class="fas fa-table"></i> Google Sheet
+                </button>
+                <button type="button" data-google-app="slides" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-sm hover:shadow">
+                    <i class="fas fa-file-powerpoint"></i> Google Slides
+                </button>
+                <button type="button" data-google-app="notebook" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm hover:shadow">
+                    <i class="fas fa-book"></i> Google Notebook
+                </button>
+            </div>
+        </div>
+        {% endif %}
+        {% if not google_drive_connected %}
+        <div class="py-6 text-center rounded-xl bg-amber-50 border border-amber-200">
+            <i class="fab fa-google-drive text-amber-500 text-3xl mb-2"></i>
+            <p class="text-amber-800 font-semibold">Google Drive not connected</p>
+            <p class="text-amber-700 text-sm mt-1">Connect Drive in Documents Settings to view and upload case documents.</p>
+            <a href="{{ url_for('documents_settings') }}" class="inline-block mt-3 text-sm font-semibold text-amber-700 hover:text-amber-900">Documents Settings →</a>
+        </div>
+        {% elif documents and documents|length > 0 %}
+        <div class="space-y-2">
+            {% for doc in documents %}
+            {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
+            <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-100 bg-white hover:border-amber-200 transition-colors">
+                <div class="flex items-center gap-3 min-w-0">
+                    {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
+                    <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
+                    {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
+                    <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
+                    {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
+                    <i class="fas fa-file-image text-emerald-600 text-xl flex-shrink-0"></i>
+                    {% else %}
+                    <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
+                    {% endif %}
+                    <div class="min-w-0">
+                        <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
+                        <p class="text-xs text-gray-500">{{ doc.size }} · {{ doc.modified_time or doc.created_time or '—' }}</p>
+                    </div>
+                </div>
+                <div class="flex flex-shrink-0 items-center gap-2 flex-wrap justify-end">
+                    {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
+                    <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100 transition-colors" title="Edit in Google Docs"><i class="fas fa-edit text-xs"></i> Edit</a>
+                    {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
+                    <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100 transition-colors" title="Edit in Google Sheets"><i class="fas fa-edit text-xs"></i> Edit</a>
+                    {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
+                    <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100 transition-colors" title="Edit in Google Slides"><i class="fas fa-edit text-xs"></i> Edit</a>
+                    {% elif doc.url %}
+                    <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                    {% endif %}
+                    <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100 transition-colors"><i class="fas fa-download text-xs"></i> Download</a>
+                    <button type="button" class="case-doc-delete inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100 transition-colors" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="mt-4 text-sm text-gray-500">
+            <a href="{{ url_for('case_documents', case_id=case_id) }}" class="text-amber-600 hover:text-amber-700 font-semibold">View all documents and upload more →</a>
+        </p>
+        {% else %}
+        <div class="py-8 text-center rounded-xl bg-slate-50 border-2 border-dashed border-slate-200">
+            <i class="fas fa-folder-open text-slate-300 text-4xl mb-3 block"></i>
+            <p class="font-semibold text-gray-700 mb-1">No documents uploaded</p>
+            <p class="text-gray-500 text-sm mb-4">Documents for this case are stored in Google Drive.</p>
+            <a href="{{ url_for('case_documents', case_id=case_id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-semibold text-sm transition-colors">
+                <i class="fas fa-upload"></i> Upload document
+            </a>
+        </div>
+        {% endif %}
     </div>
 </div>
 
 <script>
+const caseId = {{ case_id }};
+
 function toggleDescription() {
     const content = document.getElementById('description-content');
     const toggleText = document.getElementById('description-toggle-text');
     const toggleIcon = document.getElementById('description-toggle-icon');
-    const toggleButton = document.getElementById('description-toggle');
-    
+    const btn = document.getElementById('description-toggle');
     if (content.classList.contains('hidden')) {
         content.classList.remove('hidden');
-        toggleText.textContent = 'Hide Description';
-        toggleIcon.classList.remove('fa-eye');
-        toggleIcon.classList.add('fa-eye-slash');
-        toggleButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-        toggleButton.classList.add('bg-gray-600', 'hover:bg-gray-700');
+        toggleText.textContent = 'Hide';
+        toggleIcon.classList.replace('fa-eye', 'fa-eye-slash');
+        btn.classList.replace('bg-indigo-600', 'bg-slate-600');
+        btn.classList.replace('hover:bg-indigo-700', 'hover:bg-slate-700');
     } else {
         content.classList.add('hidden');
-        toggleText.textContent = 'View Description';
-        toggleIcon.classList.remove('fa-eye-slash');
-        toggleIcon.classList.add('fa-eye');
-        toggleButton.classList.remove('bg-gray-600', 'hover:bg-gray-700');
-        toggleButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        toggleText.textContent = 'View';
+        toggleIcon.classList.replace('fa-eye-slash', 'fa-eye');
+        btn.classList.replace('bg-slate-600', 'bg-indigo-600');
+        btn.classList.replace('hover:bg-slate-700', 'hover:bg-indigo-700');
     }
 }
+
+var googleAppCreateUrls = {
+    doc: 'https://docs.google.com/document/create',
+    sheet: 'https://docs.google.com/spreadsheets/create',
+    slides: 'https://docs.google.com/presentation/create',
+    notebook: 'https://keep.google.com'
+};
+var copyBtn = document.getElementById('copy-suggested-title-btn');
+if (copyBtn) {
+    copyBtn.addEventListener('click', function() {
+        var el = document.getElementById('suggested-doc-title');
+        if (el && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(el.textContent);
+            var btn = this;
+            btn.textContent = 'Copied!';
+            setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+        }
+    });
+}
+document.querySelectorAll('.open-google-app').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var app = this.getAttribute('data-google-app');
+        if (!app || !googleAppCreateUrls[app]) return;
+        window.open(googleAppCreateUrls[app], '_blank', 'noopener,noreferrer');
+    });
+});
+
+document.querySelectorAll('.case-doc-delete').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+        var fileId = this.getAttribute('data-file-id');
+        var docName = this.getAttribute('data-doc-name') || 'this document';
+        if (!fileId || !confirm('Delete "' + docName + '" from Google Drive? This cannot be undone.')) return;
+        this.disabled = true;
+        try {
+            var res = await fetch('/api/case/' + caseId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
+            var data = await res.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.error || 'Delete failed.');
+                this.disabled = false;
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Request failed.');
+            this.disabled = false;
+        }
+    });
+});
 </script>
 {% endblock %}

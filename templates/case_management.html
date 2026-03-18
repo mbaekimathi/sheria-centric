@@ -1,19 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Case Management - SHERIA CENTRIC{% endblock %}
+{% block title %}Litigation Matters - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
     <!-- Page Header -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-center justify-between">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-                    <i class="fas fa-briefcase text-indigo-600 mr-3"></i>
-                    Case Management
+                    <i class="fas fa-gavel text-indigo-600 mr-3"></i>
+                    Litigation Matters
                 </h1>
-                <p class="text-gray-600">Search and manage legal cases by client phone number</p>
+                <p class="text-gray-600">Cases allocated to you — search by client phone or view all your cases</p>
             </div>
+            {% if user_role in ['Firm Administrator', 'Associate Advocate'] %}
+            <a href="{{ url_for('register_case') }}" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors flex items-center shrink-0">
+                <i class="fas fa-plus-circle mr-2"></i>
+                Register Case
+            </a>
+            {% endif %}
         </div>
     </div>
 
@@ -26,7 +32,7 @@
         <div class="flex flex-col md:flex-row gap-4">
             <div class="flex-1">
                 <label for="phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
-                    Client Phone Number (Leave empty to show all cases)
+                    Client Phone Number (Leave empty to show all cases allocated to you)
                 </label>
                 <div class="relative">
                     <input 
@@ -41,7 +47,7 @@
                 </div>
                 <p class="text-xs text-gray-500 mt-2">
                     <i class="fas fa-info-circle mr-1"></i>
-                    Start typing to search live. Leave empty to view all cases.
+                    Start typing to search. Leave empty to view all cases allocated to you.
                 </p>
             </div>
         </div>
@@ -114,6 +120,34 @@
 
     <!-- Error Message -->
     <div id="errorMessage" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+    <!-- Allocation description & timeline popup -->
+    <div id="allocationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-info-circle text-indigo-600 mr-2"></i>
+                    <span id="allocationModalTracking">Case</span> – Brief & Timeline
+                </h3>
+                <button type="button" onclick="closeAllocationModal()" class="text-gray-400 hover:text-gray-600 p-1">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="px-6 py-4 overflow-y-auto max-h-[60vh]">
+                <div class="mb-4">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Brief description</p>
+                    <p id="allocationModalDescription" class="text-gray-800 whitespace-pre-wrap"></p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Timeline</p>
+                    <p id="allocationModalTimeline" class="text-gray-800"></p>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+                <button type="button" onclick="closeAllocationModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -246,7 +280,10 @@ function displayClientInfo(client) {
     document.getElementById('clientInfo').classList.remove('hidden');
 }
 
+let displayedCases = [];
+
 function displayCases(cases) {
+    displayedCases = cases || [];
     const tbody = document.getElementById('casesTableBody');
     tbody.innerHTML = '';
     
@@ -300,9 +337,18 @@ function displayCases(cases) {
                 </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <button onclick="viewCaseDetails(${caseItem.id})" class="text-indigo-600 hover:text-indigo-900 mr-3" title="View Details">
-                    <i class="fas fa-eye"></i>
+                <button onclick="openAllocationModal(${caseItem.id})" class="text-gray-500 hover:text-indigo-600 mr-2" title="Brief description & timeline">
+                    <i class="fas fa-info-circle"></i>
                 </button>
+                ${caseItem.status === 'Pending Approval' ? `
+                <button onclick="approveCase(${caseItem.id}, this)" class="text-amber-600 hover:text-green-600 mr-2" title="Approve case">
+                    <i class="fas fa-check-circle"></i>
+                </button>
+                ` : `
+                <a href="/case_management/${caseItem.id}" class="text-indigo-600 hover:text-indigo-900 inline-flex items-center" title="View details">
+                    <i class="fas fa-eye"></i>
+                </a>
+                `}
             </td>
         `;
         tbody.appendChild(row);
@@ -311,6 +357,44 @@ function displayCases(cases) {
 
 function viewCaseDetails(caseId) {
     window.location.href = `/case_management/${caseId}`;
+}
+
+function openAllocationModal(caseId) {
+    const c = displayedCases.find(x => x.id === caseId);
+    document.getElementById('allocationModalTracking').textContent = c ? (c.tracking_number || 'Case') : 'Case';
+    document.getElementById('allocationModalDescription').textContent = (c && c.allocation_description) ? c.allocation_description : '—';
+    document.getElementById('allocationModalTimeline').textContent = (c && c.allocation_timeline) ? c.allocation_timeline : '—';
+    document.getElementById('allocationModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAllocationModal() {
+    document.getElementById('allocationModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.getElementById('allocationModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAllocationModal();
+});
+
+function approveCase(caseId, btnEl) {
+    if (!confirm('Approve this case? It will become Active and you can open case details.')) return;
+    const btn = btnEl ? btnEl.closest('button') : null;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    fetch(`/api/cases/${caseId}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                searchCases(document.getElementById('phone_number').value.trim());
+            } else {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i>'; }
+                showError(data.error || 'Could not approve case');
+            }
+        })
+        .catch(() => {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i>'; }
+            showError('Error approving case');
+        });
 }
 
 function showError(message) {

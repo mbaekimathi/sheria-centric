@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Client - SHERIA CENTRIC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .type-card { transition: all 0.3s; }
+    .type-card.selected { transform: scale(1.03); }
+    .file-current { background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <!-- Header -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-edit text-amber-600 mr-3"></i>
+                    Edit Client
+                </h1>
+                <p class="text-gray-600 mt-1">Update details for <strong>{{ client.full_name }}</strong></p>
+            </div>
+            <a href="{{ url_for('client_management') }}" class="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>Back
+            </a>
+        </div>
+    </div>
+
+    <!-- Client Info Summary -->
+    <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl border border-amber-100 p-5 mb-6 flex items-center space-x-4">
+        {% if client.profile_picture %}
+        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}"
+             alt="{{ client.full_name }}" class="w-14 h-14 rounded-full object-cover border-2 border-white shadow">
+        {% else %}
+        <div class="w-14 h-14 rounded-full bg-amber-200 flex items-center justify-center border-2 border-white shadow">
+            <i class="fas fa-user text-amber-600 text-xl"></i>
+        </div>
+        {% endif %}
+        <div>
+            <p class="text-lg font-bold text-gray-900">{{ client.full_name }}</p>
+            <p class="text-sm text-gray-600"><i class="fas fa-envelope text-gray-400 mr-1"></i>{{ client.email }}</p>
+        </div>
+        <span class="ml-auto px-3 py-1 text-xs font-semibold rounded-full
+            {% if client.client_type == 'Individual' %}bg-blue-100 text-blue-800
+            {% elif client.client_type == 'Corporate' %}bg-indigo-100 text-indigo-800
+            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+            {{ client.client_type or 'Pending' }}
+        </span>
+    </div>
+
+    <!-- Edit Form -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+        <form method="POST" action="{{ url_for('edit_client', client_id=client.id) }}" enctype="multipart/form-data" class="space-y-6">
+            <!-- Client Type -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-3">Client Type</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label id="elabel-individual" class="type-card relative flex items-center justify-center p-5 border-2 rounded-xl cursor-pointer hover:border-blue-300 hover:bg-blue-50
+                        {% if client.client_type == 'Individual' %}border-blue-500 bg-blue-50 shadow-md selected{% else %}border-gray-200{% endif %}">
+                        <input type="radio" name="client_type" value="Individual" class="sr-only" onchange="onEditTypeSelect('Individual')"
+                            {% if client.client_type == 'Individual' %}checked{% endif %}>
+                        <div class="text-center">
+                            <i class="fas fa-user text-2xl mb-1 block {% if client.client_type == 'Individual' %}text-blue-600{% else %}text-gray-400{% endif %}" id="eico-individual"></i>
+                            <span class="text-sm font-bold text-gray-700">Individual</span>
+                        </div>
+                    </label>
+                    <label id="elabel-corporate" class="type-card relative flex items-center justify-center p-5 border-2 rounded-xl cursor-pointer hover:border-indigo-300 hover:bg-indigo-50
+                        {% if client.client_type == 'Corporate' %}border-indigo-500 bg-indigo-50 shadow-md selected{% else %}border-gray-200{% endif %}">
+                        <input type="radio" name="client_type" value="Corporate" class="sr-only" onchange="onEditTypeSelect('Corporate')"
+                            {% if client.client_type == 'Corporate' %}checked{% endif %}>
+                        <div class="text-center">
+                            <i class="fas fa-building text-2xl mb-1 block {% if client.client_type == 'Corporate' %}text-indigo-600{% else %}text-gray-400{% endif %}" id="eico-corporate"></i>
+                            <span class="text-sm font-bold text-gray-700">Corporate</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Basic Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="full_name" required value="{{ client.full_name or '' }}"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+                    <input type="email" name="email" required value="{{ client.email or '' }}"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Phone Number</label>
+                    <input type="tel" name="phone_number" value="{{ client.phone_number or '' }}" placeholder="0712 345 678"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">KRA PIN</label>
+                    <input type="text" name="kra_pin" value="{{ client.kra_pin or '' }}" placeholder="e.g. A123456789Z"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all uppercase">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">National ID</label>
+                <input type="text" name="national_id" value="{{ client.national_id or '' }}" placeholder="National ID number"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all">
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Physical Address</label>
+                <input type="text" name="client_address" value="{{ client.client_address or '' }}" placeholder="Client's physical address"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all">
+            </div>
+
+            <!-- Individual Documents Section -->
+            <div id="edit-individual-docs" class="{% if client.client_type != 'Individual' %}hidden{% endif %} space-y-5">
+                <hr class="border-gray-200">
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                    <p class="text-sm font-semibold text-blue-800"><i class="fas fa-file-alt mr-2"></i>Individual Client Documents</p>
+                </div>
+
+                <!-- National ID or Passport -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        National ID or Passport Upload <span class="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    {% if client.id_front %}
+                    <div class="file-current rounded-xl p-3 mb-2 flex items-center space-x-3">
+                        <i class="fas fa-file-check text-green-600"></i>
+                        <span class="text-sm text-gray-700 font-medium">Current: {{ client.id_front }}</span>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="id_front" accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <p class="text-xs text-gray-500 mt-1">Upload a new file to replace the existing one</p>
+                </div>
+
+                <!-- KRA PIN Upload -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        KRA PIN Upload <span class="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    {% if client.id_back %}
+                    <div class="file-current rounded-xl p-3 mb-2 flex items-center space-x-3">
+                        <i class="fas fa-file-check text-green-600"></i>
+                        <span class="text-sm text-gray-700 font-medium">Current: {{ client.id_back }}</span>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="id_back" accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <p class="text-xs text-gray-500 mt-1">Upload a new file to replace the existing one</p>
+                </div>
+
+                <!-- Signed Instruction Note -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        Signed Instruction Note <span class="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    {% if client.instruction_note %}
+                    <div class="file-current rounded-xl p-3 mb-2 flex items-center space-x-3">
+                        <i class="fas fa-file-check text-green-600"></i>
+                        <span class="text-sm text-gray-700 font-medium">Current: {{ client.instruction_note }}</span>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="instruction_note" accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <p class="text-xs text-gray-500 mt-1">Upload a new file to replace the existing one</p>
+                </div>
+            </div>
+
+            <!-- Corporate Documents Section -->
+            <div id="edit-corporate-docs" class="{% if client.client_type != 'Corporate' %}hidden{% endif %} space-y-5">
+                <hr class="border-gray-200">
+                <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded">
+                    <p class="text-sm font-semibold text-indigo-800"><i class="fas fa-file-alt mr-2"></i>Corporate Client Documents</p>
+                </div>
+
+                <!-- Registration Certificate (CR12 or CR13) -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        Registration Certificate (CR12 or CR13) <span class="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    {% if client.cr12_certificate %}
+                    <div class="file-current rounded-xl p-3 mb-2 flex items-center space-x-3">
+                        <i class="fas fa-file-check text-green-600"></i>
+                        <span class="text-sm text-gray-700 font-medium">Current: {{ client.cr12_certificate }}</span>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="cr12_certificate" accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    <p class="text-xs text-gray-500 mt-1">Upload a new file to replace the existing one</p>
+                </div>
+
+                <!-- KRA PIN Upload -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        KRA PIN Upload <span class="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    <input type="file" name="corporate_kra_pin" accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    <p class="text-xs text-gray-500 mt-1">Upload a new file to replace the existing one</p>
+                </div>
+
+                <!-- Signed Instruction Note -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        Signed Instruction Note <span class="text-gray-400 text-xs">(Optional)</span>
+                    </label>
+                    {% if client.instruction_note %}
+                    <div class="file-current rounded-xl p-3 mb-2 flex items-center space-x-3">
+                        <i class="fas fa-file-check text-green-600"></i>
+                        <span class="text-sm text-gray-700 font-medium">Current: {{ client.instruction_note }}</span>
+                    </div>
+                    {% endif %}
+                    <input type="file" name="instruction_note" accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    <p class="text-xs text-gray-500 mt-1">Upload a new file to replace the existing one</p>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                <a href="{{ url_for('client_management') }}" class="text-gray-500 hover:text-gray-700 text-sm font-semibold transition-colors">
+                    <i class="fas fa-arrow-left mr-1"></i>Cancel
+                </a>
+                <button type="submit"
+                    class="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-amber-600 rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all shadow-lg hover:shadow-xl">
+                    <i class="fas fa-save mr-2"></i>Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function onEditTypeSelect(type) {
+    var labels = {
+        'Individual': { el: 'elabel-individual', ico: 'eico-individual', border: 'border-blue-500', bg: 'bg-blue-50', color: 'text-blue-600', icon: 'fa-user' },
+        'Corporate': { el: 'elabel-corporate', ico: 'eico-corporate', border: 'border-indigo-500', bg: 'bg-indigo-50', color: 'text-indigo-600', icon: 'fa-building' }
+    };
+
+    Object.keys(labels).forEach(function(key) {
+        var cfg = labels[key];
+        var el = document.getElementById(cfg.el);
+        var ico = document.getElementById(cfg.ico);
+        el.classList.remove(cfg.border, cfg.bg, 'shadow-md', 'selected');
+        el.classList.add('border-gray-200');
+        ico.className = 'fas ' + cfg.icon + ' text-2xl mb-1 block text-gray-400';
+    });
+
+    var sel = labels[type];
+    var selEl = document.getElementById(sel.el);
+    var selIco = document.getElementById(sel.ico);
+    selEl.classList.remove('border-gray-200');
+    selEl.classList.add(sel.border, sel.bg, 'shadow-md', 'selected');
+    selIco.className = 'fas ' + sel.icon + ' text-2xl mb-1 block ' + sel.color;
+
+    var indDocs = document.getElementById('edit-individual-docs');
+    var corpDocs = document.getElementById('edit-corporate-docs');
+
+    if (type === 'Individual') {
+        indDocs.classList.remove('hidden');
+        corpDocs.classList.add('hidden');
+    } else {
+        corpDocs.classList.remove('hidden');
+        indDocs.classList.add('hidden');
+    }
+}
+</script>
+{% endblock %}

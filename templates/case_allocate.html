@@ -19,32 +19,57 @@
 
     <!-- Allocation Change Form -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-        <div class="mb-6">
-            <p class="text-sm text-gray-600 mb-4">Currently Allocated To:</p>
-            <p class="text-lg font-semibold text-gray-900">{{ case_data.filled_by_name or 'Not Allocated' }}</p>
-        </div>
-
         <form id="allocationChangeForm" class="space-y-6">
             <div>
-                <label for="employeeSearch" class="block text-sm font-semibold text-gray-700 mb-2">
-                    Select Employee <span class="text-red-500">*</span>
+                <label for="caseHandlerSelect" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Select Case Handler <span class="text-red-500">*</span>
                 </label>
-                <div class="relative">
-                    <input 
-                        type="text" 
-                        id="employeeSearch" 
-                        placeholder="Type employee name or code..."
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        oninput="searchEmployees(this.value)"
-                        autocomplete="off"
-                    >
-                    <input type="hidden" id="selectedEmployeeId" name="employee_id">
-                    <div id="employeeDropdown" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    </div>
-                </div>
+                <select 
+                    id="caseHandlerSelect" 
+                    name="employee_id"
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                    <option value="">— Select Case Handler —</option>
+                    {% for emp in case_handlers %}
+                    <option value="{{ emp.id }}" {% if case_data.filled_by_id and case_data.filled_by_id == emp.id %}selected{% endif %}>
+                        {{ emp.full_name }} — {{ emp.role }}
+                    </option>
+                    {% endfor %}
+                </select>
                 <p class="mt-2 text-sm text-gray-500">
                     <i class="fas fa-info-circle mr-1"></i>
-                    Search for an employee by name or employee code
+                    Managing Partners and Associate Advocates only
+                </p>
+            </div>
+
+            <div>
+                <label for="allocationDescription" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Brief Description
+                </label>
+                <textarea 
+                    id="allocationDescription" 
+                    name="allocation_description"
+                    rows="3"
+                    placeholder="e.g. Scope of work, key tasks, or instructions for the case handler..."
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >{{ case_data.allocation_description|default('', true) }}</textarea>
+            </div>
+
+            <div>
+                <label for="allocationTimeline" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Timeline
+                </label>
+                <input 
+                    type="date" 
+                    id="allocationTimeline" 
+                    name="allocation_timeline"
+                    value="{{ (case_data.allocation_timeline[:10] if case_data.allocation_timeline and (case_data.allocation_timeline|length) >= 10 else '')|default('', true) }}"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                <p class="mt-2 text-sm text-gray-500">
+                    <i class="fas fa-calendar-alt mr-1"></i>
+                    Select a target date from the calendar
                 </p>
             </div>
 
@@ -66,67 +91,32 @@
 </div>
 
 <script>
-function searchEmployees(query) {
-    const dropdown = document.getElementById('employeeDropdown');
-    
-    if (query.length < 2) {
-        dropdown.classList.add('hidden');
-        return;
-    }
-    
-    fetch(`/api/employees/search?q=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            dropdown.innerHTML = '';
-            
-            if (data.error || !data.employees || data.employees.length === 0) {
-                dropdown.innerHTML = '<div class="px-4 py-2 text-gray-500">No employees found</div>';
-                dropdown.classList.remove('hidden');
-                return;
-            }
-            
-            data.employees.forEach(employee => {
-                const item = document.createElement('div');
-                item.className = 'px-4 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100';
-                const name = employee.full_name || '';
-                const code = employee.employee_code || '';
-                item.textContent = `${name}${code ? ' (' + code + ')' : ''}`;
-                item.onclick = () => {
-                    document.getElementById('employeeSearch').value = `${name}${code ? ' (' + code + ')' : ''}`;
-                    document.getElementById('selectedEmployeeId').value = employee.id;
-                    dropdown.classList.add('hidden');
-                };
-                dropdown.appendChild(item);
-            });
-            
-            dropdown.classList.remove('hidden');
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            dropdown.innerHTML = '<div class="px-4 py-2 text-red-500">Error searching employees</div>';
-            dropdown.classList.remove('hidden');
-        });
-}
-
 document.getElementById('allocationChangeForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const employeeId = document.getElementById('selectedEmployeeId').value;
+    const selectEl = document.getElementById('caseHandlerSelect');
+    const employeeId = selectEl && selectEl.value;
     
     if (!employeeId) {
-        alert('Please select an employee');
+        alert('Please select a case handler');
         return;
     }
     
-    const employeeName = document.getElementById('employeeSearch').value;
+    const employeeName = selectEl.options[selectEl.selectedIndex].text.replace(/\s*—\s*Managing Partner$|\s*—\s*Associate Advocate$/, '').trim();
+    const description = (document.getElementById('allocationDescription') && document.getElementById('allocationDescription').value) ? document.getElementById('allocationDescription').value.trim() : '';
+    const timeline = (document.getElementById('allocationTimeline') && document.getElementById('allocationTimeline').value) ? document.getElementById('allocationTimeline').value.trim() : '';
     
-    if (confirm(`Are you sure you want to allocate this case to "${employeeName}"?`)) {
+    if (confirm('Are you sure you want to allocate this case to "' + employeeName + '"?')) {
         fetch(`/api/allocate_case/{{ case_id }}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ employee_id: parseInt(employeeId) })
+            body: JSON.stringify({ 
+                employee_id: parseInt(employeeId),
+                allocation_description: description,
+                allocation_timeline: timeline
+            })
         })
         .then(response => response.json())
         .then(data => {
@@ -141,16 +131,6 @@ document.getElementById('allocationChangeForm').addEventListener('submit', funct
             console.error('Error:', error);
             alert('An error occurred while allocating the case.');
         });
-    }
-});
-
-// Close dropdown when clicking outside
-document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('employeeDropdown');
-    const searchInput = document.getElementById('employeeSearch');
-    
-    if (!dropdown.contains(event.target) && event.target !== searchInput) {
-        dropdown.classList.add('hidden');
     }
 });
 </script>

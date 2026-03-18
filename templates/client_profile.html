@@ -37,9 +37,6 @@
                     <h1 class="text-3xl font-bold text-white mb-2">{{ client.full_name }}</h1>
                     <div class="flex flex-wrap items-center justify-center md:justify-start gap-3">
                         <span class="px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold">
-                            <i class="fas fa-user-tag mr-2"></i>{{ client.client_type }}
-                        </span>
-                        <span class="px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold">
                             <i class="fas fa-building mr-2"></i>{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}
                         </span>
                         <span class="px-4 py-1.5 rounded-full text-sm font-semibold {% if client.status == 'Active' %}bg-green-500 text-white{% else %}bg-gray-500 text-white{% endif %}">
@@ -92,18 +89,44 @@
                 </div>
                 {% endif %}
                 
-                <div class="flex items-start space-x-4">
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
                     <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-tag text-blue-600"></i>
+                        <i class="fas fa-id-card text-blue-600"></i>
                     </div>
                     <div class="flex-1">
-                        <p class="text-xs text-gray-500 font-medium mb-1">Client Type</p>
-                        {% if client.client_type == 'Pending' %}
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>Pending - Please complete registration
-                        </span>
-                        {% else %}
-                        <p class="text-lg font-semibold text-gray-900">{{ client.client_type }}</p>
+                        <p class="text-xs text-gray-500 font-medium mb-1">National ID</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.national_id or 'Not provided' }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-file-invoice text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">KRA PIN</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.kra_pin or 'Not provided' }}</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-start space-x-4">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-map-marker-alt text-blue-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 font-medium mb-1">Physical Address</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ client.client_address or 'Not provided' }}</p>
+                        {% if client.address_latitude and client.address_longitude %}
+                        <div class="mt-3 rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                            <iframe
+                                width="100%"
+                                height="200"
+                                style="border:0"
+                                loading="lazy"
+                                referrerpolicy="no-referrer-when-downgrade"
+                                src="https://www.google.com/maps/embed/v1/place?key=AIzaSyCOYVcba3oi7_rCjMCAwWn1FyWV4RvovlQ&q={{ client.address_latitude }},{{ client.address_longitude }}&zoom=15">
+                            </iframe>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
@@ -127,25 +150,13 @@
                     </div>
                 </div>
                 
-                <div class="flex items-start space-x-4 pb-4 border-b border-gray-100">
+                <div class="flex items-start space-x-4">
                     <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
                         <i class="fas fa-clock text-indigo-600"></i>
                     </div>
                     <div class="flex-1">
                         <p class="text-xs text-gray-500 font-medium mb-1">Last Updated</p>
                         <p class="text-lg font-semibold text-gray-900">{{ client.updated_at.strftime('%B %d, %Y') if client.updated_at else 'N/A' }}</p>
-                    </div>
-                </div>
-                
-                <div class="flex items-start space-x-4">
-                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-shield-alt text-indigo-600"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-xs text-gray-500 font-medium mb-1">Account Status</p>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                            {{ client.status }}
-                        </span>
                     </div>
                 </div>
             </div>
@@ -227,16 +238,50 @@
                     <p class="text-xs text-gray-500 mt-1">Format: 07XX XXX XXX (Kenyan mobile number)</p>
                 </div>
 
-                <!-- Client Type -->
+                <!-- National ID -->
                 <div>
-                    <label for="client_type" class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-tag text-indigo-600 mr-2"></i>Client Type <span class="text-red-500">*</span>
+                    <label for="national_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-id-card text-blue-600 mr-2"></i>National ID
                     </label>
-                    <select name="client_type" id="client_type" required
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all">
-                        <option value="Individual" {% if client.client_type == 'Individual' %}selected{% endif %}>Individual</option>
-                        <option value="Corporate" {% if client.client_type == 'Corporate' %}selected{% endif %}>Corporate</option>
-                    </select>
+                    <input type="text" name="national_id" id="national_id" value="{{ client.national_id or '' }}"
+                           placeholder="e.g. 12345678"
+                           maxlength="50"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                </div>
+
+                <!-- KRA PIN -->
+                <div>
+                    <label for="kra_pin" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-file-invoice text-blue-600 mr-2"></i>KRA PIN
+                    </label>
+                    <input type="text" name="kra_pin" id="kra_pin" value="{{ client.kra_pin or '' }}"
+                           placeholder="e.g. A012345678Z"
+                           maxlength="50"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                    <p class="text-xs text-gray-500 mt-1">Kenya Revenue Authority Personal Identification Number</p>
+                </div>
+
+                <!-- Physical Address with Google Places Autocomplete -->
+                <div class="md:col-span-2">
+                    <label for="client_address" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>Physical Address
+                    </label>
+                    <div class="relative">
+                        <input type="text" name="client_address" id="client_address" value="{{ client.client_address or '' }}"
+                               placeholder="Start typing to search for a location..."
+                               autocomplete="off"
+                               class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <div id="addressSpinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2">
+                            <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                        </div>
+                    </div>
+                    <input type="hidden" name="address_latitude" id="address_latitude" value="{{ client.address_latitude or '' }}">
+                    <input type="hidden" name="address_longitude" id="address_longitude" value="{{ client.address_longitude or '' }}">
+                    <div id="addressMapPreview" class="mt-3 rounded-xl overflow-hidden border border-gray-200 shadow-sm {% if not client.address_latitude %}hidden{% endif %}">
+                        <div id="editMap" style="height: 200px; width: 100%;"></div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1"><i class="fab fa-google text-gray-400 mr-1"></i>Powered by Google Maps - type to search locations</p>
                 </div>
 
                 <!-- Email (Read-only) -->
@@ -264,21 +309,92 @@
     </form>
 </div>
 
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCOYVcba3oi7_rCjMCAwWn1FyWV4RvovlQ&libraries=places&callback=initAutocomplete" async defer></script>
 <script>
+    let autocomplete;
+    let editMap;
+    let editMarker;
+
+    function initAutocomplete() {
+        const addressInput = document.getElementById('client_address');
+        if (!addressInput) return;
+
+        autocomplete = new google.maps.places.Autocomplete(addressInput, {
+            types: ['geocode', 'establishment'],
+            componentRestrictions: { country: 'ke' }
+        });
+
+        autocomplete.addListener('place_changed', function() {
+            const place = autocomplete.getPlace();
+            if (!place.geometry) return;
+
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+
+            document.getElementById('address_latitude').value = lat;
+            document.getElementById('address_longitude').value = lng;
+            document.getElementById('client_address').value = place.formatted_address || place.name;
+
+            showEditMap(lat, lng);
+        });
+
+        const existingLat = parseFloat(document.getElementById('address_latitude').value);
+        const existingLng = parseFloat(document.getElementById('address_longitude').value);
+        if (existingLat && existingLng) {
+            showEditMap(existingLat, existingLng);
+        }
+    }
+
+    function showEditMap(lat, lng) {
+        const mapContainer = document.getElementById('addressMapPreview');
+        mapContainer.classList.remove('hidden');
+
+        const location = { lat: lat, lng: lng };
+
+        if (!editMap) {
+            editMap = new google.maps.Map(document.getElementById('editMap'), {
+                center: location,
+                zoom: 15,
+                disableDefaultUI: true,
+                zoomControl: true,
+                mapTypeControl: false,
+                streetViewControl: false,
+                styles: [
+                    { featureType: "poi", stylers: [{ visibility: "simplified" }] }
+                ]
+            });
+            editMarker = new google.maps.Marker({
+                map: editMap,
+                position: location,
+                animation: google.maps.Animation.DROP
+            });
+        } else {
+            editMap.setCenter(location);
+            editMarker.setPosition(location);
+        }
+    }
+
     function toggleEditMode() {
         const viewMode = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.gap-6');
         const editForm = document.getElementById('editProfileForm');
         const editBtn = document.getElementById('editBtn');
         
         if (editForm.classList.contains('hidden')) {
-            // Switch to edit mode
             viewMode.style.display = 'none';
             editForm.classList.remove('hidden');
             editBtn.innerHTML = '<i class="fas fa-eye mr-2"></i>View Profile';
             editBtn.classList.remove('from-blue-600', 'to-indigo-700', 'hover:from-blue-700', 'hover:to-indigo-800');
             editBtn.classList.add('from-gray-600', 'to-gray-700', 'hover:from-gray-700', 'hover:to-gray-800');
+
+            setTimeout(function() {
+                const lat = parseFloat(document.getElementById('address_latitude').value);
+                const lng = parseFloat(document.getElementById('address_longitude').value);
+                if (lat && lng && editMap) {
+                    google.maps.event.trigger(editMap, 'resize');
+                    editMap.setCenter({ lat: lat, lng: lng });
+                }
+            }, 300);
         } else {
-            // Switch to view mode
             viewMode.style.display = 'grid';
             editForm.classList.add('hidden');
             editBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Profile';
@@ -297,7 +413,6 @@
                 if (preview) {
                     preview.src = e.target.result;
                 } else if (container) {
-                    // Replace placeholder with image
                     container.innerHTML = `<img id="profilePreview" src="${e.target.result}" alt="Profile" class="w-full h-full object-cover">`;
                 }
             };
@@ -305,11 +420,9 @@
         }
     }
 
-    // Format phone number as user types (Kenyan format)
     document.getElementById('phone_number').addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+        let value = e.target.value.replace(/\D/g, '');
         
-        // Format as 07XX XXX XXX
         if (value.length > 0) {
             if (value.length <= 4) {
                 value = value;

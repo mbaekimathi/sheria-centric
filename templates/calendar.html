@@ -5,115 +5,385 @@
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <!-- Page Header -->
-    <div class="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl shadow-xl border border-green-200 p-6 mb-6 text-white">
-        <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
-            <i class="fas fa-calendar-alt mr-3"></i>
-            Calendar
-        </h1>
-        <p class="text-green-100">View all upcoming court dates across all cases</p>
+    <div class="bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 rounded-2xl shadow-xl border border-emerald-200/50 p-6 mb-6 text-white relative overflow-hidden">
+        <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.06\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-80"></div>
+        <div class="relative">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                <i class="fas fa-calendar-days mr-3"></i>
+                Calendar
+            </h1>
+            <p class="text-emerald-100 text-sm md:text-base">Court dates across all cases — month view and agenda</p>
+        </div>
     </div>
 
-    <!-- Calendar Content -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
-        <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <i class="fas fa-calendar-check text-green-600 mr-3"></i>
-            Upcoming Court Dates
-            <span class="ml-3 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-                {{ all_upcoming_proceedings|length }}
-            </span>
-        </h2>
-        
-        {% if all_upcoming_proceedings and all_upcoming_proceedings|length > 0 %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Room</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Attendance</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+    <!-- Toolbar: view toggle + month nav + today -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
+        <div class="flex rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+            <button type="button" id="view-month-btn" class="view-toggle px-4 py-2.5 text-sm font-semibold text-white bg-emerald-600 border-r border-emerald-500">
+                <i class="fas fa-calendar-alt mr-2"></i>Month
+            </button>
+            <button type="button" id="view-agenda-btn" class="view-toggle px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                <i class="fas fa-list mr-2"></i>Agenda
+            </button>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" id="today-btn" class="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm transition-colors">
+                <i class="fas fa-dot-circle mr-2 text-emerald-500"></i>Today
+            </button>
+            <div class="flex items-center rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <button type="button" id="prev-month" class="p-2.5 text-gray-600 hover:bg-gray-100 transition-colors" title="Previous month">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <h2 id="calendar-title" class="min-w-[180px] px-4 py-2.5 text-center text-base font-bold text-gray-900">
+                    <!-- Filled by JS -->
+                </h2>
+                <button type="button" id="next-month" class="p-2.5 text-gray-600 hover:bg-gray-100 transition-colors" title="Next month">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Calendar + Agenda content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Month view -->
+            <div id="month-view" class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                <div class="px-4 sm:px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                    <div id="calendar-weekdays" class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                    </div>
+                </div>
+                <div id="calendar-grid" class="p-4 sm:p-6 grid grid-cols-7 gap-2">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Agenda (list) view -->
+            <div id="agenda-view" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6">
+                <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-calendar-check text-emerald-600 mr-2"></i>
+                    Upcoming court dates
+                    <span class="ml-2 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold" id="agenda-count">{{ all_upcoming_proceedings|length }}</span>
+                </h2>
+                {% if all_upcoming_proceedings and all_upcoming_proceedings|length > 0 %}
+                <div class="space-y-3 max-h-[520px] overflow-y-auto pr-1 custom-scrollbar">
                     {% for proceeding in all_upcoming_proceedings %}
-                    <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location.href='/case_management/{{ proceeding.case_id }}'">
-                        <td class="px-3 py-2 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-green-100 text-green-800 rounded-lg px-2 py-1 text-xs font-bold">
-                                        {{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else 'N/A' }}
-                                    </div>
+                    <a href="/case_management/{{ proceeding.case_id }}" class="block rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-emerald-50 hover:border-emerald-200 p-4 transition-all duration-200 group">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-600 text-white flex flex-col items-center justify-center font-bold text-sm leading-tight">
+                                    <span>{{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else '—' }}</span>
+                                    <span class="text-[10px] font-medium opacity-90">{{ proceeding.next_court_date and proceeding.next_court_date.split('-')[1] or '—' }}</span>
                                 </div>
-                                <div class="ml-2">
-                                    <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
-                                    {% if proceeding.days_until is defined %}
-                                    {% if proceeding.days_until == 0 %}
-                                    <div class="text-xs text-red-600 font-medium">Today</div>
-                                    {% elif proceeding.days_until == 1 %}
-                                    <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
-                                    {% elif proceeding.days_until <= 7 %}
-                                    <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
-                                    {% else %}
-                                    <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
-                                    {% endif %}
-                                    {% endif %}
+                                <div>
+                                    <p class="font-semibold text-gray-900 group-hover:text-emerald-800">{{ proceeding.court_activity_type or 'Court date' }}</p>
+                                    <p class="text-sm text-gray-500">{{ proceeding.tracking_number }} · {{ proceeding.client_name or 'N/A' }}</p>
                                 </div>
                             </div>
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
-                            {% if proceeding.virtual_link %}
-                            <a href="{{ proceeding.virtual_link }}" target="_blank" onclick="event.stopPropagation();" class="text-xs text-blue-600 hover:text-blue-800 flex items-center mt-1">
-                                <i class="fas fa-link mr-1"></i>Virtual Link
-                            </a>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-indigo-600">
-                                {{ proceeding.tracking_number }}
-                            </div>
-                            <div class="text-xs text-gray-500">{{ proceeding.client_name or 'N/A' }}</div>
-                        </td>
-                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.court_room or '-' }}</td>
-                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
-                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.next_attendance or '-' }}</td>
-                        <td class="px-3 py-2 whitespace-nowrap">
                             {% if proceeding.days_until is defined %}
                             {% if proceeding.days_until == 0 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                <i class="fas fa-exclamation-circle mr-1"></i>Today
-                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-800">Today</span>
                             {% elif proceeding.days_until == 1 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                                <i class="fas fa-clock mr-1"></i>Tomorrow
-                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 text-orange-800">Tomorrow</span>
                             {% elif proceeding.days_until <= 7 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                <i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d
-                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800">{{ proceeding.days_until }}d</span>
                             {% else %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                <i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d
-                            </span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">{{ proceeding.days_until }}d</span>
                             {% endif %}
                             {% endif %}
-                        </td>
-                    </tr>
+                        </div>
+                        {% if proceeding.court_room or proceeding.judicial_officer %}
+                        <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                            {% if proceeding.court_room %}<span><i class="fas fa-door-open mr-1 text-gray-400"></i>{{ proceeding.court_room }}</span>{% endif %}
+                            {% if proceeding.judicial_officer %}<span><i class="fas fa-gavel mr-1 text-gray-400"></i>{{ proceeding.judicial_officer }}</span>{% endif %}
+                        </div>
+                        {% endif %}
+                    </a>
                     {% endfor %}
-                </tbody>
-            </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>
+                    <p class="text-gray-600 font-semibold mb-1">No upcoming court dates</p>
+                    <p class="text-gray-500 text-sm">Scheduled dates will appear here.</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
-        {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>
-            <p class="text-gray-600 text-lg font-semibold mb-2">No Upcoming Court Dates</p>
-            <p class="text-gray-500 text-sm">There are no scheduled court dates across all cases.</p>
+
+        <!-- Side panel: selected date events -->
+        <div class="lg:col-span-1">
+            <div id="day-panel" class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden sticky top-6">
+                <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                    <h3 class="font-bold text-gray-900 flex items-center">
+                        <i class="fas fa-calendar-day text-emerald-600 mr-2"></i>
+                        <span id="day-panel-title">Select a date</span>
+                    </h3>
+                    <span id="day-panel-count" class="text-xs font-semibold text-gray-500 hidden"></span>
+                </div>
+                <div id="day-panel-events" class="p-4 max-h-[420px] overflow-y-auto custom-scrollbar">
+                    <p id="day-panel-empty" class="text-sm text-gray-500 text-center py-8">Click a date on the calendar to see court dates.</p>
+                    <p id="day-panel-no-events" class="text-sm text-gray-500 text-center py-8 hidden">No court dates on this day.</p>
+                    <div id="day-panel-list" class="space-y-3 hidden"></div>
+                </div>
+            </div>
         </div>
-        {% endif %}
     </div>
 </div>
-{% endblock %}
 
+<!-- Date activities popup modal -->
+<div id="date-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div id="date-modal-backdrop" class="absolute inset-0 bg-black/40 sm:bg-black/50 backdrop-blur-sm transition-opacity duration-200"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-3 sm:p-4">
+        <div id="date-modal-box" class="relative w-full max-w-md max-h-[85vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transform transition-all duration-200 translate-y-4 sm:translate-y-0 scale-95 opacity-0">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-green-50">
+                <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-calendar-day text-emerald-600 mr-2"></i>
+                    <span id="date-modal-title">Date</span>
+                </h3>
+                <button type="button" id="date-modal-close" class="p-2 rounded-xl text-gray-500 hover:bg-white hover:text-gray-700 transition-colors" aria-label="Close">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div class="px-5 py-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                <p id="date-modal-empty" class="text-sm text-gray-600 text-center py-6 hidden">No court dates on this day.</p>
+                <div id="date-modal-list" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #e5f3ff; border-radius: 999px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #60a5fa; border-radius: 999px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+.cal-day {
+    min-height: 82px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.03), transparent 55%);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.cal-day:hover {
+    border-color: #34d399;
+    box-shadow: 0 6px 18px rgba(15, 118, 110, 0.18);
+    transform: translateY(-1px);
+    background-color: #f0fdf4;
+}
+.cal-day.today {
+    border-color: #10b981;
+    background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.25), #ecfdf5);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.55), 0 10px 25px rgba(5, 150, 105, 0.35);
+}
+.cal-day.has-events {
+    background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 40%, #eef2ff 100%);
+    border-color: #22c55e;
+}
+.cal-day.other-month .cal-day-num { color: #9ca3af; }
+.cal-day-event-dot { width: 6px; height: 6px; border-radius: 999px; }
+#date-modal.open #date-modal-box { transform: translateY(0) scale(1); opacity: 1; }
+#date-modal.open #date-modal-backdrop { opacity: 1; }
+</style>
+
+<script>
+(function() {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const calendarEvents = {{ calendar_events|tojson }} || {};
+    let currentMonth = new Date().getMonth();
+    let currentYear = new Date().getFullYear();
+    let view = 'month';
+
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+    function formatDateKey(y, m, d) {
+        const ym = Number(y);
+        const mm = Number(m);
+        const dm = Number(d);
+        if (isNaN(ym) || isNaN(mm) || isNaN(dm)) return '';
+        // Match backend date keys: YYYY-MM-DD
+        return ym + '-' + String(mm).padStart(2, '0') + '-' + String(dm).padStart(2, '0');
+    }
+
+    function setView(v) {
+        view = v;
+        document.querySelectorAll('.view-toggle').forEach(btn => btn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-500'));
+        document.querySelectorAll('.view-toggle').forEach(btn => btn.classList.add('text-gray-600'));
+        if (v === 'month') {
+            document.getElementById('view-month-btn').classList.add('bg-emerald-600', 'text-white', 'border-emerald-500');
+            document.getElementById('view-month-btn').classList.remove('text-gray-600');
+            document.getElementById('month-view').classList.remove('hidden');
+            document.getElementById('agenda-view').classList.add('hidden');
+        } else {
+            document.getElementById('view-agenda-btn').classList.add('bg-emerald-600', 'text-white');
+            document.getElementById('view-agenda-btn').classList.remove('text-gray-600');
+            document.getElementById('month-view').classList.add('hidden');
+            document.getElementById('agenda-view').classList.remove('hidden');
+        }
+    }
+
+    function renderMonth() {
+        const titleMonth = (typeof currentMonth === 'number' && !isNaN(currentMonth)) ? monthNames[currentMonth] : 'Month';
+        const titleYear = (typeof currentYear === 'number' && !isNaN(currentYear)) ? currentYear : new Date().getFullYear();
+        document.getElementById('calendar-title').textContent = titleMonth + ' ' + titleYear;
+        const grid = document.getElementById('calendar-grid');
+        grid.innerHTML = '';
+
+        const first = new Date(currentYear, currentMonth, 1);
+        const last = new Date(currentYear, currentMonth + 1, 0);
+        const startPad = first.getDay();
+        const daysInMonth = last.getDate();
+        const isCurrentMonth = currentYear === today.getFullYear() && currentMonth === today.getMonth();
+
+        // Pad before first day
+        for (let i = 0; i < startPad; i++) {
+            const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+            const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+            const prevLast = new Date(prevYear, prevMonth + 1, 0).getDate();
+            const d = prevLast - startPad + i + 1;
+            grid.appendChild(createDayCell(prevYear, prevMonth, d, true));
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            grid.appendChild(createDayCell(currentYear, currentMonth, d, false));
+        }
+        const totalCells = startPad + daysInMonth;
+        const remainder = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+        for (let i = 0; i < remainder; i++) {
+            const nextD = i + 1;
+            const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+            const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+            grid.appendChild(createDayCell(nextYear, nextMonth, nextD, true));
+        }
+    }
+
+    function createDayCell(y, m, d, otherMonth) {
+        const dateStr = formatDateKey(y, m + 1, d);
+        const events = (calendarEvents && typeof calendarEvents === 'object') ? (calendarEvents[dateStr] || []) : [];
+        const isToday = dateStr === todayStr && !otherMonth;
+
+        const cell = document.createElement('div');
+        cell.className = 'cal-day p-2 cursor-pointer ' + (otherMonth ? 'other-month bg-gray-50/50' : '') + (isToday ? ' today' : '') + (events.length ? ' has-events' : '');
+        cell.dataset.date = dateStr;
+        cell.title = events.length ? (events.length + ' court date(s) – click to view') : 'Click to view this date';
+
+        const num = document.createElement('div');
+        num.className = 'cal-day-num text-sm font-bold text-gray-800 mb-1';
+        num.textContent = d;
+        cell.appendChild(num);
+
+        if (events.length > 0) {
+            const wrap = document.createElement('div');
+            wrap.className = 'mt-1 flex items-center justify-between';
+
+            // Short label showing first activity
+            const label = document.createElement('span');
+            label.className = 'text-[11px] font-medium text-emerald-800 truncate max-w-[70%]';
+            const first = events[0] || {};
+            const type = first.court_activity_type || 'Court date';
+            const tracking = first.tracking_number || '';
+            label.textContent = (tracking ? tracking + ' · ' : '') + type;
+            wrap.appendChild(label);
+
+            // Count badge (visible number of events)
+            const countBadge = document.createElement('span');
+            countBadge.className = 'ml-1 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold flex-shrink-0';
+            countBadge.textContent = events.length;
+            wrap.appendChild(countBadge);
+
+            cell.classList.add('border-emerald-400', 'bg-emerald-50/80');
+            cell.appendChild(wrap);
+        }
+
+        cell.addEventListener('click', function() {
+            openDateModal(dateStr, events);
+        });
+        return cell;
+    }
+
+    function openDateModal(dateStr, eventsList) {
+        const modal = document.getElementById('date-modal');
+        const titleEl = document.getElementById('date-modal-title');
+        const emptyEl = document.getElementById('date-modal-empty');
+        const listEl = document.getElementById('date-modal-list');
+
+        const d = new Date(dateStr + 'T12:00:00');
+        const dayIdx = d.getDay();
+        const monthIdx = d.getMonth();
+        const dateNum = d.getDate();
+        const year = d.getFullYear();
+        const isValid = !isNaN(monthIdx) && !isNaN(dateNum) && !isNaN(year);
+        const label = isValid
+            ? (dayNamesShort[dayIdx] || '') + ', ' + dateNum + ' ' + (monthNames[monthIdx] || '') + ' ' + year
+            : (typeof dateStr === 'string' ? dateStr : 'Selected date');
+        titleEl.textContent = label;
+
+        emptyEl.classList.add('hidden');
+        listEl.classList.add('hidden');
+        listEl.innerHTML = '';
+
+        if (!eventsList || eventsList.length === 0) {
+            emptyEl.classList.remove('hidden');
+        } else {
+            listEl.classList.remove('hidden');
+            eventsList.forEach(ev => {
+                const a = document.createElement('a');
+                a.href = '/case_management/' + (ev.case_id || ev.case_table_id);
+                a.className = 'block rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-emerald-50 hover:border-emerald-200 p-3 transition-all duration-200';
+                let room = ev.court_room ? '<p class="text-xs text-gray-600 mt-1"><i class="fas fa-door-open mr-1 text-gray-400"></i>' + ev.court_room + '</p>' : '';
+                let link = ev.virtual_link ? '<p class="text-xs mt-1"><a href="' + ev.virtual_link + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-emerald-600 hover:underline"><i class="fas fa-video mr-1"></i>Virtual link</a></p>' : '';
+                a.innerHTML = '<p class="font-semibold text-gray-900 text-sm">' + (ev.court_activity_type || 'Court date') + '</p>' +
+                    '<p class="text-xs text-gray-500 mt-0.5">' + (ev.tracking_number || '') + (ev.client_name ? ' · ' + ev.client_name : '') + '</p>' + room + link;
+                listEl.appendChild(a);
+            });
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDateModal() {
+        const modal = document.getElementById('date-modal');
+        modal.classList.remove('open');
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function goPrevMonth() {
+        currentMonth--;
+        if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+        renderMonth();
+    }
+    function goNextMonth() {
+        currentMonth++;
+        if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+        renderMonth();
+    }
+    function goToday() {
+        currentMonth = today.getMonth();
+        currentYear = today.getFullYear();
+        renderMonth();
+        openDateModal(todayStr, calendarEvents[todayStr] || []);
+    }
+
+    document.getElementById('date-modal-close').addEventListener('click', closeDateModal);
+    document.getElementById('date-modal-backdrop').addEventListener('click', closeDateModal);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && document.getElementById('date-modal').classList.contains('open')) closeDateModal();
+    });
+
+    document.getElementById('view-month-btn').addEventListener('click', function() { setView('month'); });
+    document.getElementById('view-agenda-btn').addEventListener('click', function() { setView('agenda'); });
+    document.getElementById('prev-month').addEventListener('click', goPrevMonth);
+    document.getElementById('next-month').addEventListener('click', goNextMonth);
+    document.getElementById('today-btn').addEventListener('click', goToday);
+
+    renderMonth();
+    setView('month');
+})();
+</script>
+{% endblock %}

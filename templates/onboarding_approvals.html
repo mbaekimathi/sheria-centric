@@ -3,390 +3,1039 @@
 {% block title %}Onboarding & Approvals - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
     <!-- Page Header -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-                    <i class="fas fa-user-check text-green-600 mr-3"></i>
-                    Onboarding & Approvals
+    <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1 sm:mb-2 flex items-center">
+                    <i class="fas fa-user-check text-green-600 mr-2 sm:mr-3 flex-shrink-0"></i>
+                    <span class="truncate">Onboarding & Approvals</span>
                 </h1>
-                <p class="text-gray-600">Manage new employee onboarding and approval processes</p>
+                <p class="text-gray-600 text-xs sm:text-sm lg:text-base">Review, assign roles, and approve pending employees</p>
             </div>
+            <button onclick="loadPendingApprovals()" class="btn-touch px-4 py-3 sm:py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors font-medium text-sm flex items-center self-end sm:self-auto border border-gray-200/80">
+                <i class="fas fa-sync-alt mr-2"></i>Refresh
+            </button>
         </div>
     </div>
 
-    <!-- Pending Approval Employees Content -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-user-check text-green-600 mr-3"></i>
-                Pending Approval Employees
-            </h2>
-            <span id="pending-count" class="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold">
-                Loading...
-            </span>
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        <div class="stat-card bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100 p-4 sm:p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Pending</p>
+                    <p id="stat-total" class="text-xl sm:text-3xl font-bold text-gray-900 mt-1">-</p>
+                </div>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-users text-yellow-600 text-base sm:text-xl"></i>
+                </div>
+            </div>
         </div>
-        
-        <div id="approval-list" class="space-y-4">
+        <div class="stat-card bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100 p-4 sm:p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider">Ready</p>
+                    <p id="stat-ready" class="text-xl sm:text-3xl font-bold text-green-600 mt-1">-</p>
+                </div>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-check-circle text-green-600 text-base sm:text-xl"></i>
+                </div>
+            </div>
+            <p class="text-[10px] sm:text-xs text-gray-400 mt-1.5 sm:mt-2 hidden sm:block">Onboarding completed</p>
+        </div>
+        <div class="stat-card bg-white rounded-xl sm:rounded-2xl shadow-md border border-gray-100 p-4 sm:p-5">
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider">In Progress</p>
+                    <p id="stat-pending" class="text-xl sm:text-3xl font-bold text-orange-500 mt-1">-</p>
+                </div>
+                <div class="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-hourglass-half text-orange-500 text-base sm:text-xl"></i>
+                </div>
+            </div>
+            <p class="text-[10px] sm:text-xs text-gray-400 mt-1.5 sm:mt-2 hidden sm:block">Awaiting onboarding</p>
+        </div>
+    </div>
+
+    <!-- Filter Tabs + Search -->
+    <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-4 sm:p-5 lg:p-6">
+        <div class="flex flex-col gap-3 mb-4 sm:mb-6">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <!-- Tabs (horizontally scrollable on mobile) -->
+                <div class="flex bg-gray-100 rounded-xl p-1.5 gap-1 overflow-x-auto flex-shrink-0 scrollbar-hide min-h-[44px] sm:min-h-0">
+                    <button onclick="filterEmployees('all')" id="tab-all" class="tab-btn px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-gray-900 shadow-sm whitespace-nowrap">
+                        All <span id="tab-all-count" class="ml-1 text-xs opacity-70"></span>
+                    </button>
+                    <button onclick="filterEmployees('ready')" id="tab-ready" class="tab-btn px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                        Ready <span class="hidden sm:inline">to Approve</span> <span id="tab-ready-count" class="ml-1 text-xs opacity-70"></span>
+                    </button>
+                    <button onclick="filterEmployees('pending')" id="tab-pending" class="tab-btn px-4 sm:px-5 py-2.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                        <span class="hidden sm:inline">Onboarding</span> Pending <span id="tab-pending-count" class="ml-1 text-xs opacity-70"></span>
+                    </button>
+                </div>
+                <!-- Search -->
+                <div class="relative w-full sm:w-72">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                    <input type="text" id="searchInput" placeholder="Search name, email, code..."
+                        class="search-input w-full pl-10 pr-4 py-2.5 sm:py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow"
+                        oninput="applySearch()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Desktop Table (hidden on mobile) -->
+        <div class="hidden md:block overflow-x-auto -mx-2 sm:mx-0 rounded-xl">
+            <table class="w-full min-w-[640px]" id="employees-table-desktop">
+                <thead>
+                    <tr class="border-b-2 border-gray-200 bg-gray-50/80">
+                        <th class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider py-4 pl-5">Employee</th>
+                        <th class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider py-4">Contact</th>
+                        <th class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider py-4">Current Role</th>
+                        <th class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider py-4">Onboarding</th>
+                        <th class="text-left text-xs font-semibold text-gray-600 uppercase tracking-wider py-4">Registered</th>
+                        <th class="text-right text-xs font-semibold text-gray-600 uppercase tracking-wider py-4 pr-5">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="approval-list-desktop">
+                    <tr><td colspan="6" class="text-center py-16">
+                        <i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4 block"></i>
+                        <p class="text-gray-500">Loading employees...</p>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Mobile Card List (hidden on desktop) -->
+        <div class="md:hidden" id="approval-list-mobile">
             <div class="text-center py-12">
-                <i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4"></i>
-                <p class="text-gray-500">Loading employees...</p>
+                <i class="fas fa-spinner fa-spin text-gray-400 text-2xl mb-3 block"></i>
+                <p class="text-gray-500 text-sm">Loading employees...</p>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-12 sm:py-16">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-check-circle text-green-400 text-3xl sm:text-4xl"></i>
+            </div>
+            <p class="text-gray-600 text-base sm:text-lg font-medium">No pending approvals</p>
+            <p class="text-gray-400 text-xs sm:text-sm mt-1">All employees have been reviewed</p>
+        </div>
+
+        <!-- No Search Results -->
+        <div id="no-results" class="hidden text-center py-12 sm:py-16">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-search text-gray-300 text-3xl sm:text-4xl"></i>
+            </div>
+            <p class="text-gray-600 text-base sm:text-lg font-medium">No matching employees</p>
+            <p class="text-gray-400 text-xs sm:text-sm mt-1">Try a different search term</p>
+        </div>
+    </div>
+</div>
+
+<!-- Role Assignment & Approval Modal -->
+<div id="approveModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6">
+            <div class="flex items-center justify-between mb-4 sm:mb-5">
+                <h3 class="text-lg sm:text-xl font-bold text-gray-900">Approve Employee</h3>
+                <button onclick="closeApproveModal()" class="btn-touch p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <p class="text-gray-600 text-sm mb-4">Assign a role and approve <strong id="approve-emp-name" class="text-gray-900"></strong>.</p>
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Assign Role</label>
+                <select id="roleSelect" class="input-modern w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white">
+                    <option value="">Keep current role</option>
+                    <option value="Firm Administrator">Firm Administrator</option>
+                    <option value="Managing Partner">Managing Partner</option>
+                    <option value="Finance Office">Finance Office</option>
+                    <option value="Associate Advocate">Associate Advocate</option>
+                    <option value="Clerk">Clerk</option>
+                    <option value="IT Support">IT Support</option>
+                    <option value="Employee">Employee</option>
+                </select>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeApproveModal()" class="btn-touch flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors font-semibold text-sm">
+                    Cancel
+                </button>
+                <button onclick="confirmApproval()" class="btn-touch flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md">
+                    <i class="fas fa-check mr-2"></i>Approve
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Employee Details Modal -->
-<div id="employeeDetailsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
-        <div class="mt-3">
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between pb-4 border-b border-gray-200">
-                <h3 class="text-2xl font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-user-check text-green-600 mr-3"></i>
-                    Employee Onboarding Details
-                </h3>
-                <button onclick="closeEmployeeDetailsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <i class="fas fa-times text-2xl"></i>
-                </button>
-            </div>
-            
-            <!-- Modal Body -->
-            <div id="employeeDetailsContent" class="mt-4">
-                <!-- Content will be populated by JavaScript -->
-            </div>
-            
-            <!-- Modal Footer -->
-            <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end space-x-3">
-                <button 
-                    onclick="closeEmployeeDetailsModal()"
-                    class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
-                >
-                    Close
-                </button>
-                <button 
-                    id="approveFromModalBtn"
-                    onclick="approveFromModal()"
-                    class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold hidden"
-                >
-                    <i class="fas fa-check mr-2"></i>Approve Employee
-                </button>
-            </div>
+<!-- Employee Onboarding Details Modal (full-screen on mobile, centered on desktop) -->
+<div id="employeeDetailsModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="details-modal-panel absolute inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-4xl sm:max-h-[90vh] sm:rounded-2xl bg-white flex flex-col overflow-hidden">
+        <!-- Sticky Header -->
+        <div class="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 flex-shrink-0 bg-white shadow-sm">
+            <h3 class="text-base sm:text-xl font-bold text-gray-900 flex items-center min-w-0 truncate pr-2">
+                <i class="fas fa-user-check text-green-600 mr-2 sm:mr-3 flex-shrink-0"></i>
+                <span class="truncate" id="employeeDetailsModalTitle">Employee Onboarding Details</span>
+            </h3>
+            <button onclick="closeEmployeeDetailsModal()" class="btn-touch flex-shrink-0 p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                <i class="fas fa-times text-lg sm:text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div id="employeeDetailsContent" class="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6"></div>
+
+        <!-- Sticky Footer -->
+        <div id="employeeDetailsFooter" class="flex flex-wrap justify-end gap-2 sm:gap-3 p-4 sm:p-5 border-t border-gray-200 flex-shrink-0 bg-gray-50/50">
+            <button onclick="closeEmployeeDetailsModal()" class="btn-touch px-4 sm:px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm shadow-sm">
+                Close
+            </button>
+            <button id="editOnboardingBtn" type="button" onclick="switchToEditMode()" class="btn-touch px-4 sm:px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors font-semibold text-sm shadow-md hidden">
+                <i class="fas fa-edit mr-1.5 sm:mr-2"></i>Edit
+            </button>
+            <button id="approveFromModalBtn" onclick="approveFromModal()" class="btn-touch px-4 sm:px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md hidden">
+                <i class="fas fa-check mr-1.5 sm:mr-2"></i>Approve
+            </button>
+        </div>
+        <!-- Edit mode footer (hidden by default) -->
+        <div id="employeeDetailsEditFooter" class="hidden flex flex-wrap justify-end gap-2 sm:gap-3 p-4 sm:p-5 border-t border-gray-200 flex-shrink-0 bg-gray-50/50">
+            <button type="button" onclick="cancelEditMode()" class="btn-touch px-4 sm:px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm shadow-sm">
+                Cancel
+            </button>
+            <button type="button" id="saveOnboardingBtn" onclick="saveOnboardingEdits()" class="btn-touch px-4 sm:px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md">
+                <i class="fas fa-save mr-1.5 sm:mr-2"></i>Save
+            </button>
         </div>
     </div>
 </div>
 
 <script>
+let allEmployees = [];
+let currentFilter = 'all';
 let currentEmployeeId = null;
+let currentEmployeeData = null;
+let approveTargetId = null;
+let approveTargetName = '';
 
+const ROLE_COLORS = {
+    'Firm Administrator': 'bg-purple-100 text-purple-800',
+    'Managing Partner': 'bg-indigo-100 text-indigo-800',
+    'Finance Office': 'bg-blue-100 text-blue-800',
+    'Associate Advocate': 'bg-cyan-100 text-cyan-800',
+    'Clerk': 'bg-teal-100 text-teal-800',
+    'IT Support': 'bg-red-100 text-red-800',
+    'Employee': 'bg-gray-100 text-gray-700'
+};
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch { return dateStr; }
+}
+
+function getInitials(name) {
+    return name.split(' ').map(w => w.charAt(0).toUpperCase()).slice(0, 2).join('');
+}
+
+function loadPendingApprovals() {
+    document.getElementById('approval-list-desktop').innerHTML = `<tr><td colspan="6" class="text-center py-16">
+        <i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4 block"></i>
+        <p class="text-gray-500">Loading employees...</p>
+    </td></tr>`;
+    document.getElementById('approval-list-mobile').innerHTML = `<div class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-gray-400 text-2xl mb-3 block"></i>
+        <p class="text-gray-500 text-sm">Loading employees...</p>
+    </div>`;
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('no-results').classList.add('hidden');
+    document.getElementById('employees-table-desktop').classList.remove('hidden');
+    document.getElementById('approval-list-mobile').classList.remove('hidden');
+
+    fetch('{{ url_for("get_pending_approvals") }}')
+        .then(r => r.json())
+        .then(data => {
+            allEmployees = data.employees || [];
+
+            document.getElementById('stat-total').textContent = data.count || 0;
+            document.getElementById('stat-ready').textContent = data.onboarding_done || 0;
+            document.getElementById('stat-pending').textContent = data.onboarding_pending || 0;
+
+            document.getElementById('tab-all-count').textContent = `(${data.count || 0})`;
+            document.getElementById('tab-ready-count').textContent = `(${data.onboarding_done || 0})`;
+            document.getElementById('tab-pending-count').textContent = `(${data.onboarding_pending || 0})`;
+
+            renderEmployees();
+        })
+        .catch(err => {
+            console.error('Error loading pending approvals:', err);
+            const errHtml = `<div class="text-center py-12 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4 block"></i><p>Failed to load employees</p></div>`;
+            document.getElementById('approval-list-desktop').innerHTML = `<tr><td colspan="6">${errHtml}</td></tr>`;
+            document.getElementById('approval-list-mobile').innerHTML = errHtml;
+        });
+}
+
+function getFilteredEmployees() {
+    let list = allEmployees;
+    if (currentFilter === 'ready') list = list.filter(e => e.onboarding_completed);
+    else if (currentFilter === 'pending') list = list.filter(e => !e.onboarding_completed);
+
+    const query = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+    if (query) {
+        list = list.filter(e =>
+            (e.full_name || '').toLowerCase().includes(query) ||
+            (e.work_email || '').toLowerCase().includes(query) ||
+            (e.employee_code || '').toLowerCase().includes(query) ||
+            (e.phone_number || '').includes(query) ||
+            (e.role || '').toLowerCase().includes(query)
+        );
+    }
+    return list;
+}
+
+function renderEmployees() {
+    const filtered = getFilteredEmployees();
+    const desktopTbody = document.getElementById('approval-list-desktop');
+    const mobileContainer = document.getElementById('approval-list-mobile');
+    const desktopTable = document.getElementById('employees-table-desktop');
+    const emptyState = document.getElementById('empty-state');
+    const noResults = document.getElementById('no-results');
+
+    noResults.classList.add('hidden');
+
+    if (allEmployees.length === 0) {
+        desktopTable.classList.add('hidden');
+        mobileContainer.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        return;
+    }
+
+    emptyState.classList.add('hidden');
+
+    if (filtered.length === 0) {
+        desktopTable.classList.add('hidden');
+        mobileContainer.classList.add('hidden');
+        noResults.classList.remove('hidden');
+        return;
+    }
+
+    desktopTable.classList.remove('hidden');
+    mobileContainer.classList.remove('hidden');
+
+    /* ---------- Desktop Table Rows ---------- */
+    desktopTbody.innerHTML = filtered.map(emp => {
+        const roleClass = ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-700';
+        const initials = getInitials(emp.full_name);
+        const avatarColors = emp.onboarding_completed ? 'from-green-400 to-emerald-500' : 'from-yellow-400 to-orange-400';
+        const onboardingBadge = emp.onboarding_completed
+            ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700"><i class="fas fa-check-circle mr-1"></i>Complete</span>'
+            : '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"><i class="fas fa-clock mr-1"></i>In Progress</span>';
+        const escapedName = emp.full_name.replace(/'/g, "\\'");
+        return `
+            <tr class="border-b border-gray-100 hover:bg-gray-50/80 transition-colors group">
+                <td class="py-4 pl-5"><div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br ${avatarColors} flex items-center justify-center text-white text-sm font-bold flex-shrink-0">${initials}</div>
+                    <div class="min-w-0"><p class="text-sm font-semibold text-gray-900 truncate">${emp.full_name}</p><p class="text-xs text-gray-400">${emp.employee_code || '-'}</p></div>
+                </div></td>
+                <td class="py-4"><p class="text-sm text-gray-700 truncate max-w-[200px]">${emp.work_email || '-'}</p><p class="text-xs text-gray-400">${emp.phone_number || '-'}</p></td>
+                <td class="py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${roleClass}">${emp.role || 'Employee'}</span></td>
+                <td class="py-4">${onboardingBadge}</td>
+                <td class="py-4"><p class="text-sm text-gray-500">${formatDate(emp.created_at)}</p></td>
+                <td class="py-4 pr-4"><div class="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <button onclick="viewEmployeeDetails(${emp.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details"><i class="fas fa-eye"></i></button>
+                    <button onclick="openApproveModal(${emp.id}, '${escapedName}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors ${emp.onboarding_completed ? '' : 'opacity-30 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled title="Onboarding must be completed first"'} title="Approve"><i class="fas fa-check-circle"></i></button>
+                    <button onclick="rejectEmployee(${emp.id})" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Reject"><i class="fas fa-times-circle"></i></button>
+                </div></td>
+            </tr>`;
+    }).join('');
+
+    /* ---------- Mobile Card List ---------- */
+    mobileContainer.innerHTML = filtered.map(emp => {
+        const roleClass = ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-700';
+        const initials = getInitials(emp.full_name);
+        const avatarColors = emp.onboarding_completed ? 'from-green-400 to-emerald-500' : 'from-yellow-400 to-orange-400';
+        const onboardingBadge = emp.onboarding_completed
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700"><i class="fas fa-check-circle mr-1"></i>Complete</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700"><i class="fas fa-clock mr-1"></i>Pending</span>';
+        const escapedName = emp.full_name.replace(/'/g, "\\'");
+        return `
+            <div class="card-employee bg-white rounded-xl p-4 border border-gray-200 mb-3 shadow-sm">
+                <div class="flex items-start gap-3">
+                    <div class="w-11 h-11 rounded-full bg-gradient-to-br ${avatarColors} flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-sm">${initials}</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-gray-900 truncate">${emp.full_name}</p>
+                                <p class="text-xs text-gray-500 truncate">${emp.work_email || '-'}</p>
+                            </div>
+                            ${onboardingBadge}
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-2 text-[10px] text-gray-400">
+                            <span>${emp.employee_code || ''}</span>
+                            <span class="text-gray-300">|</span>
+                            <span>${emp.phone_number || '-'}</span>
+                            <span class="text-gray-300">|</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${roleClass}">${emp.role || 'Employee'}</span>
+                        </div>
+                        <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                            <p class="text-[10px] text-gray-400">${formatDate(emp.created_at)}</p>
+                            <div class="flex items-center gap-1">
+                                <button onclick="viewEmployeeDetails(${emp.id})" class="btn-touch p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-xl transition-colors" title="View Details"><i class="fas fa-eye text-sm"></i></button>
+                                <button onclick="openApproveModal(${emp.id}, '${escapedName}')" class="btn-touch p-2.5 text-green-600 hover:bg-green-50 active:bg-green-100 rounded-xl transition-colors ${emp.onboarding_completed ? '' : 'opacity-30 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled'} title="Approve"><i class="fas fa-check-circle text-sm"></i></button>
+                                <button onclick="rejectEmployee(${emp.id})" class="btn-touch p-2.5 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-xl transition-colors" title="Reject"><i class="fas fa-times-circle text-sm"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+function filterEmployees(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+        btn.classList.add('text-gray-500');
+    });
+    const activeTab = document.getElementById('tab-' + filter);
+    activeTab.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+    activeTab.classList.remove('text-gray-500');
+    renderEmployees();
+}
+
+function applySearch() { renderEmployees(); }
+
+/* ---- Approve Modal ---- */
+function openApproveModal(id, name) {
+    approveTargetId = id;
+    approveTargetName = name;
+    document.getElementById('approve-emp-name').textContent = name;
+    document.getElementById('roleSelect').value = '';
+    document.getElementById('approveModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeApproveModal() {
+    document.getElementById('approveModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+    approveTargetId = null;
+}
+function confirmApproval() {
+    if (!approveTargetId) return;
+    const role = document.getElementById('roleSelect').value;
+    const payload = { employee_id: approveTargetId };
+    if (role) payload.role = role;
+
+    fetch('{{ url_for("assign_role_and_approve") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        closeApproveModal();
+        if (data.success) { showToast('Employee approved successfully!', 'success'); loadPendingApprovals(); }
+        else { showToast(data.error || 'Error approving employee', 'error'); }
+    })
+    .catch(() => { closeApproveModal(); showToast('An error occurred while approving.', 'error'); });
+}
+
+/* ---- Employee Details Modal ---- */
 function viewEmployeeDetails(id) {
     currentEmployeeId = id;
     const modal = document.getElementById('employeeDetailsModal');
     const content = document.getElementById('employeeDetailsContent');
     const approveBtn = document.getElementById('approveFromModalBtn');
-    
+
     content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4"></i><p class="text-gray-500">Loading details...</p></div>';
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-    
+
     fetch(`{{ url_for('get_employee_onboarding_details') }}?id=${id}`)
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
             if (data.error) {
                 content.innerHTML = `<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>${data.error}</p></div>`;
                 return;
             }
-            
             const emp = data.employee;
-            const formatDate = (dateStr) => {
-                if (!dateStr) return 'N/A';
-                try {
-                    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                } catch {
-                    return dateStr;
-                }
-            };
-            
-            let html = `
-                <div class="space-y-6">
-                    <!-- Basic Information -->
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-2 border-blue-200">
-                        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <i class="fas fa-user text-blue-600 mr-2"></i>
-                            Basic Information
-                        </h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Full Name</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.full_name || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Employee Code</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.employee_code || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Email</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.work_email || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Phone Number</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.phone_number || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Role</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.role || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Status</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.status || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Onboarding Completed</p>
-                                <p class="text-sm font-semibold ${emp.onboarding_completed ? 'text-green-600' : 'text-red-600'}">
-                                    ${emp.onboarding_completed ? '<i class="fas fa-check-circle mr-1"></i>Yes' : '<i class="fas fa-times-circle mr-1"></i>No'}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Registration Date</p>
-                                <p class="text-sm font-semibold text-gray-900">${formatDate(emp.created_at)}</p>
-                            </div>
+            currentEmployeeData = emp;
+            const roleClass = ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-700';
+            document.getElementById('employeeDetailsModalTitle').textContent = emp.full_name ? `${emp.full_name} – Onboarding Details` : 'Employee Onboarding Details';
+
+            const paymentLabel = (emp.payment_method === 'Bank') ? 'Bank' : (emp.payment_method === 'Mobile Money' ? 'Mobile Money' : '—');
+            const paymentDetail = emp.payment_method === 'Bank'
+                ? (emp.bank_name ? `Bank: ${emp.bank_name}` : 'Bank (no name provided)')
+                : emp.payment_method === 'Mobile Money'
+                    ? (emp.mobile_money_company ? `Provider: ${emp.mobile_money_company}` : 'Mobile Money (no provider)')
+                    : '—';
+
+            let html = `<div class="space-y-4 sm:space-y-5">
+                ${!emp.onboarding_completed ? `
+                <div class="section-card bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5 flex items-center gap-3">
+                    <i class="fas fa-hourglass-half text-amber-600 text-xl flex-shrink-0"></i>
+                    <p class="text-sm text-amber-800 font-medium">Onboarding not yet complete. Details and documents will appear once the employee submits their onboarding form.</p>
+                </div>` : ''}
+
+                <!-- Basic Information -->
+                <div class="section-card bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-5 lg:p-6 border border-blue-200/80">
+                    <h4 class="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center">
+                        <i class="fas fa-user text-blue-600 mr-2"></i>Basic Information
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Full Name</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.full_name || 'N/A'}</p></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Employee Code</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.employee_code || 'N/A'}</p></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Email</p><p class="text-xs sm:text-sm font-semibold text-gray-900 break-all">${emp.work_email || 'N/A'}</p></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Phone</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.phone_number || 'N/A'}</p></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Role</p><span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold ${roleClass}">${emp.role || 'N/A'}</span></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Status</p><span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-yellow-100 text-yellow-800">${emp.status || 'N/A'}</span></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Onboarding</p>
+                            <p class="text-xs sm:text-sm font-semibold ${emp.onboarding_completed ? 'text-green-600' : 'text-amber-600'}">
+                                ${emp.onboarding_completed ? '<i class="fas fa-check-circle mr-1"></i>Completed' : '<i class="fas fa-clock mr-1"></i>In Progress'}
+                            </p>
                         </div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Registered</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${formatDate(emp.created_at)}</p></div>
                     </div>
-                    
-                    <!-- Payroll & Compensation -->
-                    <div class="bg-white rounded-lg p-6 border border-gray-200">
-                        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <i class="fas fa-money-bill-wave text-green-600 mr-2"></i>
-                            Payroll & Compensation Details
-                        </h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Account Number</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.account_number || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Account Name</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.account_name || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Tax PIN</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.tax_pin || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Pay Frequency</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.pay_frequency || 'N/A'}</p>
-                            </div>
-                            ${emp.salary ? `
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Salary</p>
-                                <p class="text-sm font-semibold text-gray-900">${emp.salary}</p>
-                            </div>
-                            ` : ''}
-                            ${emp.salary_components ? `
-                            <div class="md:col-span-2">
-                                <p class="text-xs text-gray-500 font-medium mb-1">Salary Components</p>
-                                <p class="text-sm text-gray-900 whitespace-pre-wrap">${emp.salary_components}</p>
-                            </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                    
-                    <!-- Documents -->
-                    <div class="bg-white rounded-lg p-6 border border-gray-200">
-                        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <i class="fas fa-file-alt text-purple-600 mr-2"></i>
-                            Documents
-                        </h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            ${emp.employment_contract ? `
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">Employment Contract</p>
-                                <a href="/static/uploads/profile_pictures/${emp.employment_contract}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
-                                    <i class="fas fa-file-pdf mr-2"></i>View Contract
-                                </a>
-                            </div>
-                            ` : '<div><p class="text-xs text-gray-500 font-medium mb-1">Employment Contract</p><p class="text-sm text-gray-400">Not uploaded</p></div>'}
-                            ${emp.id_front ? `
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Front</p>
-                                <a href="/static/uploads/profile_pictures/${emp.id_front}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
-                                    <i class="fas fa-id-card mr-2"></i>View ID Front
-                                </a>
-                            </div>
-                            ` : '<div><p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Front</p><p class="text-sm text-gray-400">Not uploaded</p></div>'}
-                            ${emp.id_back ? `
-                            <div>
-                                <p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Back</p>
-                                <a href="/static/uploads/profile_pictures/${emp.id_back}" target="_blank" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
-                                    <i class="fas fa-id-card mr-2"></i>View ID Back
-                                </a>
-                            </div>
-                            ` : '<div><p class="text-xs text-gray-500 font-medium mb-1">ID/Passport Back</p><p class="text-sm text-gray-400">Not uploaded</p></div>'}
-                        </div>
-                    </div>
-                    
                 </div>
-            `;
-            
+
+                <!-- Payroll & Compensation -->
+                <div class="section-card bg-white rounded-xl p-4 sm:p-5 lg:p-6 border border-gray-200 shadow-sm">
+                    <h4 class="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center">
+                        <i class="fas fa-money-bill-wave text-green-600 mr-2"></i>Payroll & Compensation
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Payment Method</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${paymentLabel}</p></div>
+                        ${paymentDetail !== '—' ? `<div class="sm:col-span-2"><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Payment Details</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${paymentDetail}</p></div>` : ''}
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Account Number</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.account_number || 'N/A'}</p></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Account Name</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.account_name || 'N/A'}</p></div>
+                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Pay Frequency</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.pay_frequency || 'N/A'}</p></div>
+                        ${emp.salary ? `<div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Salary</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.salary}</p></div>` : ''}
+                        ${emp.salary_components ? `<div class="sm:col-span-2 lg:col-span-3"><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Salary Components</p><p class="text-xs sm:text-sm text-gray-900 whitespace-pre-wrap">${emp.salary_components}</p></div>` : ''}
+                    </div>
+                </div>
+
+                <!-- Uploaded Documents -->
+                <div class="section-card bg-white rounded-xl p-4 sm:p-5 lg:p-6 border border-gray-200 shadow-sm">
+                    <h4 class="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 flex items-center">
+                        <i class="fas fa-file-alt text-purple-600 mr-2"></i>Uploaded Documents
+                    </h4>
+                    <p class="text-xs text-gray-500 mb-4">View or download documents submitted during onboarding. Opens in a new tab.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                        ${emp.employment_contract
+                            ? `<a href="/static/uploads/profile_pictures/${emp.employment_contract}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50/80 transition-all duration-200 group shadow-sm">
+                                <div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0 group-hover:bg-red-200 transition-colors"><i class="fas fa-file-pdf text-red-600 text-xl"></i></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-gray-900">Employment Contract</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
+                                </div>
+                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
+                               </a>`
+                            : `<div class="flex items-center gap-3 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50">
+                                <div class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0"><i class="fas fa-file text-gray-400 text-xl"></i></div>
+                                <div><p class="text-sm font-medium text-gray-500">Employment Contract</p><p class="text-xs text-gray-400">Not uploaded</p></div>
+                               </div>`}
+                        ${emp.id_front
+                            ? `<a href="/static/uploads/profile_pictures/${emp.id_front}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group">
+                                <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors"><i class="fas fa-id-card text-blue-600 text-xl"></i></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-gray-900">National ID or Passport</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
+                                </div>
+                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
+                               </a>`
+                            : `<div class="flex items-center gap-3 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50">
+                                <div class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0"><i class="fas fa-id-card text-gray-400 text-xl"></i></div>
+                                <div><p class="text-sm font-medium text-gray-500">National ID or Passport</p><p class="text-xs text-gray-400">Not uploaded</p></div>
+                               </div>`}
+                        ${emp.kra_pin_document
+                            ? `<a href="/static/uploads/profile_pictures/${emp.kra_pin_document}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group">
+                                <div class="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors"><i class="fas fa-file-invoice text-amber-600 text-xl"></i></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-gray-900">KRA PIN Certificate</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
+                                </div>
+                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
+                               </a>`
+                            : `<div class="flex items-center gap-3 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50">
+                                <div class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0"><i class="fas fa-file-invoice text-gray-400 text-xl"></i></div>
+                                <div><p class="text-sm font-medium text-gray-500">KRA PIN Certificate</p><p class="text-xs text-gray-400">Not uploaded</p></div>
+                               </div>`}
+                        ${emp.id_back
+                            ? `<a href="/static/uploads/profile_pictures/${emp.id_back}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group">
+                                <div class="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-200 transition-colors"><i class="fas fa-id-card text-indigo-600 text-xl"></i></div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-gray-900">ID Back (legacy)</p>
+                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
+                                </div>
+                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
+                               </a>`
+                            : ''}
+                    </div>
+                </div>
+            </div>`;
+
             content.innerHTML = html;
-            
-            // Show approve button only if onboarding is completed
-            if (emp.onboarding_completed) {
-                approveBtn.classList.remove('hidden');
-            } else {
-                approveBtn.classList.add('hidden');
-            }
+            document.getElementById('employeeDetailsFooter').classList.remove('hidden');
+            document.getElementById('employeeDetailsEditFooter').classList.add('hidden');
+            document.getElementById('editOnboardingBtn').classList.remove('hidden');
+            if (emp.onboarding_completed) { approveBtn.classList.remove('hidden'); } else { approveBtn.classList.add('hidden'); }
         })
-        .catch(error => {
-            console.error('Error loading employee details:', error);
-            content.innerHTML = '<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>Error loading employee details</p></div>';
+        .catch(() => {
+            content.innerHTML = '<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>Error loading details</p></div>';
         });
 }
 
+function switchToEditMode() {
+    if (!currentEmployeeData || !currentEmployeeId) return;
+    const e = currentEmployeeData;
+    const content = document.getElementById('employeeDetailsContent');
+    document.getElementById('employeeDetailsModalTitle').textContent = (e.full_name || 'Employee') + ' – Edit';
+    document.getElementById('employeeDetailsFooter').classList.add('hidden');
+    document.getElementById('employeeDetailsEditFooter').classList.remove('hidden');
+
+    const pm = (e.payment_method || '').toString();
+    const showBank = pm === 'Bank';
+    const showMobile = pm === 'Mobile Money';
+
+    const docLink = (filename) => filename ? `<a href="/static/uploads/profile_pictures/${filename}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-xs font-medium inline-flex items-center gap-1"><i class="fas fa-external-link-alt text-[10px]"></i>View current</a>` : '<span class="text-gray-400 text-xs">None uploaded</span>';
+
+    content.innerHTML = `
+    <form id="onboardingEditForm" class="edit-popup-form space-y-5 sm:space-y-6">
+        <input type="hidden" name="employee_id" value="${currentEmployeeId}">
+        <input type="hidden" name="role" value="${(e.role || '').replace(/"/g, '&quot;')}">
+        <input type="hidden" name="status" value="${(e.status || '').replace(/"/g, '&quot;')}">
+
+        <div class="edit-section edit-section-basic">
+            <div class="edit-section-header">
+                <span class="edit-section-icon"><i class="fas fa-user"></i></span>
+                <h4 class="edit-section-title">Basic Information</h4>
+            </div>
+            <div class="edit-section-body">
+                <div class="edit-grid">
+                    <div class="edit-field">
+                        <label class="edit-label">Full Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="full_name" value="${(e.full_name || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="Full name">
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Employee Code</label>
+                        <input type="text" name="employee_code" value="${(e.employee_code || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Optional">
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Email <span class="text-red-500">*</span></label>
+                        <input type="email" name="work_email" value="${(e.work_email || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="work@example.com">
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Phone <span class="text-red-500">*</span></label>
+                        <input type="text" name="phone_number" value="${(e.phone_number || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="Phone number">
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Role</label>
+                        <div class="edit-readonly">${(e.role || '—')}</div>
+                        <p class="edit-hint">Locked; use Approve to change role</p>
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label">Status</label>
+                        <div class="edit-readonly">${(e.status || '—')}</div>
+                        <p class="edit-hint">Locked</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="edit-section edit-section-payroll">
+            <div class="edit-section-header">
+                <span class="edit-section-icon edit-section-icon-green"><i class="fas fa-money-bill-wave"></i></span>
+                <h4 class="edit-section-title">Payment & Account</h4>
+            </div>
+            <div class="edit-section-body space-y-4">
+                <div class="edit-field">
+                    <label class="edit-label">Payment Method</label>
+                    <select name="payment_method" onchange="toggleEditPayrollSections(this)" class="edit-input edit-select">
+                        <option value="">— Select method —</option>
+                        <option value="Bank" ${pm === 'Bank' ? 'selected' : ''}>Bank</option>
+                        <option value="Mobile Money" ${pm === 'Mobile Money' ? 'selected' : ''}>Mobile Money</option>
+                    </select>
+                </div>
+
+                <div id="edit-bank-section" class="edit-subsection edit-subsection-bank ${showBank ? '' : 'hidden'}">
+                    <div class="edit-subsection-title"><i class="fas fa-university mr-2 text-blue-600"></i>Bank Details</div>
+                    <div class="edit-field">
+                        <label class="edit-label">Bank Name</label>
+                        <input type="text" name="bank_name" value="${(e.bank_name || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="e.g. Equity Bank, KCB">
+                    </div>
+                </div>
+
+                <div id="edit-mobile-section" class="edit-subsection edit-subsection-mobile ${showMobile ? '' : 'hidden'}">
+                    <div class="edit-subsection-title"><i class="fas fa-mobile-alt mr-2 text-purple-600"></i>Mobile Money Details</div>
+                    <div class="edit-field">
+                        <label class="edit-label">Provider</label>
+                        <input type="text" name="mobile_money_company" value="${(e.mobile_money_company || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="e.g. M-Pesa, Airtel Money">
+                    </div>
+                </div>
+
+                <div id="edit-account-section" class="edit-subsection edit-subsection-account ${showBank || showMobile ? '' : 'hidden'}">
+                    <div class="edit-subsection-title"><i class="fas fa-wallet mr-2 text-gray-600"></i>Account Details</div>
+                    <div class="edit-grid edit-grid-2">
+                        <div class="edit-field">
+                            <label class="edit-label">Account Name</label>
+                            <input type="text" name="account_name" value="${(e.account_name || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Account holder name">
+                        </div>
+                        <div class="edit-field">
+                            <label class="edit-label">Account Number <span id="edit-account-number-label" class="text-gray-500 font-normal">${showMobile ? '(Phone)' : ''}</span></label>
+                            <input type="text" name="account_number" value="${(e.account_number || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="${showMobile ? 'e.g. 07XXXXXXXX' : 'Account number'}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="edit-section edit-section-docs">
+            <div class="edit-section-header">
+                <span class="edit-section-icon edit-section-icon-purple"><i class="fas fa-file-alt"></i></span>
+                <h4 class="edit-section-title">Documents</h4>
+            </div>
+            <div class="edit-section-body">
+                <p class="edit-docs-intro">Current files are linked below. Upload a new file only to replace; leave empty to keep current.</p>
+                <div class="edit-docs-grid">
+                    <div class="edit-doc-card">
+                        <div class="edit-doc-card-header">
+                            <i class="fas fa-file-pdf text-red-500"></i>
+                            <span class="edit-doc-card-title">Employment Contract</span>
+                        </div>
+                        <p class="edit-doc-current">Current: ${e.employment_contract ? docLink(e.employment_contract) : '<span class="text-gray-400">None</span>'}</p>
+                        <input type="file" name="employment_contract" accept=".pdf,.doc,.docx" class="edit-file-input" title="Replace (optional)">
+                    </div>
+                    <div class="edit-doc-card">
+                        <div class="edit-doc-card-header">
+                            <i class="fas fa-id-card text-blue-500"></i>
+                            <span class="edit-doc-card-title">National ID or Passport</span>
+                        </div>
+                        <p class="edit-doc-current">Current: ${e.id_front ? docLink(e.id_front) : '<span class="text-gray-400">None</span>'}</p>
+                        <input type="file" name="id_front" accept="image/*,.pdf" class="edit-file-input" title="Replace (optional)">
+                    </div>
+                    <div class="edit-doc-card">
+                        <div class="edit-doc-card-header">
+                            <i class="fas fa-file-invoice text-amber-500"></i>
+                            <span class="edit-doc-card-title">KRA PIN Certificate</span>
+                        </div>
+                        <p class="edit-doc-current">Current: ${e.kra_pin_document ? docLink(e.kra_pin_document) : '<span class="text-gray-400">None</span>'}</p>
+                        <input type="file" name="kra_pin_document" accept="image/*,.pdf,.doc,.docx" class="edit-file-input" title="Replace (optional)">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>`;
+    toggleEditPayrollSections(document.querySelector('#onboardingEditForm select[name="payment_method"]'));
+}
+
+function toggleEditPayrollSections(selectEl) {
+    if (!selectEl) return;
+    const val = (selectEl.value || '').trim();
+    const bankSection = document.getElementById('edit-bank-section');
+    const mobileSection = document.getElementById('edit-mobile-section');
+    const accountSection = document.getElementById('edit-account-section');
+    const accountLabel = document.getElementById('edit-account-number-label');
+    const accountInput = document.querySelector('#onboardingEditForm input[name="account_number"]');
+    if (bankSection) bankSection.classList.toggle('hidden', val !== 'Bank');
+    if (mobileSection) mobileSection.classList.toggle('hidden', val !== 'Mobile Money');
+    const showAccount = val === 'Bank' || val === 'Mobile Money';
+    if (accountSection) accountSection.classList.toggle('hidden', !showAccount);
+    if (accountLabel) accountLabel.textContent = val === 'Mobile Money' ? '(Phone)' : '';
+    if (accountInput) accountInput.placeholder = val === 'Mobile Money' ? 'e.g. 07XXXXXXXX' : '';
+}
+
+function cancelEditMode() {
+    if (!currentEmployeeId) return;
+    document.getElementById('employeeDetailsEditFooter').classList.add('hidden');
+    document.getElementById('employeeDetailsFooter').classList.remove('hidden');
+    viewEmployeeDetails(currentEmployeeId);
+}
+
+function saveOnboardingEdits() {
+    const form = document.getElementById('onboardingEditForm');
+    if (!form || !currentEmployeeId) return;
+    const btn = document.getElementById('saveOnboardingBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    const formData = new FormData(form);
+    fetch('{{ url_for("update_employee_onboarding") }}', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-1 sm:mr-2"></i>Save';
+        if (data.success) {
+            showToast(data.message || 'Details updated successfully', 'success');
+            document.getElementById('employeeDetailsEditFooter').classList.add('hidden');
+            document.getElementById('employeeDetailsFooter').classList.remove('hidden');
+            loadPendingApprovals();
+            viewEmployeeDetails(currentEmployeeId);
+        } else {
+            showToast(data.error || 'Update failed', 'error');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-1 sm:mr-2"></i>Save';
+        showToast('An error occurred', 'error');
+    });
+}
+
 function closeEmployeeDetailsModal() {
-    const modal = document.getElementById('employeeDetailsModal');
-    modal.classList.add('hidden');
+    document.getElementById('employeeDetailsModal').classList.add('hidden');
     document.body.style.overflow = 'auto';
     currentEmployeeId = null;
+    currentEmployeeData = null;
 }
 
 function approveFromModal() {
-    if (currentEmployeeId) {
-        closeEmployeeDetailsModal();
-        approveEmployee(currentEmployeeId);
-    }
+    if (!currentEmployeeId) return;
+    const id = currentEmployeeId;
+    const emp = currentEmployeeData || allEmployees.find(e => e.id === currentEmployeeId);
+    const name = (emp && emp.full_name) ? emp.full_name : 'Employee';
+    closeEmployeeDetailsModal();
+    openApproveModal(id, name);
 }
 
-// Close modal when clicking outside
-document.addEventListener('click', function(event) {
-    const modal = document.getElementById('employeeDetailsModal');
-    if (event.target === modal) {
-        closeEmployeeDetailsModal();
-    }
-});
-
-// Close modal on Escape key
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        const modal = document.getElementById('employeeDetailsModal');
-        if (!modal.classList.contains('hidden')) {
-            closeEmployeeDetailsModal();
-        }
-    }
-});
-
-function loadPendingApprovals() {
-        fetch('{{ url_for("get_pending_approvals") }}')
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('approval-list');
-                const countSpan = document.getElementById('pending-count');
-                
-                countSpan.textContent = `${data.count || 0} Pending`;
-                
-                if (data.employees && data.employees.length > 0) {
-                    container.innerHTML = data.employees.map(emp => `
-                        <div class="bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-green-300 transition-all">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-4">
-                                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center text-white text-xl font-bold">
-                                        ${emp.full_name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-bold text-gray-900">${emp.full_name}</h3>
-                                        <p class="text-sm text-gray-600">${emp.work_email}</p>
-                                        <p class="text-xs text-gray-500 mt-1">Code: ${emp.employee_code} | Phone: ${emp.phone_number}</p>
-                                        <p class="text-xs mt-1">
-                                            <span class="px-2 py-1 rounded-full ${emp.onboarding_completed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'} font-semibold">
-                                                ${emp.onboarding_completed ? '<i class="fas fa-check-circle mr-1"></i>Onboarding Complete' : '<i class="fas fa-clock mr-1"></i>Onboarding Pending'}
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-3">
-                                    <button onclick="viewEmployeeDetails(${emp.id})" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                        <i class="fas fa-eye mr-2"></i>View Details
-                                    </button>
-                                    <button onclick="approveEmployee(${emp.id})" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${emp.onboarding_completed ? '' : 'opacity-50 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled title="Onboarding must be completed before approval"'}">
-                                        <i class="fas fa-check mr-2"></i>Approve
-                                    </button>
-                                    <button onclick="rejectEmployee(${emp.id})" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
-                                        <i class="fas fa-times mr-2"></i>Reject
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = `
-                        <div class="text-center py-12">
-                            <i class="fas fa-check-circle text-green-500 text-5xl mb-4"></i>
-                            <p class="text-gray-600 text-lg">No pending approvals</p>
-                        </div>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Error loading pending approvals:', error);
-                document.getElementById('approval-list').innerHTML = `
-                    <div class="text-center py-12 text-red-600">
-                        <i class="fas fa-exclamation-circle text-3xl mb-4"></i>
-                        <p>Error loading employees</p>
-                    </div>
-                `;
-            });
-    }
-    
-    function approveEmployee(id) {
-        if (confirm('Are you sure you want to approve this employee?')) {
-            fetch(`{{ url_for('update_employee_status') }}?id=${id}&status=Active`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'}
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Employee approved successfully!');
-                    loadPendingApprovals();
-                } else {
-                    alert(data.error || 'Error approving employee');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while approving the employee.');
-            });
-        }
-    }
-    
-    function rejectEmployee(id) {
-        if (confirm('Are you sure you want to reject this employee? This will delete their account.')) {
-            deleteEmployee(id, 'this employee');
-        }
-    }
-    
-    function deleteEmployee(id, name) {
-        if (confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
-            fetch(`{{ url_for('delete_employee') }}?id=${id}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'}
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    loadPendingApprovals();
-                } else {
-                    alert(data.message || 'Error deleting employee');
-                }
-            });
-        }
-    }
-    
-    // Load initial data
-    document.addEventListener('DOMContentLoaded', function() {
-        loadPendingApprovals();
+/* ---- Reject / Delete ---- */
+function rejectEmployee(id) {
+    if (confirm('Are you sure you want to reject this employee? This will delete their account.')) { deleteEmployee(id); }
+}
+function deleteEmployee(id) {
+    fetch(`{{ url_for('delete_employee') }}?id=${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { showToast('Employee rejected and removed.', 'success'); loadPendingApprovals(); }
+        else { showToast(data.message || 'Error deleting employee', 'error'); }
     });
+}
+
+/* ---- Toast ---- */
+function showToast(message, type) {
+    const colors = type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto ${colors} px-5 py-3 rounded-xl shadow-lg z-[9999] flex items-center gap-3 text-sm font-medium animate-slide-up`;
+    toast.innerHTML = `<i class="fas ${icon}"></i>${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2500);
+    setTimeout(() => toast.remove(), 2900);
+}
+
+/* ---- Close modals on outside click / Escape ---- */
+document.addEventListener('click', function(e) {
+    if (e.target === document.getElementById('approveModal')) closeApproveModal();
+    if (e.target === document.getElementById('employeeDetailsModal')) closeEmployeeDetailsModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        if (!document.getElementById('approveModal').classList.contains('hidden')) closeApproveModal();
+        if (!document.getElementById('employeeDetailsModal').classList.contains('hidden')) closeEmployeeDetailsModal();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', loadPendingApprovals);
 </script>
+
+<style>
+@keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.animate-slide-up { animation: slide-up 0.3s ease-out; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Modern responsive enhancements */
+@media (max-width: 640px) {
+    .details-modal-panel { border-radius: 1rem 1rem 0 0; }
+    #employeeDetailsContent { padding-left: 1rem; padding-right: 1rem; padding-bottom: env(safe-area-inset-bottom, 1rem); }
+}
+#employeeDetailsContent { -webkit-overflow-scrolling: touch; }
+.details-modal-panel { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+.stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+@media (min-width: 640px) {
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); }
+}
+.tab-btn { min-height: 2.75rem; transition: background-color 0.2s, color 0.2s; }
+.search-input:focus { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+.btn-touch { min-height: 44px; min-width: 44px; }
+.card-employee { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
+.card-employee:active { border-color: rgb(209 213 219); }
+@media (min-width: 768px) {
+    .card-employee:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+}
+#approval-list-desktop tr { transition: background-color 0.15s ease; }
+.section-card { border-radius: 1rem; transition: box-shadow 0.2s ease; }
+.section-card:focus-within { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+.input-modern { transition: border-color 0.2s, box-shadow 0.2s; }
+.input-modern:focus { outline: none; border-color: rgb(16 185 129); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); }
+.file-zone { transition: border-color 0.2s, background-color 0.2s; }
+.file-zone:focus-within { border-color: rgb(59 130 246); background-color: rgb(239 246 255); }
+
+/* Edit popup – advanced appearance */
+.edit-popup-form { max-width: 100%; }
+.edit-section {
+    border-radius: 1rem;
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.edit-section:focus-within { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); border-color: rgb(191 219 254); }
+.edit-section-basic { background: linear-gradient(135deg, rgb(239 246 255) 0%, rgb(224 231 255) 100%); border-color: rgb(191 219 254); }
+.edit-section-payroll { background: #fff; }
+.edit-section-docs { background: #fff; }
+.edit-section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem 0.875rem 1.25rem;
+    background: rgba(255,255,255,0.7);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-weight: 700;
+    color: rgb(17 24 39);
+    font-size: 0.9375rem;
+}
+.edit-section-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    background: linear-gradient(135deg, rgb(59 130 246), rgb(99 102 241));
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+.edit-section-icon-green { background: linear-gradient(135deg, rgb(34 197 94), rgb(22 163 74)); }
+.edit-section-icon-purple { background: linear-gradient(135deg, rgb(168 85 247), rgb(124 58 237)); }
+.edit-section-title { margin: 0; letter-spacing: -0.01em; }
+.edit-section-body { padding: 1rem 1.25rem 1.25rem; }
+.edit-section-docs .edit-section-body { padding: 1rem 1.25rem 1.25rem; }
+.edit-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem 1.25rem;
+}
+@media (min-width: 640px) { .edit-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .edit-grid { grid-template-columns: repeat(3, 1fr); } }
+.edit-grid-2 { grid-template-columns: 1fr; }
+@media (min-width: 640px) { .edit-grid-2 { grid-template-columns: repeat(2, 1fr); } }
+.edit-field { min-width: 0; }
+.edit-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(75 85 99);
+    margin-bottom: 0.375rem;
+    letter-spacing: 0.02em;
+}
+.edit-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.75rem;
+    background: #fff;
+    color: rgb(17 24 39);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.edit-input::placeholder { color: rgb(156 163 175); }
+.edit-input:focus {
+    outline: none;
+    border-color: rgb(59 130 246);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.edit-select { cursor: pointer; appearance: auto; }
+.edit-readonly {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    background: rgb(243 244 246);
+    color: rgb(75 85 99);
+    font-weight: 500;
+}
+.edit-hint {
+    font-size: 0.6875rem;
+    color: rgb(156 163 175);
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+}
+.edit-subsection {
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+    margin-top: 0.5rem;
+}
+.edit-subsection-bank { background: rgb(239 246 255); border: 1px solid rgb(191 219 254); }
+.edit-subsection-mobile { background: rgb(250 245 255); border: 1px solid rgb(233 213 255); }
+.edit-subsection-account { background: rgb(249 250 251); border: 1px solid rgb(229 231 235); }
+.edit-subsection-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(55 65 81);
+    margin-bottom: 0.75rem;
+}
+.edit-docs-intro {
+    font-size: 0.8125rem;
+    color: rgb(107 114 128);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+.edit-docs-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+@media (min-width: 640px) { .edit-docs-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .edit-docs-grid { grid-template-columns: repeat(3, 1fr); } }
+.edit-doc-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    background: rgb(249 250 251);
+    transition: border-color 0.2s, background-color 0.2s;
+}
+.edit-doc-card:focus-within { border-color: rgb(147 197 253); background: rgb(239 246 255); }
+.edit-doc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(55 65 81);
+    margin-bottom: 0.5rem;
+}
+.edit-doc-card-title { flex: 1; min-width: 0; }
+.edit-doc-current {
+    font-size: 0.75rem;
+    color: rgb(107 114 128);
+    margin-bottom: 0.5rem;
+    min-height: 1.25rem;
+}
+.edit-file-input {
+    width: 100%;
+    font-size: 0.75rem;
+    padding: 0.5rem 0;
+    color: rgb(107 114 128);
+}
+.edit-file-input::file-selector-button {
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 0;
+    background: rgb(239 246 255);
+    color: rgb(37 99 235);
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.edit-file-input::file-selector-button:hover { background: rgb(219 234 254); color: rgb(29 78 216); }
+</style>
 {% endblock %}

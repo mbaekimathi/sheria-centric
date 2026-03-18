@@ -393,79 +393,117 @@
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
             <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                 <i class="fab fa-whatsapp text-green-600 mr-3"></i>
-                WhatsApp Settings
+                WhatsApp Cloud API Settings
             </h2>
             <div class="space-y-6">
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-2">
                     <div class="flex items-start">
                         <i class="fas fa-info-circle text-green-600 mr-3 mt-1"></i>
                         <div>
-                            <p class="text-sm font-semibold text-green-900 mb-2">WhatsApp Configuration</p>
-                            <p class="text-xs text-green-800">
-                                Configure WhatsApp Business API settings for sending messages and notifications via WhatsApp.
+                            <p class="text-sm font-semibold text-green-900 mb-2">Meta WhatsApp Cloud API</p>
+                            <p class="text-xs text-green-800 leading-relaxed">
+                                Get your credentials from 
+                                <a href="https://developers.facebook.com/apps/" target="_blank" class="underline font-semibold">Meta Developer Dashboard</a>.
+                                You need a Meta Business App with WhatsApp product enabled.
+                                Set your webhook URL to: <code class="bg-green-100 px-1.5 py-0.5 rounded font-mono text-green-900">{{ request.url_root }}webhook/whatsapp</code>
                             </p>
                         </div>
                     </div>
                 </div>
+
+                {% if whatsapp_settings and whatsapp_settings.is_active %}
+                <div class="flex items-center gap-2 px-4 py-2 bg-green-100 border border-green-300 rounded-lg text-sm text-green-800 font-medium">
+                    <i class="fas fa-check-circle"></i> WhatsApp is connected and active
+                </div>
+                {% endif %}
+
                 <form id="whatsappSettingsForm" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="whatsapp_api_url" class="block text-sm font-semibold text-gray-700 mb-2">
-                                WhatsApp API URL <span class="text-red-500">*</span>
-                            </label>
-                            <input 
-                                type="url" 
-                                id="whatsapp_api_url" 
-                                name="whatsapp_api_url"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="https://api.whatsapp.com"
-                            />
-                        </div>
-                        <div>
-                            <label for="whatsapp_api_key" class="block text-sm font-semibold text-gray-700 mb-2">
-                                API Key <span class="text-red-500">*</span>
+                        <div class="md:col-span-2">
+                            <label for="wa_access_token" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Permanent Access Token <span class="text-red-500">*</span>
                             </label>
                             <input 
                                 type="password" 
-                                id="whatsapp_api_key" 
-                                name="whatsapp_api_key"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="Enter API key"
+                                id="wa_access_token" 
+                                name="access_token"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
+                                placeholder="EAAxxxxxxx..."
+                                {% if whatsapp_settings and whatsapp_settings.access_token %}value="{{ whatsapp_settings.access_token }}"{% endif %}
                             />
+                            <p class="text-xs text-gray-500 mt-1">System User token from Meta Business Settings &rarr; Users &rarr; System Users</p>
                         </div>
                         <div>
-                            <label for="whatsapp_phone_number" class="block text-sm font-semibold text-gray-700 mb-2">
-                                WhatsApp Business Phone Number <span class="text-red-500">*</span>
+                            <label for="wa_phone_number_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Phone Number ID <span class="text-red-500">*</span>
                             </label>
                             <input 
                                 type="text" 
-                                id="whatsapp_phone_number" 
-                                name="whatsapp_phone_number"
+                                id="wa_phone_number_id" 
+                                name="phone_number_id"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="+1234567890"
+                                placeholder="100xxxxxxxxx"
+                                value="{% if whatsapp_settings %}{{ whatsapp_settings.phone_number_id }}{% endif %}"
                             />
+                            <p class="text-xs text-gray-500 mt-1">From WhatsApp &rarr; API Setup in your Meta App</p>
                         </div>
                         <div>
-                            <label for="whatsapp_business_id" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Business ID
+                            <label for="wa_display_phone" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Display Phone Number
                             </label>
                             <input 
                                 type="text" 
-                                id="whatsapp_business_id" 
-                                name="whatsapp_business_id"
+                                id="wa_display_phone" 
+                                name="display_phone_number"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="Enter Business ID"
+                                placeholder="+254 7XX XXX XXX"
+                                value="{% if whatsapp_settings %}{{ whatsapp_settings.display_phone_number or '' }}{% endif %}"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">The actual phone number registered on WhatsApp Business</p>
+                        </div>
+                        <div>
+                            <label for="wa_waba_id" class="block text-sm font-semibold text-gray-700 mb-2">
+                                WhatsApp Business Account ID
+                            </label>
+                            <input 
+                                type="text" 
+                                id="wa_waba_id" 
+                                name="whatsapp_business_account_id"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="10xxxxxxxxxx"
+                                value="{% if whatsapp_settings %}{{ whatsapp_settings.whatsapp_business_account_id or '' }}{% endif %}"
+                            />
+                        </div>
+                        <div>
+                            <label for="wa_verify_token" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Webhook Verify Token <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                id="wa_verify_token" 
+                                name="webhook_verify_token"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="my_secret_verify_token"
+                                value="{% if whatsapp_settings %}{{ whatsapp_settings.webhook_verify_token or '' }}{% endif %}"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">A secret string you choose — enter the same in Meta's Webhook configuration</p>
+                        </div>
+                        <div>
+                            <label for="wa_api_version" class="block text-sm font-semibold text-gray-700 mb-2">
+                                API Version
+                            </label>
+                            <input 
+                                type="text" 
+                                id="wa_api_version" 
+                                name="api_version"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="v21.0"
+                                value="{% if whatsapp_settings %}{{ whatsapp_settings.api_version or 'v21.0' }}{% else %}v21.0{% endif %}"
                             />
                         </div>
                     </div>
+
                     <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
-                        <button 
-                            type="button"
-                            onclick="testWhatsAppConnection()"
-                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
-                        >
-                            <i class="fas fa-vial mr-2"></i>Test Connection
-                        </button>
                         <button 
                             type="submit"
                             class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 font-semibold"
@@ -476,6 +514,88 @@
                 </form>
             </div>
         </div>
+
+        <!-- Setup Guide -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mt-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-list-ol text-green-600 mr-3"></i>
+                Setup Guide
+            </h2>
+            <ol class="space-y-3 text-sm text-gray-700">
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">1</span>
+                    <span>Go to <a href="https://developers.facebook.com/apps/" target="_blank" class="text-green-600 underline font-semibold">Meta Developer Dashboard</a> and create an app (type: Business). Add the <strong>WhatsApp</strong> product.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">2</span>
+                    <span>In WhatsApp &rarr; API Setup, copy the <strong>Phone Number ID</strong> and the temporary <strong>Access Token</strong>. For production, create a permanent System User token in Business Settings.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">3</span>
+                    <span>In WhatsApp &rarr; Configuration, set the <strong>Webhook URL</strong> to: <code class="bg-gray-100 px-1.5 py-0.5 rounded font-mono text-xs">{{ request.url_root }}webhook/whatsapp</code> and enter the same <strong>Verify Token</strong> you set above.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">4</span>
+                    <span>Subscribe to webhook fields: <strong>messages</strong> and <strong>message_status</strong> (under the WhatsApp Business Account).</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xs font-bold">5</span>
+                    <span>Fill in the form above and click <strong>Save</strong>. Then use the test section below to verify it works.</span>
+                </li>
+            </ol>
+        </div>
+
+        <!-- Test / Quick Send Section -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mt-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <i class="fab fa-whatsapp text-green-600 mr-3"></i>
+                Send WhatsApp Message
+            </h2>
+            {% if not whatsapp_settings or not whatsapp_settings.is_active %}
+            <div class="flex items-center gap-2 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 font-medium mb-4">
+                <i class="fas fa-exclamation-triangle"></i> Save your WhatsApp settings above first before sending messages.
+            </div>
+            {% endif %}
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="wa_test_phone" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Recipient Phone Number <span class="text-red-500">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="wa_test_phone" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="+254712345678"
+                            value="{% if whatsapp_settings %}{{ whatsapp_settings.display_phone_number or '' }}{% endif %}"
+                        />
+                        <p class="text-xs text-gray-500 mt-1">Include country code, e.g. +254 for Kenya</p>
+                    </div>
+                    <div>
+                        <label for="wa_test_message" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Message
+                        </label>
+                        <input 
+                            type="text" 
+                            id="wa_test_message" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="Hello from SHERIA CENTRIC!"
+                            value="Test message from SHERIA CENTRIC. WhatsApp integration is working!"
+                        />
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button 
+                        type="button"
+                        onclick="sendQuickWhatsApp()"
+                        class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 font-semibold"
+                    >
+                        <i class="fab fa-whatsapp mr-2"></i>Send WhatsApp Message
+                    </button>
+                    <span id="waSendResult" class="text-sm hidden"></span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- SMS Settings Tab Content -->
@@ -483,20 +603,31 @@
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
             <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                 <i class="fas fa-sms text-blue-600 mr-3"></i>
-                SMS Settings
+                SMS Gateway Settings
             </h2>
             <div class="space-y-6">
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-2">
                     <div class="flex items-start">
                         <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
                         <div>
-                            <p class="text-sm font-semibold text-blue-900 mb-2">SMS Configuration</p>
-                            <p class="text-xs text-blue-800">
-                                Configure SMS gateway settings for sending text messages and notifications via SMS.
+                            <p class="text-sm font-semibold text-blue-900 mb-2">SMS Gateway Configuration</p>
+                            <p class="text-xs text-blue-800 leading-relaxed">
+                                Choose your SMS provider and enter API credentials. Supported providers:
+                                <a href="https://africastalking.com" target="_blank" class="underline font-semibold">Africa's Talking</a>,
+                                <a href="https://twilio.com" target="_blank" class="underline font-semibold">Twilio</a>,
+                                <a href="https://vonage.com" target="_blank" class="underline font-semibold">Vonage</a>,
+                                or any custom SMS API.
                             </p>
                         </div>
                     </div>
                 </div>
+
+                {% if sms_settings and sms_settings.is_active %}
+                <div class="flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-lg text-sm text-blue-800 font-medium">
+                    <i class="fas fa-check-circle"></i> SMS is connected via <strong>{{ sms_settings.provider | replace('_', ' ') | title }}</strong>
+                </div>
+                {% endif %}
+
                 <form id="smsSettingsForm" class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
@@ -505,63 +636,70 @@
                             </label>
                             <select 
                                 id="sms_provider" 
-                                name="sms_provider"
+                                name="provider"
+                                onchange="toggleSmsFields()"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                                 <option value="">Select Provider</option>
-                                <option value="twilio">Twilio</option>
-                                <option value="africas_talking">Africa's Talking</option>
-                                <option value="nexmo">Vonage (Nexmo)</option>
-                                <option value="custom">Custom API</option>
+                                <option value="africas_talking" {% if sms_settings and sms_settings.provider == 'africas_talking' %}selected{% endif %}>Africa's Talking</option>
+                                <option value="twilio" {% if sms_settings and sms_settings.provider == 'twilio' %}selected{% endif %}>Twilio</option>
+                                <option value="vonage" {% if sms_settings and sms_settings.provider == 'vonage' %}selected{% endif %}>Vonage (Nexmo)</option>
+                                <option value="custom" {% if sms_settings and sms_settings.provider == 'custom' %}selected{% endif %}>Custom API</option>
                             </select>
                         </div>
-                        <div>
-                            <label for="sms_api_url" class="block text-sm font-semibold text-gray-700 mb-2">
-                                API URL <span class="text-red-500">*</span>
+                        <div id="sms_username_group">
+                            <label for="sms_username" class="block text-sm font-semibold text-gray-700 mb-2">
+                                <span id="sms_username_label">Username</span>
                             </label>
                             <input 
-                                type="url" 
-                                id="sms_api_url" 
-                                name="sms_api_url"
+                                type="text" 
+                                id="sms_username" 
+                                name="username"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="https://api.sms-provider.com"
+                                placeholder="sandbox"
+                                value="{% if sms_settings %}{{ sms_settings.username or '' }}{% endif %}"
                             />
+                            <p id="sms_username_hint" class="text-xs text-gray-500 mt-1">Africa's Talking username (use "sandbox" for testing)</p>
                         </div>
                         <div>
                             <label for="sms_api_key" class="block text-sm font-semibold text-gray-700 mb-2">
-                                API Key <span class="text-red-500">*</span>
+                                <span id="sms_key_label">API Key</span> <span class="text-red-500">*</span>
                             </label>
                             <input 
                                 type="password" 
                                 id="sms_api_key" 
-                                name="sms_api_key"
+                                name="api_key"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Enter API key"
+                                {% if sms_settings and sms_settings.api_key %}value="{{ sms_settings.api_key }}"{% endif %}
                             />
                         </div>
                         <div>
                             <label for="sms_api_secret" class="block text-sm font-semibold text-gray-700 mb-2">
-                                API Secret
+                                <span id="sms_secret_label">API Secret / Auth Token</span>
                             </label>
                             <input 
                                 type="password" 
                                 id="sms_api_secret" 
-                                name="sms_api_secret"
+                                name="api_secret"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Enter API secret"
+                                {% if sms_settings and sms_settings.api_secret %}value="{{ sms_settings.api_secret }}"{% endif %}
                             />
                         </div>
                         <div>
                             <label for="sms_sender_id" class="block text-sm font-semibold text-gray-700 mb-2">
-                                Sender ID/Phone Number <span class="text-red-500">*</span>
+                                Sender ID / From Number
                             </label>
                             <input 
                                 type="text" 
                                 id="sms_sender_id" 
-                                name="sms_sender_id"
+                                name="sender_id"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="+1234567890 or SenderID"
+                                placeholder="SHERIA or +254XXXXXXXXX"
+                                value="{% if sms_settings %}{{ sms_settings.sender_id or '' }}{% endif %}"
                             />
+                            <p class="text-xs text-gray-500 mt-1">Alphanumeric sender ID or phone number (provider dependent)</p>
                         </div>
                         <div>
                             <label for="sms_country_code" class="block text-sm font-semibold text-gray-700 mb-2">
@@ -570,20 +708,30 @@
                             <input 
                                 type="text" 
                                 id="sms_country_code" 
-                                name="sms_country_code"
+                                name="default_country_code"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="+254"
+                                value="{% if sms_settings %}{{ sms_settings.default_country_code or '+254' }}{% else %}+254{% endif %}"
                             />
+                            <p class="text-xs text-gray-500 mt-1">Auto-prepended when phone starts with 0</p>
+                        </div>
+                        <div id="sms_custom_url_group" class="md:col-span-2 hidden">
+                            <label for="sms_custom_url" class="block text-sm font-semibold text-gray-700 mb-2">
+                                Custom API URL <span class="text-red-500">*</span>
+                            </label>
+                            <input 
+                                type="url" 
+                                id="sms_custom_url" 
+                                name="custom_api_url"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="https://your-sms-api.com/send"
+                                value="{% if sms_settings %}{{ sms_settings.custom_api_url or '' }}{% endif %}"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">POST endpoint that accepts JSON with: to, message, from, api_key, api_secret</p>
                         </div>
                     </div>
+
                     <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
-                        <button 
-                            type="button"
-                            onclick="testSMSConnection()"
-                            class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
-                        >
-                            <i class="fas fa-vial mr-2"></i>Test Connection
-                        </button>
                         <button 
                             type="submit"
                             class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold"
@@ -592,6 +740,98 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Provider Setup Guides -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mt-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-list-ol text-blue-600 mr-3"></i>
+                Provider Setup Guides
+            </h2>
+            <div class="space-y-4">
+                <details class="border border-gray-200 rounded-lg">
+                    <summary class="px-4 py-3 cursor-pointer font-semibold text-sm text-gray-800 hover:bg-gray-50 flex items-center gap-2">
+                        <img src="https://africastalking.com/favicon.ico" class="w-4 h-4" onerror="this.style.display='none'"> Africa's Talking
+                    </summary>
+                    <div class="px-4 pb-4 text-xs text-gray-600 space-y-1">
+                        <p>1. Sign up at <a href="https://africastalking.com" target="_blank" class="text-blue-600 underline">africastalking.com</a></p>
+                        <p>2. Go to Settings &rarr; API Key to generate your key</p>
+                        <p>3. <strong>Provider:</strong> Africa's Talking, <strong>Username:</strong> your AT username (use "sandbox" for testing), <strong>API Key:</strong> from dashboard</p>
+                        <p>4. Optional: Set a Sender ID (requires approval from AT)</p>
+                    </div>
+                </details>
+                <details class="border border-gray-200 rounded-lg">
+                    <summary class="px-4 py-3 cursor-pointer font-semibold text-sm text-gray-800 hover:bg-gray-50 flex items-center gap-2">
+                        <i class="fas fa-phone-alt text-red-500"></i> Twilio
+                    </summary>
+                    <div class="px-4 pb-4 text-xs text-gray-600 space-y-1">
+                        <p>1. Sign up at <a href="https://twilio.com" target="_blank" class="text-blue-600 underline">twilio.com</a></p>
+                        <p>2. Get your Account SID and Auth Token from the Console Dashboard</p>
+                        <p>3. <strong>Provider:</strong> Twilio, <strong>API Key:</strong> Account SID, <strong>API Secret:</strong> Auth Token, <strong>Sender ID:</strong> your Twilio phone number (e.g. +1234567890)</p>
+                    </div>
+                </details>
+                <details class="border border-gray-200 rounded-lg">
+                    <summary class="px-4 py-3 cursor-pointer font-semibold text-sm text-gray-800 hover:bg-gray-50 flex items-center gap-2">
+                        <i class="fas fa-comment-dots text-purple-500"></i> Vonage (Nexmo)
+                    </summary>
+                    <div class="px-4 pb-4 text-xs text-gray-600 space-y-1">
+                        <p>1. Sign up at <a href="https://vonage.com" target="_blank" class="text-blue-600 underline">vonage.com</a></p>
+                        <p>2. Go to API Settings to get your API Key and API Secret</p>
+                        <p>3. <strong>Provider:</strong> Vonage, <strong>API Key:</strong> from dashboard, <strong>API Secret:</strong> from dashboard, <strong>Sender ID:</strong> alphanumeric or number</p>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- Quick Send SMS Section -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mt-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-sms text-blue-600 mr-3"></i>
+                Send SMS Message
+            </h2>
+            {% if not sms_settings or not sms_settings.is_active %}
+            <div class="flex items-center gap-2 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 font-medium mb-4">
+                <i class="fas fa-exclamation-triangle"></i> Save your SMS settings above first before sending messages.
+            </div>
+            {% endif %}
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="sms_test_phone" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Recipient Phone Number <span class="text-red-500">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="sms_test_phone" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="+254712345678 or 0712345678"
+                        />
+                        <p class="text-xs text-gray-500 mt-1">Numbers starting with 0 get country code auto-prepended</p>
+                    </div>
+                    <div>
+                        <label for="sms_test_message" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Message
+                        </label>
+                        <input 
+                            type="text" 
+                            id="sms_test_message" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Hello from SHERIA CENTRIC!"
+                            value="Test SMS from SHERIA CENTRIC. SMS integration is working!"
+                        />
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button 
+                        type="button"
+                        onclick="sendQuickSMS()"
+                        class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold"
+                    >
+                        <i class="fas fa-sms mr-2"></i>Send SMS
+                    </button>
+                    <span id="smsSendResult" class="text-sm hidden"></span>
+                </div>
             </div>
         </div>
     </div>
@@ -692,27 +932,132 @@ function testEmailConnection() {
     }, 1000);
 }
 
-// Test WhatsApp Connection
+// Send Quick WhatsApp Message
+function sendQuickWhatsApp() {
+    const phone = document.getElementById('wa_test_phone').value.trim();
+    const msg = document.getElementById('wa_test_message').value.trim();
+    const resultEl = document.getElementById('waSendResult');
+
+    if (!phone) {
+        showMessage('Enter a recipient phone number', 'error');
+        return;
+    }
+    if (!msg) {
+        showMessage('Enter a message to send', 'error');
+        return;
+    }
+
+    resultEl.className = 'text-sm text-blue-600';
+    resultEl.textContent = 'Sending...';
+    resultEl.classList.remove('hidden');
+
+    fetch('/api/whatsapp/send-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone, message: msg })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultEl.className = 'text-sm text-green-600 font-semibold';
+            resultEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>' + (data.message || 'Message sent!');
+            showMessage(data.message || 'WhatsApp message sent!', 'success');
+        } else {
+            resultEl.className = 'text-sm text-red-600 font-semibold';
+            resultEl.innerHTML = '<i class="fas fa-times-circle mr-1"></i>' + (data.error || 'Failed');
+            showMessage(data.error || 'Failed to send', 'error');
+        }
+    })
+    .catch(err => {
+        resultEl.className = 'text-sm text-red-600';
+        resultEl.textContent = 'Error: ' + err.message;
+        showMessage('Error: ' + err.message, 'error');
+    });
+}
+
+// Alias for backward compat
 function testWhatsAppConnection() {
-    showMessage('Testing WhatsApp connection...', 'info');
-    // TODO: Implement WhatsApp connection test
-    setTimeout(() => {
-        showMessage('WhatsApp connection test feature coming soon', 'info');
-    }, 1000);
+    sendQuickWhatsApp();
 }
 
-// Test SMS Connection
-function testSMSConnection() {
-    showMessage('Testing SMS connection...', 'info');
-    // TODO: Implement SMS connection test
-    setTimeout(() => {
-        showMessage('SMS connection test feature coming soon', 'info');
-    }, 1000);
+// Toggle SMS form fields based on provider
+function toggleSmsFields() {
+    const provider = document.getElementById('sms_provider').value;
+    const usernameGroup = document.getElementById('sms_username_group');
+    const usernameLabel = document.getElementById('sms_username_label');
+    const usernameHint = document.getElementById('sms_username_hint');
+    const keyLabel = document.getElementById('sms_key_label');
+    const secretLabel = document.getElementById('sms_secret_label');
+    const customUrlGroup = document.getElementById('sms_custom_url_group');
+
+    // Reset visibility
+    usernameGroup.style.display = '';
+    customUrlGroup.classList.add('hidden');
+
+    if (provider === 'africas_talking') {
+        usernameLabel.textContent = 'Username';
+        usernameHint.textContent = 'Africa\'s Talking username (use "sandbox" for testing)';
+        keyLabel.textContent = 'API Key';
+        secretLabel.textContent = 'API Secret (optional)';
+    } else if (provider === 'twilio') {
+        usernameGroup.style.display = 'none';
+        keyLabel.textContent = 'Account SID';
+        secretLabel.textContent = 'Auth Token';
+    } else if (provider === 'vonage') {
+        usernameGroup.style.display = 'none';
+        keyLabel.textContent = 'API Key';
+        secretLabel.textContent = 'API Secret';
+    } else if (provider === 'custom') {
+        usernameGroup.style.display = 'none';
+        keyLabel.textContent = 'API Key / Bearer Token';
+        secretLabel.textContent = 'API Secret (optional)';
+        customUrlGroup.classList.remove('hidden');
+    }
 }
 
-// Load email accounts on page load
+// Send Quick SMS
+function sendQuickSMS() {
+    const phone = document.getElementById('sms_test_phone').value.trim();
+    const msg = document.getElementById('sms_test_message').value.trim();
+    const resultEl = document.getElementById('smsSendResult');
+
+    if (!phone) { showMessage('Enter a recipient phone number', 'error'); return; }
+    if (!msg) { showMessage('Enter a message to send', 'error'); return; }
+
+    resultEl.className = 'text-sm text-blue-600';
+    resultEl.textContent = 'Sending...';
+    resultEl.classList.remove('hidden');
+
+    fetch('/api/sms/send-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone, message: msg })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultEl.className = 'text-sm text-green-600 font-semibold';
+            resultEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>' + (data.message || 'SMS sent!');
+            showMessage(data.message || 'SMS sent!', 'success');
+        } else {
+            resultEl.className = 'text-sm text-red-600 font-semibold';
+            resultEl.innerHTML = '<i class="fas fa-times-circle mr-1"></i>' + (data.error || 'Failed');
+            showMessage(data.error || 'Failed to send', 'error');
+        }
+    })
+    .catch(err => {
+        resultEl.className = 'text-sm text-red-600';
+        resultEl.textContent = 'Error: ' + err.message;
+        showMessage('Error: ' + err.message, 'error');
+    });
+}
+
+function testSMSConnection() { sendQuickSMS(); }
+
+// Load email accounts and init SMS fields on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadSubEmails();
+    toggleSmsFields();
 });
 
 // Form submissions
@@ -1018,14 +1363,70 @@ function deleteSubEmail(emailAddress) {
 
 document.getElementById('whatsappSettingsForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    showMessage('WhatsApp settings saved successfully!', 'success');
-    // TODO: Implement save functionality
+    const form = this;
+    const fd = new FormData(form);
+    const data = {
+        access_token: fd.get('access_token'),
+        phone_number_id: fd.get('phone_number_id'),
+        whatsapp_business_account_id: fd.get('whatsapp_business_account_id'),
+        webhook_verify_token: fd.get('webhook_verify_token'),
+        display_phone_number: fd.get('display_phone_number'),
+        api_version: fd.get('api_version') || 'v21.0'
+    };
+    if (!data.access_token || !data.phone_number_id || !data.webhook_verify_token) {
+        showMessage('Access Token, Phone Number ID, and Webhook Verify Token are required', 'error');
+        return;
+    }
+    showMessage('Saving WhatsApp settings...', 'info');
+    fetch('/api/whatsapp/settings/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('WhatsApp settings saved successfully!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showMessage(result.error || 'Failed to save', 'error');
+        }
+    })
+    .catch(err => showMessage('Error: ' + err.message, 'error'));
 });
 
 document.getElementById('smsSettingsForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    showMessage('SMS settings saved successfully!', 'success');
-    // TODO: Implement save functionality
+    const fd = new FormData(this);
+    const data = {
+        provider: fd.get('provider'),
+        api_key: fd.get('api_key'),
+        api_secret: fd.get('api_secret'),
+        sender_id: fd.get('sender_id'),
+        username: fd.get('username'),
+        default_country_code: fd.get('default_country_code') || '+254',
+        custom_api_url: fd.get('custom_api_url')
+    };
+    if (!data.provider || !data.api_key) {
+        showMessage('Provider and API Key are required', 'error');
+        return;
+    }
+    showMessage('Saving SMS settings...', 'info');
+    fetch('/api/sms/settings/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showMessage('SMS settings saved successfully!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showMessage(result.error || 'Failed to save', 'error');
+        }
+    })
+    .catch(err => showMessage('Error: ' + err.message, 'error'));
 });
 
 // Message display function

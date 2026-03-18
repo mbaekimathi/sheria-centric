@@ -22,12 +22,12 @@
 {% endif %}
 
 <!-- Dashboard Content Area -->
-{% if employee.role == 'Clerk' %}
-<!-- Clerk Dashboard: Clients and Employees -->
+{% if user_role in ['Clerk', 'Firm Administrator', 'Managing Partner'] %}
+<!-- Admin Dashboard: Clickable Client Cards -->
 <div class="space-y-6">
-    <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+    <!-- Statistics Cards (Clickable) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div id="card-individual" onclick="showClientSection('individual')" class="dash-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-blue-100 text-sm font-medium">Individual Clients</p>
@@ -35,8 +35,12 @@
                 </div>
                 <i class="fas fa-user text-4xl opacity-50"></i>
             </div>
+            <div class="mt-3 flex items-center text-blue-200 text-xs font-medium">
+                <i class="fas fa-hand-pointer mr-1"></i> Click to view
+                <i class="fas fa-chevron-right ml-auto animate-pulse"></i>
+            </div>
         </div>
-        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+        <div id="card-corporate" onclick="showClientSection('corporate')" class="dash-card bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-indigo-100 text-sm font-medium">Corporate Clients</p>
@@ -44,350 +48,255 @@
                 </div>
                 <i class="fas fa-building text-4xl opacity-50"></i>
             </div>
-        </div>
-        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-green-100 text-sm font-medium">Total Clients</p>
-                    <p class="text-3xl font-bold mt-1">{{ individual_clients|length + corporate_clients|length + (pending_clients|length if pending_clients else 0) }}</p>
-                </div>
-                <i class="fas fa-users text-4xl opacity-50"></i>
+            <div class="mt-3 flex items-center text-indigo-200 text-xs font-medium">
+                <i class="fas fa-hand-pointer mr-1"></i> Click to view
+                <i class="fas fa-chevron-right ml-auto animate-pulse"></i>
             </div>
         </div>
-        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+        <div id="card-pending" onclick="showClientSection('pending')" class="dash-card bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-purple-100 text-sm font-medium">Employees</p>
-                    <p class="text-3xl font-bold mt-1">{{ all_employees|length }}</p>
+                    <p class="text-yellow-100 text-sm font-medium">Pending Clients</p>
+                    <p class="text-3xl font-bold mt-1">{{ pending_clients|length }}</p>
                 </div>
-                <i class="fas fa-user-tie text-4xl opacity-50"></i>
+                <i class="fas fa-user-clock text-4xl opacity-50"></i>
+            </div>
+            <div class="mt-3 flex items-center text-yellow-200 text-xs font-medium">
+                <i class="fas fa-hand-pointer mr-1"></i> Click to view
+                <i class="fas fa-chevron-right ml-auto animate-pulse"></i>
             </div>
         </div>
     </div>
 
-    <!-- All Clients Section (Unified View) -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-users text-green-600 mr-3"></i>
-                All Clients ({{ all_clients|length if all_clients else 0 }})
-            </h2>
+    <!-- Default Prompt -->
+    <div id="dash-default-prompt" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 text-center">
+        <div class="animate-bounce mb-4">
+            <i class="fas fa-arrow-up text-4xl text-indigo-300"></i>
         </div>
-        {% if all_clients and all_clients|length > 0 %}
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-green-50 to-green-100 border-b border-green-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for client in all_clients %}
-                    <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location.href='{{ url_for('view_as_client', client_id=client.id) }}'" title="Click to view as this client">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                {% if client.profile_picture %}
-                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" 
-                                     alt="{{ client.full_name }}" 
-                                     class="w-10 h-10 rounded-full object-cover mr-3">
-                                {% else %}
-                                <div class="w-10 h-10 rounded-full {% if client.client_type == 'Individual' %}bg-blue-100{% elif client.client_type == 'Corporate' %}bg-indigo-100{% else %}bg-yellow-100{% endif %} flex items-center justify-center mr-3">
-                                    <i class="fas {% if client.client_type == 'Individual' %}fa-user text-blue-600{% elif client.client_type == 'Corporate' %}fa-building text-indigo-600{% else %}fa-user-clock text-yellow-600{% endif %}"></i>
-                                </div>
-                                {% endif %}
-                                <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
-                                    <div class="text-sm text-gray-500">{{ client.email }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.client_type == 'Individual' %}bg-blue-100 text-blue-800{% elif client.client_type == 'Corporate' %}bg-indigo-100 text-indigo-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
-                                {{ client.client_type or 'Pending' }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ client.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ client.created_at }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-users text-6xl text-gray-300 mb-4"></i>
-            <p class="text-gray-500 text-lg">No clients registered yet</p>
-        </div>
-        {% endif %}
+        <p class="text-gray-700 font-bold text-lg mb-1">Select a client category</p>
+        <p class="text-gray-400 text-sm">Click on any card above to view the respective clients</p>
     </div>
 
-    <!-- Individual Clients Section -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-user text-blue-600 mr-3"></i>
-                Individual Clients ({{ individual_clients|length }})
-            </h2>
-        </div>
-        {% if individual_clients %}
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for client in individual_clients %}
-                    <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location.href='{{ url_for('view_as_client', client_id=client.id) }}'" title="Click to view as this client">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                {% if client.profile_picture %}
-                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" 
-                                     alt="{{ client.full_name }}" 
-                                     class="w-10 h-10 rounded-full object-cover mr-3">
-                                {% else %}
-                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                                    <i class="fas fa-user text-blue-600"></i>
+    <!-- Individual Clients Section (hidden by default) -->
+    <div id="section-individual" class="hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6" style="animation: fadeSlideIn 0.3s ease-out">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-user text-blue-600"></i>
+                    </div>
+                    Individual Clients
+                    <span class="ml-3 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">{{ individual_clients|length }}</span>
+                </h2>
+            </div>
+            {% if individual_clients %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for client in individual_clients %}
+                        <tr class="hover:bg-blue-50 transition-colors cursor-pointer" onclick="window.location.href='{{ url_for('view_as_client', client_id=client.id) }}'">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    {% if client.profile_picture %}
+                                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-10 h-10 rounded-full object-cover mr-3">
+                                    {% else %}
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                        <i class="fas fa-user text-blue-600"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
+                                        <div class="text-sm text-gray-500">{{ client.email }}</div>
+                                    </div>
                                 </div>
-                                {% endif %}
-                                <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
-                                    <div class="text-sm text-gray-500">{{ client.email }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ client.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ client.created_at }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">{{ client.status }}</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-user text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">No individual clients registered yet</p>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-user text-6xl text-gray-300 mb-4"></i>
-            <p class="text-gray-500 text-lg">No individual clients registered yet</p>
-        </div>
-        {% endif %}
     </div>
 
-    <!-- Corporate Clients Section -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-building text-indigo-600 mr-3"></i>
-                Corporate Clients ({{ corporate_clients|length }})
-            </h2>
-        </div>
-        {% if corporate_clients %}
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for client in corporate_clients %}
-                    <tr class="hover:bg-gray-50 transition-colors cursor-pointer" onclick="window.location.href='{{ url_for('view_as_client', client_id=client.id) }}'" title="Click to view as this client">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                {% if client.profile_picture %}
-                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" 
-                                     alt="{{ client.full_name }}" 
-                                     class="w-10 h-10 rounded-full object-cover mr-3">
-                                {% else %}
-                                <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
-                                    <i class="fas fa-building text-indigo-600"></i>
+    <!-- Corporate Clients Section (hidden by default) -->
+    <div id="section-corporate" class="hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6" style="animation: fadeSlideIn 0.3s ease-out">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-building text-indigo-600"></i>
+                    </div>
+                    Corporate Clients
+                    <span class="ml-3 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold">{{ corporate_clients|length }}</span>
+                </h2>
+            </div>
+            {% if corporate_clients %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for client in corporate_clients %}
+                        <tr class="hover:bg-indigo-50 transition-colors cursor-pointer" onclick="window.location.href='{{ url_for('view_as_client', client_id=client.id) }}'">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    {% if client.profile_picture %}
+                                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-10 h-10 rounded-full object-cover mr-3">
+                                    {% else %}
+                                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                                        <i class="fas fa-building text-indigo-600"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
+                                        <div class="text-sm text-gray-500">{{ client.email }}</div>
+                                    </div>
                                 </div>
-                                {% endif %}
-                                <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
-                                    <div class="text-sm text-gray-500">{{ client.email }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                {{ client.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ client.created_at }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">{{ client.status }}</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-building text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">No corporate clients registered yet</p>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-building text-6xl text-gray-300 mb-4"></i>
-            <p class="text-gray-500 text-lg">No corporate clients registered yet</p>
-        </div>
-        {% endif %}
     </div>
 
-    <!-- Pending Clients Section -->
-    {% if pending_clients and pending_clients|length > 0 %}
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-clock text-yellow-600 mr-3"></i>
-                Pending Clients ({{ pending_clients|length }})
-            </h2>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-yellow-50 to-yellow-100 border-b border-yellow-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for client in pending_clients %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                {% if client.profile_picture %}
-                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" 
-                                     alt="{{ client.full_name }}" 
-                                     class="w-10 h-10 rounded-full object-cover mr-3">
-                                {% else %}
-                                <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
-                                    <i class="fas fa-user-clock text-yellow-600"></i>
+    <!-- Pending Clients Section (hidden by default) -->
+    <div id="section-pending" class="hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6" style="animation: fadeSlideIn 0.3s ease-out">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                    <div class="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center mr-3">
+                        <i class="fas fa-user-clock text-yellow-600"></i>
+                    </div>
+                    Pending Clients
+                    <span class="ml-3 px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-semibold">{{ pending_clients|length }}</span>
+                </h2>
+            </div>
+            {% if pending_clients %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gradient-to-r from-yellow-50 to-yellow-100 border-b border-yellow-200">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for client in pending_clients %}
+                        <tr class="hover:bg-yellow-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    {% if client.profile_picture %}
+                                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-10 h-10 rounded-full object-cover mr-3">
+                                    {% else %}
+                                    <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
+                                        <i class="fas fa-user-clock text-yellow-600"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
+                                        <div class="text-sm text-gray-500">{{ client.email }}</div>
+                                    </div>
                                 </div>
-                                {% endif %}
-                                <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ client.full_name }}</div>
-                                    <div class="text-sm text-gray-500">{{ client.email }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                {{ client.client_type or 'Pending' }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ client.created_at }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ client.phone_number or 'N/A' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">{{ client.client_type or 'Pending' }}</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-12">
+                <i class="fas fa-user-clock text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">No pending clients</p>
+            </div>
+            {% endif %}
         </div>
-    </div>
-    {% endif %}
-
-    <!-- Employees Section -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-user-tie text-purple-600 mr-3"></i>
-                Employees ({{ all_employees|length }})
-            </h2>
-        </div>
-        {% if all_employees %}
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Employee</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Role</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for emp in all_employees %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center">
-                                {% if emp.profile_picture %}
-                                <img src="{{ url_for('static', filename='uploads/profile_pictures/' + emp.profile_picture) }}" 
-                                     alt="{{ emp.full_name }}" 
-                                     class="w-10 h-10 rounded-full object-cover mr-3">
-                                {% else %}
-                                <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mr-3">
-                                    <i class="fas fa-user-tie text-purple-600"></i>
-                                </div>
-                                {% endif %}
-                                <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ emp.full_name }}</div>
-                                    <div class="text-sm text-gray-500">{{ emp.work_email }}</div>
-                                    <div class="text-xs text-gray-400">Code: {{ emp.employee_code }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ emp.phone_number or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                {{ emp.role }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if emp.status == 'Active' %}bg-green-100 text-green-800{% elif emp.status == 'Pending Approval' %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
-                                {{ emp.status }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ emp.created_at }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-user-tie text-6xl text-gray-300 mb-4"></i>
-            <p class="text-gray-500 text-lg">No employees registered yet</p>
-        </div>
-        {% endif %}
     </div>
 </div>
+
+<style>
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.dash-card.active-card { ring: 4px; box-shadow: 0 0 0 4px rgba(255,255,255,0.6), 0 20px 40px rgba(0,0,0,0.15); transform: scale(1.03); }
+</style>
+
+<script>
+let activeDashSection = null;
+
+function showClientSection(type) {
+    const sections = ['individual', 'corporate', 'pending'];
+    const prompt = document.getElementById('dash-default-prompt');
+    const cards = document.querySelectorAll('.dash-card');
+
+    if (activeDashSection === type) {
+        document.getElementById('section-' + type).classList.add('hidden');
+        prompt.classList.remove('hidden');
+        cards.forEach(c => c.classList.remove('active-card'));
+        activeDashSection = null;
+        return;
+    }
+
+    sections.forEach(s => document.getElementById('section-' + s).classList.add('hidden'));
+    cards.forEach(c => c.classList.remove('active-card'));
+    prompt.classList.add('hidden');
+
+    const section = document.getElementById('section-' + type);
+    section.classList.remove('hidden');
+    const inner = section.querySelector('div');
+    if (inner) { inner.style.animation = 'none'; inner.offsetHeight; inner.style.animation = 'fadeSlideIn 0.3s ease-out'; }
+
+    document.getElementById('card-' + type).classList.add('active-card');
+    activeDashSection = type;
+
+    section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
 {% else %}
 <!-- Default Dashboard for other roles -->
 <div class="space-y-6">

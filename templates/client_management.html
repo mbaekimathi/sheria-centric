@@ -1,9 +1,37 @@
+
 {% extends "base.html" %}
 
 {% block title %}Client Management - SHERIA CENTRIC{% endblock %}
 
+{% block extra_css %}
+<style>
+    .stat-card { position: relative; overflow: hidden; }
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(255,255,255,0);
+        transition: background 0.3s;
+    }
+    .stat-card:hover::after { background: rgba(255,255,255,0.08); }
+    .stat-card.active-card { ring: 4px; transform: scale(1.03); box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+    .stat-card .click-hint { transition: all 0.3s; }
+    .stat-card:hover .click-hint { transform: translateX(3px); }
+    @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-slide-in { animation: fadeSlideIn 0.35s ease-out; }
+    @keyframes pulse-arrow {
+        0%, 100% { opacity: 0.6; transform: translateY(0); }
+        50% { opacity: 1; transform: translateY(3px); }
+    }
+    .pulse-arrow { animation: pulse-arrow 1.5s ease-in-out infinite; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-6xl mx-auto">
+<div class="max-w-7xl mx-auto">
     <!-- Page Header -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
         <div class="flex flex-col md:flex-row items-center justify-between">
@@ -12,48 +40,595 @@
                     <i class="fas fa-user-friends text-blue-600 mr-3"></i>
                     Client Management
                 </h1>
-                <p class="text-gray-600">Manage client records, profiles, and relationships</p>
+                <p class="text-gray-600">Manage individual and corporate client records, profiles, and relationships</p>
+            </div>
+            <div class="flex items-center space-x-3 mt-4 md:mt-0">
+                <div class="px-4 py-2 rounded-xl bg-blue-50 border border-blue-200">
+                    <span class="text-sm font-semibold text-blue-700">{{ total_clients }} Total Clients</span>
+                </div>
+                <button onclick="openRegisterModal()"
+                    class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl flex items-center">
+                    <i class="fas fa-user-plus mr-2"></i>Register Client
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Content Placeholder -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
-        <div class="max-w-md mx-auto">
-            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-user-friends text-white text-4xl"></i>
+    <!-- Clickable Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="stat-cards">
+        <div onclick="showClients('individual')" id="card-individual"
+             class="stat-card bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-5 text-white cursor-pointer hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-sm font-medium">Individual Clients</p>
+                    <p class="text-3xl font-bold mt-1">{{ individual_clients|length }}</p>
+                </div>
+                <i class="fas fa-user text-4xl opacity-50"></i>
             </div>
-            <h2 class="text-2xl font-bold text-gray-900 mb-4">Client Management</h2>
-            <p class="text-gray-600 mb-6">This section will contain client management features including:</p>
-            <ul class="text-left text-gray-600 space-y-2 mb-6">
-                <li class="flex items-center">
-                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
-                    Client Records Management
-                </li>
-                <li class="flex items-center">
-                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
-                    Client Profiles & Documents
-                </li>
-                <li class="flex items-center">
-                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
-                    Case Assignments
-                </li>
-                <li class="flex items-center">
-                    <i class="fas fa-check-circle text-blue-600 mr-2"></i>
-                    Communication History
-                </li>
-            </ul>
-            <p class="text-sm text-gray-500 italic">Feature coming soon</p>
+            <div class="click-hint flex items-center mt-3 pt-3 border-t border-white/20">
+                <i class="fas fa-hand-pointer text-white/70 mr-2 text-xs"></i>
+                <span class="text-xs text-white/70 font-medium">Click to view clients</span>
+                <i class="fas fa-chevron-right text-white/50 ml-auto text-xs"></i>
+            </div>
+        </div>
+
+        <div onclick="showClients('corporate')" id="card-corporate"
+             class="stat-card bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg p-5 text-white cursor-pointer hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-indigo-100 text-sm font-medium">Corporate Clients</p>
+                    <p class="text-3xl font-bold mt-1">{{ corporate_clients|length }}</p>
+                </div>
+                <i class="fas fa-building text-4xl opacity-50"></i>
+            </div>
+            <div class="click-hint flex items-center mt-3 pt-3 border-t border-white/20">
+                <i class="fas fa-hand-pointer text-white/70 mr-2 text-xs"></i>
+                <span class="text-xs text-white/70 font-medium">Click to view clients</span>
+                <i class="fas fa-chevron-right text-white/50 ml-auto text-xs"></i>
+            </div>
+        </div>
+
+        <div onclick="showClients('pending')" id="card-pending"
+             class="stat-card bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-5 text-white cursor-pointer hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-yellow-100 text-sm font-medium">Pending Onboarding</p>
+                    <p class="text-3xl font-bold mt-1">{{ pending_clients|length }}</p>
+                </div>
+                <i class="fas fa-user-clock text-4xl opacity-50"></i>
+            </div>
+            <div class="click-hint flex items-center mt-3 pt-3 border-t border-white/20">
+                <i class="fas fa-hand-pointer text-white/70 mr-2 text-xs"></i>
+                <span class="text-xs text-white/70 font-medium">Click to view clients</span>
+                <i class="fas fa-chevron-right text-white/50 ml-auto text-xs"></i>
+            </div>
         </div>
     </div>
 
-    <!-- Back Button -->
-    <div class="mt-6">
-        <a href="{{ url_for('user_management') }}" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl">
-            <i class="fas fa-arrow-left mr-2"></i>Back to User Management
-        </a>
+    <!-- Default Prompt (shown when no card is selected) -->
+    <div id="default-prompt" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 text-center">
+        <div class="max-w-sm mx-auto">
+            <i class="fas fa-arrow-up text-4xl text-gray-300 mb-4 pulse-arrow block"></i>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Select a category above</h3>
+            <p class="text-sm text-gray-500">Click on any of the cards above to view and manage the clients in that category</p>
+        </div>
+    </div>
+
+    <!-- Client List Container -->
+    <div id="client-list-container" class="hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden fade-slide-in">
+            <!-- Active Section Header + Search -->
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border-b border-gray-100 gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center" id="section-icon-bg">
+                        <i class="fas fa-user text-white" id="section-icon"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-gray-900" id="section-title">Individual Clients</h3>
+                        <p class="text-xs text-gray-500" id="section-subtitle">3 clients</p>
+                    </div>
+                </div>
+                <div class="relative w-full sm:w-72">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="client-search" placeholder="Search clients..."
+                        class="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-sm transition-all"
+                        oninput="filterClients()">
+                </div>
+            </div>
+
+            <!-- Individual Clients Content -->
+            <div id="content-individual" class="tab-content p-6 hidden">
+                {% if individual_clients|length > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
+                                <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for client in individual_clients %}
+                            <tr class="hover:bg-gray-50 transition-colors client-row">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        {% if client.profile_picture %}
+                                        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}"
+                                             alt="{{ client.full_name }}" class="w-10 h-10 rounded-full object-cover mr-3">
+                                        {% else %}
+                                        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                            <i class="fas fa-user text-blue-600"></i>
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 client-name">{{ client.full_name }}</div>
+                                            <div class="text-sm text-gray-500 client-email">{{ client.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 client-phone">{{ client.phone_number or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ client.status }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center justify-center space-x-2">
+                                        <a href="{{ url_for('view_as_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View client portal">
+                                            <i class="fas fa-eye mr-1"></i>View
+                                        </a>
+                                        {% if client.status != 'Active' %}
+                                        <a href="{{ url_for('onboard_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors" title="Onboard this client">
+                                            <i class="fas fa-user-check mr-1"></i>Onboard
+                                        </a>
+                                        {% endif %}
+                                        <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
+                                            <i class="fas fa-edit mr-1"></i>Edit
+                                        </a>
+                                        <button onclick="openSuspendModal({{ client.id }}, '{{ client.full_name|e }}', '{{ client.status }}')" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg {% if client.status == 'Active' %}bg-orange-50 text-orange-700 hover:bg-orange-100{% else %}bg-green-50 text-green-700 hover:bg-green-100{% endif %} transition-colors" title="{% if client.status == 'Active' %}Suspend{% else %}Reactivate{% endif %}">
+                                            <i class="fas {% if client.status == 'Active' %}fa-ban{% else %}fa-check-circle{% endif %} mr-1"></i>{% if client.status == 'Active' %}Suspend{% else %}Activate{% endif %}
+                                        </button>
+                                        <button onclick="openDeleteModal({{ client.id }}, '{{ client.full_name|e }}')" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors" title="Delete client permanently">
+                                            <i class="fas fa-trash-alt mr-1"></i>Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-user text-6xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500 text-lg">No individual clients registered yet</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Corporate Clients Content -->
+            <div id="content-corporate" class="tab-content p-6 hidden">
+                {% if corporate_clients|length > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
+                                <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for client in corporate_clients %}
+                            <tr class="hover:bg-gray-50 transition-colors client-row">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        {% if client.profile_picture %}
+                                        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}"
+                                             alt="{{ client.full_name }}" class="w-10 h-10 rounded-full object-cover mr-3">
+                                        {% else %}
+                                        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                                            <i class="fas fa-building text-indigo-600"></i>
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 client-name">{{ client.full_name }}</div>
+                                            <div class="text-sm text-gray-500 client-email">{{ client.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 client-phone">{{ client.phone_number or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if client.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                        {{ client.status }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center justify-center space-x-2">
+                                        <a href="{{ url_for('view_as_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View client portal">
+                                            <i class="fas fa-eye mr-1"></i>View
+                                        </a>
+                                        {% if client.status != 'Active' %}
+                                        <a href="{{ url_for('onboard_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors" title="Onboard this client">
+                                            <i class="fas fa-user-check mr-1"></i>Onboard
+                                        </a>
+                                        {% endif %}
+                                        <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
+                                            <i class="fas fa-edit mr-1"></i>Edit
+                                        </a>
+                                        <button onclick="openSuspendModal({{ client.id }}, '{{ client.full_name|e }}', '{{ client.status }}')" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg {% if client.status == 'Active' %}bg-orange-50 text-orange-700 hover:bg-orange-100{% else %}bg-green-50 text-green-700 hover:bg-green-100{% endif %} transition-colors" title="{% if client.status == 'Active' %}Suspend{% else %}Reactivate{% endif %}">
+                                            <i class="fas {% if client.status == 'Active' %}fa-ban{% else %}fa-check-circle{% endif %} mr-1"></i>{% if client.status == 'Active' %}Suspend{% else %}Activate{% endif %}
+                                        </button>
+                                        <button onclick="openDeleteModal({{ client.id }}, '{{ client.full_name|e }}')" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors" title="Delete client permanently">
+                                            <i class="fas fa-trash-alt mr-1"></i>Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-building text-6xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500 text-lg">No corporate clients registered yet</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Pending Clients Content -->
+            <div id="content-pending" class="tab-content p-6 hidden">
+                {% if pending_clients|length > 0 %}
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gradient-to-r from-yellow-50 to-yellow-100 border-b border-yellow-200">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
+                                <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for client in pending_clients %}
+                            <tr class="hover:bg-gray-50 transition-colors client-row">
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        {% if client.profile_picture %}
+                                        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}"
+                                             alt="{{ client.full_name }}" class="w-10 h-10 rounded-full object-cover mr-3">
+                                        {% else %}
+                                        <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mr-3">
+                                            <i class="fas fa-user-clock text-yellow-600"></i>
+                                        </div>
+                                        {% endif %}
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900 client-name">{{ client.full_name }}</div>
+                                            <div class="text-sm text-gray-500 client-email">{{ client.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900 client-phone">{{ client.phone_number or 'N/A' }}</div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center justify-center space-x-2">
+                                        <a href="{{ url_for('view_as_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View client portal">
+                                            <i class="fas fa-eye mr-1"></i>View
+                                        </a>
+                                        <a href="{{ url_for('onboard_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors" title="Onboard this client">
+                                            <i class="fas fa-user-check mr-1"></i>Onboard
+                                        </a>
+                                        <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
+                                            <i class="fas fa-edit mr-1"></i>Edit
+                                        </a>
+                                        <button onclick="openDeleteModal({{ client.id }}, '{{ client.full_name|e }}')" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors" title="Delete client permanently">
+                                            <i class="fas fa-trash-alt mr-1"></i>Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <i class="fas fa-user-clock text-6xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500 text-lg">No pending onboarding clients</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Suspend Client Modal -->
+<div id="suspendModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div class="p-6 border-b border-gray-200" id="suspend-header">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-ban text-orange-600 mr-3" id="suspend-icon"></i>
+                    <span id="suspend-title-text">Suspend Client</span>
+                </h2>
+                <button onclick="closeSuspendModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" id="suspend-icon-circle">
+                    <i class="fas fa-ban text-3xl" id="suspend-modal-icon"></i>
+                </div>
+                <p class="text-gray-700" id="suspend-message"></p>
+            </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-end space-x-3">
+            <button type="button" onclick="closeSuspendModal()"
+                class="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+            <form id="suspendForm" method="POST" class="inline">
+                <button type="submit" id="suspend-confirm-btn"
+                    class="px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-all shadow-lg hover:shadow-xl">
+                    <i class="fas fa-ban mr-2" id="suspend-btn-icon"></i>
+                    <span id="suspend-btn-text">Suspend</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Client Modal -->
+<div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-600 mr-3"></i>Delete Client
+                </h2>
+                <button onclick="closeDeleteModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="text-center mb-4">
+                <div class="w-16 h-16 rounded-full bg-red-100 mx-auto mb-4 flex items-center justify-center">
+                    <i class="fas fa-trash-alt text-red-600 text-3xl"></i>
+                </div>
+                <p class="text-gray-700" id="delete-message"></p>
+                <p class="text-sm text-red-600 mt-2 font-semibold">This action cannot be undone.</p>
+            </div>
+        </div>
+        <div class="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-end space-x-3">
+            <button type="button" onclick="closeDeleteModal()"
+                class="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+            <form id="deleteForm" method="POST" class="inline">
+                <button type="submit"
+                    class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl">
+                    <i class="fas fa-trash-alt mr-2"></i>Delete Permanently
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Register Client Modal -->
+<div id="registerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-100 flex-shrink-0">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-user-plus text-green-600 mr-3"></i>Register New Client
+                </h2>
+                <button onclick="closeRegisterModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        <form id="registerForm" method="POST" action="{{ url_for('register_client') }}" class="flex flex-col flex-1 overflow-hidden">
+            <div class="p-6 space-y-5 overflow-y-auto flex-1">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="full_name" required placeholder="Enter full name"
+                        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 text-sm transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+                    <input type="email" name="email" required placeholder="client@example.com"
+                        class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 text-sm transition-all">
+                </div>
+                <p class="text-xs text-gray-500 italic">
+                    <i class="fas fa-info-circle mr-1"></i>Client can complete full registration (KRA PIN, physical address, documents, etc.) via the client portal.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-6 border-t border-gray-200 bg-gray-50 flex items-center justify-end space-x-3 flex-shrink-0">
+                <button type="button" onclick="closeRegisterModal()"
+                    class="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="submit" id="register-submit-btn"
+                    class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl flex items-center">
+                    <i class="fas fa-user-plus mr-2"></i>Register Client
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+const sectionMeta = {
+    individual: {
+        title: 'Individual Clients',
+        subtitle: '{{ individual_clients|length }} client{{ "s" if individual_clients|length != 1 }}',
+        icon: 'fa-user',
+        iconBg: 'bg-blue-500',
+        ringClass: 'ring-4 ring-blue-300 ring-offset-2'
+    },
+    corporate: {
+        title: 'Corporate Clients',
+        subtitle: '{{ corporate_clients|length }} client{{ "s" if corporate_clients|length != 1 }}',
+        icon: 'fa-building',
+        iconBg: 'bg-indigo-500',
+        ringClass: 'ring-4 ring-indigo-300 ring-offset-2'
+    },
+    pending: {
+        title: 'Pending Onboarding',
+        subtitle: '{{ pending_clients|length }} client{{ "s" if pending_clients|length != 1 }}',
+        icon: 'fa-user-clock',
+        iconBg: 'bg-yellow-500',
+        ringClass: 'ring-4 ring-yellow-300 ring-offset-2'
+    }
+};
 
+let activeCard = null;
+
+function showClients(type) {
+    const meta = sectionMeta[type];
+    if (!meta) return;
+
+    // Hide prompt, show list
+    document.getElementById('default-prompt').classList.add('hidden');
+    const container = document.getElementById('client-list-container');
+    container.classList.remove('hidden');
+
+    // Re-trigger animation
+    const inner = container.querySelector('.bg-white');
+    inner.classList.remove('fade-slide-in');
+    void inner.offsetWidth;
+    inner.classList.add('fade-slide-in');
+
+    // Update section header
+    document.getElementById('section-title').textContent = meta.title;
+    document.getElementById('section-subtitle').textContent = meta.subtitle;
+    document.getElementById('section-icon').className = 'fas ' + meta.icon + ' text-white';
+    document.getElementById('section-icon-bg').className = 'w-9 h-9 rounded-lg flex items-center justify-center ' + meta.iconBg;
+
+    // Toggle content panels
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    const content = document.getElementById('content-' + type);
+    if (content) content.classList.remove('hidden');
+
+    // Highlight active card
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.remove('ring-4', 'ring-blue-300', 'ring-indigo-300', 'ring-yellow-300', 'ring-offset-2');
+        card.style.transform = '';
+    });
+    const card = document.getElementById('card-' + type);
+    if (card) {
+        meta.ringClass.split(' ').forEach(cls => card.classList.add(cls));
+    }
+    activeCard = type;
+
+    // Clear search
+    document.getElementById('client-search').value = '';
+    filterClients();
+
+    // Scroll to list
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function filterClients() {
+    const query = document.getElementById('client-search').value.toLowerCase();
+    const visibleContent = document.querySelector('.tab-content:not(.hidden)');
+    if (!visibleContent) return;
+    visibleContent.querySelectorAll('.client-row').forEach(row => {
+        const name = (row.querySelector('.client-name')?.textContent || '').toLowerCase();
+        const email = (row.querySelector('.client-email')?.textContent || '').toLowerCase();
+        const phone = (row.querySelector('.client-phone')?.textContent || '').toLowerCase();
+        row.style.display = (!query || name.includes(query) || email.includes(query) || phone.includes(query)) ? '' : 'none';
+    });
+}
+
+function openSuspendModal(id, name, status) {
+    const isSuspending = status === 'Active';
+    document.getElementById('suspendForm').action = '/client_management/suspend/' + id;
+    document.getElementById('suspend-title-text').textContent = isSuspending ? 'Suspend Client' : 'Reactivate Client';
+    document.getElementById('suspend-message').textContent = isSuspending
+        ? 'Are you sure you want to suspend "' + name + '"? They will no longer be able to access the system.'
+        : 'Are you sure you want to reactivate "' + name + '"? They will regain access to the system.';
+    const header = document.getElementById('suspend-header');
+    const iconCircle = document.getElementById('suspend-icon-circle');
+    const modalIcon = document.getElementById('suspend-modal-icon');
+    const icon = document.getElementById('suspend-icon');
+    const confirmBtn = document.getElementById('suspend-confirm-btn');
+    const btnIcon = document.getElementById('suspend-btn-icon');
+    const btnText = document.getElementById('suspend-btn-text');
+    if (isSuspending) {
+        header.className = 'p-6 border-b border-gray-200 bg-gradient-to-r from-orange-50 to-orange-100';
+        icon.className = 'fas fa-ban text-orange-600 mr-3';
+        iconCircle.className = 'w-16 h-16 rounded-full bg-orange-100 mx-auto mb-4 flex items-center justify-center';
+        modalIcon.className = 'fas fa-ban text-orange-600 text-3xl';
+        confirmBtn.className = 'px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl';
+        btnIcon.className = 'fas fa-ban mr-2';
+        btnText.textContent = 'Suspend';
+    } else {
+        header.className = 'p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-green-100';
+        icon.className = 'fas fa-check-circle text-green-600 mr-3';
+        iconCircle.className = 'w-16 h-16 rounded-full bg-green-100 mx-auto mb-4 flex items-center justify-center';
+        modalIcon.className = 'fas fa-check-circle text-green-600 text-3xl';
+        confirmBtn.className = 'px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl';
+        btnIcon.className = 'fas fa-check-circle mr-2';
+        btnText.textContent = 'Reactivate';
+    }
+    document.getElementById('suspendModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeSuspendModal() {
+    document.getElementById('suspendModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function openDeleteModal(id, name) {
+    document.getElementById('deleteForm').action = '/client_management/delete/' + id;
+    document.getElementById('delete-message').textContent = 'Are you sure you want to permanently delete "' + name + '" from the system?';
+    document.getElementById('deleteModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+// --- Register Client Modal ---
+function openRegisterModal() {
+    document.getElementById('registerForm').reset();
+    document.getElementById('registerModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeRegisterModal() {
+    document.getElementById('registerModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('click', function(e) {
+    ['suspendModal', 'deleteModal', 'registerModal'].forEach(modalId => {
+        const modal = document.getElementById(modalId);
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+    });
+});
+</script>
+{% endblock %}

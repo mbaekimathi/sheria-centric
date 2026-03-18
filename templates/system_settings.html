@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+{% set cs = company_settings or {} %}
+<div class="max-w-5xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-cog text-indigo-600 mr-3"></i>
+            System Settings
+        </h1>
+        <p class="text-gray-600">Configure company and system options. Use the sidebar for other system settings.</p>
+    </div>
+
+    <form action="{{ url_for('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6">
+        <!-- 1. Basic Company Information -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-building text-indigo-600 mr-2"></i>
+                    1. Basic Company Information
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Main identity details of the law firm.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company / Law Firm Name</label>
+                    <input type="text" name="company_name" value="{{ cs.get('company_name') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. BAUNI LAW GROUP">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>
+                    <input type="file" name="company_logo" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if cs.get('company_logo') %}
+                    <p class="mt-1 text-xs text-gray-500">Current: {{ cs.company_logo }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Company Tagline (optional)</label>
+                    <input type="text" name="company_tagline" value="{{ cs.get('company_tagline') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Excellence in Legal Services">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Registration Number / Law Firm Number</label>
+                    <input type="text" name="registration_number" value="{{ cs.get('registration_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tax PIN / VAT Number</label>
+                    <input type="text" name="tax_pin_vat_number" value="{{ cs.get('tax_pin_vat_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Year Established</label>
+                    <input type="text" name="year_established" value="{{ cs.get('year_established') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 2010">
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Contact Information -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-address-book text-indigo-600 mr-2"></i>
+                    2. Contact Information
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Used for communication with clients.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Official Email Address</label>
+                    <input type="email" name="email" value="{{ cs.get('email') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input type="text" name="contact_number" value="{{ cs.get('contact_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+                    <input type="text" name="whatsapp_number" value="{{ cs.get('whatsapp_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Alternative Phone Number</label>
+                    <input type="text" name="alternative_phone" value="{{ cs.get('alternative_phone') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Customer Support Email</label>
+                    <input type="email" name="customer_support_email" value="{{ cs.get('customer_support_email') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Physical Address -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-map-marker-alt text-indigo-600 mr-2"></i>
+                    3. Physical Address
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Used on invoices, legal letters, and documents.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <input type="text" name="country" value="{{ cs.get('country') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">County / State</label>
+                    <input type="text" name="county_state" value="{{ cs.get('county_state') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">City / Town</label>
+                    <input type="text" name="city_town" value="{{ cs.get('city_town') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Street / Building Name</label>
+                    <input type="text" name="street_building" value="{{ cs.get('street_building') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Office Number / Floor</label>
+                    <input type="text" name="office_number_floor" value="{{ cs.get('office_number_floor') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Postal Address (P.O. Box)</label>
+                    <input type="text" name="postal_address" value="{{ cs.get('postal_address') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                    <input type="text" name="postal_code" value="{{ cs.get('postal_code') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Business Hours -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-clock text-indigo-600 mr-2"></i>
+                    4. Business Hours
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Used for appointment scheduling.</p>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Regular hours: clock/time pickers -->
+                <div>
+                    <p class="text-sm font-medium text-gray-700 mb-2">Regular opening hours</p>
+                    <p class="text-xs text-gray-500 mb-2">Select from what time to what time you are open.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Opening Time</label>
+                            <input type="time" name="opening_time" value="{{ cs.get('opening_time') or '08:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Closing Time</label>
+                            <input type="time" name="closing_time" value="{{ cs.get('closing_time') or '17:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+                <!-- Working days: calendar-style checkboxes -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Working Days</label>
+                    <p class="text-xs text-gray-500 mb-2">Select the days you are open (e.g. Mon–Fri, Sat optional).</p>
+                    {% set wd_list = (cs.get('working_days') or '').split(',') %}
+                    <div class="flex flex-wrap gap-4">
+                        {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="working_days" value="{{ day }}" {% if day in wd_list %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">{{ day }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <!-- Public Holiday Status: select + when open times -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Public Holiday Status</label>
+                    <p class="text-xs text-gray-500 mb-2">Choose whether you are closed, open, or on reduced hours on public holidays.</p>
+                    <select name="public_holiday_status" id="public_holiday_status" class="w-full md:max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+                        <option value="">— Select —</option>
+                        <option value="Closed" {% if cs.get('public_holiday_status') == 'Closed' %}selected{% endif %}>Closed</option>
+                        <option value="Open" {% if cs.get('public_holiday_status') == 'Open' %}selected{% endif %}>Open</option>
+                        <option value="Reduced hours" {% if cs.get('public_holiday_status') == 'Reduced hours' %}selected{% endif %}>Reduced hours</option>
+                    </select>
+                    <div id="when_open_times" class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 {% if cs.get('public_holiday_status') not in ['Open', 'Reduced hours'] %}hidden{% endif %}">
+                        <p class="text-sm font-medium text-gray-700 mb-2">When open on public holidays</p>
+                        <p class="text-xs text-gray-500 mb-2">From what time to what time.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">From (time)</label>
+                                <input type="time" name="public_holiday_open_time" value="{{ cs.get('public_holiday_open_time') or '09:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">To (time)</label>
+                                <input type="time" name="public_holiday_close_time" value="{{ cs.get('public_holiday_close_time') or '13:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function() {
+            var sel = document.getElementById('public_holiday_status');
+            var block = document.getElementById('when_open_times');
+            if (!sel || !block) return;
+            function toggle() {
+                var v = sel.value;
+                block.classList.toggle('hidden', v !== 'Open' && v !== 'Reduced hours');
+            }
+            sel.addEventListener('change', toggle);
+            toggle();
+        })();
+        </script>
+
+        <!-- 5. Social Media Links -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-share-alt text-indigo-600 mr-2"></i>
+                    5. Social Media Links
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Optional but useful for visibility.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                    <input type="url" name="website_url" value="{{ cs.get('website_url') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
+                    <input type="url" name="fb_link" value="{{ cs.get('fb_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn</label>
+                    <input type="url" name="linkedin_link" value="{{ cs.get('linkedin_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Twitter / X</label>
+                    <input type="url" name="twitter_link" value="{{ cs.get('twitter_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+                    <input type="url" name="instagram_link" value="{{ cs.get('instagram_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Legal & Professional Information -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-balance-scale text-indigo-600 mr-2"></i>
+                    6. Legal & Professional Information
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Important for law firms.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Law Society Registration Number</label>
+                    <input type="text" name="law_society_reg_number" value="{{ cs.get('law_society_reg_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Practicing Certificate Number</label>
+                    <input type="text" name="practicing_certificate_number" value="{{ cs.get('practicing_certificate_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lead Advocate / Managing Partner</label>
+                    <input type="text" name="lead_advocate_name" value="{{ cs.get('lead_advocate_name') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bar Association Membership</label>
+                    <input type="text" name="bar_association_membership" value="{{ cs.get('bar_association_membership') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Document Settings -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-file-alt text-indigo-600 mr-2"></i>
+                    7. Document Settings
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Used when generating legal documents.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Letterhead</label>
+                    <input type="file" name="default_letterhead" accept="image/*,.pdf" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if cs.get('default_letterhead') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.default_letterhead }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Stamp / Seal Upload</label>
+                    <input type="file" name="stamp_seal_upload" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if cs.get('stamp_seal_upload') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.stamp_seal_upload }}</p>{% endif %}
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Document Footer Text</label>
+                    <textarea name="document_footer_text" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ cs.get('document_footer_text') or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Signature for Documents</label>
+                    <input type="file" name="default_signature_documents" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if cs.get('default_signature_documents') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.default_signature_documents }}</p>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. Billing & Finance Settings -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-dollar-sign text-indigo-600 mr-2"></i>
+                    8. Billing & Finance Settings
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Used for invoices and payments.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <input type="text" name="currency" value="{{ cs.get('currency') or 'KES' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. KES">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Prefix</label>
+                    <input type="text" name="invoice_prefix" value="{{ cs.get('invoice_prefix') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. INV-0001">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                    <input type="text" name="payment_terms" value="{{ cs.get('payment_terms') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 30 days">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Payment (M-Pesa Paybill / Till)</label>
+                    <input type="text" name="mobile_payment_mpesa" value="{{ cs.get('mobile_payment_mpesa') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Paybill 123456">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bank Account Details</label>
+                    <textarea name="bank_account_details" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Bank name, account number, branch...">{{ cs.get('bank_account_details') or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- 9. Notification Settings -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-bell text-indigo-600 mr-2"></i>
+                    9. Notification Settings
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Controls system communication.</p>
+            </div>
+            <div class="p-6 space-y-3">
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="send_email_notifications" {% if cs.get('send_email_notifications', 1) %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">Send Email Notifications</span>
+                </label>
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="send_sms_notifications" {% if cs.get('send_sms_notifications') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">Send SMS Notifications</span>
+                </label>
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="whatsapp_notifications" {% if cs.get('whatsapp_notifications') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">WhatsApp Notifications</span>
+                </label>
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="court_date_reminders" {% if cs.get('court_date_reminders', 1) %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">Court Date Reminders</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- 11. Branding Settings -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-palette text-indigo-600 mr-2"></i>
+                    11. Branding Settings
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">For a professional look across the system.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
+                    <input type="text" name="primary_brand_color" value="{{ cs.get('primary_brand_color') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. #4F46E5">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
+                    <input type="text" name="secondary_color" value="{{ cs.get('secondary_color') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. #7C3AED">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
+                    <input type="file" name="favicon" accept="image/*,.ico" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if cs.get('favicon') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.favicon }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Login Page Background</label>
+                    <input type="file" name="login_page_background" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if cs.get('login_page_background') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.login_page_background }}</p>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pb-8">
+            <button type="submit" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
+                <i class="fas fa-save mr-2"></i>Save Company Settings
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

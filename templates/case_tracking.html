@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Case tracking — court attendances{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-2 sm:px-0">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 sm:p-6 mb-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 flex items-center flex-wrap gap-2">
+                    <i class="fas fa-route text-indigo-600"></i>
+                    Case tracking
+                </h1>
+                <p class="text-gray-600 text-sm sm:text-base">
+                    Showing only the <strong>latest updated case details</strong> (one latest attendance/proceeding per case) that you can access.
+                    <span class="text-green-700 font-semibold">{{ attendance_count }}</span> case{{ 's' if attendance_count != 1 else '' }}.
+                </p>
+            </div>
+            <a href="{{ url_for('case_management') }}"
+               class="inline-flex items-center justify-center px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl border border-gray-200 transition-colors shrink-0">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to case management
+            </a>
+        </div>
+    </div>
+
+    {% if not attendances %}
+    <div class="bg-white rounded-2xl shadow border border-gray-100 p-12 text-center">
+        <i class="fas fa-calendar-check text-gray-300 text-5xl mb-4"></i>
+        <p class="text-gray-700 font-semibold text-lg">No court attendances yet</p>
+        <p class="text-gray-500 text-sm mt-2">Proceedings added on each matter’s Court attendance page will appear here.</p>
+        <a href="{{ url_for('case_management') }}" class="inline-flex mt-6 px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700">
+            Go to cases
+        </a>
+    </div>
+    {% else %}
+    <!-- Desktop table -->
+    <div class="hidden md:block bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Tracking #</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Client</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Activity</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Court / Officer</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Directions</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Next date</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Attendance</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for a in attendances %}
+                    <tr class="hover:bg-slate-50/80">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ a.date_of_court_appeared or '—' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-indigo-700 font-semibold">{{ a.tracking_number or '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 max-w-[220px]">{{ a.client_full_name or a.client_name or '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 max-w-[140px] truncate" title="{{ a.court_activity_type or '' }}">{{ a.court_activity_type or '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 max-w-[180px]">
+                            <div class="truncate" title="{{ a.court_room or '' }}">{{ a.court_room or '—' }}</div>
+                            <div class="text-xs text-gray-500 truncate" title="{{ a.judicial_officer or '' }}">{{ a.judicial_officer or '' }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700 max-w-[200px]">
+                            <span class="block truncate" title="{{ a.outcome_orders or '' }}">{{ a.outcome_orders or '—' }}</span>
+                        </td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-green-700 font-medium">{{ a.next_court_date or '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700 max-w-[120px] truncate">{{ a.attendance or '—' }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm">
+                            <a href="{{ url_for('case_proceedings', case_id=a.case_id) }}#previous-court-attendances" class="text-indigo-600 hover:text-indigo-900 font-semibold">
+                                Open matter
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="md:hidden space-y-3">
+        {% for a in attendances %}
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div class="flex justify-between items-start gap-2 mb-2">
+                <span class="text-sm font-bold text-gray-900">{{ a.date_of_court_appeared or '—' }}</span>
+                <span class="text-xs font-semibold text-indigo-700">{{ a.tracking_number or '—' }}</span>
+            </div>
+            <p class="text-sm text-gray-800 font-medium mb-1">{{ a.client_full_name or a.client_name or '—' }}</p>
+            <p class="text-xs text-gray-600 mb-2">{{ a.court_activity_type or '—' }} · {{ a.court_room or '' }} {% if a.judicial_officer %}· {{ a.judicial_officer }}{% endif %}</p>
+            {% if a.outcome_orders %}
+            <p class="text-xs text-gray-700 mb-2 overflow-hidden" style="max-height: 4.5rem;">{{ a.outcome_orders }}</p>
+            {% endif %}
+            <div class="flex flex-wrap gap-2 text-xs text-gray-600">
+                {% if a.next_court_date %}<span>Next: <strong class="text-green-700">{{ a.next_court_date }}</strong></span>{% endif %}
+                {% if a.attendance %}<span>Attendance: {{ a.attendance }}</span>{% endif %}
+            </div>
+            <a href="{{ url_for('case_proceedings', case_id=a.case_id) }}#previous-court-attendances" class="inline-flex mt-3 text-sm font-semibold text-indigo-600">
+                Court attendance →
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

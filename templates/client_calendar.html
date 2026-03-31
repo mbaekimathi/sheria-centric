@@ -66,89 +66,271 @@
                 {{ all_upcoming_proceedings|length }}
             </span>
         </h2>
-        
+
         {% if all_upcoming_proceedings and all_upcoming_proceedings|length > 0 %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Room</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Attendance</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for proceeding in all_upcoming_proceedings %}
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-3 py-2 whitespace-nowrap">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <div class="bg-indigo-100 text-indigo-800 rounded-lg px-2 py-1 text-xs font-bold">
-                                        {{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else 'N/A' }}
-                                    </div>
-                                </div>
-                                <div class="ml-2">
-                                    <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
-                                    {% if proceeding.days_until is defined %}
-                                    {% if proceeding.days_until == 0 %}
-                                    <div class="text-xs text-red-600 font-medium">Today</div>
-                                    {% elif proceeding.days_until == 1 %}
-                                    <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
-                                    {% elif proceeding.days_until <= 7 %}
-                                    <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
-                                    {% else %}
-                                    <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
-                                    {% endif %}
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
-                            {% if proceeding.virtual_link %}
-                            <a href="{{ proceeding.virtual_link }}" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center mt-1">
-                                <i class="fas fa-link mr-1"></i>Virtual Link
-                            </a>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-indigo-600">
-                                {{ proceeding.tracking_number }}
-                            </div>
-                        </td>
-                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.court_room or '-' }}</td>
-                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
-                        <td class="px-3 py-2 text-sm text-gray-900">{{ proceeding.next_attendance or '-' }}</td>
-                        <td class="px-3 py-2 whitespace-nowrap">
-                            {% if proceeding.days_until is defined %}
-                            {% if proceeding.days_until == 0 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                <i class="fas fa-exclamation-circle mr-1"></i>Today
-                            </span>
-                            {% elif proceeding.days_until == 1 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                                <i class="fas fa-clock mr-1"></i>Tomorrow
-                            </span>
-                            {% elif proceeding.days_until <= 7 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                <i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d
-                            </span>
-                            {% else %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                <i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d
-                            </span>
-                            {% endif %}
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Calendar -->
+            <div class="lg:col-span-1 bg-gray-50 rounded-2xl border border-gray-100 p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <button
+                        type="button"
+                        id="clientCalPrev"
+                        class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 hover:bg-white text-gray-700 transition"
+                        aria-label="Previous month"
+                    >
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+
+                    <div class="text-center">
+                        <div id="clientCalMonthLabel" class="text-lg font-bold text-gray-900"></div>
+                        <div class="text-xs text-gray-500">Click a day to view activities</div>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="clientCalNext"
+                        class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:text-indigo-700 hover:bg-white text-gray-700 transition"
+                        aria-label="Next month"
+                    >
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-7 gap-2 mb-3 text-xs font-semibold text-gray-500">
+                    <div class="text-center">Mon</div>
+                    <div class="text-center">Tue</div>
+                    <div class="text-center">Wed</div>
+                    <div class="text-center">Thu</div>
+                    <div class="text-center">Fri</div>
+                    <div class="text-center">Sat</div>
+                    <div class="text-center">Sun</div>
+                </div>
+
+                <div id="clientCalGrid" class="grid grid-cols-7 gap-2"></div>
+
+                <div class="mt-4 flex items-center justify-between">
+                    <button
+                        type="button"
+                        id="clientCalToday"
+                        class="inline-flex items-center px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition"
+                    >
+                        <i class="fas fa-crosshairs mr-2"></i>Today
+                    </button>
+                    <div class="text-xs text-gray-500">
+                        <span class="inline-flex items-center">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-500 mr-2"></span>Has activity
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Day details -->
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+                <div class="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Selected day</div>
+                        <h3 id="clientSelectedDateTitle" class="text-2xl font-bold text-gray-900">-</h3>
+                        <p id="clientSelectedDateSubtitle" class="text-sm text-gray-600 mt-1">Court activities for the selected date.</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Activities</div>
+                        <div id="clientSelectedCount" class="text-2xl font-bold text-indigo-600">0</div>
+                    </div>
+                </div>
+
+                <div id="clientActivitiesList" class="space-y-3"></div>
+            </div>
         </div>
+
+        <script>
+            // Build events map keyed by YYYY-MM-DD for the calendar.
+            const clientProceedingsByDate = {};
+            const clientProceedings = [
+                {% for proceeding in all_upcoming_proceedings %}
+                {
+                    date: {{ proceeding.next_court_date | tojson }},
+                    court_activity_type: {{ proceeding.court_activity_type | tojson }},
+                    tracking_number: {{ proceeding.tracking_number | tojson }},
+                    court_room: {{ proceeding.court_room | tojson }},
+                    judicial_officer: {{ proceeding.judicial_officer | tojson }},
+                    next_attendance: {{ proceeding.next_attendance | tojson }},
+                    virtual_link: {{ proceeding.virtual_link | tojson }},
+                    days_until: {{ (proceeding.days_until if proceeding.days_until is defined else none) | tojson }}
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ];
+
+            clientProceedings.forEach(p => {
+                if (!p.date) return;
+                if (!clientProceedingsByDate[p.date]) clientProceedingsByDate[p.date] = [];
+                clientProceedingsByDate[p.date].push(p);
+            });
+
+            const clientCalGrid = document.getElementById('clientCalGrid');
+            const clientMonthLabel = document.getElementById('clientCalMonthLabel');
+            const clientSelectedDateTitle = document.getElementById('clientSelectedDateTitle');
+            const clientSelectedDateSubtitle = document.getElementById('clientSelectedDateSubtitle');
+            const clientSelectedCount = document.getElementById('clientSelectedCount');
+            const clientActivitiesList = document.getElementById('clientActivitiesList');
+
+            const pad = (n) => String(n).padStart(2, '0');
+            const formatYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            const getWeekdayMonStartIndex = (d) => (d.getDay() + 6) % 7; // Mon=0..Sun=6
+
+            let currentMonthDate = new Date();
+            currentMonthDate.setDate(1);
+
+            function setSelectedDate(isoDate) {
+                const activities = clientProceedingsByDate[isoDate] || [];
+                clientSelectedDateTitle.textContent = isoDate;
+                clientSelectedCount.textContent = activities.length;
+                clientSelectedDateSubtitle.textContent = activities.length
+                    ? 'Court activities for the selected date.'
+                    : 'No court activities on this date.';
+
+                clientActivitiesList.innerHTML = '';
+
+                if (!activities.length) {
+                    clientActivitiesList.innerHTML = `
+                        <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-4 text-center">
+                            <i class="fas fa-circle-info text-gray-400 mb-2" style="font-size: 2rem;"></i>
+                            <div class="font-semibold text-gray-700">No activities found</div>
+                            <div class="text-sm text-gray-500 mt-1">Pick another date from the calendar.</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                activities.forEach(a => {
+                    const daysUntil = (a.days_until === null || a.days_until === undefined || a.days_until === '') ? null : Number(a.days_until);
+                    let badgeHtml = '';
+                    if (daysUntil !== null && !Number.isNaN(daysUntil)) {
+                        if (daysUntil === 0) badgeHtml = `<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-exclamation-circle mr-1"></i>Today</span>`;
+                        else if (daysUntil === 1) badgeHtml = `<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-orange-100 text-orange-800"><i class="fas fa-clock mr-1"></i>Tomorrow</span>`;
+                        else if (daysUntil <= 7) badgeHtml = `<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-hourglass-half mr-1"></i>${daysUntil}d</span>`;
+                        else badgeHtml = `<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800"><i class="fas fa-calendar mr-1"></i>${daysUntil}d</span>`;
+                    }
+
+                    clientActivitiesList.insertAdjacentHTML('beforeend', `
+                        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow transition p-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <i class="fas fa-gavel text-indigo-600"></i>
+                                        <div class="font-bold text-gray-900 truncate">${a.court_activity_type || 'N/A'}</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-2 space-y-1">
+                                        <div><span class="font-semibold text-indigo-700">Case:</span> <span class="text-gray-900">${a.tracking_number || 'N/A'}</span></div>
+                                        <div><span class="font-semibold text-gray-700">Court Room:</span> <span class="text-gray-900">${a.court_room || '-'}</span></div>
+                                        <div><span class="font-semibold text-gray-700">Judicial Officer:</span> <span class="text-gray-900">${a.judicial_officer || '-'}</span></div>
+                                        <div><span class="font-semibold text-gray-700">Attendance:</span> <span class="text-gray-900">${a.next_attendance || '-'}</span></div>
+                                    </div>
+                                    ${a.virtual_link ? `
+                                        <a href="${a.virtual_link}" target="_blank" class="mt-3 inline-flex items-center px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 transition text-sm font-semibold">
+                                            <i class="fas fa-link mr-2"></i>Virtual Link
+                                        </a>
+                                    ` : ''}
+                                </div>
+                                <div class="shrink-0">
+                                    ${badgeHtml || ''}
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                });
+            }
+
+            function renderCalendar() {
+                const year = currentMonthDate.getFullYear();
+                const month = currentMonthDate.getMonth();
+
+                const firstDay = new Date(year, month, 1);
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const startOffset = getWeekdayMonStartIndex(firstDay); // Mon=0
+
+                const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                clientMonthLabel.textContent = `${monthNames[month]} ${year}`;
+
+                // 6 weeks grid (42 cells)
+                const cells = [];
+                let dayNumber = 1 - startOffset;
+                for (let i = 0; i < 42; i++, dayNumber++) {
+                    const inMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
+                    if (!inMonth) {
+                        cells.push(`<div class="h-11"></div>`);
+                        continue;
+                    }
+
+                    const cellDate = new Date(year, month, dayNumber);
+                    const iso = formatYMD(cellDate);
+                    const hasEvents = !!clientProceedingsByDate[iso]?.length;
+
+                    const isToday = iso === formatYMD(new Date());
+                    const isSelected = iso === clientSelectedDateTitle.textContent;
+
+                    cells.push(`
+                        <button
+                            type="button"
+                            class="h-11 rounded-xl border transition relative text-sm font-semibold
+                                ${hasEvents ? 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-900' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-800'}
+                                ${isSelected ? 'ring-2 ring-indigo-500 bg-indigo-100 border-indigo-300' : ''}
+                                ${!hasEvents && isToday ? 'bg-gray-50 border-gray-300' : ''}"
+                            data-iso-date="${iso}"
+                        >
+                            <span class="absolute top-2 left-2">${dayNumber}</span>
+                            ${hasEvents ? `<span class="absolute bottom-2 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-indigo-500"></span>` : ''}
+                            ${isToday ? `<span class="absolute top-1 right-2 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Today</span>` : ''}
+                        </button>
+                    `);
+                }
+
+                clientCalGrid.innerHTML = cells.join('');
+            }
+
+            function wireCalendarInteractions() {
+                clientCalGrid.addEventListener('click', (e) => {
+                    const btn = e.target.closest('button[data-iso-date]');
+                    if (!btn) return;
+                    const iso = btn.getAttribute('data-iso-date');
+                    if (!iso) return;
+                    setSelectedDate(iso);
+                    renderCalendar();
+                });
+            }
+
+            function pickInitialSelectedDate() {
+                const todayIso = formatYMD(new Date());
+                if (clientProceedingsByDate[todayIso]?.length) return todayIso;
+                const firstIso = Object.keys(clientProceedingsByDate).sort()[0];
+                return firstIso || todayIso;
+            }
+
+            clientMonthLabel.textContent = '';
+            wireCalendarInteractions();
+            const initialSelected = pickInitialSelectedDate();
+            setSelectedDate(initialSelected);
+
+            // Move calendar view to selected month
+            const [y, m] = initialSelected.split('-').map(Number);
+            currentMonthDate = new Date(y, m - 1, 1);
+            renderCalendar();
+
+            document.getElementById('clientCalPrev').addEventListener('click', () => {
+                currentMonthDate = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() - 1, 1);
+                renderCalendar();
+            });
+            document.getElementById('clientCalNext').addEventListener('click', () => {
+                currentMonthDate = new Date(currentMonthDate.getFullYear(), currentMonthDate.getMonth() + 1, 1);
+                renderCalendar();
+            });
+            document.getElementById('clientCalToday').addEventListener('click', () => {
+                const today = new Date();
+                const todayIso = formatYMD(today);
+                setSelectedDate(todayIso);
+                currentMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                renderCalendar();
+            });
+        </script>
         {% else %}
         <div class="text-center py-12">
             <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>

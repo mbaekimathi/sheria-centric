@@ -12,7 +12,7 @@
                 <i class="fas fa-calendar-days mr-3"></i>
                 Calendar
             </h1>
-            <p class="text-emerald-100 text-sm md:text-base">Court dates across all cases — month view and agenda</p>
+            <p class="text-emerald-100 text-sm md:text-base">Court dates (cases) and matters — month view and agenda</p>
         </div>
     </div>
 
@@ -61,52 +61,89 @@
 
             <!-- Agenda (list) view -->
             <div id="agenda-view" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6">
-                <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                    <i class="fas fa-calendar-check text-emerald-600 mr-2"></i>
-                    Upcoming court dates
-                    <span class="ml-2 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold" id="agenda-count">{{ all_upcoming_proceedings|length }}</span>
+                <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <i class="fas fa-calendar-check text-emerald-600"></i>
+                    Upcoming Events
+                    <span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-sm font-semibold" id="agenda-count">{{ all_upcoming_proceedings|length }}</span>
                 </h2>
                 {% if all_upcoming_proceedings and all_upcoming_proceedings|length > 0 %}
                 <div class="space-y-3 max-h-[520px] overflow-y-auto pr-1 custom-scrollbar">
-                    {% for proceeding in all_upcoming_proceedings %}
-                    <a href="/case_management/{{ proceeding.case_id }}" class="block rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-emerald-50 hover:border-emerald-200 p-4 transition-all duration-200 group">
+                    {% for item in all_upcoming_proceedings %}
+                    {% if item.source == 'matter' %}
+                    {# ── Matter entry ── #}
+                    <a href="/other_matters/{{ item.id }}" class="block rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 hover:border-purple-300 p-4 transition-all duration-200 group">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-purple-600 text-white flex flex-col items-center justify-center font-bold text-sm leading-tight">
+                                    <span>{{ item.date_opened.split('-')[2] if item.date_opened else '—' }}</span>
+                                    <span class="text-[10px] font-medium opacity-90">{{ item.date_opened.split('-')[1] if item.date_opened else '' }}</span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-1.5 mb-0.5">
+                                        <span class="px-1.5 py-0.5 bg-purple-200 text-purple-800 text-[10px] font-bold rounded uppercase tracking-wide">Matter</span>
+                                    </div>
+                                    <p class="font-semibold text-gray-900 group-hover:text-purple-800">{{ item.matter_title or 'Matter' }}</p>
+                                    <p class="text-sm text-gray-500">{{ item.matter_reference_number }} · {{ item.client_name or 'N/A' }}</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-1">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-semibold
+                                    {% if item.status == 'Pending Approval' %}bg-red-100 text-red-800
+                                    {% elif item.status == 'Open' %}bg-green-100 text-green-800
+                                    {% elif item.status == 'In Progress' %}bg-blue-100 text-blue-800
+                                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                    {{ item.status }}
+                                </span>
+                                {% if item.assigned_employee_name %}
+                                <span class="text-xs text-purple-600"><i class="fas fa-user mr-1"></i>{{ item.assigned_employee_name }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% else %}
+                    {# ── Case proceeding entry ── #}
+                    <a href="/case_management/{{ item.case_id }}" class="block rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-emerald-50 hover:border-emerald-200 p-4 transition-all duration-200 group">
                         <div class="flex flex-wrap items-start justify-between gap-2">
                             <div class="flex items-center gap-3">
                                 <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-600 text-white flex flex-col items-center justify-center font-bold text-sm leading-tight">
-                                    <span>{{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else '—' }}</span>
-                                    <span class="text-[10px] font-medium opacity-90">{{ proceeding.next_court_date and proceeding.next_court_date.split('-')[1] or '—' }}</span>
+                                    <span>{{ item.next_court_date.split('-')[2] if item.next_court_date else '—' }}</span>
+                                    <span class="text-[10px] font-medium opacity-90">{{ item.next_court_date.split('-')[1] if item.next_court_date else '' }}</span>
                                 </div>
                                 <div>
-                                    <p class="font-semibold text-gray-900 group-hover:text-emerald-800">{{ proceeding.court_activity_type or 'Court date' }}</p>
-                                    <p class="text-sm text-gray-500">{{ proceeding.tracking_number }} · {{ proceeding.client_name or 'N/A' }}</p>
+                                    <div class="flex items-center gap-1.5 mb-0.5">
+                                        <span class="px-1.5 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded uppercase tracking-wide">Case</span>
+                                    </div>
+                                    <p class="font-semibold text-gray-900 group-hover:text-emerald-800">{{ item.court_activity_type or 'Court date' }}</p>
+                                    <p class="text-sm text-gray-500">{{ item.tracking_number }} · {{ item.client_name or 'N/A' }}</p>
                                 </div>
                             </div>
-                            {% if proceeding.days_until is defined %}
-                            {% if proceeding.days_until == 0 %}
+                            {% if item.days_until is defined %}
+                            {% if item.days_until == 0 %}
                             <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-100 text-red-800">Today</span>
-                            {% elif proceeding.days_until == 1 %}
+                            {% elif item.days_until == 1 %}
                             <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-100 text-orange-800">Tomorrow</span>
-                            {% elif proceeding.days_until <= 7 %}
-                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800">{{ proceeding.days_until }}d</span>
+                            {% elif item.days_until <= 7 %}
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800">{{ item.days_until }}d</span>
                             {% else %}
-                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">{{ proceeding.days_until }}d</span>
+                            <span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">{{ item.days_until }}d</span>
                             {% endif %}
                             {% endif %}
                         </div>
-                        {% if proceeding.court_room or proceeding.judicial_officer %}
+                        {% if item.court_room or item.judicial_officer %}
                         <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
-                            {% if proceeding.court_room %}<span><i class="fas fa-door-open mr-1 text-gray-400"></i>{{ proceeding.court_room }}</span>{% endif %}
-                            {% if proceeding.judicial_officer %}<span><i class="fas fa-gavel mr-1 text-gray-400"></i>{{ proceeding.judicial_officer }}</span>{% endif %}
+                            {% if item.court_room %}<span><i class="fas fa-door-open mr-1 text-gray-400"></i>{{ item.court_room }}</span>{% endif %}
+                            {% if item.judicial_officer %}<span><i class="fas fa-gavel mr-1 text-gray-400"></i>{{ item.judicial_officer }}</span>{% endif %}
                         </div>
                         {% endif %}
                     </a>
+                    {% endif %}
                     {% endfor %}
                 </div>
                 {% else %}
                 <div class="text-center py-12">
                     <i class="fas fa-calendar-times text-gray-300 text-5xl mb-4"></i>
-                    <p class="text-gray-600 font-semibold mb-1">No upcoming court dates</p>
-                    <p class="text-gray-500 text-sm">Scheduled dates will appear here.</p>
+                    <p class="text-gray-600 font-semibold mb-1">No upcoming events</p>
+                    <p class="text-gray-500 text-sm">Court dates and matters will appear here.</p>
                 </div>
                 {% endif %}
             </div>
@@ -279,13 +316,14 @@
             const wrap = document.createElement('div');
             wrap.className = 'mt-1 flex items-center justify-between';
 
-            // Short label showing first activity
+            // Short label showing first event
             const label = document.createElement('span');
-            label.className = 'text-[11px] font-medium text-emerald-800 truncate max-w-[70%]';
             const first = events[0] || {};
-            const type = first.court_activity_type || 'Court date';
-            const tracking = first.tracking_number || '';
-            label.textContent = (tracking ? tracking + ' · ' : '') + type;
+            const isMatter = first.source === 'matter';
+            label.className = 'text-[11px] font-medium truncate max-w-[70%] ' + (isMatter ? 'text-purple-800' : 'text-emerald-800');
+            const ref = isMatter ? (first.matter_reference_number || '') : (first.tracking_number || '');
+            const title = isMatter ? (first.matter_title || 'Matter') : (first.court_activity_type || 'Court date');
+            label.textContent = (ref ? ref + ' · ' : '') + title;
             wrap.appendChild(label);
 
             // Count badge (visible number of events)
@@ -294,7 +332,15 @@
             countBadge.textContent = events.length;
             wrap.appendChild(countBadge);
 
-            cell.classList.add('border-emerald-400', 'bg-emerald-50/80');
+            const hasMatter = events.some(e => e.source === 'matter');
+            const hasCase = events.some(e => e.source === 'case');
+            if (hasMatter && hasCase) {
+                cell.classList.add('border-purple-400', 'bg-gradient-to-br', 'from-emerald-50', 'to-purple-50');
+            } else if (hasMatter) {
+                cell.classList.add('border-purple-400', 'bg-purple-50/80');
+            } else {
+                cell.classList.add('border-emerald-400', 'bg-emerald-50/80');
+            }
             cell.appendChild(wrap);
         }
 
@@ -331,12 +377,31 @@
             listEl.classList.remove('hidden');
             eventsList.forEach(ev => {
                 const a = document.createElement('a');
-                a.href = '/case_management/' + (ev.case_id || ev.case_table_id);
-                a.className = 'block rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-emerald-50 hover:border-emerald-200 p-3 transition-all duration-200';
-                let room = ev.court_room ? '<p class="text-xs text-gray-600 mt-1"><i class="fas fa-door-open mr-1 text-gray-400"></i>' + ev.court_room + '</p>' : '';
-                let link = ev.virtual_link ? '<p class="text-xs mt-1"><a href="' + ev.virtual_link + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-emerald-600 hover:underline"><i class="fas fa-video mr-1"></i>Virtual link</a></p>' : '';
-                a.innerHTML = '<p class="font-semibold text-gray-900 text-sm">' + (ev.court_activity_type || 'Court date') + '</p>' +
-                    '<p class="text-xs text-gray-500 mt-0.5">' + (ev.tracking_number || '') + (ev.client_name ? ' · ' + ev.client_name : '') + '</p>' + room + link;
+                const isMatter = ev.source === 'matter';
+                a.href = isMatter
+                    ? '/other_matters/' + ev.id
+                    : '/case_management/' + (ev.case_id || ev.case_table_id);
+                a.className = isMatter
+                    ? 'block rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 p-3 transition-all duration-200'
+                    : 'block rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-emerald-50 hover:border-emerald-200 p-3 transition-all duration-200';
+
+                if (isMatter) {
+                    const statusColors = { 'Pending Approval': 'bg-red-100 text-red-700', 'Open': 'bg-green-100 text-green-700', 'In Progress': 'bg-blue-100 text-blue-700' };
+                    const sc = statusColors[ev.status] || 'bg-gray-100 text-gray-600';
+                    a.innerHTML =
+                        '<div class="flex items-center gap-1.5 mb-1"><span class="px-1.5 py-0.5 bg-purple-200 text-purple-800 text-[10px] font-bold rounded uppercase">Matter</span>' +
+                        '<span class="px-1.5 py-0.5 ' + sc + ' text-[10px] font-semibold rounded">' + (ev.status || '') + '</span></div>' +
+                        '<p class="font-semibold text-gray-900 text-sm">' + (ev.matter_title || 'Matter') + '</p>' +
+                        '<p class="text-xs text-gray-500 mt-0.5">' + (ev.matter_reference_number || '') + (ev.client_name ? ' · ' + ev.client_name : '') + '</p>' +
+                        (ev.assigned_employee_name ? '<p class="text-xs text-purple-600 mt-0.5"><i class="fas fa-user mr-1"></i>' + ev.assigned_employee_name + '</p>' : '');
+                } else {
+                    let room = ev.court_room ? '<p class="text-xs text-gray-600 mt-1"><i class="fas fa-door-open mr-1 text-gray-400"></i>' + ev.court_room + '</p>' : '';
+                    let link = ev.virtual_link ? '<p class="text-xs mt-1"><a href="' + ev.virtual_link + '" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="text-emerald-600 hover:underline"><i class="fas fa-video mr-1"></i>Virtual link</a></p>' : '';
+                    a.innerHTML =
+                        '<div class="flex items-center gap-1.5 mb-1"><span class="px-1.5 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded uppercase">Case</span></div>' +
+                        '<p class="font-semibold text-gray-900 text-sm">' + (ev.court_activity_type || 'Court date') + '</p>' +
+                        '<p class="text-xs text-gray-500 mt-0.5">' + (ev.tracking_number || '') + (ev.client_name ? ' · ' + ev.client_name : '') + '</p>' + room + link;
+                }
                 listEl.appendChild(a);
             });
         }

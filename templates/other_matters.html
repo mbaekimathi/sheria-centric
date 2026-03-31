@@ -11,7 +11,13 @@
                 <i class="fas fa-folder-open text-blue-600 mr-3"></i>
                 Other Matters
             </h1>
-            <p class="text-gray-600">Matters allocated to you. Accept pending matters to view and manage them.</p>
+            <p class="text-gray-600">
+                {% if user_role == 'Managing Partner' %}
+                Your active allocated matters (Pending Approval, Closed and Completed are hidden).
+                {% else %}
+                Matters allocated to you. Pending matters are approved with allocation details before work starts.
+                {% endif %}
+            </p>
         </div>
         {% if user_role in ['Firm Administrator', 'Managing Partner', 'Associate Advocate', 'Clerk'] %}
         <a href="{{ url_for('register_matter') }}" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center">
@@ -115,6 +121,79 @@
 
 <!-- Error Message -->
 <div id="errorMessage" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+<!-- Approve Matter Modal -->
+<div id="approveMatterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-xl w-full">
+        <div class="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-6 rounded-t-2xl flex items-center justify-between">
+            <h2 class="text-xl font-bold flex items-center">
+                <i class="fas fa-check-circle mr-3"></i>
+                Approve Matter
+            </h2>
+            <button onclick="closeApproveModal()" class="text-white hover:text-gray-200 transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div id="approveModalPermissionNote" class="hidden rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm px-4 py-3">
+                <i class="fas fa-info-circle mr-2"></i>Only Firm Administrators, Managing Partners, or IT Support can submit this approval.
+            </div>
+            <div>
+                <label for="approveEmployeeSearch" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Allocate To (Firm Administrator / Managing Partner) <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                    <input
+                        type="text"
+                        id="approveEmployeeSearch"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Search by name or employee code..."
+                        autocomplete="off"
+                    />
+                    <div id="approveEmployeeDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                </div>
+                <input type="hidden" id="approveEmployeeId" />
+                <p id="approveEmployeeSelected" class="hidden text-xs text-green-700 mt-2"></p>
+            </div>
+
+            <div>
+                <label for="approveBriefDescription" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Brief Description <span class="text-red-500">*</span>
+                </label>
+                <textarea
+                    id="approveBriefDescription"
+                    rows="3"
+                    maxlength="1000"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Enter a short approval/allocation description..."
+                ></textarea>
+            </div>
+
+            <div>
+                <label for="approveTimeline" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-calendar-alt text-green-600 mr-1"></i>
+                    Timeline (target date) <span class="text-red-500">*</span>
+                </label>
+                <p class="text-xs text-gray-500 mb-2">Select a target or review date from the calendar.</p>
+                <input
+                    type="date"
+                    id="approveTimeline"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white"
+                    autocomplete="off"
+                />
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button onclick="closeApproveModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    Cancel
+                </button>
+                <button id="confirmApproveBtn" onclick="confirmApproveMatter()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <i class="fas fa-check mr-1"></i>Approve
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -122,6 +201,9 @@
 let searchTimeout;
 let currentSearchQuery = '';
 let currentView = 'client'; // 'client' or 'category'
+let approveSearchTimeout;
+let currentApproveMatterId = null;
+const canApprovePending = {{ 'true' if can_approve_matters else 'false' }};
 
 // Load data on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -497,8 +579,8 @@ function loadClientMatters(clientId) {
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
                                                     ${isPendingApproval ? `
-                                                    <button onclick="event.stopPropagation(); acceptMatter(${matter.id}, this)" class="text-green-600 hover:text-green-800 font-semibold text-sm" title="Accept matter">
-                                                        <i class="fas fa-check-circle mr-1"></i>Accept
+                                                    <button type="button" onclick="event.stopPropagation(); openApproveModal(${matter.id})" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm" title="Approve and allocate matter">
+                                                        <i class="fas fa-check-circle mr-1"></i>Approve
                                                     </button>
                                                     ` : `
                                                     <a href="/other_matters/${matter.id}" class="text-blue-600 hover:text-blue-800" title="View matter"><i class="fas fa-eye"></i> View</a>
@@ -709,7 +791,7 @@ function loadCategoryMatters(categoryName, categoryId) {
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
                                                     ${isPendingApproval ? `
-                                                    <button onclick="event.stopPropagation(); acceptMatter(${matter.id}, this)" class="text-green-600 hover:text-green-800 font-semibold text-sm" title="Accept matter"><i class="fas fa-check-circle mr-1"></i>Accept</button>
+                                                    <button type="button" onclick="event.stopPropagation(); openApproveModal(${matter.id})" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm" title="Approve and allocate matter"><i class="fas fa-check-circle mr-1"></i>Approve</button>
                                                     ` : `
                                                     <a href="/other_matters/${matter.id}" class="text-blue-600 hover:text-blue-800" title="View matter"><i class="fas fa-eye"></i> View</a>
                                                     `}
@@ -745,26 +827,164 @@ function loadCategoryMatters(categoryName, categoryId) {
         });
 }
 
-function acceptMatter(matterId, btnEl) {
-    if (!btnEl) btnEl = document.getElementById('acceptMatterBtn');
-    var origHtml = btnEl ? btnEl.innerHTML : '';
-    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Accepting...'; }
-    fetch('/api/matters/' + matterId + '/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                if (btnEl) { btnEl.innerHTML = '<i class="fas fa-check mr-1"></i>Accepted'; btnEl.classList.add('text-gray-500'); }
-                showSuccess(data.message || 'Matter accepted. You can now view it.');
-                setTimeout(function() { refreshView(); }, 800);
-            } else {
-                showError(data.error || 'Failed to accept matter');
-                if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = origHtml; }
+function openApproveModal(matterId) {
+    currentApproveMatterId = matterId;
+    document.getElementById('approveEmployeeSearch').value = '';
+    document.getElementById('approveEmployeeId').value = '';
+    document.getElementById('approveEmployeeDropdown').innerHTML = '';
+    document.getElementById('approveEmployeeDropdown').classList.add('hidden');
+    document.getElementById('approveEmployeeSelected').textContent = '';
+    document.getElementById('approveEmployeeSelected').classList.add('hidden');
+    document.getElementById('approveBriefDescription').value = '';
+    const timeEl = document.getElementById('approveTimeline');
+    timeEl.value = '';
+    timeEl.min = new Date().toISOString().slice(0, 10);
+
+    const note = document.getElementById('approveModalPermissionNote');
+    const confirmBtn = document.getElementById('confirmApproveBtn');
+    const searchEl = document.getElementById('approveEmployeeSearch');
+    const descEl = document.getElementById('approveBriefDescription');
+    if (canApprovePending) {
+        note.classList.add('hidden');
+        confirmBtn.disabled = false;
+        confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        searchEl.readOnly = false;
+        descEl.readOnly = false;
+        timeEl.readOnly = false;
+        searchEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        descEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        timeEl.classList.remove('bg-gray-100', 'cursor-not-allowed');
+    } else {
+        note.classList.remove('hidden');
+        confirmBtn.disabled = true;
+        confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        searchEl.readOnly = true;
+        descEl.readOnly = true;
+        timeEl.readOnly = true;
+        searchEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+        descEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+        timeEl.classList.add('bg-gray-100', 'cursor-not-allowed');
+    }
+
+    document.getElementById('approveMatterModal').classList.remove('hidden');
+}
+
+function closeApproveModal() {
+    document.getElementById('approveMatterModal').classList.add('hidden');
+    currentApproveMatterId = null;
+}
+
+function searchApproveEmployees(query) {
+    const dropdown = document.getElementById('approveEmployeeDropdown');
+    if (query.length < 1) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+
+    fetch(`/api/matters/approvers/search?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                dropdown.innerHTML = `<div class="p-3 text-red-600">${data.error}</div>`;
+                dropdown.classList.remove('hidden');
+                return;
             }
+            const employees = data.employees || [];
+            if (employees.length === 0) {
+                dropdown.innerHTML = '<div class="p-3 text-gray-500">No eligible employees found</div>';
+                dropdown.classList.remove('hidden');
+                return;
+            }
+            dropdown.innerHTML = employees.map(emp => `
+                <div class="p-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 approve-employee-option"
+                     data-employee-id="${emp.id}"
+                     data-employee-name="${emp.full_name || ''}"
+                     data-employee-role="${emp.role || ''}"
+                     data-employee-code="${emp.employee_code || ''}">
+                    <div class="font-semibold text-gray-900">${emp.full_name || 'N/A'}</div>
+                    <div class="text-xs text-gray-600">${emp.role || ''}${emp.employee_code ? ' • ' + emp.employee_code : ''}</div>
+                </div>
+            `).join('');
+            dropdown.classList.remove('hidden');
+
+            document.querySelectorAll('.approve-employee-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const employeeId = this.dataset.employeeId;
+                    const employeeName = this.dataset.employeeName;
+                    const employeeRole = this.dataset.employeeRole;
+                    const employeeCode = this.dataset.employeeCode;
+                    document.getElementById('approveEmployeeId').value = employeeId;
+                    document.getElementById('approveEmployeeSearch').value = `${employeeName}${employeeCode ? ' (' + employeeCode + ')' : ''}`;
+                    const selected = document.getElementById('approveEmployeeSelected');
+                    selected.textContent = `Selected: ${employeeName} (${employeeRole})`;
+                    selected.classList.remove('hidden');
+                    dropdown.classList.add('hidden');
+                });
+            });
         })
-        .catch(function() {
-            showError('Request failed');
-            if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = origHtml; }
+        .catch(() => {
+            dropdown.innerHTML = '<div class="p-3 text-red-600">Error searching employees</div>';
+            dropdown.classList.remove('hidden');
         });
+}
+
+function confirmApproveMatter() {
+    if (!currentApproveMatterId) {
+        showError('Matter ID is missing');
+        return;
+    }
+    if (!canApprovePending) {
+        showError('Only Firm Administrators, Managing Partners, or IT Support can approve matters');
+        return;
+    }
+
+    const employeeId = document.getElementById('approveEmployeeId').value;
+    const description = document.getElementById('approveBriefDescription').value.trim();
+    const timeline = document.getElementById('approveTimeline').value.trim();
+    if (!employeeId) {
+        showError('Please select who to allocate this matter to');
+        return;
+    }
+    if (!description) {
+        showError('Please enter a brief description');
+        return;
+    }
+    if (!timeline) {
+        showError('Please select a timeline date from the calendar');
+        return;
+    }
+
+    const btn = document.getElementById('confirmApproveBtn');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Approving...';
+
+    fetch(`/api/approve_matter/${currentApproveMatterId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            allocated_employee_id: parseInt(employeeId, 10),
+            allocation_description: description,
+            allocation_timeline: timeline
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeApproveModal();
+            showSuccess(data.message || 'Matter approved successfully');
+            setTimeout(() => refreshView(), 700);
+        } else {
+            showError(data.error || 'Failed to approve matter');
+        }
+    })
+    .catch(() => {
+        showError('Request failed');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    });
 }
 
 function showSuccess(message) {
@@ -790,6 +1010,26 @@ function showError(message) {
         errorDiv.classList.add('hidden');
     }, 5000);
 }
+
+document.getElementById('approveEmployeeSearch').addEventListener('input', function() {
+    clearTimeout(approveSearchTimeout);
+    const query = this.value.trim();
+    approveSearchTimeout = setTimeout(() => searchApproveEmployees(query), 250);
+});
+
+document.getElementById('approveMatterModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeApproveModal();
+    }
+});
+
+document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('approveEmployeeDropdown');
+    const searchInput = document.getElementById('approveEmployeeSearch');
+    if (dropdown && searchInput && !dropdown.contains(event.target) && event.target !== searchInput) {
+        dropdown.classList.add('hidden');
+    }
+});
 
 </script>
 {% endblock %}

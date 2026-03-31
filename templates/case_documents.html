@@ -71,7 +71,7 @@
     <div class="doc-header-card p-5 sm:p-6 mb-6 text-white">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center gap-4">
-                <a href="{{ url_for('case_details', case_id=case_id) }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to case">
+                <a href="{{ url_for('case_details', case_id=case_id, task_id=access_task_id) if access_task_id else url_for('case_details', case_id=case_id) }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to case">
                     <i class="fas fa-arrow-left"></i>
                 </a>
                 <div>
@@ -154,8 +154,9 @@
                 <p class="text-xs text-gray-500 mt-1.5">PDF, DOC, DOCX, JPG, JPEG, PNG — max 16MB</p>
             </div>
             <div>
-                <label for="document_description" class="doc-label">Description (optional)</label>
-                <textarea id="document_description" name="document_description" rows="3" class="doc-input" placeholder="Brief description of this document..."></textarea>
+                <label for="document_description" class="doc-label">Description <span class="text-red-500">*</span></label>
+                <input type="text" id="document_description" name="document_description" class="doc-input" placeholder="Max 5 words (e.g. client affidavit scan)" required maxlength="500" autocomplete="off" />
+                <p class="text-xs text-gray-500 mt-1.5" id="description-word-hint">Maximum <span class="font-semibold">5 words</span>. <span id="description-word-count" class="text-indigo-600">0 / 5 words</span></p>
             </div>
             <div class="flex flex-wrap justify-end gap-3 pt-4 border-t border-gray-200">
                 <button type="button" onclick="window.history.back()" class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors">
@@ -188,6 +189,7 @@
                         <tr>
                             <th>Document</th>
                             <th>Size</th>
+                            <th>Description</th>
                             <th>Uploaded</th>
                             <th>Modified</th>
                             <th>Actions</th>
@@ -212,8 +214,21 @@
                                 </div>
                             </td>
                             <td class="text-gray-600">{{ doc.size }}</td>
-                            <td class="text-gray-600">{{ doc.created_time or '—' }}</td>
-                            <td class="text-gray-600">{{ doc.modified_time or '—' }}</td>
+                            <td class="text-gray-600 max-w-[260px]">
+                                <span class="block truncate" title="{{ doc.description or '—' }}">{{ doc.description or '—' }}</span>
+                            </td>
+                            <td class="text-gray-600">
+                                <div class="leading-tight">
+                                    <div>{{ doc.created_time or '—' }}</div>
+                                    <div class="text-xs text-slate-500 mt-1">By: {{ doc.uploaded_by or 'Unknown' }}</div>
+                                </div>
+                            </td>
+                            <td class="text-gray-600">
+                                <div class="leading-tight">
+                                    <div>{{ doc.modified_time or '—' }}</div>
+                                    <div class="text-xs text-slate-500 mt-1">By: {{ doc.modified_by or 'Unknown' }}</div>
+                                </div>
+                            </td>
                             <td>
                                 <div class="flex flex-wrap items-center gap-2">
                                     {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
@@ -225,7 +240,7 @@
                                     {% elif doc.url %}
                                     <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800 font-semibold text-sm" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                                     {% endif %}
-                                    <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
+                                    <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
                                     <button type="button" class="case-doc-delete inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                                 </div>
                             </td>
@@ -252,7 +267,10 @@
                             {% endif %}
                             <div class="min-w-0">
                                 <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5">{{ doc.size }} · {{ doc.modified_time or doc.created_time or '—' }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Size: {{ doc.size }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5 truncate" title="{{ doc.description or '—' }}">Description: {{ doc.description or '—' }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Uploaded: {{ doc.created_time or '—' }} · By: {{ doc.uploaded_by or 'Unknown' }}</p>
+                                <p class="text-xs text-gray-500 mt-0.5">Modified: {{ doc.modified_time or '—' }} · By: {{ doc.modified_by or 'Unknown' }}</p>
                             </div>
                         </div>
                         <div class="flex flex-shrink-0 flex-wrap items-center gap-2">
@@ -265,7 +283,7 @@
                             {% elif doc.url %}
                             <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                             {% endif %}
-                            <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
+                            <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
                             <button type="button" class="case-doc-delete inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                         </div>
                     </div>
@@ -302,7 +320,22 @@
 
 <script>
 const caseId = {{ case_id }};
+const accessTaskId = {{ access_task_id|tojson if access_task_id else 'null' }};
 const googleDriveConnected = {{ 'true' if google_drive_connected else 'false' }};
+
+(function updateDescriptionWordCount() {
+    const el = document.getElementById('document_description');
+    const countEl = document.getElementById('description-word-count');
+    if (!el || !countEl) return;
+    function sync() {
+        const text = (el.value || '').trim();
+        const n = text ? text.split(/\s+/).filter(Boolean).length : 0;
+        countEl.textContent = n + ' / 5 words';
+        countEl.className = n > 5 ? 'text-red-600 font-semibold' : 'text-indigo-600';
+    }
+    el.addEventListener('input', sync);
+    sync();
+})();
 
 function refreshDocuments() {
     window.location.reload();
@@ -317,7 +350,19 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     }
     
     const fileInput = document.getElementById('document_file');
-    const description = document.getElementById('document_description').value;
+    const descriptionEl = document.getElementById('document_description');
+    const description = (descriptionEl && descriptionEl.value) ? descriptionEl.value.trim() : '';
+    const wordCount = description ? description.split(/\s+/).filter(Boolean).length : 0;
+    if (!description) {
+        alert('Description is required.');
+        if (descriptionEl) descriptionEl.focus();
+        return;
+    }
+    if (wordCount > 5) {
+        alert('Description must be 5 words or fewer.');
+        if (descriptionEl) descriptionEl.focus();
+        return;
+    }
     
     if (!fileInput.files || fileInput.files.length === 0) {
         alert('Please select a file to upload.');
@@ -353,7 +398,14 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     formData.append('case_id', caseId);
     
     try {
-        const response = await fetch(`/api/case/${caseId}/upload-document`, {
+        let uploadUrl = `/api/case/${caseId}/upload-document`;
+        if (accessTaskId) {
+            uploadUrl += `?task_id=${encodeURIComponent(accessTaskId)}`;
+        }
+        if (accessTaskId) {
+            formData.append('task_id', accessTaskId);
+        }
+        const response = await fetch(uploadUrl, {
             method: 'POST',
             body: formData
         });
@@ -422,7 +474,11 @@ document.querySelectorAll('.case-doc-delete').forEach(function(btn) {
         if (!fileId || !confirm('Delete "' + docName + '" from Google Drive? This cannot be undone.')) return;
         this.disabled = true;
         try {
-            var res = await fetch('/api/case/' + caseId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
+            var deleteUrl = '/api/case/' + caseId + '/document/' + encodeURIComponent(fileId) + '/delete';
+            if (accessTaskId) {
+                deleteUrl += '?task_id=' + encodeURIComponent(accessTaskId);
+            }
+            var res = await fetch(deleteUrl, { method: 'POST' });
             var data = await res.json();
             if (data.success) {
                 window.location.reload();

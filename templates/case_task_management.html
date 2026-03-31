@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Case Task Management - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-green-600 to-green-700 px-8 py-8 text-white">
+            <h1 class="text-2xl font-bold">Case Task Management</h1>
+            <p class="text-green-100 mt-2">Link tasks to a case, set due timeline, and reminder intervals.</p>
+        </div>
+
+        <div class="px-8 py-8">
+            {% if editing_task %}
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                <p class="text-sm font-semibold"><i class="fas fa-edit mr-2"></i>Editing case task #{{ editing_task.id }}</p>
+                <a href="{{ url_for('case_task_management', case_id=selected_case_id or editing_task.linked_id) }}" class="text-sm font-medium text-amber-800 underline hover:text-amber-950">Cancel and clear form</a>
+            </div>
+            {% endif %}
+            <form method="POST" action="{{ url_for('case_task_management') }}" class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                {% if editing_task %}
+                <input type="hidden" name="edit_task_id" value="{{ editing_task.id }}">
+                {% endif %}
+                <div class="md:col-span-2">
+                    <label for="linked_case_id" class="block text-sm font-semibold text-gray-700 mb-2">Select case <span class="text-red-500">*</span></label>
+                    <div class="flex items-center gap-2">
+                        <select id="linked_case_id" name="linked_case_id" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                            <option value="">Choose a case...</option>
+                            {% for case_item in cases %}
+                            <option value="{{ case_item.id }}" data-view-url="{{ url_for('case_details', case_id=case_item.id) }}" data-allocated-to="{{ case_item.filled_by_name or 'Not allocated' }}" data-allocated-by="{{ case_item.created_by_name or 'Not available' }}" {% if selected_case_id and (selected_case_id|string) == (case_item.id|string) %}selected{% elif editing_task and (editing_task.linked_id|string) == (case_item.id|string) %}selected{% endif %}>{{ case_item.tracking_number }} - {{ case_item.client_name }} ({{ case_item.status }})</option>
+                            {% endfor %}
+                        </select>
+                        <a id="view-selected-case" href="#" class="inline-flex items-center justify-center w-12 h-12 rounded-lg border border-gray-300 text-gray-500 hover:text-green-700 hover:border-green-500 hover:bg-green-50 transition-colors pointer-events-none opacity-50" title="View selected case">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
+                        <p>Allocated by: <span id="selected-case-allocated-by" class="font-semibold text-gray-700">-</span></p>
+                        <p>Allocated to: <span id="selected-case-allocated-to" class="font-semibold text-gray-700">-</span></p>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="assigned_employee_id" class="block text-sm font-semibold text-gray-700 mb-2">Allocate task to employee <span class="text-red-500">*</span></label>
+                    <select id="assigned_employee_id" name="assigned_employee_id" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                        <option value="">Choose an employee...</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.id }}" {% if editing_task and editing_task.assigned_to_id and (editing_task.assigned_to_id|string) == (emp.id|string) %}selected{% endif %}>{{ emp.full_name }}{% if emp.role %} ({{ emp.role }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-xs text-gray-500 mt-2">You can assign or change the employee for this case task here.</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="task_title" class="block text-sm font-semibold text-gray-700 mb-2">Task title <span class="text-red-500">*</span></label>
+                    <input type="text" id="task_title" name="task_title" required maxlength="255" value="{{ editing_task.task_title if editing_task else '' }}" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none" placeholder="e.g. Draft response to application">
+                </div>
+
+                <div class="md:col-span-2">
+                    <label for="task_description" class="block text-sm font-semibold text-gray-700 mb-2">Task description</label>
+                    <textarea id="task_description" name="task_description" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none" placeholder="Write task details, dependencies, and expected output">{{ editing_task.task_description if editing_task else '' }}</textarea>
+                </div>
+
+                {% if editing_task %}
+                <div class="md:col-span-2">
+                    <label for="task_status" class="block text-sm font-semibold text-gray-700 mb-2">Task status <span class="text-red-500">*</span></label>
+                    <select id="task_status" name="task_status" required class="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                        {% for st in task_status_options %}
+                        <option value="{{ st }}" {% if editing_task.task_status == st %}selected{% endif %}>{{ st }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div>
+                    <label for="due_at" class="block text-sm font-semibold text-gray-700 mb-2">Timeline / due date <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" id="due_at" name="due_at" required value="{{ editing_task.due_at_input if editing_task else '' }}" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Reminder intervals <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-2 gap-2">
+                        {% for value, label in reminder_options %}
+                        <label class="inline-flex items-center px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="reminder_intervals" value="{{ value }}" class="mr-2" {% if editing_task and value in editing_task.reminder_set %}checked{% endif %}>
+                            <span>{{ label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Task access permissions</label>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                        <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                            <span class="text-sm text-gray-700">View case details</span>
+                            <input type="checkbox" name="allow_view_case_details" value="1" class="h-4 w-4 text-green-600 border-gray-300 rounded" {% if not editing_task or editing_task.allow_view_case_details %}checked{% endif %}>
+                        </label>
+                        <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                            <span class="text-sm text-gray-700">Edit case details</span>
+                            <input type="checkbox" name="allow_edit_case_details" value="1" class="h-4 w-4 text-green-600 border-gray-300 rounded" {% if not editing_task or editing_task.allow_edit_case_details %}checked{% endif %}>
+                        </label>
+                        <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                            <span class="text-sm text-gray-700">View documents</span>
+                            <input type="checkbox" name="allow_view_case_documents" value="1" class="h-4 w-4 text-green-600 border-gray-300 rounded" {% if not editing_task or editing_task.allow_view_case_documents %}checked{% endif %}>
+                        </label>
+                        <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                            <span class="text-sm text-gray-700">Upload documents</span>
+                            <input type="checkbox" name="allow_upload_case_documents" value="1" class="h-4 w-4 text-green-600 border-gray-300 rounded" {% if not editing_task or editing_task.allow_upload_case_documents %}checked{% endif %}>
+                        </label>
+                        <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                            <span class="text-sm text-gray-700">Download case documents</span>
+                            <input type="checkbox" name="allow_download_case_documents" value="1" class="h-4 w-4 text-green-600 border-gray-300 rounded" {% if not editing_task or editing_task.allow_download_case_documents %}checked{% endif %}>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">These permissions apply to the employee you allocate this task to, and only while the task is active.</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <button type="submit" class="inline-flex items-center px-5 py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors">
+                        <i class="fas fa-save mr-2"></i>
+                        Save Case Task
+                    </button>
+                </div>
+            </form>
+
+            <div class="mb-8">
+                <h2 class="text-lg font-bold text-gray-900 mb-3">Recent case tasks</h2>
+                <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Case</th>
+                                <th class="px-4 py-3 text-left">Title</th>
+                                <th class="px-4 py-3 text-left">Due</th>
+                                <th class="px-4 py-3 text-left">Reminders</th>
+                                <th class="px-4 py-3 text-left">Allocated By</th>
+                                <th class="px-4 py-3 text-left">Allocated To</th>
+                                <th class="px-4 py-3 text-left">Permissions</th>
+                                <th class="px-4 py-3 text-left">Status</th>
+                                <th class="px-4 py-3 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in case_tasks %}
+                            <tr class="border-t border-gray-100">
+                                <td class="px-4 py-3">{{ task.tracking_number }} - {{ task.client_name }}</td>
+                                <td class="px-4 py-3">
+                                    <div class="font-medium text-gray-900">{{ task.task_title }}</div>
+                                    <div class="text-xs text-gray-500">{{ task.task_description or 'No description' }}</div>
+                                </td>
+                                <td class="px-4 py-3">{{ task.due_at }}</td>
+                                <td class="px-4 py-3">{{ task.reminder_intervals or '-' }}</td>
+                                <td class="px-4 py-3">{{ task.created_by_name or '-' }}</td>
+                                <td class="px-4 py-3">{{ task.assigned_to_name or '-' }}</td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-700' if task.allow_view_case_details else 'bg-gray-100 text-gray-500' }}">View</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-700' if task.allow_edit_case_details else 'bg-gray-100 text-gray-500' }}">Edit</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-700' if task.allow_view_case_documents else 'bg-gray-100 text-gray-500' }}">View Docs</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-700' if task.allow_upload_case_documents else 'bg-gray-100 text-gray-500' }}">Upload</span>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-700' if task.allow_download_case_documents else 'bg-gray-100 text-gray-500' }}">Download</span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">{{ task.task_status }}</td>
+                                <td class="px-4 py-3">
+                                    <a href="{{ url_for('case_task_management', edit_task=task.id, case_id=task.case_id) }}" class="inline-flex items-center px-3 py-1.5 rounded-lg border border-green-600 text-green-700 text-xs font-semibold hover:bg-green-50 transition-colors">
+                                        <i class="fas fa-pen mr-1.5"></i>Edit
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="px-4 py-8 text-center text-gray-500">No case tasks created yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ url_for('case_management') }}" class="inline-flex items-center px-4 py-2.5 rounded-lg bg-gray-900 text-white hover:bg-black transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to Case Management
+                </a>
+                <a href="{{ url_for('case_tracking') }}" class="inline-flex items-center px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-route mr-2"></i>
+                    Open Case Tracking
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const select = document.getElementById('linked_case_id');
+        const viewLink = document.getElementById('view-selected-case');
+        const allocatedTo = document.getElementById('selected-case-allocated-to');
+        const allocatedBy = document.getElementById('selected-case-allocated-by');
+        if (!select || !viewLink || !allocatedTo || !allocatedBy) return;
+
+        const syncViewLink = () => {
+            const selected = select.options[select.selectedIndex];
+            const url = selected ? selected.getAttribute('data-view-url') : '';
+            const owner = selected ? selected.getAttribute('data-allocated-to') : '';
+            const allocator = selected ? selected.getAttribute('data-allocated-by') : '';
+            if (url) {
+                viewLink.href = url;
+                viewLink.classList.remove('pointer-events-none', 'opacity-50');
+            } else {
+                viewLink.href = '#';
+                viewLink.classList.add('pointer-events-none', 'opacity-50');
+            }
+            allocatedTo.textContent = owner || '-';
+            allocatedBy.textContent = allocator || '-';
+        };
+
+        select.addEventListener('change', syncViewLink);
+        syncViewLink();
+    })();
+</script>
+{% endblock %}

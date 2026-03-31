@@ -10,107 +10,77 @@
             <i class="fas fa-bell mr-3"></i>
             Reminders
         </h1>
-        <p class="text-orange-100">View all case items and reminders</p>
+        <p class="text-orange-100">Case reminders and all active matters in one place</p>
     </div>
 
-    <!-- Reminders Content -->
+    <!-- ── Case Reminders Section ─────────────────────────────────────── -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
-        <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <i class="fas fa-bell text-orange-600 mr-3"></i>
-            All Reminders
-            <span class="ml-3 px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold">
-                {{ all_reminders|length }}
-            </span>
+        <h2 class="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+            <i class="fas fa-gavel text-orange-600"></i>
+            Case Reminders
+            <span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold">{{ all_reminders|length }}</span>
         </h2>
-        
+
         {% if proceedings_with_materials and proceedings_with_materials|length > 0 %}
-        <div class="overflow-x-auto mb-6">
+        <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Date</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Activity</th>
                         <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bring up date</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Instructions / Bring Up</th>
                         <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for proceeding in proceedings_with_materials %}
-                    <tr class="hover:bg-gray-50 transition-colors border-l-4 border-orange-500 cursor-pointer" onclick="window.location.href='/case_management/{{ proceeding.case_id }}'">
-                        <td class="px-3 py-2 whitespace-nowrap">
+                    <tr class="hover:bg-orange-50 transition-colors border-l-4 border-orange-500 cursor-pointer" onclick="window.location.href='/case_management/{{ proceeding.case_id }}'">
+                        <td class="px-3 py-3 whitespace-nowrap">
                             <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
                             {% if proceeding.days_until is defined %}
-                            {% if proceeding.days_until == 0 %}
-                            <div class="text-xs text-red-600 font-medium">Today</div>
-                            {% elif proceeding.days_until == 1 %}
-                            <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
-                            {% elif proceeding.days_until <= 7 %}
-                            <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
-                            {% else %}
-                            <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
-                            {% endif %}
-                            {% endif %}
+                            {% if proceeding.days_until == 0 %}<div class="text-xs text-red-600 font-medium">Today</div>
+                            {% elif proceeding.days_until == 1 %}<div class="text-xs text-orange-600 font-medium">Tomorrow</div>
+                            {% elif proceeding.days_until <= 7 %}<div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
+                            {% else %}<div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
+                            {% endif %}{% endif %}
                         </td>
-                        <td class="px-3 py-2">
+                        <td class="px-3 py-3">
                             <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
-                            <div class="text-xs text-gray-500 mt-1">
+                            <div class="text-xs text-gray-500 mt-0.5">
                                 {% if proceeding.court_room %}<span><i class="fas fa-door-open mr-1"></i>{{ proceeding.court_room }}</span>{% endif %}
-                                {% if proceeding.judicial_officer %}<span class="ml-2"><i class="fas fa-user-tie mr-1"></i>{{ proceeding.judicial_officer }}</span>{% endif %}
+                                {% if proceeding.judicial_officer %}<span class="ml-2"><i class="fas fa-gavel mr-1"></i>{{ proceeding.judicial_officer }}</span>{% endif %}
                             </div>
                         </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-indigo-600">
-                                {{ proceeding.tracking_number }}
-                            </div>
+                        <td class="px-3 py-3">
+                            <div class="text-sm font-semibold text-indigo-600">{{ proceeding.tracking_number }}</div>
                             <div class="text-xs text-gray-500">{{ proceeding.client_name or 'N/A' }}</div>
                         </td>
-                        <td class="px-3 py-2">
-                            {% if proceeding.materials and proceeding.materials|length > 0 %}
+                        <td class="px-3 py-3">
+                            {% if proceeding.materials %}
                             <div class="space-y-1.5">
                                 {% for material in proceeding.materials %}
-                                <div class="flex items-start text-xs bg-orange-50 rounded px-2 py-1.5 border border-orange-200">
+                                <div class="flex items-start bg-orange-50 rounded px-2 py-1.5 border border-orange-200">
                                     <i class="fas fa-clipboard-list text-orange-600 mr-1.5 mt-0.5 flex-shrink-0"></i>
-                                    <div class="flex-1 min-w-0">
+                                    <div>
                                         <div class="text-sm font-medium text-gray-900">{{ material.material_description }}</div>
-                                        <div class="flex items-center space-x-2 mt-0.5 text-xs text-gray-600">
-                                            {% if material.allocated_to_name %}
-                                            <span><i class="fas fa-user-tie mr-1 text-blue-600"></i>{{ material.allocated_to_name }}</span>
-                                            {% endif %}
-                                            {% if material.reminder_frequency %}
-                                            <span class="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded text-xs font-semibold">
-                                                <i class="fas fa-bell mr-0.5"></i>{{ material.reminder_frequency }}
-                                            </span>
-                                            {% endif %}
+                                        <div class="flex flex-wrap gap-2 mt-0.5 text-xs text-gray-600">
+                                            {% if material.allocated_to_name %}<span><i class="fas fa-user-tie mr-1 text-blue-600"></i>{{ material.allocated_to_name }}</span>{% endif %}
+                                            {% if material.reminder_frequency %}<span class="px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded font-semibold"><i class="fas fa-bell mr-0.5"></i>{{ material.reminder_frequency }}</span>{% endif %}
                                         </div>
                                     </div>
                                 </div>
                                 {% endfor %}
                             </div>
-                            {% else %}
-                            <span class="text-xs text-gray-400">No items</span>
-                            {% endif %}
+                            {% else %}<span class="text-xs text-gray-400">—</span>{% endif %}
                         </td>
-                        <td class="px-3 py-2 whitespace-nowrap">
+                        <td class="px-3 py-3 whitespace-nowrap">
                             {% if proceeding.days_until is defined %}
-                            {% if proceeding.days_until == 0 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                                <i class="fas fa-exclamation-circle mr-1"></i>Today
-                            </span>
-                            {% elif proceeding.days_until == 1 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                                <i class="fas fa-clock mr-1"></i>Tomorrow
-                            </span>
-                            {% elif proceeding.days_until <= 7 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                <i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d
-                            </span>
-                            {% else %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                <i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d
-                            </span>
-                            {% endif %}
-                            {% endif %}
+                            {% if proceeding.days_until == 0 %}<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-exclamation-circle mr-1"></i>Today</span>
+                            {% elif proceeding.days_until == 1 %}<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-orange-100 text-orange-800"><i class="fas fa-clock mr-1"></i>Tomorrow</span>
+                            {% elif proceeding.days_until <= 7 %}<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-hourglass-half mr-1"></i>{{ proceeding.days_until }}d</span>
+                            {% else %}<span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800"><i class="fas fa-calendar mr-1"></i>{{ proceeding.days_until }}d</span>
+                            {% endif %}{% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -118,10 +88,91 @@
             </table>
         </div>
         {% else %}
-        <div class="text-center py-12">
-            <i class="fas fa-bell-slash text-gray-300 text-5xl mb-4"></i>
-            <p class="text-gray-600 text-lg font-semibold mb-2">No Reminders</p>
-            <p class="text-gray-500 text-sm">No items or reminders have been set up for upcoming proceedings.</p>
+        <div class="text-center py-10">
+            <i class="fas fa-bell-slash text-gray-300 text-4xl mb-3"></i>
+            <p class="text-gray-600 font-semibold">No case reminders</p>
+            <p class="text-gray-500 text-sm mt-1">Reminders added to case proceedings will appear here.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Matters Section ────────────────────────────────────────────── -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+            <i class="fas fa-folder-open text-purple-600"></i>
+            Matters
+            <span class="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-semibold">{{ all_matters|length if all_matters else 0 }}</span>
+        </h2>
+
+        {% if all_matters and all_matters|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reference</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Matter</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Assigned To</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date Opened</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for matter in all_matters %}
+                    <tr class="hover:bg-purple-50 transition-colors border-l-4
+                        {% if matter.status == 'Pending Approval' %}border-red-500
+                        {% elif matter.status == 'In Progress' %}border-blue-500
+                        {% elif matter.status == 'Open' %}border-green-500
+                        {% else %}border-purple-400{% endif %}
+                        cursor-pointer" onclick="window.location.href='/other_matters/{{ matter.id }}'">
+                        <td class="px-3 py-3 whitespace-nowrap">
+                            <div class="text-sm font-semibold text-purple-700">{{ matter.matter_reference_number }}</div>
+                        </td>
+                        <td class="px-3 py-3">
+                            <div class="text-sm font-semibold text-gray-900">{{ matter.matter_title }}</div>
+                            <div class="text-xs text-gray-500">{{ matter.matter_category }}</div>
+                        </td>
+                        <td class="px-3 py-3">
+                            <div class="text-sm text-gray-900">{{ matter.client_name }}</div>
+                            {% if matter.client_phone %}<div class="text-xs text-gray-500">{{ matter.client_phone }}</div>{% endif %}
+                        </td>
+                        <td class="px-3 py-3">
+                            {% if matter.assigned_employee_name %}
+                            <div class="flex items-center gap-1 text-sm text-gray-800">
+                                <i class="fas fa-user-tie text-purple-500 text-xs"></i>
+                                {{ matter.assigned_employee_name }}
+                            </div>
+                            {% else %}
+                            <span class="text-xs text-gray-400">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ matter.date_opened or '—' }}</div>
+                            {% if matter.days_since_opened is defined %}
+                            <div class="text-xs text-gray-500">{{ matter.days_since_opened }} days ago</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 whitespace-nowrap">
+                            <span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full
+                                {% if matter.status == 'Pending Approval' %}bg-red-100 text-red-800
+                                {% elif matter.status == 'Open' %}bg-green-100 text-green-800
+                                {% elif matter.status == 'In Progress' %}bg-blue-100 text-blue-800
+                                {% elif matter.status == 'Pending Client' %}bg-yellow-100 text-yellow-800
+                                {% elif matter.status == 'On Hold' %}bg-gray-100 text-gray-700
+                                {% else %}bg-purple-100 text-purple-800{% endif %}">
+                                {{ matter.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-10">
+            <i class="fas fa-folder-open text-gray-300 text-4xl mb-3"></i>
+            <p class="text-gray-600 font-semibold">No active matters</p>
+            <p class="text-gray-500 text-sm mt-1">Active matters will appear here.</p>
         </div>
         {% endif %}
     </div>

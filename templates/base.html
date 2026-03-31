@@ -387,6 +387,17 @@
                     </div>
                     {% endif %}
                     
+                    {% if session.get('employee_id') %}
+                    <a href="{{ url_for('notifications') }}" class="relative inline-flex items-center justify-center w-11 h-11 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 {% if request.endpoint == 'notifications' %}ring-2 ring-emerald-500/40{% endif %}" title="Notifications">
+                        <i class="fas fa-bell text-green-700"></i>
+                        {% if notification_badge_count and notification_badge_count > 0 %}
+                        <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white">
+                            {{ notification_badge_count }}
+                        </span>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
                     <!-- User Menu (if logged in) -->
                     {% if session.get('employee_id') %}
                     <div class="relative">
@@ -415,6 +426,14 @@
                         
                         <!-- Dropdown Menu -->
                         <div id="user-dropdown" class="dropdown-menu">
+                            <a href="{{ url_for('notifications') }}" class="dropdown-item">
+                                <i class="fas fa-bell text-emerald-600"></i>
+                                <span>Notifications</span>
+                            </a>
+                            <a href="{{ url_for('my_tasks') }}" class="dropdown-item">
+                                <i class="fas fa-tasks text-green-600"></i>
+                                <span>My Tasks</span>
+                            </a>
                             <a href="{{ url_for('profile') }}" class="dropdown-item">
                                 <i class="fas fa-user-circle text-green-600"></i>
                                 <span>My Profile</span>
@@ -628,7 +647,7 @@
                     {% else %}
                     <!-- Employee Sidebar Links -->
                     {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
-                    {% set matter_mgmt_pages = ['matter_management', 'case_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'register_matter', 'approve_matters', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
+                    {% set matter_mgmt_pages = ['matter_management', 'case_management', 'case_tracking', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
                     <!-- Common Links (All Roles) - hidden on case_documents / matter_documents so only Case/Matter Actions show -->
                     {% if request.endpoint not in user_mgmt_pages and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
                     <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}" id="nav-dashboard">
@@ -662,12 +681,17 @@
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
-                    {% if user_role in ['Firm Administrator', 'Associate Advocate'] %}
+                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-administration">
+                        <i class="fas fa-route"></i>
+                        <span>Case tracking</span>
+                    </a>
+                    {% if user_role in ['Firm Administrator', 'Associate Advocate', 'IT Support'] %}
                     <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
                         <i class="fas fa-plus-circle"></i>
                         <span>Register Case</span>
                     </a>
-                    <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %}" id="nav-register-matter">
+                    {# Show "Register Matter" only on the Other Matters listing page #}
+                    <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %} {% if request.endpoint != 'other_matters' %}hidden{% endif %}" id="nav-register-matter">
                         <i class="fas fa-folder-plus"></i>
                         <span>Register Matter</span>
                     </a>
@@ -692,7 +716,7 @@
                     </a>
                     {% endif %}
 
-                    <!-- Matter Management page only: sidebar shows only Litigation Matters + Other Matters -->
+                    <!-- Matter Management page only: sidebar shows Litigation Matters + Other Matters (no Case tracking here) -->
                     {% if request.endpoint == 'matter_management' and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
@@ -707,6 +731,27 @@
                     </a>
                     {% endif %}
 
+                    <!-- Case Management / Case tracking: sidebar quick actions -->
+                    {% if request.endpoint in ['case_management', 'case_tracking'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
+                    </div>
+                    {% if request.endpoint == 'case_management' %}
+                    <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case-case-management">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Register Case</span>
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-sidebar">
+                        <i class="fas fa-route"></i>
+                        <span>Case tracking</span>
+                    </a>
+                    <a href="{{ url_for('case_task_management') }}" class="sidebar-link {% if request.endpoint == 'case_task_management' %}active{% endif %}" id="nav-case-task-management">
+                        <i class="fas fa-tasks"></i>
+                        <span>Case Task Management</span>
+                    </a>
+                    {% endif %}
+
                     <!-- Case Actions: when viewing a specific case (e.g. /case_management/5) -->
                     {% set current_case_id = request.view_args.get('case_id', 0) %}
                     {% if current_case_id and request.endpoint in ['case_details', 'case_proceedings', 'case_documents', 'case_edit', 'case_status', 'case_allocate', 'case_reminders', 'case_calendar', 'case_audit_progress'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
@@ -716,6 +761,10 @@
                     <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-back-to-cases">
                         <i class="fas fa-arrow-left"></i>
                         <span>Back to Cases</span>
+                    </a>
+                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-case-actions">
+                        <i class="fas fa-route"></i>
+                        <span>Case tracking</span>
                     </a>
                     <a href="{{ url_for('case_details', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_details' %}active{% endif %}" id="nav-case-details">
                         <i class="fas fa-briefcase"></i>
@@ -764,7 +813,11 @@
                         <i class="fas fa-gavel"></i>
                         <span>Litigation Matters</span>
                     </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'approve_matters', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
+                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-mp">
+                        <i class="fas fa-route"></i>
+                        <span>Case tracking</span>
+                    </a>
+                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'case_tracking', 'matter_tracking', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
                         <i class="fas fa-folder-open"></i>
                         <span>Other Matters</span>
                     </a>
@@ -779,7 +832,11 @@
                         <i class="fas fa-gavel"></i>
                         <span>Litigation Matters</span>
                     </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'approve_matters', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
+                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-assoc">
+                        <i class="fas fa-route"></i>
+                        <span>Case tracking</span>
+                    </a>
+                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'case_tracking', 'matter_tracking', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
                         <i class="fas fa-folder-open"></i>
                         <span>Other Matters</span>
                     </a>
@@ -805,6 +862,10 @@
                     <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
+                    </a>
+                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-clerk">
+                        <i class="fas fa-route"></i>
+                        <span>Case tracking</span>
                     </a>
                     {% endif %}
                     <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint in ['user_management', 'employee_management', 'client_management', 'individual_client_management', 'corporate_client_management'] %}active{% endif %}" id="nav-user-management">
@@ -1091,25 +1152,36 @@
                     </a>
                     {% endif %}
 
-                    <!-- Other Matters Page Links -->
-                    {% if request.endpoint in ['other_matters', 'register_matter', 'approve_matters'] %}
+                    <!-- Other Matters page: Register Matter (IT Support) then Matter Tracking -->
+                    {% if request.endpoint in ['other_matters', 'matter_task_management'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Other Matters</p>
                     </div>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint == 'other_matters' %}active{% endif %}" id="nav-other-matters">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
-                    </a>
-                    {% if user_role not in ['Firm Administrator', 'Managing Partner'] %}
-                    <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %}" id="nav-register-matter">
-                        <i class="fas fa-plus-circle"></i>
+                    {% if user_role == 'IT Support' %}
+                    <a href="{{ url_for('register_matter') }}" class="sidebar-link" id="nav-register-matter-it-support">
+                        <i class="fas fa-folder-plus"></i>
                         <span>Register Matter</span>
                     </a>
-                    <a href="{{ url_for('approve_matters') }}" class="sidebar-link {% if request.endpoint == 'approve_matters' %}active{% endif %}" id="nav-approve-matters">
-                        <i class="fas fa-check-circle"></i>
-                        <span>Approve Matters</span>
+                    {% endif %}
+                    <a href="{{ url_for('matter_tracking') }}" class="sidebar-link" id="nav-matter-tracking-other-matters">
+                        <i class="fas fa-route"></i>
+                        <span>Matter Tracking</span>
+                    </a>
+                    <a href="{{ url_for('matter_task_management') }}" class="sidebar-link {% if request.endpoint == 'matter_task_management' %}active{% endif %}" id="nav-matter-task-management">
+                        <i class="fas fa-tasks"></i>
+                        <span>Matter Task Management</span>
                     </a>
                     {% endif %}
+
+                    <!-- Register Matter page: show only back link -->
+                    {% if request.endpoint == 'register_matter' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Other Matters</p>
+                    </div>
+                    <a href="{{ url_for('other_matters') }}" class="sidebar-link" id="nav-back-to-other-matters-from-register">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back to Other Matters</span>
+                    </a>
                     {% endif %}
 
                     <!-- Matter Details Section Links -->
@@ -1255,8 +1327,15 @@
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">General</p>
                     </div>
-                    <a href="#" class="sidebar-link" id="nav-tasks">
-                        <i class="fas fa-tasks"></i>
+                    <a href="{{ url_for('my_tasks') }}" class="sidebar-link {% if request.endpoint == 'my_tasks' %}active{% endif %}" id="nav-tasks">
+                        <span class="relative inline-flex items-center justify-center w-5">
+                            <i class="fas fa-bell"></i>
+                            {% if my_task_badge_count and my_task_badge_count > 0 %}
+                            <span class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white">
+                                {{ my_task_badge_count }}
+                            </span>
+                            {% endif %}
+                        </span>
                         <span>My Tasks</span>
                     </a>
                     <a href="#" class="sidebar-link" id="nav-calendar">
@@ -1274,6 +1353,17 @@
             
             <!-- Sidebar Footer -->
             <div class="p-4 border-t border-gray-200/50">
+                <a href="{{ url_for('my_tasks') }}" class="sidebar-link {% if request.endpoint == 'my_tasks' %}active{% endif %}" id="nav-my-tasks-footer">
+                    <span class="relative inline-flex items-center justify-center w-5">
+                        <i class="fas fa-bell"></i>
+                        {% if my_task_badge_count and my_task_badge_count > 0 %}
+                        <span class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white">
+                            {{ my_task_badge_count }}
+                        </span>
+                        {% endif %}
+                    </span>
+                    <span>My Tasks</span>
+                </a>
                 <a href="{{ url_for('my_tools') }}" class="sidebar-link {% if request.endpoint == 'my_tools' %}active{% endif %}" id="nav-my-tools">
                     <i class="fas fa-tools"></i>
                     <span>My Tools</span>

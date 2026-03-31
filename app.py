@@ -66,11 +66,60 @@ try:
 except ImportError:
     pass
 
+# Kenya court hierarchy (for case registration / edit dropdowns)
+COURT_RANK_OPTIONS = [
+    "Supreme Court",
+    "Court of Appeal",
+    "High Court",
+    "Environment and Land Court",
+    "Employment and Labour Relations Court",
+    "Magistrates' Courts",
+    "Kadhi's Courts",
+    "Courts Martial",
+    "Small Claims Court",
+    "Tribunals",
+]
+
+
+def validate_court_rank(value):
+    """Return a valid court rank string or None."""
+    if not value or not isinstance(value, str):
+        return None
+    v = value.strip()
+    return v if v in COURT_RANK_OPTIONS else None
+
+
+def get_public_base_url():
+    """Public base URL for building external redirects (prefers APP_BASE_URL)."""
+    if APP_BASE_URL:
+        return APP_BASE_URL
+    try:
+        return request.url_root.rstrip('/')
+    except Exception:
+        return ''
+
 def get_google_drive_redirect_uri():
     """Redirect URI for Google Drive OAuth; use APP_BASE_URL when hosted so it matches Google Console."""
     if APP_BASE_URL:
         return APP_BASE_URL + '/api/auth/google-drive/callback'
     return url_for('google_drive_callback', _external=True)
+
+def verify_google_id_token(id_token_jwt: str):
+    """
+    Verify Google ID token with small clock-skew tolerance.
+    Hosted environments can occasionally drift by ~1s which triggers 'Token used too early'.
+    """
+    request_session = google_requests.Request()
+    try:
+        return id_token.verify_oauth2_token(
+            id_token_jwt,
+            request_session,
+            GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=10,
+        )
+    except TypeError:
+        # Older google-auth versions may not support clock_skew_in_seconds.
+        return id_token.verify_oauth2_token(id_token_jwt, request_session, GOOGLE_CLIENT_ID)
 
 # Configuration
 UPLOAD_FOLDER = 'static/uploads/profile_pictures'
@@ -111,7 +160,7 @@ def get_db_config():
         return {
             'host': os.environ.get('DB_HOST', 'localhost'),
             'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-            'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
+            'password': os.environ.get('DB_PASSWORD', ''),
             'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
             'charset': 'utf8mb4'
         }
@@ -221,7 +270,7 @@ def test_db_connection():
         return False
 
 # Schema version for migrations
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 def get_db_connection(use_database=True):
     """Create and return database connection"""
@@ -321,6 +370,186 @@ def table_exists(table_name):
     finally:
         if connection:
             connection.close()
+
+def ensure_case_proceeding_advocates_table(cursor, connection=None):
+    """Ensure advocates table exists (fixes DBs that missed migration 15)."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS case_proceeding_advocates (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                proceeding_id INT NOT NULL,
+                advocate_name VARCHAR(255) NOT NULL,
+                remarks TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (proceeding_id) REFERENCES case_proceedings(id) ON DELETE CASCADE,
+                INDEX idx_proceeding_id (proceeding_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_case_proceeding_advocates_table: {e}")
+
+
+def reconcile_additive_schema(cursor, connection=None):
+    """Run additive DDL on every app startup (safe after git pull / cPanel deploy).
+
+    Numbered migrations bump schema_version, but many features also use
+    CREATE TABLE IF NOT EXISTS / ALTER ADD COLUMN in ensure_* helpers.
+    Calling those here guarantees production DBs stay aligned with the code
+    even when schema_version is already at SCHEMA_VERSION.
+    """
+    try:
+        ensure_task_management_table(cursor, connection)
+        ensure_case_proceeding_advocates_table(cursor, connection)
+    except Exception as e:
+        print(f"[WARNING] reconcile_additive_schema: {e}")
+
+
+def verify_core_tables_present():
+    """Log a concise check that expected tables exist after initialization."""
+    expected = (
+        'schema_version',
+        'company_settings',
+        'employees',
+        'clients',
+        'cases',
+        'case_proceedings',
+        'task_management',
+        'matters',
+    )
+    connection = get_db_connection()
+    if not connection:
+        print("[WARNING] Could not verify core tables (no DB connection)")
+        return
+    try:
+        placeholders = ','.join(['%s'] * len(expected))
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = %s AND table_name IN ({placeholders})
+                """,
+                (DB_CONFIG['database'],) + expected,
+            )
+            found = {row[0] for row in cursor.fetchall()}
+        missing = [t for t in expected if t not in found]
+        if missing:
+            print(f"[WARNING] After init, these tables are missing: {', '.join(missing)}")
+        else:
+            print("[OK] Core tables verified")
+    except Exception as e:
+        print(f"[WARNING] Core table verification failed: {e}")
+    finally:
+        connection.close()
+
+
+def ensure_task_management_table(cursor, connection=None):
+    """Ensure task management table exists for case/matter tasks."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_management (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                task_type ENUM('case', 'matter') NOT NULL,
+                linked_id INT NOT NULL,
+                task_title VARCHAR(255) NOT NULL,
+                task_description TEXT,
+                due_at DATETIME NOT NULL,
+                reminder_intervals VARCHAR(255),
+                assigned_to_id INT NULL,
+                assigned_to_name VARCHAR(255) NULL,
+                allow_view_case_details TINYINT(1) DEFAULT 1,
+                allow_edit_case_details TINYINT(1) DEFAULT 1,
+                allow_view_case_documents TINYINT(1) DEFAULT 1,
+                allow_upload_case_documents TINYINT(1) DEFAULT 1,
+                allow_download_case_documents TINYINT(1) DEFAULT 1,
+                task_status ENUM('Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending',
+                created_by_id INT NOT NULL,
+                created_by_name VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_task_type_linked (task_type, linked_id),
+                INDEX idx_due_at (due_at),
+                INDEX idx_created_by (created_by_id),
+                INDEX idx_assigned_to_id (assigned_to_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        # Keep status enum compatible with newly added "Submitted" state.
+        try:
+            cursor.execute("""
+                ALTER TABLE task_management
+                MODIFY COLUMN task_status ENUM('Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending'
+            """)
+        except Exception as enum_err:
+            print(f"[WARNING] ensure_task_management_table enum update: {enum_err}")
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN assigned_to_id INT NULL")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN assigned_to_name VARCHAR(255) NULL")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD INDEX idx_assigned_to_id (assigned_to_id)")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_view_case_details TINYINT(1) DEFAULT 1")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_edit_case_details TINYINT(1) DEFAULT 1")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_view_case_documents TINYINT(1) DEFAULT 1")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_upload_case_documents TINYINT(1) DEFAULT 1")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_download_case_documents TINYINT(1) DEFAULT 1")
+        except Exception:
+            pass
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_task_management_table: {e}")
+
+def has_active_case_task_access(cursor, case_id, employee_id, task_id=None, permission_key=None):
+    """Return True when employee has an active case task allocation for this case."""
+    try:
+        sql = """
+            SELECT 1
+            FROM task_management t
+            WHERE t.task_type = 'case'
+              AND t.linked_id = %s
+              AND t.assigned_to_id = %s
+              AND t.task_status IN ('Pending', 'In Progress')
+        """
+        params = [case_id, employee_id]
+        if task_id:
+            sql += " AND t.id = %s"
+            params.append(task_id)
+        permission_map = {
+            'view': 'allow_view_case_details',
+            'edit': 'allow_edit_case_details',
+            'view_documents': 'allow_view_case_documents',
+            'upload_documents': 'allow_upload_case_documents',
+            'download': 'allow_download_case_documents',
+        }
+        if permission_key in permission_map:
+            sql += f" AND COALESCE(t.{permission_map[permission_key]}, 1) = 1"
+        sql += " LIMIT 1"
+        cursor.execute(sql, tuple(params))
+        return bool(cursor.fetchone())
+    except Exception:
+        return False
 
 def column_exists(table_name, column_name):
     """Check if a column exists in a table"""
@@ -708,6 +937,36 @@ def create_clients_table():
                     # If error, try to check if 'Pending' already exists
                     if 'Duplicate' not in str(e) and 'already exists' not in str(e).lower():
                         print(f"[WARNING] Could not update client_type ENUM: {e}")
+
+                # Update status ENUM to include Pending Approval for manual signups
+                try:
+                    cursor.execute("""
+                        ALTER TABLE clients
+                        MODIFY COLUMN status ENUM('Active', 'Inactive', 'Pending Approval') DEFAULT 'Active'
+                    """)
+                    connection.commit()
+                    print("[OK] Updated clients status ENUM to include Pending Approval")
+                except Exception as e:
+                    if 'Duplicate' not in str(e) and 'already exists' not in str(e).lower():
+                        print(f"[WARNING] Could not update clients status ENUM: {e}")
+
+                # Manual client auth support
+                if not column_exists('clients', 'password_hash'):
+                    try:
+                        cursor.execute("ALTER TABLE clients ADD COLUMN password_hash VARCHAR(255) NULL")
+                        connection.commit()
+                        print("[OK] Added password_hash column to clients table")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add password_hash column: {e}")
+
+                # Allow manual clients without Google account
+                try:
+                    cursor.execute("ALTER TABLE clients MODIFY COLUMN google_id VARCHAR(255) UNIQUE NULL")
+                    connection.commit()
+                    print("[OK] Updated clients.google_id to allow NULL")
+                except Exception as e:
+                    if 'Duplicate' not in str(e) and 'already exists' not in str(e).lower():
+                        print(f"[WARNING] Could not update clients.google_id nullability: {e}")
                 
                 # Add columns for Individual client requirements (ID front and back)
                 if not column_exists('clients', 'id_front'):
@@ -943,6 +1202,8 @@ def create_case_tables():
                         party_type VARCHAR(255) NOT NULL,
                         party_category VARCHAR(255),
                         firm_agent VARCHAR(255),
+                        party_phone VARCHAR(50),
+                        party_email VARCHAR(255),
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
@@ -953,6 +1214,23 @@ def create_case_tables():
                 print("[OK] Case parties table created")
             else:
                 print("[OK] Case parties table already exists")
+
+            # Add missing columns to case_parties table (for existing DBs)
+            if not column_exists('case_parties', 'party_phone'):
+                try:
+                    cursor.execute("ALTER TABLE case_parties ADD COLUMN party_phone VARCHAR(50)")
+                    connection.commit()
+                    print("[OK] Added party_phone column to case_parties table")
+                except Exception as e:
+                    print(f"[WARNING] Could not add party_phone column to case_parties: {e}")
+
+            if not column_exists('case_parties', 'party_email'):
+                try:
+                    cursor.execute("ALTER TABLE case_parties ADD COLUMN party_email VARCHAR(255)")
+                    connection.commit()
+                    print("[OK] Added party_email column to case_parties table")
+                except Exception as e:
+                    print(f"[WARNING] Could not add party_email column to case_parties: {e}")
             
             # Create case_proceedings table
             if not table_exists('case_proceedings'):
@@ -1003,6 +1281,25 @@ def create_case_tables():
             else:
                 print("[OK] Case proceeding materials table already exists")
             
+            # Create case_proceeding_advocates table (advocates present + what they said)
+            if not table_exists('case_proceeding_advocates'):
+                cursor.execute("""
+                    CREATE TABLE case_proceeding_advocates (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        proceeding_id INT NOT NULL,
+                        advocate_name VARCHAR(255) NOT NULL,
+                        remarks TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        FOREIGN KEY (proceeding_id) REFERENCES case_proceedings(id) ON DELETE CASCADE,
+                        INDEX idx_proceeding_id (proceeding_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] Case proceeding advocates table created")
+            else:
+                print("[OK] Case proceeding advocates table already exists")
+            
             # Check and add missing columns to cases table
             if not column_exists('cases', 'tracking_number'):
                 try:
@@ -1044,6 +1341,13 @@ def create_case_tables():
                     print("[OK] Added allocation_timeline column to cases table")
                 except Exception as e:
                     print(f"[WARNING] Could not add allocation_timeline column: {e}")
+            if not column_exists('cases', 'court_rank'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN court_rank VARCHAR(255) NULL AFTER client_name")
+                    connection.commit()
+                    print("[OK] Added court_rank column to cases table")
+                except Exception as e:
+                    print(f"[WARNING] Could not add court_rank column: {e}")
         
         return True
     except Exception as e:
@@ -1106,6 +1410,22 @@ def create_matters_table():
                 print("[OK] Updated matters status ENUM")
             except Exception as e:
                 print(f"[WARNING] Could not update matters status ENUM: {e}")
+
+            # Add allocation description/timeline columns for approval workflow
+            if not column_exists('matters', 'allocation_description'):
+                try:
+                    cursor.execute("ALTER TABLE matters ADD COLUMN allocation_description TEXT NULL AFTER client_instructions")
+                    connection.commit()
+                    print("[OK] Added allocation_description column to matters")
+                except Exception as e:
+                    print(f"[WARNING] Could not add allocation_description column: {e}")
+            if not column_exists('matters', 'allocation_timeline'):
+                try:
+                    cursor.execute("ALTER TABLE matters ADD COLUMN allocation_timeline VARCHAR(500) NULL AFTER allocation_description")
+                    connection.commit()
+                    print("[OK] Added allocation_timeline column to matters")
+                except Exception as e:
+                    print(f"[WARNING] Could not add allocation_timeline column: {e}")
         
         return True
     except Exception as e:
@@ -1414,6 +1734,8 @@ def apply_migrations(current_version):
                             party_type VARCHAR(255) NOT NULL,
                             party_category VARCHAR(255),
                             firm_agent VARCHAR(255),
+                            party_phone VARCHAR(50),
+                            party_email VARCHAR(255),
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                             FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE,
@@ -1568,6 +1890,28 @@ def apply_migrations(current_version):
                 print("Applying migration 14: Creating email management tables...")
                 migrations_applied = True
             
+            # Migration 15: Create case_proceeding_advocates table
+            if current_version < 15:
+                print("Applying migration 15: Creating case_proceeding_advocates table...")
+                if not table_exists('case_proceeding_advocates'):
+                    cursor.execute("""
+                        CREATE TABLE case_proceeding_advocates (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            proceeding_id INT NOT NULL,
+                            advocate_name VARCHAR(255) NOT NULL,
+                            remarks TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                            FOREIGN KEY (proceeding_id) REFERENCES case_proceedings(id) ON DELETE CASCADE,
+                            INDEX idx_proceeding_id (proceeding_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                    """)
+                    connection.commit()
+                    print("[OK] Created case_proceeding_advocates table")
+                else:
+                    print("[OK] case_proceeding_advocates table already exists")
+                migrations_applied = True
+            
             # Migration 1: Ensure all required columns exist (for older versions)
             if current_version < 1:
                 print("Applying migration 1: Schema updates...")
@@ -1692,7 +2036,9 @@ def init_database():
     if not database_exists():
         print(f"Database '{DB_CONFIG['database']}' not found. Creating...")
         if not create_database():
-            print("[ERROR] Failed to create database")
+            print("[ERROR] Failed to create database.")
+            print("        On cPanel, create the database in MySQL Databases and assign the user;")
+            print("        many hosts do not allow CREATE DATABASE from the app user.")
             return False
     else:
         print(f"[OK] Database '{DB_CONFIG['database']}' exists")
@@ -1757,10 +2103,28 @@ def init_database():
             print("[ERROR] Failed to apply migrations")
             return False
     elif current_version == SCHEMA_VERSION:
-        print("[OK] Database schema is up to date")
+        print("[OK] Database schema version matches application (numbered migrations)")
     else:
         print(f"[WARNING] Database schema version ({current_version}) is newer than application version ({SCHEMA_VERSION})")
-    
+
+    # Always reconcile additive schema (tables/columns maintained outside migration blocks).
+    # Ensures cPanel/Git deploys pick up new DDL without bumping SCHEMA_VERSION every time.
+    print("Reconciling additive schema (ensure_* tables/columns)...")
+    _reconcile_conn = get_db_connection()
+    if not _reconcile_conn:
+        print("[ERROR] Failed to connect for additive schema reconciliation")
+        return False
+    try:
+        with _reconcile_conn.cursor(pymysql.cursors.DictCursor) as _rec_cursor:
+            reconcile_additive_schema(_rec_cursor, _reconcile_conn)
+    except Exception as e:
+        print(f"[ERROR] Additive schema reconciliation failed: {e}")
+        return False
+    finally:
+        _reconcile_conn.close()
+
+    verify_core_tables_present()
+
     print("="*50)
     print("[OK] Database initialization completed successfully")
     print("="*50 + "\n")
@@ -2285,13 +2649,20 @@ def login():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    """Employee signup page"""
+    """Signup page"""
     if 'employee_id' in session:
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         full_name = request.form.get('full_name', '').strip().upper()
-        phone_number = request.form.get('phone_number', '').strip().upper()
+        phone_number_local = request.form.get('phone_number', '').strip()
+        country_code = request.form.get('country_code', '').strip()
+        phone_number_local = re.sub(r'\D', '', phone_number_local)
+        country_digits = re.sub(r'\D', '', country_code or '')
+        # Prevent accidental double-prefixing if the posted number already includes dial digits.
+        if country_digits and phone_number_local.startswith(country_digits) and len(phone_number_local) > len(country_digits):
+            phone_number_local = phone_number_local[len(country_digits):]
+        phone_number = f"+{country_digits}{phone_number_local}" if country_digits and phone_number_local else phone_number_local
         work_email = request.form.get('work_email', '').strip().lower()
         employee_code = request.form.get('employee_code', '').strip().upper()
         password = request.form.get('password', '')
@@ -2302,12 +2673,12 @@ def signup():
         errors = []
         if not full_name:
             errors.append('Full name is required')
-        if not phone_number:
+        if not phone_number_local:
             errors.append('Phone number is required')
         if not work_email:
-            errors.append('Personal email is required')
+            errors.append('Email is required')
         if not employee_code or len(employee_code) != 6:
-            errors.append('Employee code must be 6 digits')
+            errors.append('Firm code must be 6 digits')
         if not password or len(password) < 6:
             errors.append('Password must be at least 6 characters (letters and numbers allowed)')
         if password != confirm_password:
@@ -2352,9 +2723,9 @@ def signup():
                 return redirect(url_for('login'))
         except pymysql.IntegrityError as e:
             if 'employee_code' in str(e):
-                flash('Employee code already exists', 'error')
+                flash('Firm code already exists', 'error')
             elif 'work_email' in str(e):
-                flash('Personal email already registered', 'error')
+                flash('Email already registered', 'error')
             else:
                 flash('Registration failed. Please try again.', 'error')
         except Exception as e:
@@ -2367,13 +2738,13 @@ def signup():
 
 @app.route('/check_employee_code', methods=['POST'])
 def check_employee_code():
-    """Check if employee code is already in use"""
+    """Check if firm code is already in use"""
     try:
         data = request.get_json()
         employee_code = data.get('employee_code', '').strip().upper()
         
         if not employee_code or len(employee_code) != 6:
-            return jsonify({'available': False, 'message': 'Employee code must be 6 digits'})
+            return jsonify({'available': False, 'message': 'Firm code must be 6 digits'})
         
         connection = get_db_connection()
         if not connection:
@@ -2385,12 +2756,12 @@ def check_employee_code():
                 result = cursor.fetchone()
                 
                 if result:
-                    return jsonify({'available': False, 'message': 'Employee code already in use'})
+                    return jsonify({'available': False, 'message': 'Firm code already in use'})
                 else:
-                    return jsonify({'available': True, 'message': 'Employee code is available'})
+                    return jsonify({'available': True, 'message': 'Firm code is available'})
         except Exception as e:
-            print(f"Error checking employee code: {e}")
-            return jsonify({'available': False, 'message': 'Error checking employee code'})
+            print(f"Error checking firm code: {e}")
+            return jsonify({'available': False, 'message': 'Error checking firm code'})
         finally:
             connection.close()
     except Exception as e:
@@ -3825,9 +4196,203 @@ def client_login():
     
     return render_template('client_login.html', company_settings=company_settings)
 
+@app.route('/client_manual_login', methods=['GET', 'POST'])
+def client_manual_login():
+    """Manual client login using email and password"""
+    if 'client_id' in session:
+        return redirect(url_for('client_dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip().lower()
+        password = request.form.get('password') or ''
+
+        if not email or not password:
+            flash('Please enter both email and password.', 'error')
+            return render_template('client_manual_login.html', company_settings=company_settings)
+
+        connection = get_db_connection()
+        if not connection:
+            flash('Database connection error. Please try again later.', 'error')
+            return render_template('client_manual_login.html', company_settings=company_settings)
+
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT id, full_name, email, profile_picture, client_type, status, password_hash
+                    FROM clients
+                    WHERE LOWER(email) = %s
+                    LIMIT 1
+                """, (email,))
+                client = cursor.fetchone()
+
+                if not client or not client.get('password_hash') or not check_password_hash(client['password_hash'], password):
+                    flash('Invalid email or password.', 'error')
+                    return render_template('client_manual_login.html', company_settings=company_settings)
+
+                if client.get('status') == 'Pending Approval':
+                    flash('Your account is pending approval. Please wait for administrator approval.', 'warning')
+                    return render_template('client_manual_login.html', company_settings=company_settings)
+
+                if client.get('status') == 'Inactive':
+                    flash('Your account is inactive. Please contact support.', 'error')
+                    return render_template('client_manual_login.html', company_settings=company_settings)
+
+                session['client_id'] = client['id']
+                session['client_name'] = client.get('full_name', '')
+                session['client_email'] = client.get('email', '')
+                session['client_profile_picture'] = client.get('profile_picture', '')
+                session['client_type'] = client.get('client_type', 'Pending')
+
+                session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                flash('Successfully logged in!', 'success')
+                return redirect(url_for('client_dashboard'))
+        except Exception as e:
+            print(f"Manual client login error: {e}")
+            flash('An error occurred during login. Please try again.', 'error')
+        finally:
+            connection.close()
+
+    return render_template('client_manual_login.html', company_settings=company_settings)
+
+@app.route('/client_signup', methods=['GET', 'POST'])
+def client_signup():
+    """Client signup with active status"""
+    if 'client_id' in session:
+        return redirect(url_for('client_dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    if request.method == 'POST':
+        full_name = (request.form.get('full_name') or '').strip()
+        phone_number = (request.form.get('phone_number') or '').strip()
+        email = (request.form.get('email') or '').strip().lower()
+        password = request.form.get('password') or ''
+        confirm_password = request.form.get('confirm_password') or ''
+
+        if not full_name or not phone_number or not email or not password or not confirm_password:
+            flash('Please fill all required fields.', 'error')
+            return render_template('client_signup.html', company_settings=company_settings)
+
+        if password != confirm_password:
+            flash('Passwords do not match.', 'error')
+            return render_template('client_signup.html', company_settings=company_settings)
+
+        if len(password) < 6:
+            flash('Password must be at least 6 characters.', 'error')
+            return render_template('client_signup.html', company_settings=company_settings)
+
+        profile_picture = None
+        if 'profile_picture' in request.files:
+            file = request.files['profile_picture']
+            if file and file.filename:
+                if not allowed_file(file.filename):
+                    flash('Invalid profile image format. Use PNG, JPG, JPEG, or GIF.', 'error')
+                    return render_template('client_signup.html', company_settings=company_settings)
+                filename = secure_filename(file.filename)
+                file_ext = filename.rsplit('.', 1)[1].lower()
+                unique_filename = f"client_signup_{secrets.token_hex(8)}.{file_ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(filepath)
+                profile_picture = unique_filename
+
+        connection = get_db_connection()
+        if not connection:
+            flash('Database connection error. Please try again later.', 'error')
+            return render_template('client_signup.html', company_settings=company_settings)
+
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("SELECT id FROM clients WHERE LOWER(email) = %s LIMIT 1", (email,))
+                existing = cursor.fetchone()
+                if existing:
+                    flash('An account with this email already exists.', 'error')
+                    return render_template('client_signup.html', company_settings=company_settings)
+
+                password_hash = generate_password_hash(password)
+                cursor.execute("""
+                    INSERT INTO clients (
+                        google_id, email, full_name, phone_number, profile_picture,
+                        client_type, status, password_hash
+                    ) VALUES (%s, %s, %s, %s, %s, 'Pending', 'Active', %s)
+                """, (
+                    f"manual_{secrets.token_hex(12)}",
+                    email,
+                    full_name,
+                    phone_number,
+                    profile_picture,
+                    password_hash
+                ))
+                connection.commit()
+
+                flash('Signup successful. Your account is now active.', 'success')
+                return redirect(url_for('client_manual_login'))
+        except Exception as e:
+            print(f"Client signup error: {e}")
+            flash('An error occurred during signup. Please try again.', 'error')
+        finally:
+            connection.close()
+
+    return render_template('client_signup.html', company_settings=company_settings)
+
+@app.route('/api/client_auth/check_registration', methods=['POST'])
+def api_client_auth_check_registration():
+    """Check whether client email exists and whether email/password combination is already used."""
+    payload = request.get_json(silent=True) or {}
+    email = (payload.get('email') or '').strip().lower()
+    password = payload.get('password') or ''
+
+    if not email:
+        return jsonify({'email_exists': False, 'credentials_exists': False})
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT id, password_hash
+                FROM clients
+                WHERE LOWER(email) = %s
+                """,
+                (email,),
+            )
+            rows = cursor.fetchall() or []
+
+            email_exists = len(rows) > 0
+            credentials_exists = False
+            if email_exists and password:
+                for row in rows:
+                    stored_hash = row.get('password_hash')
+                    if stored_hash and check_password_hash(stored_hash, password):
+                        credentials_exists = True
+                        break
+
+            return jsonify({
+                'email_exists': email_exists,
+                'credentials_exists': credentials_exists
+            })
+    except Exception as e:
+        print(f"Error checking client registration: {e}")
+        return jsonify({'error': 'Server error'}), 500
+    finally:
+        connection.close()
+
 @app.route('/google_login')
 def google_login():
     """Initiate Google OAuth flow"""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        flash('Google login is not configured. Please contact support.', 'error')
+        return redirect(url_for('client_login'))
+
+    redirect_uri = (get_public_base_url() + '/callback') if APP_BASE_URL else url_for('google_callback', _external=True)
     flow = Flow.from_client_config(
         {
             "web": {
@@ -3835,17 +4400,18 @@ def google_login():
                 "client_secret": GOOGLE_CLIENT_SECRET,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [request.url_root + "callback"]
+                "redirect_uris": [redirect_uri]
             }
         },
-        scopes=SCOPES
+        scopes=SCOPES,
+        autogenerate_code_verifier=False
     )
-    flow.redirect_uri = url_for('google_callback', _external=True)
+    flow.redirect_uri = redirect_uri
     
     authorization_url, state = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
-        prompt='consent'
+        prompt='select_account consent'
     )
     
     session['state'] = state
@@ -3855,6 +4421,29 @@ def google_login():
 def google_callback():
     """Handle Google OAuth callback"""
     try:
+        if request.args.get('error'):
+            google_error = request.args.get('error')
+            google_error_description = request.args.get('error_description', '')
+            print(f"OAuth callback rejected by Google: {google_error} - {google_error_description}")
+            flash('Google sign-in was cancelled or denied. Please try again.', 'error')
+            return redirect(url_for('client_login'))
+
+        session_state = session.get('state')
+        request_state = request.args.get('state')
+        if session_state and request_state and request_state != session_state:
+            print(f"OAuth state mismatch: session={session_state}, request={request_state}")
+            flash('Authentication session expired. Please sign in again.', 'error')
+            return redirect(url_for('client_login'))
+
+        callback_state = session_state or request_state
+        redirect_uri = (get_public_base_url() + '/callback') if APP_BASE_URL else url_for('google_callback', _external=True)
+
+        # Behind a reverse-proxy (cPanel/Passenger) request.url may still use http://
+        # even though the real external URL is https://. Rewrite to match redirect_uri.
+        authorization_response = request.url
+        if APP_BASE_URL and APP_BASE_URL.startswith('https://') and authorization_response.startswith('http://'):
+            authorization_response = 'https://' + authorization_response[len('http://'):]
+
         # Extract actual scopes from the callback URL and normalize them
         returned_scopes_raw = request.args.get('scope', '').split()
         # Normalize shorthand scopes to full URLs
@@ -3879,15 +4468,15 @@ def google_callback():
                     "client_secret": GOOGLE_CLIENT_SECRET,
                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                     "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [request.url_root + "callback"]
+                    "redirect_uris": [redirect_uri]
                 }
             },
             scopes=scopes_to_use,
-            state=session['state']
+            state=callback_state,
+            autogenerate_code_verifier=False
         )
-        flow.redirect_uri = url_for('google_callback', _external=True)
+        flow.redirect_uri = redirect_uri
         
-        authorization_response = request.url
         try:
             flow.fetch_token(authorization_response=authorization_response)
         except Exception as scope_error:
@@ -3901,21 +4490,20 @@ def google_callback():
                             "client_secret": GOOGLE_CLIENT_SECRET,
                             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                             "token_uri": "https://oauth2.googleapis.com/token",
-                            "redirect_uris": [request.url_root + "callback"]
+                            "redirect_uris": [redirect_uri]
                         }
                     },
-                    scopes=normalized_scopes  # Use exact normalized scopes from Google
+                    scopes=normalized_scopes,  # Use exact normalized scopes from Google
+                    state=callback_state,
+                    autogenerate_code_verifier=False
                 )
-                flow.redirect_uri = url_for('google_callback', _external=True)
+                flow.redirect_uri = redirect_uri
                 flow.fetch_token(authorization_response=authorization_response)
             else:
                 raise
         
         credentials = flow.credentials
-        request_session = google_requests.Request()
-        id_info = id_token.verify_oauth2_token(
-            credentials.id_token, request_session, GOOGLE_CLIENT_ID
-        )
+        id_info = verify_google_id_token(credentials.id_token)
         
         # Extract user information
         google_id = id_info.get('sub')
@@ -3960,14 +4548,17 @@ def google_callback():
                     # Check if client has completed registration based on client type
                     client_type = client.get('client_type', 'Pending')
                     if client_type == 'Pending':
+                        session.pop('state', None)
                         flash('Please complete your registration', 'info')
                         return redirect(url_for('client_registration'))
                     
                     # Check basic registration requirement
                     if client_type in ('Individual', 'Corporate') and not client.get('phone_number'):
+                        session.pop('state', None)
                         flash('Please complete your registration by providing your phone number', 'info')
                         return redirect(url_for('client_registration'))
                     
+                    session.pop('state', None)
                     flash('Successfully logged in!', 'success')
                     return redirect(url_for('client_dashboard'))
             except Exception as e:
@@ -3978,7 +4569,9 @@ def google_callback():
         
         return redirect(url_for('client_login'))
     except Exception as e:
+        import traceback
         print(f"OAuth callback error: {e}")
+        traceback.print_exc()
         flash('Authentication failed. Please try again.', 'error')
         return redirect(url_for('client_login'))
 
@@ -4128,6 +4721,435 @@ def my_tools():
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
     
     return render_template('my_tools.html', company_settings=company_settings)
+
+@app.route('/my_tasks')
+def my_tasks():
+    """My Tasks page - all case/matter tasks allocated to the logged-in user."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('dashboard'))
+
+    employee_id = session.get('employee_id')
+    tasks = []
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            cursor.execute("""
+                SELECT
+                    t.id,
+                    t.task_type,
+                    t.linked_id,
+                    t.task_title,
+                    t.task_description,
+                    t.due_at,
+                    t.reminder_intervals,
+                    t.task_status,
+                    t.assigned_to_id,
+                    t.assigned_to_name,
+                    t.allow_view_case_details,
+                    t.allow_edit_case_details,
+                    t.allow_view_case_documents,
+                    t.allow_upload_case_documents,
+                    t.allow_download_case_documents,
+                    t.created_by_name,
+                    t.created_at,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    m.matter_reference_number,
+                    m.matter_title,
+                    'task_management' AS task_source,
+                    NULL AS proceeding_id
+                FROM task_management t
+                LEFT JOIN cases c
+                    ON t.task_type = 'case' AND t.linked_id = c.id
+                LEFT JOIN matters m
+                    ON t.task_type = 'matter' AND t.linked_id = m.id
+                WHERE
+                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                    OR
+                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                ORDER BY t.due_at ASC, t.created_at DESC
+            """, (employee_id, employee_id, employee_id))
+            tasks = list(cursor.fetchall() or [])
+
+            # Include allocated court-session items (case proceeding materials) assigned to this employee
+            cursor.execute("""
+                SELECT
+                    m.id,
+                    'case' AS task_type,
+                    p.case_id AS linked_id,
+                    COALESCE(NULLIF(m.material_description, ''), 'Allocated Session Item') AS task_title,
+                    m.material_description AS task_description,
+                    COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) AS due_at,
+                    m.reminder_frequency AS reminder_intervals,
+                    'Pending' AS task_status,
+                    m.allocated_to_name AS created_by_name,
+                    m.created_at,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    NULL AS matter_reference_number,
+                    NULL AS matter_title,
+                    'session_allocation' AS task_source,
+                    p.id AS proceeding_id
+                FROM case_proceeding_materials m
+                INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+                INNER JOIN cases c ON c.id = p.case_id
+                WHERE m.allocated_to_id = %s
+                ORDER BY COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) ASC, m.created_at DESC
+            """, (employee_id,))
+            session_tasks = list(cursor.fetchall() or [])
+
+            if session_tasks:
+                tasks.extend(session_tasks)
+
+            # Normalize date display for mixed task sources
+            for t in tasks:
+                due_val = t.get('due_at')
+                if due_val:
+                    try:
+                        t['due_at'] = due_val.strftime('%Y-%m-%d %H:%M')
+                    except Exception:
+                        t['due_at'] = str(due_val)
+                else:
+                    t['due_at'] = '-'
+
+                created_val = t.get('created_at')
+                if created_val:
+                    try:
+                        t['created_at'] = created_val.strftime('%Y-%m-%d %H:%M:%S')
+                    except Exception:
+                        t['created_at'] = str(created_val)
+
+            tasks.sort(key=lambda x: (x.get('due_at') or '9999-12-31 23:59', x.get('created_at') or ''), reverse=False)
+    except Exception as e:
+        print(f"Error loading my tasks: {e}")
+        flash('An error occurred while loading your tasks.', 'error')
+    finally:
+        connection.close()
+
+    return render_template('my_tasks.html', company_settings=company_settings, tasks=tasks)
+
+@app.route('/my_tasks/<int:task_id>/accept', methods=['POST'])
+def accept_my_task(task_id):
+    """Accept a task assigned to the logged-in user and set it In Progress."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            cursor.execute("""
+                SELECT t.id, t.task_status
+                FROM task_management t
+                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+                WHERE t.id = %s
+                  AND (
+                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                    OR
+                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                  )
+                LIMIT 1
+            """, (task_id, employee_id, employee_id, employee_id))
+            task = cursor.fetchone()
+            if not task:
+                flash('Task not found or not allocated to your account.', 'error')
+                return redirect(url_for('my_tasks'))
+            if task.get('task_status') != 'Pending':
+                flash('Only pending tasks can be accepted.', 'error')
+                return redirect(url_for('my_tasks'))
+
+            cursor.execute("UPDATE task_management SET task_status = 'In Progress' WHERE id = %s", (task_id,))
+            connection.commit()
+            flash('Task accepted and moved to In Progress.', 'success')
+    except Exception as e:
+        print(f"Accept task error: {e}")
+        flash('An error occurred while accepting the task.', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('my_tasks'))
+
+@app.route('/my_tasks/<int:task_id>')
+def my_task_view(task_id):
+    """View a single allocated task."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    task = None
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            cursor.execute("""
+                SELECT
+                    t.id,
+                    t.task_type,
+                    t.linked_id,
+                    t.task_title,
+                    t.task_description,
+                    t.due_at,
+                    t.reminder_intervals,
+                    t.task_status,
+                    t.assigned_to_id,
+                    t.assigned_to_name,
+                    t.allow_view_case_details,
+                    t.allow_edit_case_details,
+                    t.allow_view_case_documents,
+                    t.allow_upload_case_documents,
+                    t.allow_download_case_documents,
+                    t.created_by_name,
+                    t.created_at,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    m.matter_reference_number,
+                    m.matter_title
+                FROM task_management t
+                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+                WHERE t.id = %s
+                  AND (
+                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                    OR
+                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                  )
+                LIMIT 1
+            """, (task_id, employee_id, employee_id, employee_id))
+            task = cursor.fetchone()
+    except Exception as e:
+        print(f"My task view error: {e}")
+        flash('An error occurred while loading the task.', 'error')
+        return redirect(url_for('my_tasks'))
+    finally:
+        connection.close()
+
+    if not task:
+        flash('Task not found or not allocated to your account.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    return render_template('my_task_view.html', company_settings=company_settings, task=task)
+
+@app.route('/my_tasks/<int:task_id>/complete', methods=['POST'])
+def complete_my_task(task_id):
+    """Submit an in-progress task."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            cursor.execute("""
+                SELECT t.id, t.task_status
+                FROM task_management t
+                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+                WHERE t.id = %s
+                  AND (
+                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                    OR
+                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                  )
+                LIMIT 1
+            """, (task_id, employee_id, employee_id, employee_id))
+            task = cursor.fetchone()
+            if not task:
+                flash('Task not found or not allocated to your account.', 'error')
+                return redirect(url_for('my_tasks'))
+            if task.get('task_status') != 'In Progress':
+                flash('Only in-progress tasks can be submitted.', 'error')
+                return redirect(url_for('my_task_view', task_id=task_id))
+
+            cursor.execute("UPDATE task_management SET task_status = 'Submitted' WHERE id = %s", (task_id,))
+            connection.commit()
+            flash('Task submitted successfully.', 'success')
+    except Exception as e:
+        print(f"Complete task error: {e}")
+        flash('An error occurred while submitting the task.', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('my_tasks'))
+
+@app.route('/notifications')
+def notifications():
+    """Unified notifications for the logged-in employee."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('dashboard'))
+
+    employee_id = session.get('employee_id')
+    notifications_feed = []
+    try:
+        from datetime import date
+        today = date.today()
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+
+            cursor.execute("""
+                SELECT
+                    t.id,
+                    t.task_type,
+                    t.linked_id,
+                    t.task_title,
+                    t.task_status,
+                    t.due_at,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    m.matter_reference_number,
+                    m.matter_title
+                FROM task_management t
+                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+                WHERE
+                    t.task_status IN ('Pending', 'In Progress')
+                    AND (
+                        (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                        OR
+                        (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                    )
+                ORDER BY t.due_at ASC, t.created_at DESC
+            """, (employee_id, employee_id, employee_id))
+            active_tasks = list(cursor.fetchall() or [])
+            for task in active_tasks:
+                due_val = task.get('due_at')
+                due_text = '-'
+                if due_val:
+                    try:
+                        due_text = due_val.strftime('%Y-%m-%d %H:%M')
+                    except Exception:
+                        due_text = str(due_val)
+                if task.get('task_type') == 'case':
+                    ref = f"{task.get('case_tracking_number') or '-'} - {task.get('case_client_name') or 'Case'}"
+                else:
+                    ref = f"{task.get('matter_reference_number') or '-'} - {task.get('matter_title') or 'Matter'}"
+                notifications_feed.append({
+                    'type': 'task',
+                    'icon': 'fa-tasks',
+                    'title': task.get('task_title') or 'Assigned task',
+                    'subtitle': ref,
+                    'meta': f"Status: {task.get('task_status') or '-'} | Due: {due_text}",
+                    'link': url_for('my_task_view', task_id=task['id']) if task.get('task_status') == 'In Progress' else url_for('my_tasks'),
+                    'sort_key': due_text if due_text != '-' else '9999-12-31 23:59'
+                })
+
+            cursor.execute("""
+                SELECT
+                    m.id,
+                    m.material_description,
+                    m.reminder_frequency,
+                    p.case_id,
+                    p.next_court_date,
+                    c.tracking_number,
+                    c.client_name
+                FROM case_proceeding_materials m
+                INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+                INNER JOIN cases c ON c.id = p.case_id
+                WHERE m.allocated_to_id = %s
+                ORDER BY COALESCE(p.next_court_date, m.created_at) ASC
+            """, (employee_id,))
+            allocated_materials = list(cursor.fetchall() or [])
+            for material in allocated_materials:
+                next_date = material.get('next_court_date')
+                next_text = '-'
+                if next_date:
+                    try:
+                        next_text = next_date.strftime('%Y-%m-%d')
+                    except Exception:
+                        next_text = str(next_date)
+                notifications_feed.append({
+                    'type': 'reminder',
+                    'icon': 'fa-bell',
+                    'title': material.get('material_description') or 'Session reminder',
+                    'subtitle': f"{material.get('tracking_number') or '-'} - {material.get('client_name') or 'Case'}",
+                    'meta': f"Reminder: {material.get('reminder_frequency') or '-'} | Next court: {next_text}",
+                    'link': url_for('case_details', case_id=material.get('case_id')),
+                    'sort_key': next_text if next_text != '-' else '9999-12-31'
+                })
+
+            cursor.execute("""
+                SELECT
+                    p.case_id,
+                    p.next_court_date,
+                    p.next_attendance,
+                    c.tracking_number,
+                    c.client_name
+                FROM case_proceedings p
+                INNER JOIN cases c ON c.id = p.case_id
+                WHERE p.next_court_date IS NOT NULL
+                  AND p.next_court_date >= %s
+                  AND c.filled_by_id = %s
+                ORDER BY p.next_court_date ASC
+                LIMIT 50
+            """, (today, employee_id))
+            upcoming_calendar = list(cursor.fetchall() or [])
+            for cal in upcoming_calendar:
+                next_date = cal.get('next_court_date')
+                next_text = '-'
+                if next_date:
+                    try:
+                        next_text = next_date.strftime('%Y-%m-%d')
+                    except Exception:
+                        next_text = str(next_date)
+                notifications_feed.append({
+                    'type': 'calendar',
+                    'icon': 'fa-calendar-alt',
+                    'title': cal.get('next_attendance') or 'Upcoming court date',
+                    'subtitle': f"{cal.get('tracking_number') or '-'} - {cal.get('client_name') or 'Case'}",
+                    'meta': f"Scheduled: {next_text}",
+                    'link': url_for('case_calendar', case_id=cal.get('case_id')),
+                    'sort_key': next_text if next_text != '-' else '9999-12-31'
+                })
+
+            notifications_feed.sort(key=lambda x: x.get('sort_key') or '9999-12-31 23:59')
+            notifications_feed = notifications_feed[:120]
+    except Exception as e:
+        print(f"Error loading notifications: {e}")
+        flash('An error occurred while loading notifications.', 'error')
+    finally:
+        connection.close()
+
+    return render_template(
+        'notifications.html',
+        company_settings=company_settings,
+        notifications=notifications_feed
+    )
 
 @app.route('/upload_signature_stamp', methods=['POST'])
 def upload_signature_stamp():
@@ -5220,7 +6242,16 @@ def client_case_details(case_id):
                     END as is_latest
                 FROM case_proceedings p
                 WHERE p.case_id = %s
-                ORDER BY date_of_court_appeared DESC, created_at DESC
+                ORDER BY 
+                    CASE 
+                        WHEN EXISTS (
+                            SELECT 1 FROM case_proceedings p2 
+                            WHERE p2.previous_proceeding_id = p.id
+                        ) THEN 0 
+                        ELSE 1 
+                    END DESC,
+                    p.date_of_court_appeared DESC,
+                    p.created_at DESC
             """, (case_id,))
             all_proceedings = cursor.fetchall()
             
@@ -6133,8 +7164,36 @@ def client_registration():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    client = {}
+    connection = get_db_connection()
+    if connection:
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT
+                        id,
+                        full_name,
+                        email,
+                        phone_number,
+                        client_type,
+                        client_address,
+                        national_id,
+                        profile_picture,
+                        id_front,
+                        id_back,
+                        cr12_certificate
+                    FROM clients
+                    WHERE id = %s
+                """, (session['client_id'],))
+                client = cursor.fetchone() or {}
+        except Exception as e:
+            print(f"Error loading client registration data: {e}")
+            client = {}
+        finally:
+            connection.close()
     
-    return render_template('client_registration.html', company_settings=company_settings)
+    return render_template('client_registration.html', company_settings=company_settings, client=client)
 
 @app.route('/submit_client_registration', methods=['POST'])
 def submit_client_registration():
@@ -6247,7 +7306,7 @@ def submit_client_registration():
     connection = get_db_connection()
     if connection:
         try:
-            with connection.cursor() as cursor:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
                 # Build update query based on client type and provided data
                 update_fields = ['phone_number = %s', 'client_type = %s']
                 update_values = [phone_number, client_type]
@@ -7749,7 +8808,8 @@ def matter_management():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    return render_template('matter_management.html', company_settings=company_settings)
+    return render_template('matter_management.html', company_settings=company_settings,
+                           user_role=user_role, current_employee_id=session.get('employee_id'))
 
 @app.route('/case_management')
 def case_management():
@@ -7785,7 +8845,501 @@ def case_management():
         finally:
             connection.close()
     
-    return render_template('case_management.html', company_settings=company_settings, employee_name=employee_name)
+    return render_template('case_management.html', company_settings=company_settings, employee_name=employee_name, user_role=user_role)
+
+@app.route('/case_management/tasks', methods=['GET', 'POST'])
+def case_task_management():
+    """Case task management page."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('case_management'))
+
+    current_employee_id = session.get('employee_id')
+    selected_case_id = (request.args.get('case_id') or '').strip()
+    edit_task_query = (request.args.get('edit_task') or '').strip()
+    cases = []
+    employees = []
+    case_tasks = []
+    editing_task = None
+    reminder_options = [
+        ('10m', '10 minutes before'),
+        ('30m', '30 minutes before'),
+        ('1h', '1 hour before'),
+        ('6h', '6 hours before'),
+        ('12h', '12 hours before'),
+        ('1d', '1 day before'),
+        ('2d', '2 days before'),
+        ('7d', '1 week before'),
+    ]
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+
+            if user_role == 'IT Support' or original_role == 'IT Support':
+                cursor.execute("""
+                    SELECT id, tracking_number, client_name, filled_by_name, created_by_name, status
+                    FROM cases
+                    ORDER BY updated_at DESC
+                """)
+            else:
+                cursor.execute("""
+                    SELECT id, tracking_number, client_name, filled_by_name, created_by_name, status
+                    FROM cases
+                    WHERE filled_by_id = %s
+                    ORDER BY updated_at DESC
+                """, (current_employee_id,))
+            cases = cursor.fetchall()
+            case_ids = {str(c['id']) for c in cases}
+
+            cursor.execute("""
+                SELECT id, full_name, role
+                FROM employees
+                WHERE status = 'Active'
+                ORDER BY full_name ASC
+            """)
+            employees = cursor.fetchall()
+            employee_map = {str(e['id']): e for e in employees}
+
+            if request.method == 'GET' and edit_task_query:
+                try:
+                    _edit_tid = int(edit_task_query)
+                except (ValueError, TypeError):
+                    _edit_tid = None
+                if _edit_tid:
+                    cursor.execute("""
+                        SELECT t.id, t.linked_id, t.task_title, t.task_description, t.due_at,
+                               t.reminder_intervals, t.assigned_to_id, t.assigned_to_name, t.task_status,
+                               t.allow_view_case_details, t.allow_edit_case_details, t.allow_view_case_documents,
+                               t.allow_upload_case_documents, t.allow_download_case_documents
+                        FROM task_management t
+                        WHERE t.id = %s AND t.task_type = 'case'
+                    """, (_edit_tid,))
+                    _et_row = cursor.fetchone()
+                    if _et_row and str(_et_row['linked_id']) in case_ids:
+                        editing_task = _et_row
+                        selected_case_id = str(_et_row['linked_id'])
+                        _da = editing_task.get('due_at')
+                        if hasattr(_da, 'strftime'):
+                            editing_task['due_at_input'] = _da.strftime('%Y-%m-%dT%H:%M')
+                        else:
+                            _ds = str(_da or '')
+                            editing_task['due_at_input'] = (_ds[:16].replace(' ', 'T') if len(_ds) >= 16 else _ds)
+                        _rim = (editing_task.get('reminder_intervals') or '').strip()
+                        editing_task['reminder_set'] = {x.strip() for x in _rim.split(',') if x.strip()}
+                    elif _et_row:
+                        flash('You cannot edit this task.', 'error')
+
+            if request.method == 'POST':
+                linked_case_id = (request.form.get('linked_case_id') or '').strip()
+                selected_case_id = linked_case_id or selected_case_id
+                edit_task_id = (request.form.get('edit_task_id') or '').strip()
+                assigned_employee_id = (request.form.get('assigned_employee_id') or '').strip()
+                allow_view_case_details = 1 if request.form.get('allow_view_case_details') else 0
+                allow_edit_case_details = 1 if request.form.get('allow_edit_case_details') else 0
+                allow_view_case_documents = 1 if request.form.get('allow_view_case_documents') else 0
+                allow_upload_case_documents = 1 if request.form.get('allow_upload_case_documents') else 0
+                allow_download_case_documents = 1 if request.form.get('allow_download_case_documents') else 0
+                task_title = (request.form.get('task_title') or '').strip()
+                task_description = (request.form.get('task_description') or '').strip()
+                due_at = (request.form.get('due_at') or '').strip()
+                reminder_intervals = request.form.getlist('reminder_intervals')
+                task_status_val = (request.form.get('task_status') or '').strip()
+
+                errors = []
+                if not linked_case_id:
+                    errors.append('Please select a case.')
+                elif linked_case_id not in case_ids:
+                    errors.append('Selected case is not available for your account.')
+                if not assigned_employee_id:
+                    errors.append('Please select the employee to allocate this task to.')
+                elif assigned_employee_id not in employee_map:
+                    errors.append('Selected employee is not available.')
+                if not task_title:
+                    errors.append('Task title is required.')
+                if not due_at:
+                    errors.append('Task timeline is required.')
+                if not reminder_intervals:
+                    errors.append('Select at least one reminder interval.')
+                allowed_status = {'Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled'}
+                if edit_task_id:
+                    if task_status_val not in allowed_status:
+                        errors.append('Task status is required.')
+                elif task_status_val and task_status_val not in allowed_status:
+                    errors.append('Invalid task status.')
+
+                if errors:
+                    for err in errors:
+                        flash(err, 'error')
+                    if edit_task_id:
+                        try:
+                            _post_eid = int(edit_task_id)
+                        except (ValueError, TypeError):
+                            _post_eid = None
+                        if _post_eid:
+                            cursor.execute("""
+                                SELECT t.id, t.linked_id, t.task_title, t.task_description, t.due_at,
+                                       t.reminder_intervals, t.assigned_to_id, t.assigned_to_name, t.task_status,
+                                       t.allow_view_case_details, t.allow_edit_case_details, t.allow_view_case_documents,
+                                       t.allow_upload_case_documents, t.allow_download_case_documents
+                                FROM task_management t
+                                WHERE t.id = %s AND t.task_type = 'case'
+                            """, (_post_eid,))
+                            _et_retry = cursor.fetchone()
+                            if _et_retry and str(_et_retry['linked_id']) in case_ids:
+                                editing_task = dict(_et_retry)
+                                selected_case_id = linked_case_id or str(_et_retry['linked_id'])
+                                editing_task['task_title'] = task_title
+                                editing_task['task_description'] = task_description
+                                editing_task['due_at_input'] = due_at
+                                editing_task['reminder_set'] = set(reminder_intervals)
+                                try:
+                                    editing_task['assigned_to_id'] = int(assigned_employee_id) if assigned_employee_id else _et_retry['assigned_to_id']
+                                except (ValueError, TypeError):
+                                    editing_task['assigned_to_id'] = _et_retry['assigned_to_id']
+                                editing_task['allow_view_case_details'] = allow_view_case_details
+                                editing_task['allow_edit_case_details'] = allow_edit_case_details
+                                editing_task['allow_view_case_documents'] = allow_view_case_documents
+                                editing_task['allow_upload_case_documents'] = allow_upload_case_documents
+                                editing_task['allow_download_case_documents'] = allow_download_case_documents
+                                editing_task['task_status'] = task_status_val if task_status_val in allowed_status else _et_retry.get('task_status')
+                else:
+                    if edit_task_id:
+                        try:
+                            _upd_tid = int(edit_task_id)
+                        except (ValueError, TypeError):
+                            _upd_tid = None
+                        if not _upd_tid:
+                            flash('Invalid task reference.', 'error')
+                        else:
+                            cursor.execute("""
+                                SELECT id, linked_id, task_type
+                                FROM task_management
+                                WHERE id = %s AND task_type = 'case'
+                            """, (_upd_tid,))
+                            existing = cursor.fetchone()
+                            if not existing:
+                                flash('Task not found.', 'error')
+                            elif str(existing['linked_id']) not in case_ids:
+                                flash('You cannot edit this task.', 'error')
+                            else:
+                                cursor.execute("""
+                                    UPDATE task_management
+                                    SET linked_id = %s,
+                                        task_title = %s,
+                                        task_description = %s,
+                                        due_at = %s,
+                                        reminder_intervals = %s,
+                                        assigned_to_id = %s,
+                                        assigned_to_name = %s,
+                                        allow_view_case_details = %s,
+                                        allow_edit_case_details = %s,
+                                        allow_view_case_documents = %s,
+                                        allow_upload_case_documents = %s,
+                                        allow_download_case_documents = %s,
+                                        task_status = %s
+                                    WHERE id = %s AND task_type = 'case'
+                                """, (
+                                    int(linked_case_id),
+                                    task_title,
+                                    task_description,
+                                    due_at.replace('T', ' '),
+                                    ','.join(reminder_intervals),
+                                    int(assigned_employee_id),
+                                    employee_map[assigned_employee_id]['full_name'],
+                                    allow_view_case_details,
+                                    allow_edit_case_details,
+                                    allow_view_case_documents,
+                                    allow_upload_case_documents,
+                                    allow_download_case_documents,
+                                    task_status_val,
+                                    _upd_tid,
+                                ))
+                                connection.commit()
+                                flash('Case task updated successfully.', 'success')
+                                return redirect(url_for('case_task_management', case_id=linked_case_id))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO task_management
+                            (task_type, linked_id, task_title, task_description, due_at, reminder_intervals, assigned_to_id, assigned_to_name, allow_view_case_details, allow_edit_case_details, allow_view_case_documents, allow_upload_case_documents, allow_download_case_documents, created_by_id, created_by_name)
+                            VALUES ('case', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            int(linked_case_id),
+                            task_title,
+                            task_description,
+                            due_at.replace('T', ' '),
+                            ','.join(reminder_intervals),
+                            int(assigned_employee_id),
+                            employee_map[assigned_employee_id]['full_name'],
+                            allow_view_case_details,
+                            allow_edit_case_details,
+                            allow_view_case_documents,
+                            allow_upload_case_documents,
+                            allow_download_case_documents,
+                            current_employee_id,
+                            session.get('employee_name') or 'Unknown'
+                        ))
+                        connection.commit()
+                        flash('Case task created successfully.', 'success')
+                        return redirect(url_for('case_task_management'))
+
+            if case_ids:
+                cursor.execute("""
+                    SELECT
+                        t.id,
+                        t.task_title,
+                        t.task_description,
+                        t.due_at,
+                        t.reminder_intervals,
+                        t.task_status,
+                        t.assigned_to_name,
+                        t.allow_view_case_details,
+                        t.allow_edit_case_details,
+                        t.allow_view_case_documents,
+                        t.allow_upload_case_documents,
+                        t.allow_download_case_documents,
+                        t.created_by_name,
+                        c.id AS case_id,
+                        c.tracking_number,
+                        c.client_name
+                    FROM task_management t
+                    INNER JOIN cases c ON c.id = t.linked_id
+                    WHERE t.task_type = 'case'
+                    ORDER BY t.created_at DESC
+                    LIMIT 100
+                """)
+                task_rows = cursor.fetchall()
+                case_tasks = [r for r in task_rows if str(r.get('case_id')) in case_ids]
+            else:
+                case_tasks = []
+    except Exception as e:
+        print(f"Case task management error: {e}")
+        flash('An error occurred while loading case tasks.', 'error')
+    finally:
+        connection.close()
+
+    return render_template(
+        'case_task_management.html',
+        company_settings=company_settings,
+        user_role=user_role,
+        current_employee_id=current_employee_id,
+        selected_case_id=selected_case_id,
+        cases=cases,
+        employees=employees,
+        case_tasks=case_tasks,
+        reminder_options=reminder_options,
+        editing_task=editing_task,
+        task_status_options=['Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled']
+    )
+
+@app.route('/case_management/case_tracking')
+def case_tracking():
+    """All court attendances (proceedings) across cases the user can access."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    current_employee_id = session['employee_id']
+    is_mp = user_role == 'Managing Partner'
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('case_management'))
+
+    rows = []
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            mp_clause = ""
+            params = ()
+            if is_mp:
+                mp_clause = " AND c.filled_by_id = %s AND c.status = 'Active' "
+                params = (current_employee_id,)
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id AS proceeding_id,
+                    p.case_id,
+                    c.tracking_number,
+                    c.client_name,
+                    cl.full_name AS client_full_name,
+                    p.court_activity_type,
+                    p.court_room,
+                    p.judicial_officer,
+                    p.date_of_court_appeared,
+                    p.outcome_orders,
+                    p.outcome_details,
+                    p.next_court_date,
+                    p.attendance,
+                    p.next_attendance,
+                    p.virtual_link,
+                    p.reason,
+                    p.created_at,
+                    p.updated_at
+                FROM case_proceedings p
+                INNER JOIN cases c ON c.id = p.case_id
+                LEFT JOIN clients cl ON c.client_id = cl.id
+                WHERE 1=1
+                  AND p.id = (
+                      SELECT p2.id
+                      FROM case_proceedings p2
+                      WHERE p2.case_id = p.case_id
+                      ORDER BY COALESCE(p2.updated_at, p2.created_at) DESC, p2.id DESC
+                      LIMIT 1
+                  )
+                """
+                + mp_clause
+                + """
+                ORDER BY
+                    COALESCE(p.updated_at, p.created_at) DESC,
+                    p.created_at DESC
+                """,
+                params,
+            )
+            rows = cursor.fetchall()
+
+            for r in rows:
+                if r.get('date_of_court_appeared'):
+                    r['date_of_court_appeared'] = r['date_of_court_appeared'].strftime('%Y-%m-%d')
+                if r.get('next_court_date'):
+                    r['next_court_date'] = r['next_court_date'].strftime('%Y-%m-%d')
+                if r.get('created_at'):
+                    r['created_at'] = r['created_at'].strftime('%Y-%m-%d %H:%M')
+    except Exception as e:
+        print(f"Error loading case tracking: {e}")
+        flash('An error occurred while loading court attendances.', 'error')
+        return redirect(url_for('case_management'))
+    finally:
+        connection.close()
+
+    return render_template(
+        'case_tracking.html',
+        company_settings=company_settings,
+        user_role=user_role,
+        attendances=rows,
+        attendance_count=len(rows),
+    )
+
+@app.route('/matter_tracking')
+def matter_tracking():
+    """Matter tracking page - lists matters accessible to the current user."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('other_matters'))
+
+    current_employee_id = session.get('employee_id')
+    matters = []
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if user_role == 'IT Support' or original_role == 'IT Support':
+                cursor.execute("""
+                    SELECT
+                        id,
+                        matter_reference_number,
+                        matter_title,
+                        client_name,
+                        assigned_employee_name,
+                        status,
+                        date_opened,
+                        created_at,
+                        updated_at
+                    FROM matters
+                    ORDER BY updated_at DESC, created_at DESC
+                """)
+            else:
+                cursor.execute("""
+                    SELECT
+                        id,
+                        matter_reference_number,
+                        matter_title,
+                        client_name,
+                        assigned_employee_name,
+                        status,
+                        date_opened,
+                        created_at,
+                        updated_at
+                    FROM matters
+                    WHERE assigned_employee_id = %s
+                    ORDER BY updated_at DESC, created_at DESC
+                """, (current_employee_id,))
+            matters = cursor.fetchall()
+
+            for m in matters:
+                if m.get('date_opened'):
+                    try:
+                        m['date_opened'] = m['date_opened'].strftime('%Y-%m-%d')
+                    except Exception:
+                        pass
+                if m.get('created_at'):
+                    try:
+                        m['created_at'] = m['created_at'].strftime('%Y-%m-%d %H:%M')
+                    except Exception:
+                        pass
+                if m.get('updated_at'):
+                    try:
+                        m['updated_at'] = m['updated_at'].strftime('%Y-%m-%d %H:%M')
+                    except Exception:
+                        pass
+    except Exception as e:
+        print(f"Error loading matter tracking: {e}")
+        flash('An error occurred while loading matters.', 'error')
+        matters = []
+    finally:
+        connection.close()
+
+    return render_template(
+        'matter_tracking.html',
+        company_settings=company_settings,
+        user_role=user_role,
+        matters=matters,
+        matter_count=len(matters),
+    )
 
 @app.route('/case_management/<int:case_id>')
 def case_details(case_id):
@@ -7809,6 +9363,9 @@ def case_details(case_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session.get('employee_id')
+            task_id = (request.args.get('task_id') or '').strip()
+            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
             # Fetch case details with client and employee information
             cursor.execute("""
                 SELECT 
@@ -7817,6 +9374,7 @@ def case_details(case_id):
                     c.court_case_number,
                     c.client_id,
                     c.client_name,
+                    c.court_rank,
                     c.case_type,
                     c.filing_date,
                     c.case_category,
@@ -7859,6 +9417,13 @@ def case_details(case_id):
             if not case_data:
                 flash('Case not found', 'error')
                 return redirect(url_for('case_management'))
+
+            is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
+            if not is_it_support and not is_case_owner:
+                ensure_task_management_table(cursor, connection)
+                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view'):
+                    flash('You can only access this case while your allocated task is active.', 'error')
+                    return redirect(url_for('my_tasks'))
             
             # Fetch parties for this case
             cursor.execute("""
@@ -7868,6 +9433,8 @@ def case_details(case_id):
                     party_type,
                     party_category,
                     firm_agent,
+                    party_phone,
+                    party_email,
                     created_at,
                     updated_at
                 FROM case_parties
@@ -7912,7 +9479,16 @@ def case_details(case_id):
                     p.created_at
                 FROM case_proceedings p
                 WHERE p.case_id = %s
-                ORDER BY date_of_court_appeared DESC, created_at DESC
+                ORDER BY 
+                    CASE 
+                        WHEN EXISTS (
+                            SELECT 1 FROM case_proceedings p2 
+                            WHERE p2.previous_proceeding_id = p.id
+                        ) THEN 0 
+                        ELSE 1 
+                    END DESC,
+                    p.date_of_court_appeared DESC,
+                    p.created_at DESC
             """, (case_id,))
             all_proceedings = cursor.fetchall()
             
@@ -7974,7 +9550,7 @@ def case_details(case_id):
                                     results = service.files().list(
                                         q=query,
                                         spaces='drive',
-                                        fields='nextPageToken, files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                        fields='nextPageToken, files(id, name, description, createdTime, modifiedTime, webViewLink, size, mimeType, properties, owners(displayName,emailAddress), lastModifyingUser(displayName,emailAddress))',
                                         orderBy='modifiedTime desc',
                                         pageSize=100,
                                         pageToken=page_token
@@ -8006,14 +9582,41 @@ def case_details(case_id):
                                         size_str = f"{size_int} B" if size_int < 1024 else (f"{size_int / 1024:.2f} KB" if size_int < 1024 * 1024 else f"{size_int / (1024 * 1024):.2f} MB")
                                     except Exception:
                                         size_str = "Unknown"
+
+                                    # Uploaded/modified by info
+                                    uploaded_by = None
+                                    modified_by = None
+                                    file_properties = file.get('properties') or {}
+                                    uploaded_by = (
+                                        file_properties.get('uploaded_by_name')
+                                        or file_properties.get('created_by_name')
+                                    )
+                                    if not uploaded_by:
+                                        owners = file.get('owners') or []
+                                        if owners:
+                                            owner = owners[0] or {}
+                                            uploaded_by = owner.get('displayName') or owner.get('emailAddress')
+
+                                    modifying_user = file.get('lastModifyingUser') or {}
+                                    modified_by = (
+                                        file_properties.get('updated_by_name')
+                                        or modifying_user.get('displayName')
+                                        or modifying_user.get('emailAddress')
+                                    )
+                                    if not modified_by:
+                                        modified_by = uploaded_by
+
                                     documents.append({
                                         'id': file.get('id'),
                                         'name': file.get('name', 'Unknown'),
+                                        'description': (file.get('description') or '').strip(),
                                         'created_time': created_time,
                                         'modified_time': modified_time,
                                         'url': file.get('webViewLink', ''),
                                         'size': size_str,
-                                        'mime_type': file.get('mimeType', '')
+                                        'mime_type': file.get('mimeType', ''),
+                                        'uploaded_by': uploaded_by or 'Unknown',
+                                        'modified_by': modified_by or 'Unknown'
                                     })
                 except Exception as e:
                     print(f"Error fetching documents for case details: {e}")
@@ -8032,6 +9635,7 @@ def case_details(case_id):
             return render_template('case_details.html', 
                                  case_data=case_data, 
                                  case_id=case_id,
+                                 access_task_id=task_id,
                                  parties=parties,
                                  proceedings=proceedings,
                                  documents=documents,
@@ -8072,6 +9676,9 @@ def case_edit(case_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session.get('employee_id')
+            task_id = (request.args.get('task_id') or '').strip()
+            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
             # Fetch case details
             cursor.execute("""
                 SELECT 
@@ -8080,6 +9687,7 @@ def case_edit(case_id):
                     c.court_case_number,
                     c.client_id,
                     c.client_name,
+                    c.court_rank,
                     c.case_type,
                     c.filing_date,
                     c.case_category,
@@ -8100,6 +9708,13 @@ def case_edit(case_id):
             if not case_data:
                 flash('Case not found', 'error')
                 return redirect(url_for('case_management'))
+
+            is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
+            if not is_it_support and not is_case_owner:
+                ensure_task_management_table(cursor, connection)
+                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='edit'):
+                    flash('This task does not allow editing case details or is no longer active.', 'error')
+                    return redirect(url_for('my_tasks'))
             
             # Fetch parties for this case
             cursor.execute("""
@@ -8108,7 +9723,9 @@ def case_edit(case_id):
                     party_name,
                     party_type,
                     party_category,
-                    firm_agent
+                    firm_agent,
+                    party_phone,
+                    party_email
                 FROM case_parties
                 WHERE case_id = %s
                 ORDER BY id ASC
@@ -8130,7 +9747,8 @@ def case_edit(case_id):
                                  case_id=case_id,
                                  parties=parties,
                                  company_settings=company_settings,
-                                 employee_name=employee_name)
+                                 employee_name=employee_name,
+                                 court_rank_options=COURT_RANK_OPTIONS)
     except Exception as e:
         print(f"Error fetching case for edit: {e}")
         flash('An error occurred while fetching case details.', 'error')
@@ -8160,6 +9778,9 @@ def case_documents(case_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session.get('employee_id')
+            task_id = (request.args.get('task_id') or '').strip()
+            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
             # Fetch case details with client information
             cursor.execute("""
                 SELECT 
@@ -8167,6 +9788,7 @@ def case_documents(case_id):
                     c.tracking_number,
                     c.court_case_number,
                     c.client_id,
+                    c.filled_by_id,
                     c.client_name,
                     c.case_type,
                     c.status,
@@ -8185,6 +9807,13 @@ def case_documents(case_id):
             if not case_data:
                 flash('Case not found', 'error')
                 return redirect(url_for('case_management'))
+
+            is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
+            if not is_it_support and not is_case_owner:
+                ensure_task_management_table(cursor, connection)
+                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view_documents'):
+                    flash('You can only access case documents while your allocated task is active.', 'error')
+                    return redirect(url_for('my_tasks'))
             
             # Check if Google Drive is connected and load credentials
             google_drive_connected = False
@@ -8253,7 +9882,7 @@ def case_documents(case_id):
                                     results = service.files().list(
                                         q=query,
                                         spaces='drive',
-                                        fields='nextPageToken, files(id, name, createdTime, modifiedTime, webViewLink, size, mimeType)',
+                                        fields='nextPageToken, files(id, name, description, createdTime, modifiedTime, webViewLink, size, mimeType, properties, owners(displayName,emailAddress), lastModifyingUser(displayName,emailAddress))',
                                         orderBy='modifiedTime desc',
                                         pageSize=100,
                                         pageToken=page_token
@@ -8300,15 +9929,43 @@ def case_documents(case_id):
                                             size_str = "Unknown"
                                     else:
                                         size_str = "Unknown"
+
+                                    # Uploaded/modified by info
+                                    uploaded_by = None
+                                    modified_by = None
+                                    file_properties = file.get('properties') or {}
+
+                                    # Prefer explicit uploader metadata we set during upload/create.
+                                    uploaded_by = (
+                                        file_properties.get('uploaded_by_name')
+                                        or file_properties.get('created_by_name')
+                                    )
+                                    if not uploaded_by:
+                                        owners = file.get('owners') or []
+                                        if owners:
+                                            owner = owners[0] or {}
+                                            uploaded_by = owner.get('displayName') or owner.get('emailAddress')
+
+                                    modifying_user = file.get('lastModifyingUser') or {}
+                                    modified_by = (
+                                        file_properties.get('updated_by_name')
+                                        or modifying_user.get('displayName')
+                                        or modifying_user.get('emailAddress')
+                                    )
+                                    if not modified_by:
+                                        modified_by = uploaded_by
                                     
                                     documents.append({
                                         'id': file.get('id'),
                                         'name': file.get('name', 'Unknown'),
+                                        'description': (file.get('description') or '').strip(),
                                         'created_time': created_time,
                                         'modified_time': modified_time,
                                         'url': file.get('webViewLink', ''),
                                         'size': size_str,
-                                        'mime_type': file.get('mimeType', '')
+                                        'mime_type': file.get('mimeType', ''),
+                                        'uploaded_by': uploaded_by or 'Unknown',
+                                        'modified_by': modified_by or 'Unknown'
                                     })
                 except Exception as e:
                     print(f"Error fetching documents from Google Drive: {e}")
@@ -8322,6 +9979,7 @@ def case_documents(case_id):
             return render_template('case_documents.html', 
                                  case_data=case_data, 
                                  case_id=case_id,
+                                 access_task_id=task_id,
                                  google_drive_connected=google_drive_connected,
                                  documents=documents,
                                  company_settings=company_settings)
@@ -8389,7 +10047,16 @@ def case_proceedings(case_id):
                     END as is_latest
                 FROM case_proceedings p
                 WHERE p.case_id = %s
-                ORDER BY date_of_court_appeared DESC, created_at DESC
+                ORDER BY 
+                    CASE 
+                        WHEN EXISTS (
+                            SELECT 1 FROM case_proceedings p2 
+                            WHERE p2.previous_proceeding_id = p.id
+                        ) THEN 0 
+                        ELSE 1 
+                    END DESC,
+                    p.date_of_court_appeared DESC,
+                    p.created_at DESC
             """, (case_id,))
             all_proceedings = cursor.fetchall()
             
@@ -8417,6 +10084,8 @@ def case_proceedings(case_id):
             # Use all proceedings for display (both latest and historical)
             proceedings = all_proceedings
             
+            ensure_case_proceeding_advocates_table(cursor, connection)
+            
             # Fetch materials for each proceeding (both latest and historical)
             for proceeding in all_proceedings:
                 cursor.execute("""
@@ -8434,6 +10103,14 @@ def case_proceedings(case_id):
                 """, (proceeding['id'],))
                 proceeding['materials'] = cursor.fetchall()
                 
+                cursor.execute("""
+                    SELECT id, advocate_name, remarks, created_at, updated_at
+                    FROM case_proceeding_advocates
+                    WHERE proceeding_id = %s
+                    ORDER BY id ASC
+                """, (proceeding['id'],))
+                proceeding['advocates'] = cursor.fetchall()
+                
                 # Convert date objects to strings
                 if proceeding.get('date_of_court_appeared'):
                     proceeding['date_of_court_appeared'] = proceeding['date_of_court_appeared'].strftime('%Y-%m-%d')
@@ -8450,6 +10127,12 @@ def case_proceedings(case_id):
                         material['created_at'] = material['created_at'].strftime('%Y-%m-%d %H:%M:%S')
                     if material.get('updated_at'):
                         material['updated_at'] = material['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                
+                for adv in proceeding.get('advocates') or []:
+                    if adv.get('created_at'):
+                        adv['created_at'] = adv['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    if adv.get('updated_at'):
+                        adv['updated_at'] = adv['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
             
             company_settings = get_company_settings()
             if not company_settings:
@@ -9082,11 +10765,22 @@ def api_outcomes_search():
 
 @app.route('/api/cases/proceedings/add', methods=['POST'])
 def api_add_proceeding():
-    """API endpoint to add a new case proceeding"""
+    """Add a new case proceeding row. Always inserts (never overwrites).
+    Optional JSON `previous_proceeding_id` links the new row to the prior tip of the chain for audit history.
+    """
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.get_json()
+    if not data:
+        data = {}
+    
+    # Normalize advocates list (must be a list for save)
+    _adv = data.get('advocates')
+    if _adv is None:
+        data['advocates'] = []
+    elif not isinstance(_adv, list):
+        data['advocates'] = []
     
     # Validate required fields
     if not data.get('case_id'):
@@ -9105,14 +10799,44 @@ def api_add_proceeding():
             if not cursor.fetchone():
                 return jsonify({'error': 'Case not found'}), 404
             
-            # Insert proceeding
+            # Optional chain: new row links to previous leaf for audit trail (never overwrite in place)
+            prev_raw = data.get('previous_proceeding_id')
+            prev_id = None
+            if prev_raw is not None and prev_raw != '':
+                try:
+                    prev_id = int(prev_raw)
+                except (TypeError, ValueError):
+                    prev_id = None
+            if prev_id:
+                cursor.execute(
+                    "SELECT id, case_id FROM case_proceedings WHERE id = %s",
+                    (prev_id,),
+                )
+                prow = cursor.fetchone()
+                if not prow or int(prow[1]) != int(data['case_id']):
+                    return jsonify({'error': 'Invalid previous proceeding for this case'}), 400
+                # Only append to the current tip of the chain (no child yet)
+                cursor.execute(
+                    """
+                    SELECT 1 FROM case_proceedings
+                    WHERE previous_proceeding_id = %s LIMIT 1
+                    """,
+                    (prev_id,),
+                )
+                if cursor.fetchone():
+                    return jsonify({
+                        'error': 'That attendance already has a newer record. Refresh the page and try again.',
+                    }), 400
+            
+            # Insert proceeding (always a new row)
             cursor.execute("""
                 INSERT INTO case_proceedings (
-                    case_id, court_activity_type, court_room, judicial_officer,
+                    case_id, previous_proceeding_id, court_activity_type, court_room, judicial_officer,
                     date_of_court_appeared, outcome_orders, outcome_details, next_court_date, attendance, next_attendance, virtual_link, reason
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 data['case_id'],
+                prev_id,
                 data.get('court_activity_type') if data.get('court_activity_type') else None,
                 data.get('court_room') if data.get('court_room') else None,
                 data.get('judicial_officer') if data.get('judicial_officer') else None,
@@ -9127,6 +10851,8 @@ def api_add_proceeding():
             ))
             connection.commit()
             proceeding_id = cursor.lastrowid
+            
+            ensure_case_proceeding_advocates_table(cursor, connection)
             
             # Insert materials if provided
             materials_added = 0
@@ -9148,9 +10874,26 @@ def api_add_proceeding():
                         materials_added += 1
                 connection.commit()
             
-            message = 'Proceeding added successfully'
+            advocates_added = 0
+            for adv in data.get('advocates') or []:
+                if not isinstance(adv, dict):
+                    continue
+                aname = (adv.get('advocate_name') or adv.get('advocateName') or '').strip()
+                remarks = (adv.get('remarks') or adv.get('what_they_said') or '').strip()
+                if aname:
+                    cursor.execute("""
+                        INSERT INTO case_proceeding_advocates (
+                            proceeding_id, advocate_name, remarks
+                        ) VALUES (%s, %s, %s)
+                    """, (proceeding_id, aname, remarks or None))
+                    advocates_added += 1
+            connection.commit()
+            
+            message = 'New court attendance saved (previous records kept for reference)'
             if materials_added > 0:
                 message += f' with {materials_added} material(s)'
+            if advocates_added > 0:
+                message += f' with {advocates_added} advocate(s)'
             
             return jsonify({
                 'success': True,
@@ -9171,6 +10914,13 @@ def api_update_proceeding(proceeding_id):
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.get_json()
+    if not data:
+        data = {}
+    _adv = data.get('advocates')
+    if _adv is None:
+        data['advocates'] = []
+    elif not isinstance(_adv, list):
+        data['advocates'] = []
     
     # Validate required fields
     if not data.get('date_of_court_appeared'):
@@ -9217,6 +10967,23 @@ def api_update_proceeding(proceeding_id):
                 data.get('reason') if data.get('reason') else None,
                 proceeding_id
             ))
+            connection.commit()
+            
+            ensure_case_proceeding_advocates_table(cursor, connection)
+            
+            # Replace advocates: delete existing and insert from form
+            cursor.execute("DELETE FROM case_proceeding_advocates WHERE proceeding_id = %s", (proceeding_id,))
+            for adv in data.get('advocates') or []:
+                if not isinstance(adv, dict):
+                    continue
+                aname = (adv.get('advocate_name') or adv.get('advocateName') or '').strip()
+                remarks = (adv.get('remarks') or adv.get('what_they_said') or '').strip()
+                if aname:
+                    cursor.execute("""
+                        INSERT INTO case_proceeding_advocates (
+                            proceeding_id, advocate_name, remarks
+                        ) VALUES (%s, %s, %s)
+                    """, (proceeding_id, aname, remarks or None))
             connection.commit()
             
             # Replace materials: delete existing and insert from form
@@ -9284,50 +11051,62 @@ def api_delete_proceeding(proceeding_id):
 
 @app.route('/api/cases/search', methods=['GET'])
 def api_cases_search():
-    """API endpoint to search cases by client phone number; returns only cases allocated to the current employee"""
+    """Search cases by client name and/or phone (?q=). Empty q lists all (role-filtered). Managing Partners see only their active allocated cases."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    phone_number = request.args.get('phone', '').strip()
+
+    # Search by client name and/or phone (q= preferred; phone= kept for compatibility)
+    search_term = (request.args.get('q') or request.args.get('phone') or '').strip()
     current_employee_id = session['employee_id']
-    
+    user_role = session.get('employee_role')
+    is_mp = (user_role == 'Managing Partner')
+
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             client = None
-            
-            # If phone number is provided, find client with all details
-            if phone_number:
+            cols = "c.id, c.tracking_number, c.court_case_number, c.client_id, c.client_name, c.court_rank, c.case_type, c.filing_date, c.case_category, c.station, c.filled_by_name, c.filled_by_id, c.created_by_name, c.description, c.status, c.created_at, c.updated_at"
+            if column_exists('cases', 'allocation_description'):
+                cols += ", c.allocation_description, c.allocation_timeline"
+
+            # Managing Partner restriction clause
+            mp_clause = "AND c.filled_by_id = %s AND c.status = 'Active'" if is_mp else ""
+            mp_params_extra = (current_employee_id,) if is_mp else ()
+
+            if search_term:
                 cursor.execute("""
-                    SELECT 
-                        id, 
-                        google_id,
-                        full_name, 
-                        phone_number, 
-                        email, 
-                        profile_picture,
-                        client_type,
-                        status,
-                        created_at,
-                        updated_at
-                    FROM clients 
-                    WHERE phone_number LIKE %s AND status = 'Active'
-                    LIMIT 1
-                """, (f'%{phone_number}%',))
-                client = cursor.fetchone()
-            
-            # Fetch cases allocated to current employee only (filled_by_id = current user)
-            if phone_number and client:
-                # Fetch cases for this client that are allocated to current employee
-                cols = "c.id, c.tracking_number, c.court_case_number, c.client_id, c.client_name, c.case_type, c.filing_date, c.case_category, c.station, c.filled_by_name, c.created_by_name, c.description, c.status, c.created_at, c.updated_at"
-                if column_exists('cases', 'allocation_description'):
-                    cols += ", c.allocation_description, c.allocation_timeline"
+                    SELECT id, google_id, full_name, phone_number, email,
+                           profile_picture, client_type, status, created_at, updated_at
+                    FROM clients
+                    WHERE status = 'Active'
+                      AND (phone_number LIKE %s OR full_name LIKE %s)
+                    ORDER BY full_name ASC
+                """, (f'%{search_term}%', f'%{search_term}%'))
+                matching_clients = cursor.fetchall()
+
+                if not matching_clients:
+                    return jsonify({
+                        'cases': [],
+                        'client': None,
+                        'message': 'No client found matching that name or phone number',
+                    })
+
+                if len(matching_clients) == 1:
+                    client = matching_clients[0]
+                else:
+                    client = None
+
+                client_ids = [c['id'] for c in matching_clients]
+                placeholders = ','.join(['%s'] * len(client_ids))
+                params = tuple(client_ids)
+                if is_mp:
+                    params = params + (current_employee_id,)
+
                 cursor.execute("""
-                    SELECT 
-                        """ + cols + """,
+                    SELECT """ + cols + """,
                         cl.id as client_table_id,
                         cl.full_name as client_full_name,
                         cl.phone_number as client_phone,
@@ -9338,41 +11117,53 @@ def api_cases_search():
                         cl.created_at as client_created_at
                     FROM cases c
                     LEFT JOIN clients cl ON c.client_id = cl.id
-                    WHERE c.client_id = %s AND c.filled_by_id = %s
-                    ORDER BY c.filing_date DESC, c.created_at DESC
-                """, (client['id'], current_employee_id))
+                    WHERE c.client_id IN (""" + placeholders + """) """ + mp_clause + """
+                    ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END ASC,
+                             c.filing_date DESC, c.created_at DESC
+                """, params)
                 cases = cursor.fetchall()
-                message = f'Found {len(cases)} case(s) for {client["full_name"]} (allocated to you)'
-            elif phone_number and not client:
-                # Phone number provided but no client found
-                return jsonify({
-                    'cases': [],
-                    'client': None,
-                    'message': 'No client found with this phone number'
-                })
+                if len(matching_clients) == 1:
+                    message = f'Found {len(cases)} case(s) for {matching_clients[0]["full_name"]}'
+                else:
+                    message = (
+                        f'Found {len(cases)} case(s) across {len(matching_clients)} matching clients'
+                    )
             else:
-                # No phone number: fetch only cases allocated to current employee
-                cols = "c.id, c.tracking_number, c.court_case_number, c.client_id, c.client_name, c.case_type, c.filing_date, c.case_category, c.station, c.filled_by_name, c.created_by_name, c.description, c.status, c.created_at, c.updated_at"
-                if column_exists('cases', 'allocation_description'):
-                    cols += ", c.allocation_description, c.allocation_timeline"
-                cursor.execute("""
-                    SELECT 
-                        """ + cols + """,
-                        cl.id as client_table_id,
-                        cl.full_name as client_full_name,
-                        cl.phone_number as client_phone,
-                        cl.email as client_email,
-                        cl.profile_picture as client_profile_picture,
-                        cl.client_type as client_type,
-                        cl.status as client_status,
-                        cl.created_at as client_created_at
-                    FROM cases c
-                    LEFT JOIN clients cl ON c.client_id = cl.id
-                    WHERE c.filled_by_id = %s
-                    ORDER BY c.filing_date DESC, c.created_at DESC
-                """, (current_employee_id,))
+                if is_mp:
+                    cursor.execute("""
+                        SELECT """ + cols + """,
+                            cl.id as client_table_id,
+                            cl.full_name as client_full_name,
+                            cl.phone_number as client_phone,
+                            cl.email as client_email,
+                            cl.profile_picture as client_profile_picture,
+                            cl.client_type as client_type,
+                            cl.status as client_status,
+                            cl.created_at as client_created_at
+                        FROM cases c
+                        LEFT JOIN clients cl ON c.client_id = cl.id
+                        WHERE c.filled_by_id = %s AND c.status = 'Active'
+                        ORDER BY c.filing_date DESC, c.created_at DESC
+                    """, (current_employee_id,))
+                    message = 'Displaying your active allocated cases'
+                else:
+                    cursor.execute("""
+                        SELECT """ + cols + """,
+                            cl.id as client_table_id,
+                            cl.full_name as client_full_name,
+                            cl.phone_number as client_phone,
+                            cl.email as client_email,
+                            cl.profile_picture as client_profile_picture,
+                            cl.client_type as client_type,
+                            cl.status as client_status,
+                            cl.created_at as client_created_at
+                        FROM cases c
+                        LEFT JOIN clients cl ON c.client_id = cl.id
+                        ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END ASC,
+                                 c.filing_date DESC, c.created_at DESC
+                    """)
+                    message = 'Displaying all cases'
                 cases = cursor.fetchall()
-                message = f'Displaying {len(cases)} case(s) allocated to you'
             
             # Convert date objects to strings for JSON serialization
             for case in cases:
@@ -9407,31 +11198,101 @@ def api_cases_search():
 
 @app.route('/api/cases/<int:case_id>/approve', methods=['POST'])
 def api_approve_case(case_id):
-    """Allocated employee approves the case (sets status to Active); only the allocated case handler can approve."""
+    """Firm Administrator or Managing Partner approves a case: allocates it to an employee, sets status to Active, and optionally creates a calendar/reminder entry."""
     if 'employee_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    current_employee_id = session['employee_id']
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if not ((user_role in allowed_roles) or (original_role == 'IT Support')):
+        return jsonify({'success': False, 'error': 'Only Firm Administrators or Managing Partners can approve cases'}), 403
+
+    data = request.get_json() or {}
+    alloc_employee_id = data.get('employee_id')
+    instructions = (data.get('instructions') or '').strip() or None
+    due_date = (data.get('due_date') or '').strip() or None
+    timeline = (data.get('timeline') or '').strip() or None
+
+    if not alloc_employee_id:
+        return jsonify({'success': False, 'error': 'Please select an employee to allocate the case to'}), 400
+
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database connection error'}), 500
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT id, status, filled_by_id FROM cases WHERE id = %s", (case_id,))
+            cursor.execute("SELECT id, status, tracking_number FROM cases WHERE id = %s", (case_id,))
             case = cursor.fetchone()
             if not case:
                 return jsonify({'success': False, 'error': 'Case not found'}), 404
-            if str(case.get('filled_by_id')) != str(current_employee_id):
-                return jsonify({'success': False, 'error': 'Only the allocated case handler can approve this case'}), 403
             if case.get('status') != 'Pending Approval':
                 return jsonify({'success': False, 'error': 'Case is not pending approval'}), 400
-            cursor.execute("UPDATE cases SET status = 'Active', updated_at = NOW() WHERE id = %s", (case_id,))
+
+            # Fetch the employee to allocate to
+            cursor.execute("SELECT id, full_name FROM employees WHERE id = %s AND status = 'Active'", (alloc_employee_id,))
+            employee = cursor.fetchone()
+            if not employee:
+                return jsonify({'success': False, 'error': 'Selected employee not found or is not active'}), 400
+            employee_name = employee['full_name']
+
+            # Ensure allocation columns exist
+            if not column_exists('cases', 'allocation_description'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN allocation_description TEXT NULL")
+                    connection.commit()
+                except Exception:
+                    pass
+            if not column_exists('cases', 'allocation_timeline'):
+                try:
+                    cursor.execute("ALTER TABLE cases ADD COLUMN allocation_timeline VARCHAR(500) NULL")
+                    connection.commit()
+                except Exception:
+                    pass
+
+            # Allocate + approve the case in one update
+            cursor.execute("""
+                UPDATE cases
+                SET filled_by_id = %s,
+                    filled_by_name = %s,
+                    allocation_description = %s,
+                    allocation_timeline = %s,
+                    status = 'Active',
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (alloc_employee_id, employee_name, instructions, timeline, case_id))
+
+            # If a due_date is provided, create a calendar/reminder entry for the allocated employee
+            if due_date:
+                from datetime import date as _date
+                today_str = _date.today().isoformat()
+                activity_type = 'Case Assignment'
+                orders_text = instructions or f'Case {case.get("tracking_number", "")} allocated to {employee_name}'
+                if timeline:
+                    orders_text += f'\nTimeline: {timeline}'
+                # Insert a case_proceedings entry so it appears on the calendar
+                cursor.execute("""
+                    INSERT INTO case_proceedings
+                        (case_id, court_activity_type, date_of_court_appeared, next_court_date,
+                         next_attendance, outcome_orders, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                """, (case_id, activity_type, today_str, due_date, employee_name, orders_text))
+                proceeding_id = cursor.lastrowid
+
+                # Insert a material linked to that proceeding for the reminder feed
+                cursor.execute("""
+                    INSERT INTO case_proceeding_materials
+                        (proceeding_id, material_description, allocated_to_id, allocated_to_name, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                """, (proceeding_id, orders_text, alloc_employee_id, employee_name))
+
             connection.commit()
-            return jsonify({'success': True, 'message': 'Case approved successfully'})
+            return jsonify({'success': True, 'message': f'Case approved and allocated to {employee_name} successfully'})
     except Exception as e:
         if connection:
             connection.rollback()
         print(f"Error approving case: {e}")
-        return jsonify({'success': False, 'error': 'Server error'}), 500
+        return jsonify({'success': False, 'error': 'Server error: ' + str(e)}), 500
     finally:
         if connection:
             connection.close()
@@ -9527,7 +11388,13 @@ def register_case():
             connection.close()
     
     employee_id = session.get('employee_id')
-    return render_template('register_case.html', company_settings=company_settings, employee_name=employee_name, employee_id=employee_id)
+    return render_template(
+        'register_case.html',
+        company_settings=company_settings,
+        employee_name=employee_name,
+        employee_id=employee_id,
+        court_rank_options=COURT_RANK_OPTIONS,
+    )
 
 @app.route('/api/clients/search', methods=['GET'])
 def api_clients_search():
@@ -9954,10 +11821,14 @@ def api_cases_register():
     data = request.get_json()
     
     # Validate required fields
-    required_fields = ['client_id', 'client_name', 'case_type', 'filing_date', 'case_category', 'station', 'filled_by_id', 'filled_by_name']
+    required_fields = ['client_id', 'client_name', 'court_rank', 'case_type', 'filing_date', 'case_category', 'station', 'filled_by_id', 'filled_by_name']
     for field in required_fields:
         if not data.get(field):
             return jsonify({'error': f'{field} is required'}), 400
+    
+    court_rank = validate_court_rank(data.get('court_rank'))
+    if not court_rank:
+        return jsonify({'error': 'court_rank must be one of the listed court ranks'}), 400
     
     connection = get_db_connection()
     if not connection:
@@ -9977,14 +11848,15 @@ def api_cases_register():
             # Insert case with status 'Pending Approval'
             cursor.execute("""
                 INSERT INTO cases (
-                    tracking_number, court_case_number, client_id, client_name, case_type, filing_date, case_category, 
+                    tracking_number, court_case_number, client_id, client_name, court_rank, case_type, filing_date, case_category, 
                     station, filled_by_id, filled_by_name, created_by_id, created_by_name, description, status
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 tracking_number,
                 data.get('court_case_number', '').upper() if data.get('court_case_number') else None,
                 data['client_id'],
                 data['client_name'].upper(),
+                court_rank,
                 data['case_type'].upper(),
                 data['filing_date'],
                 data['case_category'].upper(),
@@ -10004,14 +11876,18 @@ def api_cases_register():
                 for party in data.get('parties', []):
                     if party.get('party_name') and party.get('party_type'):
                         cursor.execute("""
-                            INSERT INTO case_parties (case_id, party_name, party_type, party_category, firm_agent)
-                            VALUES (%s, %s, %s, %s, %s)
+                            INSERT INTO case_parties (
+                                case_id, party_name, party_type, party_category, firm_agent, party_phone, party_email
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
                         """, (
                             case_id,
                             party['party_name'],
                             party['party_type'],
                             party.get('party_category') if party.get('party_category') else None,
-                            party.get('firm_agent') if party.get('firm_agent') else None
+                            party.get('firm_agent') if party.get('firm_agent') else None,
+                            party.get('party_phone') if party.get('party_phone') else None,
+                            party.get('party_email') if party.get('party_email') else None
                         ))
                 connection.commit()
             
@@ -10037,10 +11913,14 @@ def api_cases_update(case_id):
     data = request.get_json()
     
     # Validate required fields
-    required_fields = ['client_id', 'client_name', 'case_type', 'filing_date', 'case_category', 'station', 'filled_by_id', 'filled_by_name']
+    required_fields = ['client_id', 'client_name', 'court_rank', 'case_type', 'filing_date', 'case_category', 'station', 'filled_by_id', 'filled_by_name']
     for field in required_fields:
         if not data.get(field):
             return jsonify({'error': f'{field} is required'}), 400
+    
+    court_rank = validate_court_rank(data.get('court_rank'))
+    if not court_rank:
+        return jsonify({'error': 'court_rank must be one of the listed court ranks'}), 400
     
     connection = get_db_connection()
     if not connection:
@@ -10059,6 +11939,7 @@ def api_cases_update(case_id):
                     court_case_number = %s,
                     client_id = %s,
                     client_name = %s,
+                    court_rank = %s,
                     case_type = %s,
                     filing_date = %s,
                     case_category = %s,
@@ -10072,6 +11953,7 @@ def api_cases_update(case_id):
                 data.get('court_case_number', '').upper() if data.get('court_case_number') else None,
                 data['client_id'],
                 data['client_name'].upper(),
+                court_rank,
                 data['case_type'].upper(),
                 data['filing_date'],
                 data['case_category'].upper(),
@@ -10092,14 +11974,18 @@ def api_cases_update(case_id):
                 for party in data.get('parties', []):
                     if party.get('party_name') and party.get('party_type'):
                         cursor.execute("""
-                            INSERT INTO case_parties (case_id, party_name, party_type, party_category, firm_agent)
-                            VALUES (%s, %s, %s, %s, %s)
+                            INSERT INTO case_parties (
+                                case_id, party_name, party_type, party_category, firm_agent, party_phone, party_email
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
                         """, (
                             case_id,
                             party['party_name'].upper() if isinstance(party['party_name'], str) else party['party_name'],
                             party['party_type'].upper() if isinstance(party['party_type'], str) else party['party_type'],
                             party.get('party_category').upper() if party.get('party_category') and isinstance(party.get('party_category'), str) else (party.get('party_category') if party.get('party_category') else None),
-                            party.get('firm_agent').upper() if party.get('firm_agent') and isinstance(party.get('firm_agent'), str) else (party.get('firm_agent') if party.get('firm_agent') else None)
+                            party.get('firm_agent').upper() if party.get('firm_agent') and isinstance(party.get('firm_agent'), str) else (party.get('firm_agent') if party.get('firm_agent') else None),
+                            party.get('party_phone') if party.get('party_phone') else None,
+                            party.get('party_email') if party.get('party_email') else None
                         ))
                 connection.commit()
             
@@ -10428,7 +12314,11 @@ def google_drive_callback():
         )
         flow.redirect_uri = redirect_uri
         
+        # Behind a reverse-proxy request.url may still use http://; rewrite to match redirect_uri
         authorization_response = request.url
+        if APP_BASE_URL and APP_BASE_URL.startswith('https://') and authorization_response.startswith('http://'):
+            authorization_response = 'https://' + authorization_response[len('http://'):]
+        
         try:
             flow.fetch_token(authorization_response=authorization_response)
         except Exception as scope_error:
@@ -10455,11 +12345,8 @@ def google_drive_callback():
         
         credentials = flow.credentials
         
-        # Get user info
-        request_session = google_requests.Request()
-        id_info = id_token.verify_oauth2_token(
-            credentials.id_token, request_session, GOOGLE_CLIENT_ID
-        )
+        # Get user info (with small clock-skew tolerance)
+        id_info = verify_google_id_token(credentials.id_token)
         
         # Store credentials in database (persistent storage)
         connection = get_db_connection()
@@ -10964,6 +12851,7 @@ def upload_case_document(case_id):
                         c.id,
                         c.tracking_number,
                         c.client_id,
+                        c.filled_by_id,
                         cl.id as client_table_id,
                         cl.full_name as client_full_name,
                         cl.phone_number as client_phone
@@ -10978,6 +12866,17 @@ def upload_case_document(case_id):
                 
                 if not case_data.get('client_table_id'):
                     return jsonify({'success': False, 'error': 'Client information not found for this case'}), 404
+
+                employee_id = session.get('employee_id')
+                user_role = session.get('employee_role')
+                original_role = session.get('original_role')
+                is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+                is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
+                task_id = (request.form.get('task_id') or request.args.get('task_id') or '').strip()
+                if not is_it_support and not is_case_owner:
+                    ensure_task_management_table(cursor, connection)
+                    if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='upload_documents'):
+                        return jsonify({'success': False, 'error': 'You can only upload while your allocated task is active.'}), 403
                 
                 # Get main folder ID
                 main_folder_id = session.get('google_drive_main_folder_id')
@@ -11067,6 +12966,11 @@ def upload_case_document(case_id):
                 file_content = file.read()
                 file_name = secure_filename(file.filename)
                 description = request.form.get('description', '').strip()
+                if not description:
+                    return jsonify({'success': False, 'error': 'Description is required.'}), 400
+                desc_words = description.split()
+                if len(desc_words) > 5:
+                    return jsonify({'success': False, 'error': 'Description must be 5 words or fewer.'}), 400
                 
                 # Determine MIME type
                 file_ext = file_name.rsplit('.', 1)[1].lower() if '.' in file_name else ''
@@ -11083,10 +12987,13 @@ def upload_case_document(case_id):
                 # Create file metadata
                 file_metadata = {
                     'name': file_name,
-                    'parents': [case_doc_folder_id]
+                    'parents': [case_doc_folder_id],
+                    'properties': {
+                        'uploaded_by_id': str(session.get('employee_id') or ''),
+                        'uploaded_by_name': session.get('employee_name') or ''
+                    }
                 }
-                if description:
-                    file_metadata['description'] = description
+                file_metadata['description'] = description
                 
                 # Upload to Google Drive
                 media = MediaIoBaseUpload(
@@ -11232,43 +13139,56 @@ def create_case_google_file(case_id):
         data = request.get_json() or {}
         file_type = (data.get('type') or '').strip().lower()
         file_name = (data.get('name') or '').strip()
-        if file_type not in ('doc', 'sheet', 'slides'):
-            return jsonify({'success': False, 'error': 'Invalid type. Use doc, sheet, or slides.'}), 400
-        service = get_google_drive_service()
-        if not service:
-            connection = get_db_connection()
-            if connection:
-                try:
-                    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                        cursor.execute("""
-                            SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
-                            FROM company_settings ORDER BY id DESC LIMIT 1
-                        """)
-                        settings = cursor.fetchone()
-                        if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
-                            scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
-                            session['google_drive_credentials'] = {
-                                'token': settings['google_drive_token'],
-                                'refresh_token': settings['google_drive_refresh_token'],
-                                'token_uri': settings.get('google_drive_token_uri'),
-                                'client_id': GOOGLE_CLIENT_ID,
-                                'client_secret': GOOGLE_CLIENT_SECRET,
-                                'scopes': scopes
-                            }
-                            service = get_google_drive_service()
-                except Exception as e:
-                    print(f"Error loading credentials: {e}")
-                finally:
-                    connection.close()
-        if not service:
-            return jsonify({'success': False, 'error': 'Google Drive not connected. Connect in Documents Settings.'}), 400
+        task_id = str(data.get('task_id') or '').strip()
+        if file_type not in ('doc', 'sheet', 'slides', 'notebook'):
+            return jsonify({'success': False, 'error': 'Invalid type. Use doc, sheet, slides, or notebook.'}), 400
         connection = get_db_connection()
         if not connection:
             return jsonify({'success': False, 'error': 'Database connection error'}), 500
         try:
             with connection.cursor(pymysql.cursors.DictCursor) as cursor:
                 cursor.execute("""
-                    SELECT c.id, c.tracking_number, c.client_id,
+                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                           google_drive_scopes, google_drive_main_folder_id
+                    FROM company_settings ORDER BY id DESC LIMIT 1
+                """)
+                drive_settings = cursor.fetchone()
+                if not drive_settings or not drive_settings.get('google_drive_token') or not drive_settings.get('google_drive_refresh_token'):
+                    return jsonify({'success': False, 'error': 'Google Drive not connected. Connect in Documents Settings.'}), 400
+
+                drive_scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+                company_creds_dict = {
+                    'token': drive_settings['google_drive_token'],
+                    'refresh_token': drive_settings['google_drive_refresh_token'],
+                    'token_uri': drive_settings.get('google_drive_token_uri'),
+                    'client_id': GOOGLE_CLIENT_ID,
+                    'client_secret': GOOGLE_CLIENT_SECRET,
+                    'scopes': drive_scopes
+                }
+
+                credentials = Credentials(
+                    token=company_creds_dict.get('token'),
+                    refresh_token=company_creds_dict.get('refresh_token'),
+                    token_uri=company_creds_dict.get('token_uri'),
+                    client_id=company_creds_dict.get('client_id'),
+                    client_secret=company_creds_dict.get('client_secret'),
+                    scopes=company_creds_dict.get('scopes')
+                )
+                if credentials.expired and credentials.refresh_token:
+                    from google.auth.transport.requests import Request
+                    credentials.refresh(Request())
+                    cursor.execute("""
+                        UPDATE company_settings
+                        SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                    """, (credentials.token,))
+                    connection.commit()
+                    company_creds_dict['token'] = credentials.token
+
+                service = build('drive', 'v3', credentials=credentials)
+
+                cursor.execute("""
+                    SELECT c.id, c.tracking_number, c.client_id, c.filled_by_id,
                            cl.id as client_table_id, cl.full_name as client_full_name, cl.phone_number as client_phone
                     FROM cases c
                     LEFT JOIN clients cl ON c.client_id = cl.id
@@ -11279,13 +13199,19 @@ def create_case_google_file(case_id):
                     return jsonify({'success': False, 'error': 'Case not found'}), 404
                 if not case_data.get('client_table_id'):
                     return jsonify({'success': False, 'error': 'Client not found for this case'}), 404
-                main_folder_id = session.get('google_drive_main_folder_id')
-                if not main_folder_id:
-                    cursor.execute("SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1")
-                    row = cursor.fetchone()
-                    if row and row.get('google_drive_main_folder_id'):
-                        main_folder_id = row['google_drive_main_folder_id']
-                        session['google_drive_main_folder_id'] = main_folder_id
+
+                employee_id = session.get('employee_id')
+                user_role = session.get('employee_role')
+                original_role = session.get('original_role')
+                is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+                is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
+                if not is_it_support and not is_case_owner:
+                    ensure_task_management_table(cursor, connection)
+                    if not task_id:
+                        return jsonify({'success': False, 'error': 'task_id is required for task-based case access.'}), 403
+                    if not has_active_case_task_access(cursor, case_id, employee_id, task_id, permission_key='upload_documents'):
+                        return jsonify({'success': False, 'error': 'You can only create files while your allocated task is active.'}), 403
+                main_folder_id = drive_settings.get('google_drive_main_folder_id')
                 if not main_folder_id:
                     return jsonify({'success': False, 'error': 'Google Drive main folder not configured'}), 400
                 client_folder_name = get_user_folder_name(
@@ -11311,46 +13237,41 @@ def create_case_google_file(case_id):
                     'doc': ('application/vnd.google-apps.document', auto_title),
                     'sheet': ('application/vnd.google-apps.spreadsheet', auto_title),
                     'slides': ('application/vnd.google-apps.presentation', auto_title),
+                    'notebook': ('application/vnd.google-apps.document', f"{auto_title} - NOTEBOOK"),
                 }
                 mime_type, default_name = mime_and_default[file_type]
                 name = file_name if file_name else default_name
                 file_metadata = {
                     'name': name,
                     'mimeType': mime_type,
-                    'parents': [case_doc_folder_id]
+                    'parents': [case_doc_folder_id],
+                    'properties': {
+                        'created_by_id': str(session.get('employee_id') or ''),
+                        'created_by_name': session.get('employee_name') or '',
+                        'task_id': task_id,
+                        'task_type': 'case'
+                    }
                 }
                 created = service.files().create(
                     body=file_metadata,
                     fields='id, name, webViewLink'
                 ).execute()
                 file_id = created.get('id')
+                # Make file directly accessible via link to avoid access-request prompts.
+                try:
+                    service.permissions().create(
+                        fileId=file_id,
+                        body={'type': 'anyone', 'role': 'writer'},
+                        fields='id'
+                    ).execute()
+                except Exception as perm_err:
+                    print(f"Warning setting case file public permission: {perm_err}")
                 docs_message = None
                 docs_content_added = False
                 DOCS_SCOPE = 'https://www.googleapis.com/auth/documents'
                 # For Google Docs: insert company header, footer, letterhead, and logo from company_settings
                 if file_type == 'doc' and company_settings:
-                    creds_dict = session.get('google_drive_credentials')
-                    if not creds_dict and connection:
-                        try:
-                            with connection.cursor(pymysql.cursors.DictCursor) as cur:
-                                cur.execute("""
-                                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
-                                    FROM company_settings ORDER BY id DESC LIMIT 1
-                                """)
-                                row = cur.fetchone()
-                                if row and row.get('google_drive_token') and row.get('google_drive_refresh_token'):
-                                    scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
-                                    creds_dict = {
-                                        'token': row['google_drive_token'],
-                                        'refresh_token': row['google_drive_refresh_token'],
-                                        'token_uri': row.get('google_drive_token_uri'),
-                                        'client_id': GOOGLE_CLIENT_ID,
-                                        'client_secret': GOOGLE_CLIENT_SECRET,
-                                        'scopes': scopes
-                                    }
-                                    session['google_drive_credentials'] = creds_dict
-                        except Exception:
-                            pass
+                    creds_dict = company_creds_dict
                     stored_scopes = (creds_dict or {}).get('scopes') or []
                     has_docs_scope = DOCS_SCOPE in stored_scopes
                     if creds_dict and not has_docs_scope:
@@ -11376,6 +13297,7 @@ def create_case_google_file(case_id):
                                         insert_index = el['startIndex']
                                         break
                             # 1) Header text first (company name, prepared by, date) – always run
+                            date_str = datetime.now().strftime('%Y-%m-%d')
                             header_lines = [
                                 company_name,
                                 f"Prepared by: {employee_name or 'N/A'}",
@@ -11448,6 +13370,7 @@ def create_case_google_file(case_id):
                     'doc': f'https://docs.google.com/document/d/{file_id}/edit',
                     'sheet': f'https://docs.google.com/spreadsheets/d/{file_id}/edit',
                     'slides': f'https://docs.google.com/presentation/d/{file_id}/edit',
+                    'notebook': f'https://docs.google.com/document/d/{file_id}/edit',
                 }
                 payload = {
                     'success': True,
@@ -11477,6 +13400,143 @@ def create_case_google_file(case_id):
         print(f"Create case google file error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/matter/<int:matter_id>/create-google-file', methods=['POST'])
+def create_matter_google_file(matter_id):
+    """Create a Google Doc/Sheet/Slides/Notebook in the matter's Drive folder."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        data = request.get_json() or {}
+        file_type = (data.get('type') or '').strip().lower()
+        file_name = (data.get('name') or '').strip()
+        task_id = str(data.get('task_id') or '').strip()
+        if file_type not in ('doc', 'sheet', 'slides', 'notebook'):
+            return jsonify({'success': False, 'error': 'Invalid type. Use doc, sheet, slides, or notebook.'}), 400
+
+        connection = get_db_connection()
+        if not connection:
+            return jsonify({'success': False, 'error': 'Database connection error'}), 500
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                           google_drive_scopes, google_drive_main_folder_id
+                    FROM company_settings ORDER BY id DESC LIMIT 1
+                """)
+                drive_settings = cursor.fetchone()
+                if not drive_settings or not drive_settings.get('google_drive_token') or not drive_settings.get('google_drive_refresh_token'):
+                    return jsonify({'success': False, 'error': 'Google Drive not connected. Connect in Documents Settings.'}), 400
+
+                drive_scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+                credentials = Credentials(
+                    token=drive_settings.get('google_drive_token'),
+                    refresh_token=drive_settings.get('google_drive_refresh_token'),
+                    token_uri=drive_settings.get('google_drive_token_uri'),
+                    client_id=GOOGLE_CLIENT_ID,
+                    client_secret=GOOGLE_CLIENT_SECRET,
+                    scopes=drive_scopes
+                )
+                if credentials.expired and credentials.refresh_token:
+                    from google.auth.transport.requests import Request
+                    credentials.refresh(Request())
+                    cursor.execute("""
+                        UPDATE company_settings
+                        SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                    """, (credentials.token,))
+                    connection.commit()
+
+                cursor.execute("""
+                    SELECT
+                        m.id, m.matter_reference_number, m.matter_title, m.client_id, m.client_name, m.client_phone, m.assigned_employee_id,
+                        cl.full_name AS client_full_name, cl.phone_number AS client_phone_number
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.id = %s
+                """, (matter_id,))
+                matter_data = cursor.fetchone()
+                if not matter_data:
+                    return jsonify({'success': False, 'error': 'Matter not found'}), 404
+
+                current_employee_id = session.get('employee_id')
+                if str(matter_data.get('assigned_employee_id') or '') != str(current_employee_id):
+                    user_role = session.get('employee_role')
+                    original_role = session.get('original_role')
+                    if user_role != 'IT Support' and original_role != 'IT Support':
+                        return jsonify({'success': False, 'error': 'You do not have access to this matter'}), 403
+
+                main_folder_id = drive_settings.get('google_drive_main_folder_id')
+                if not main_folder_id:
+                    return jsonify({'success': False, 'error': 'Google Drive main folder not configured'}), 400
+
+                service = build('drive', 'v3', credentials=credentials)
+                client_phone = matter_data.get('client_phone_number') or matter_data.get('client_phone')
+                client_name = matter_data.get('client_full_name') or matter_data.get('client_name') or ''
+                if client_name or client_phone:
+                    client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
+                    client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
+                else:
+                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+
+                ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
+                ref_safe = re.sub(r'[\\/:*?"<>|]', '_', ref)
+                matter_folder_name = f"Matter {ref_safe}"
+                matter_doc_folder_id = get_or_create_folder(service, client_folder_id, matter_folder_name)
+
+                employee_name = (session.get('employee_name') or '').strip() or 'Document'
+                auto_title = f"{employee_name} - {ref_safe}"
+                mime_and_default = {
+                    'doc': ('application/vnd.google-apps.document', auto_title),
+                    'sheet': ('application/vnd.google-apps.spreadsheet', auto_title),
+                    'slides': ('application/vnd.google-apps.presentation', auto_title),
+                    'notebook': ('application/vnd.google-apps.document', f"{auto_title} - NOTEBOOK"),
+                }
+                mime_type, default_name = mime_and_default[file_type]
+                name = file_name if file_name else default_name
+
+                created = service.files().create(
+                    body={
+                        'name': name,
+                        'mimeType': mime_type,
+                        'parents': [matter_doc_folder_id],
+                        'properties': {
+                            'created_by_id': str(session.get('employee_id') or ''),
+                            'created_by_name': session.get('employee_name') or '',
+                            'task_id': task_id,
+                            'task_type': 'matter'
+                        }
+                    },
+                    fields='id, name, webViewLink'
+                ).execute()
+                file_id = created.get('id')
+                # Make file directly accessible via link to avoid access-request prompts.
+                try:
+                    service.permissions().create(
+                        fileId=file_id,
+                        body={'type': 'anyone', 'role': 'writer'},
+                        fields='id'
+                    ).execute()
+                except Exception as perm_err:
+                    print(f"Warning setting matter file public permission: {perm_err}")
+                edit_urls = {
+                    'doc': f'https://docs.google.com/document/d/{file_id}/edit',
+                    'sheet': f'https://docs.google.com/spreadsheets/d/{file_id}/edit',
+                    'slides': f'https://docs.google.com/presentation/d/{file_id}/edit',
+                    'notebook': f'https://docs.google.com/document/d/{file_id}/edit',
+                }
+                return jsonify({
+                    'success': True,
+                    'file_id': file_id,
+                    'name': created.get('name', name),
+                    'webViewLink': created.get('webViewLink') or f'https://drive.google.com/file/d/{file_id}/view',
+                    'editLink': edit_urls.get(file_type)
+                })
+        finally:
+            connection.close()
+    except Exception as e:
+        print(f"Create matter google file error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/case_management/<int:case_id>/document/<file_id>/download')
 def download_case_document(case_id, file_id):
     """Stream a case document from Google Drive as a download (attachment)."""
@@ -11493,10 +13553,20 @@ def download_case_document(case_id, file_id):
         return redirect(url_for('case_documents', case_id=case_id))
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT id FROM cases WHERE id = %s", (case_id,))
-            if not cursor.fetchone():
+            cursor.execute("SELECT id, filled_by_id FROM cases WHERE id = %s", (case_id,))
+            case_row = cursor.fetchone()
+            if not case_row:
                 flash('Case not found.', 'error')
                 return redirect(url_for('case_management'))
+            employee_id = session.get('employee_id')
+            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            is_case_owner = str(case_row.get('filled_by_id') or '') == str(employee_id)
+            task_id = (request.args.get('task_id') or '').strip()
+            if not is_it_support and not is_case_owner:
+                ensure_task_management_table(cursor, connection)
+                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='download'):
+                    flash('You can only download while your allocated task is active.', 'error')
+                    return redirect(url_for('my_tasks'))
     finally:
         connection.close()
     service = get_google_drive_service()
@@ -11551,13 +13621,21 @@ def delete_case_document_api(case_id, file_id):
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
-                SELECT c.id, c.client_id, c.tracking_number, cl.id as client_table_id,
+                SELECT c.id, c.client_id, c.tracking_number, c.filled_by_id, cl.id as client_table_id,
                        cl.full_name as client_full_name, cl.phone_number as client_phone
                 FROM cases c
                 LEFT JOIN clients cl ON c.client_id = cl.id
                 WHERE c.id = %s
             """, (case_id,))
             case_data = cursor.fetchone()
+            employee_id = session.get('employee_id')
+            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            is_case_owner = str((case_data or {}).get('filled_by_id') or '') == str(employee_id)
+            task_id = (request.args.get('task_id') or '').strip()
+            if case_data and not is_it_support and not is_case_owner:
+                ensure_task_management_table(cursor, connection)
+                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view'):
+                    return jsonify({'success': False, 'error': 'You can only delete while your allocated task is active.'}), 403
         if not case_data:
             return jsonify({'success': False, 'error': 'Case not found'}), 404
         service = get_google_drive_service()
@@ -12300,7 +14378,7 @@ def download_employee_contract():
 
 @app.route('/calendar')
 def calendar():
-    """Calendar page - displays all upcoming court dates across all cases"""
+    """Calendar page - displays all upcoming court dates (cases) and matter dates"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
@@ -12318,7 +14396,6 @@ def calendar():
         flash('Database connection error.', 'error')
         return redirect(url_for('dashboard'))
 
-    # Fine-grained permission: firm/shared calendar view
     deny = enforce_permission(connection, 'calendar_shared')
     if deny:
         return deny
@@ -12328,7 +14405,7 @@ def calendar():
         today = date.today()
         
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch all upcoming court dates across all cases
+            # ── Case proceedings (upcoming court dates) ──────────────────────
             cursor.execute("""
                 SELECT 
                     p.id,
@@ -12350,36 +14427,70 @@ def calendar():
                 ORDER BY p.next_court_date ASC
             """, (today,))
             all_upcoming_proceedings = cursor.fetchall()
-            
-            # Convert dates and calculate days until
+
             for proceeding in all_upcoming_proceedings:
+                proceeding['source'] = 'case'
                 if proceeding.get('date_of_court_appeared'):
                     proceeding['date_of_court_appeared'] = proceeding['date_of_court_appeared'].strftime('%Y-%m-%d')
                 if proceeding.get('next_court_date'):
                     next_date = proceeding['next_court_date']
                     proceeding['next_court_date'] = next_date.strftime('%Y-%m-%d')
-                    days_until = (next_date - today).days
-                    proceeding['days_until'] = days_until
+                    proceeding['days_until'] = (next_date - today).days
                 if proceeding.get('created_at'):
                     proceeding['created_at'] = proceeding['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Organize calendar events by date
+
+            # ── Matters ──────────────────────────────────────────────────────
+            cursor.execute("""
+                SELECT
+                    m.id,
+                    m.matter_reference_number,
+                    m.matter_title,
+                    m.matter_category,
+                    m.client_name,
+                    m.assigned_employee_name,
+                    m.date_opened,
+                    m.status
+                FROM matters m
+                WHERE m.status NOT IN ('Closed', 'Completed')
+                ORDER BY m.date_opened ASC
+            """)
+            all_matters = cursor.fetchall()
+
+            matter_events = []
+            for matter in all_matters:
+                matter['source'] = 'matter'
+                if matter.get('date_opened'):
+                    d = matter['date_opened']
+                    matter['date_opened'] = d.strftime('%Y-%m-%d')
+                    matter['days_until'] = (d - today).days
+                matter_events.append(matter)
+
+            # ── Build combined calendar_events dict keyed by date ────────────
             calendar_events = {}
             for proceeding in all_upcoming_proceedings:
-                if proceeding.get('next_court_date'):
-                    date_key = proceeding['next_court_date']
-                    if date_key not in calendar_events:
-                        calendar_events[date_key] = []
-                    calendar_events[date_key].append(proceeding)
-            
+                key = proceeding.get('next_court_date')
+                if key:
+                    calendar_events.setdefault(key, []).append(proceeding)
+            for matter in matter_events:
+                key = matter.get('date_opened')
+                if key:
+                    calendar_events.setdefault(key, []).append(matter)
+
+            # Combined agenda list sorted by date
+            all_agenda = sorted(
+                all_upcoming_proceedings + matter_events,
+                key=lambda x: x.get('next_court_date') or x.get('date_opened') or ''
+            )
+
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
             
             return render_template('calendar.html', 
                                  company_settings=company_settings,
-                                 all_upcoming_proceedings=all_upcoming_proceedings,
-                                 calendar_events=calendar_events)
+                                 all_upcoming_proceedings=all_agenda,
+                                 calendar_events=calendar_events,
+                                 matter_events=matter_events)
     except Exception as e:
         print(f"Error fetching calendar: {e}")
         flash('An error occurred while fetching calendar.', 'error')
@@ -12389,7 +14500,7 @@ def calendar():
 
 @app.route('/reminders')
 def reminders():
-    """Reminders page - displays all materials/reminders across all cases"""
+    """Reminders page - displays all case reminders and all active matters"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
@@ -12412,7 +14523,7 @@ def reminders():
         today = date.today()
         
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch all upcoming court dates across all cases
+            # ── Case proceedings with materials ───────────────────────────────
             cursor.execute("""
                 SELECT 
                     p.id,
@@ -12434,8 +14545,7 @@ def reminders():
                 ORDER BY p.next_court_date ASC
             """, (today,))
             all_upcoming_proceedings = cursor.fetchall()
-            
-            # Convert dates and calculate days until
+
             proceedings_with_materials = []
             all_reminders = []
             for proceeding in all_upcoming_proceedings:
@@ -12444,49 +14554,68 @@ def reminders():
                 if proceeding.get('next_court_date'):
                     next_date = proceeding['next_court_date']
                     proceeding['next_court_date'] = next_date.strftime('%Y-%m-%d')
-                    days_until = (next_date - today).days
-                    proceeding['days_until'] = days_until
+                    proceeding['days_until'] = (next_date - today).days
                 if proceeding.get('created_at'):
                     proceeding['created_at'] = proceeding['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
-                # Fetch materials for this specific proceeding
+
                 cursor.execute("""
-                    SELECT 
-                        m.id,
-                        m.proceeding_id,
-                        m.material_description,
-                        m.reminder_frequency,
-                        m.allocated_to_id,
-                        m.allocated_to_name,
-                        m.created_at,
-                        m.updated_at
+                    SELECT m.id, m.proceeding_id, m.material_description,
+                           m.reminder_frequency, m.allocated_to_id, m.allocated_to_name,
+                           m.created_at, m.updated_at
                     FROM case_proceeding_materials m
                     WHERE m.proceeding_id = %s
                     ORDER BY m.created_at ASC
                 """, (proceeding['id'],))
                 materials = cursor.fetchall()
-                
-                # Convert dates to strings
                 for material in materials:
                     if material.get('created_at'):
                         material['created_at'] = material['created_at'].strftime('%Y-%m-%d %H:%M:%S')
                     if material.get('updated_at'):
                         material['updated_at'] = material['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
-                
-                # Attach materials to proceeding
+
                 proceeding['materials'] = materials
                 if materials:
                     proceedings_with_materials.append(proceeding)
                     all_reminders.extend(materials)
-            
+
+            # ── All active matters ────────────────────────────────────────────
+            cursor.execute("""
+                SELECT
+                    m.id,
+                    m.matter_reference_number,
+                    m.matter_title,
+                    m.matter_category,
+                    m.client_name,
+                    m.client_phone,
+                    m.assigned_employee_id,
+                    m.assigned_employee_name,
+                    m.date_opened,
+                    m.status,
+                    m.created_at
+                FROM matters m
+                WHERE m.status NOT IN ('Closed', 'Completed')
+                ORDER BY
+                    CASE WHEN m.status = 'Pending Approval' THEN 0 ELSE 1 END ASC,
+                    m.date_opened ASC
+            """)
+            all_matters = cursor.fetchall()
+            for matter in all_matters:
+                if matter.get('date_opened'):
+                    d = matter['date_opened']
+                    matter['date_opened'] = d.strftime('%Y-%m-%d')
+                    matter['days_since_opened'] = (today - d).days
+                if matter.get('created_at'):
+                    matter['created_at'] = matter['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
-            
-            return render_template('reminders.html', 
+
+            return render_template('reminders.html',
                                  company_settings=company_settings,
                                  proceedings_with_materials=proceedings_with_materials,
-                                 all_reminders=all_reminders)
+                                 all_reminders=all_reminders,
+                                 all_matters=all_matters)
     except Exception as e:
         print(f"Error fetching reminders: {e}")
         flash('An error occurred while fetching reminders.', 'error')
@@ -14417,7 +16546,152 @@ def other_matters():
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
     
-    return render_template('other_matters.html', company_settings=company_settings)
+    can_approve_matters = (
+        user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
+    ) or (original_role == 'IT Support')
+
+    see_all_matters = (user_role == 'IT Support') or (original_role == 'IT Support')
+
+    return render_template('other_matters.html', company_settings=company_settings,
+                           user_role=user_role, current_employee_id=session.get('employee_id'),
+                           can_approve_matters=can_approve_matters,
+                           see_all_matters=see_all_matters)
+
+@app.route('/other_matters/tasks', methods=['GET', 'POST'])
+def matter_task_management():
+    """Matter task management page."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('other_matters'))
+
+    current_employee_id = session.get('employee_id')
+    matters = []
+    matter_tasks = []
+    reminder_options = [
+        ('10m', '10 minutes before'),
+        ('30m', '30 minutes before'),
+        ('1h', '1 hour before'),
+        ('6h', '6 hours before'),
+        ('12h', '12 hours before'),
+        ('1d', '1 day before'),
+        ('2d', '2 days before'),
+        ('7d', '1 week before'),
+    ]
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+
+            if user_role == 'IT Support' or original_role == 'IT Support':
+                cursor.execute("""
+                    SELECT id, matter_reference_number, matter_title, assigned_employee_name, status
+                    FROM matters
+                    ORDER BY updated_at DESC
+                """)
+            else:
+                cursor.execute("""
+                    SELECT id, matter_reference_number, matter_title, assigned_employee_name, status
+                    FROM matters
+                    WHERE assigned_employee_id = %s
+                    ORDER BY updated_at DESC
+                """, (current_employee_id,))
+            matters = cursor.fetchall()
+            matter_ids = {str(m['id']) for m in matters}
+
+            if request.method == 'POST':
+                linked_matter_id = (request.form.get('linked_matter_id') or '').strip()
+                task_title = (request.form.get('task_title') or '').strip()
+                task_description = (request.form.get('task_description') or '').strip()
+                due_at = (request.form.get('due_at') or '').strip()
+                reminder_intervals = request.form.getlist('reminder_intervals')
+
+                errors = []
+                if not linked_matter_id:
+                    errors.append('Please select a matter.')
+                elif linked_matter_id not in matter_ids:
+                    errors.append('Selected matter is not available for your account.')
+                if not task_title:
+                    errors.append('Task title is required.')
+                if not due_at:
+                    errors.append('Task timeline is required.')
+                if not reminder_intervals:
+                    errors.append('Select at least one reminder interval.')
+
+                if errors:
+                    for err in errors:
+                        flash(err, 'error')
+                else:
+                    cursor.execute("""
+                        INSERT INTO task_management
+                        (task_type, linked_id, task_title, task_description, due_at, reminder_intervals, created_by_id, created_by_name)
+                        VALUES ('matter', %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        int(linked_matter_id),
+                        task_title,
+                        task_description,
+                        due_at.replace('T', ' '),
+                        ','.join(reminder_intervals),
+                        current_employee_id,
+                        session.get('employee_name') or 'Unknown'
+                    ))
+                    connection.commit()
+                    flash('Matter task created successfully.', 'success')
+                    return redirect(url_for('matter_task_management'))
+
+            if matter_ids:
+                cursor.execute("""
+                    SELECT
+                        t.id,
+                        t.task_title,
+                        t.task_description,
+                        t.due_at,
+                        t.reminder_intervals,
+                        t.task_status,
+                        t.created_by_name,
+                        m.id AS matter_id,
+                        m.matter_reference_number,
+                        m.matter_title
+                    FROM task_management t
+                    INNER JOIN matters m ON m.id = t.linked_id
+                    WHERE t.task_type = 'matter'
+                    ORDER BY t.created_at DESC
+                    LIMIT 100
+                """)
+                task_rows = cursor.fetchall()
+                matter_tasks = [r for r in task_rows if str(r.get('matter_id')) in matter_ids]
+            else:
+                matter_tasks = []
+    except Exception as e:
+        print(f"Matter task management error: {e}")
+        flash('An error occurred while loading matter tasks.', 'error')
+    finally:
+        connection.close()
+
+    return render_template(
+        'matter_task_management.html',
+        company_settings=company_settings,
+        user_role=user_role,
+        current_employee_id=current_employee_id,
+        matters=matters,
+        matter_tasks=matter_tasks,
+        reminder_options=reminder_options
+    )
 
 @app.route('/approve_matters')
 def approve_matters():
@@ -14486,51 +16760,72 @@ def approve_matters():
     finally:
         connection.close()
 
+
+def _other_matters_api_scope():
+    """Scope for Other Matters listing APIs: (current_employee_id, is_mp, see_all_matters).
+    IT Support (including role-switch) sees all matters firm-wide; Managing Partner only own active;
+    others see matters assigned to them."""
+    current_employee_id = session['employee_id']
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    is_mp = (user_role == 'Managing Partner')
+    see_all_matters = (user_role == 'IT Support') or (original_role == 'IT Support')
+    return current_employee_id, is_mp, see_all_matters
+
+
 @app.route('/api/matters/search', methods=['GET'])
 def api_matters_search():
-    """API endpoint to search matters or return all matters"""
+    """API endpoint to search/return matters. Managing Partners see only their active allocated matters."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
+    current_employee_id, is_mp, see_all_matters = _other_matters_api_scope()
+
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch all matters with client details
-            cursor.execute("""
-                SELECT 
-                    m.id,
-                    m.matter_reference_number,
-                    m.matter_title,
-                    m.matter_category,
-                    m.client_id,
-                    m.client_name,
-                    m.client_phone,
-                    m.client_instructions,
-                    m.assigned_employee_id,
-                    m.assigned_employee_name,
-                    m.date_opened,
-                    m.status,
-                    m.created_by_id,
-                    m.created_by_name,
-                    m.created_at,
-                    m.updated_at,
-                    cl.id as client_table_id,
-                    cl.full_name as client_full_name,
-                    cl.phone_number as client_phone_number,
-                    cl.email as client_email,
+            matter_cols = """
+                    m.id, m.matter_reference_number, m.matter_title, m.matter_category,
+                    m.client_id, m.client_name, m.client_phone, m.client_instructions,
+                    m.assigned_employee_id, m.assigned_employee_name,
+                    m.date_opened, m.status, m.created_by_id, m.created_by_name,
+                    m.created_at, m.updated_at,
+                    cl.id as client_table_id, cl.full_name as client_full_name,
+                    cl.phone_number as client_phone_number, cl.email as client_email,
                     cl.profile_picture as client_profile_picture,
-                    cl.client_type as client_type,
-                    cl.status as client_status
-                FROM matters m
-                LEFT JOIN clients cl ON m.client_id = cl.id
-                ORDER BY m.date_opened DESC, m.created_at DESC
-            """)
+                    cl.client_type as client_type, cl.status as client_status
+            """
+            if see_all_matters:
+                cursor.execute("""
+                    SELECT """ + matter_cols + """
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """)
+                msg_label = 'all'
+            elif is_mp:
+                cursor.execute("""
+                    SELECT """ + matter_cols + """
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.assigned_employee_id = %s
+                      AND m.status NOT IN ('Pending Approval', 'Closed', 'Completed')
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """, (current_employee_id,))
+                msg_label = 'your active'
+            else:
+                cursor.execute("""
+                    SELECT """ + matter_cols + """
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """)
+                msg_label = 'all'
             matters = cursor.fetchall()
-            
-            # Convert date objects to strings for JSON serialization
+
             for matter in matters:
                 if matter.get('date_opened'):
                     matter['date_opened'] = matter['date_opened'].strftime('%Y-%m-%d') if hasattr(matter['date_opened'], 'strftime') else str(matter['date_opened'])
@@ -14538,11 +16833,8 @@ def api_matters_search():
                     matter['created_at'] = matter['created_at'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(matter['created_at'], 'strftime') else str(matter['created_at'])
                 if matter.get('updated_at'):
                     matter['updated_at'] = matter['updated_at'].strftime('%Y-%m-%d %H:%M:%S') if hasattr(matter['updated_at'], 'strftime') else str(matter['updated_at'])
-            
-            return jsonify({
-                'matters': matters,
-                'message': f'Displaying all {len(matters)} matter(s)'
-            })
+
+            return jsonify({'matters': matters, 'message': f'Displaying {msg_label} {len(matters)} matter(s)'})
     except Exception as e:
         print(f"Error searching matters: {e}")
         return jsonify({'error': 'Server error'}), 500
@@ -14551,60 +16843,69 @@ def api_matters_search():
 
 @app.route('/api/matters/clients', methods=['GET'])
 def api_matters_clients():
-    """API endpoint to get clients with their matter counts (only matters allocated to current user), with optional search"""
+    """API endpoint to get clients with their matter counts (allocated to current user, active-only for Managing Partner)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_employee_id = session['employee_id']
+
+    current_employee_id, is_mp, see_all_matters = _other_matters_api_scope()
     search_query = request.args.get('q', '').strip()
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Get clients that have at least one matter allocated to the current user
-            if search_query:
-                cursor.execute("""
-                    SELECT 
-                        cl.id,
-                        cl.full_name,
-                        cl.phone_number,
-                        cl.email,
-                        cl.profile_picture,
-                        cl.client_type,
-                        cl.status as client_status,
-                        COUNT(m.id) as matter_count
-                    FROM clients cl
-                    INNER JOIN matters m ON cl.id = m.client_id AND m.assigned_employee_id = %s
-                    WHERE cl.status = 'Active'
-                    AND (cl.full_name LIKE %s OR cl.phone_number LIKE %s)
-                    GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
-                    ORDER BY matter_count DESC, cl.full_name ASC
-                """, (current_employee_id, f'%{search_query}%', f'%{search_query}%'))
+            if see_all_matters:
+                if search_query:
+                    cursor.execute("""
+                        SELECT cl.id, cl.full_name, cl.phone_number, cl.email,
+                               cl.profile_picture, cl.client_type, cl.status as client_status,
+                               COUNT(m.id) as matter_count
+                        FROM clients cl
+                        INNER JOIN matters m ON cl.id = m.client_id
+                        WHERE cl.status = 'Active'
+                        AND (cl.full_name LIKE %s OR cl.phone_number LIKE %s)
+                        GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
+                        ORDER BY matter_count DESC, cl.full_name ASC
+                    """, (f'%{search_query}%', f'%{search_query}%'))
+                else:
+                    cursor.execute("""
+                        SELECT cl.id, cl.full_name, cl.phone_number, cl.email,
+                               cl.profile_picture, cl.client_type, cl.status as client_status,
+                               COUNT(m.id) as matter_count
+                        FROM clients cl
+                        INNER JOIN matters m ON cl.id = m.client_id
+                        WHERE cl.status = 'Active'
+                        GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
+                        ORDER BY matter_count DESC, cl.full_name ASC
+                    """)
             else:
-                cursor.execute("""
-                    SELECT 
-                        cl.id,
-                        cl.full_name,
-                        cl.phone_number,
-                        cl.email,
-                        cl.profile_picture,
-                        cl.client_type,
-                        cl.status as client_status,
-                        COUNT(m.id) as matter_count
-                    FROM clients cl
-                    INNER JOIN matters m ON cl.id = m.client_id AND m.assigned_employee_id = %s
-                    WHERE cl.status = 'Active'
-                    GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
-                    ORDER BY matter_count DESC, cl.full_name ASC
-                """, (current_employee_id,))
+                active_clause = "AND m.status NOT IN ('Pending Approval', 'Closed', 'Completed')" if is_mp else ""
+                if search_query:
+                    cursor.execute("""
+                        SELECT cl.id, cl.full_name, cl.phone_number, cl.email,
+                               cl.profile_picture, cl.client_type, cl.status as client_status,
+                               COUNT(m.id) as matter_count
+                        FROM clients cl
+                        INNER JOIN matters m ON cl.id = m.client_id AND m.assigned_employee_id = %s """ + active_clause + """
+                        WHERE cl.status = 'Active'
+                        AND (cl.full_name LIKE %s OR cl.phone_number LIKE %s)
+                        GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
+                        ORDER BY matter_count DESC, cl.full_name ASC
+                    """, (current_employee_id, f'%{search_query}%', f'%{search_query}%'))
+                else:
+                    cursor.execute("""
+                        SELECT cl.id, cl.full_name, cl.phone_number, cl.email,
+                               cl.profile_picture, cl.client_type, cl.status as client_status,
+                               COUNT(m.id) as matter_count
+                        FROM clients cl
+                        INNER JOIN matters m ON cl.id = m.client_id AND m.assigned_employee_id = %s """ + active_clause + """
+                        WHERE cl.status = 'Active'
+                        GROUP BY cl.id, cl.full_name, cl.phone_number, cl.email, cl.profile_picture, cl.client_type, cl.status
+                        ORDER BY matter_count DESC, cl.full_name ASC
+                    """, (current_employee_id,))
             clients = cursor.fetchall()
-            
-            return jsonify({
-                'clients': clients,
-                'message': f'Found {len(clients)} client(s) with matters'
-            })
+            return jsonify({'clients': clients, 'message': f'Found {len(clients)} client(s) with matters'})
     except Exception as e:
         print(f"Error fetching clients with matters: {e}")
         return jsonify({'error': 'Server error'}), 500
@@ -14613,47 +16914,52 @@ def api_matters_clients():
 
 @app.route('/api/matters/client/<int:client_id>', methods=['GET'])
 def api_matters_by_client(client_id):
-    """API endpoint to get matters for a specific client (only matters allocated to current user)"""
+    """API endpoint to get matters for a specific client (allocated to current user; active-only for Managing Partner)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_employee_id = session['employee_id']
+
+    current_employee_id, is_mp, see_all_matters = _other_matters_api_scope()
+    active_clause = "AND m.status NOT IN ('Pending Approval', 'Closed', 'Completed')" if is_mp else ""
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("""
-                SELECT 
-                    m.id,
-                    m.matter_reference_number,
-                    m.matter_title,
-                    m.matter_category,
-                    m.client_id,
-                    m.client_name,
-                    m.client_phone,
-                    m.client_instructions,
-                    m.assigned_employee_id,
-                    m.assigned_employee_name,
-                    m.date_opened,
-                    m.status,
-                    m.created_by_id,
-                    m.created_by_name,
-                    m.created_at,
-                    m.updated_at,
-                    cl.id as client_table_id,
-                    cl.full_name as client_full_name,
-                    cl.phone_number as client_phone_number,
-                    cl.email as client_email,
-                    cl.profile_picture as client_profile_picture,
-                    cl.client_type as client_type,
-                    cl.status as client_status
-                FROM matters m
-                LEFT JOIN clients cl ON m.client_id = cl.id
-                WHERE m.client_id = %s AND m.assigned_employee_id = %s
-                ORDER BY m.date_opened DESC, m.created_at DESC
-            """, (client_id, current_employee_id))
+            if see_all_matters:
+                cursor.execute("""
+                    SELECT
+                        m.id, m.matter_reference_number, m.matter_title, m.matter_category,
+                        m.client_id, m.client_name, m.client_phone, m.client_instructions,
+                        m.assigned_employee_id, m.assigned_employee_name,
+                        m.date_opened, m.status, m.created_by_id, m.created_by_name,
+                        m.created_at, m.updated_at,
+                        cl.id as client_table_id, cl.full_name as client_full_name,
+                        cl.phone_number as client_phone_number, cl.email as client_email,
+                        cl.profile_picture as client_profile_picture,
+                        cl.client_type as client_type, cl.status as client_status
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.client_id = %s
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """, (client_id,))
+            else:
+                cursor.execute("""
+                    SELECT
+                        m.id, m.matter_reference_number, m.matter_title, m.matter_category,
+                        m.client_id, m.client_name, m.client_phone, m.client_instructions,
+                        m.assigned_employee_id, m.assigned_employee_name,
+                        m.date_opened, m.status, m.created_by_id, m.created_by_name,
+                        m.created_at, m.updated_at,
+                        cl.id as client_table_id, cl.full_name as client_full_name,
+                        cl.phone_number as client_phone_number, cl.email as client_email,
+                        cl.profile_picture as client_profile_picture,
+                        cl.client_type as client_type, cl.status as client_status
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.client_id = %s AND m.assigned_employee_id = %s """ + active_clause + """
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """, (client_id, current_employee_id))
             matters = cursor.fetchall()
             
             # Convert date objects to strings for JSON serialization
@@ -14677,44 +16983,55 @@ def api_matters_by_client(client_id):
 
 @app.route('/api/matters/categories', methods=['GET'])
 def api_matters_categories():
-    """API endpoint to get categories with matter counts (only matters allocated to current user), with optional search"""
+    """API endpoint to get categories with matter counts (allocated to current user; active-only for Managing Partner)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_employee_id = session['employee_id']
+
+    current_employee_id, is_mp, see_all_matters = _other_matters_api_scope()
+    active_clause = "AND m.status NOT IN ('Pending Approval', 'Closed', 'Completed')" if is_mp else ""
     search_query = request.args.get('q', '').strip()
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            if search_query:
-                cursor.execute("""
-                    SELECT 
-                        m.matter_category as category_name,
-                        COUNT(m.id) as matter_count
-                    FROM matters m
-                    WHERE m.assigned_employee_id = %s AND m.matter_category LIKE %s
-                    GROUP BY m.matter_category
-                    ORDER BY matter_count DESC, m.matter_category ASC
-                """, (current_employee_id, f'%{search_query}%'))
+            if see_all_matters:
+                if search_query:
+                    cursor.execute("""
+                        SELECT m.matter_category as category_name, COUNT(m.id) as matter_count
+                        FROM matters m
+                        WHERE m.matter_category LIKE %s
+                        GROUP BY m.matter_category
+                        ORDER BY matter_count DESC, m.matter_category ASC
+                    """, (f'%{search_query}%',))
+                else:
+                    cursor.execute("""
+                        SELECT m.matter_category as category_name, COUNT(m.id) as matter_count
+                        FROM matters m
+                        GROUP BY m.matter_category
+                        ORDER BY matter_count DESC, m.matter_category ASC
+                    """)
             else:
-                cursor.execute("""
-                    SELECT 
-                        m.matter_category as category_name,
-                        COUNT(m.id) as matter_count
-                    FROM matters m
-                    WHERE m.assigned_employee_id = %s
-                    GROUP BY m.matter_category
-                    ORDER BY matter_count DESC, m.matter_category ASC
-                """, (current_employee_id,))
+                if search_query:
+                    cursor.execute("""
+                        SELECT m.matter_category as category_name, COUNT(m.id) as matter_count
+                        FROM matters m
+                        WHERE m.assigned_employee_id = %s """ + active_clause + """
+                          AND m.matter_category LIKE %s
+                        GROUP BY m.matter_category
+                        ORDER BY matter_count DESC, m.matter_category ASC
+                    """, (current_employee_id, f'%{search_query}%'))
+                else:
+                    cursor.execute("""
+                        SELECT m.matter_category as category_name, COUNT(m.id) as matter_count
+                        FROM matters m
+                        WHERE m.assigned_employee_id = %s """ + active_clause + """
+                        GROUP BY m.matter_category
+                        ORDER BY matter_count DESC, m.matter_category ASC
+                    """, (current_employee_id,))
             categories = cursor.fetchall()
-            
-            return jsonify({
-                'categories': categories,
-                'message': f'Found {len(categories)} category(ies) with matters'
-            })
+            return jsonify({'categories': categories, 'message': f'Found {len(categories)} category(ies) with matters'})
     except Exception as e:
         print(f"Error fetching categories with matters: {e}")
         return jsonify({'error': 'Server error'}), 500
@@ -14794,14 +17111,42 @@ def api_matter_singular(matter_id):
 
 @app.route('/api/approve_matter/<int:matter_id>', methods=['POST'])
 def api_approve_matter(matter_id):
-    """API endpoint to approve a matter (change status from 'Pending Approval' to 'Open')"""
+    """Approve a pending matter, allocate it, and save allocation details."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    _matter_approve_roles = ['Firm Administrator', 'Managing Partner', 'IT Support']
+    if user_role not in _matter_approve_roles and original_role != 'IT Support':
+        return jsonify({'error': 'Only Firm Administrators, Managing Partners, or IT Support can approve matters'}), 403
+
+    data = request.get_json() or {}
+    allocated_employee_id = data.get('allocated_employee_id')
+    allocation_description = (data.get('allocation_description') or '').strip()
+    allocation_timeline = (data.get('allocation_timeline') or '').strip()
+
+    if not allocated_employee_id:
+        return jsonify({'error': 'Allocated employee is required'}), 400
+    if not allocation_description:
+        return jsonify({'error': 'Brief description is required'}), 400
+    if not allocation_timeline:
+        return jsonify({'error': 'Timeline is required'}), 400
+
+    try:
+        allocated_employee_id = int(allocated_employee_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid allocated employee'}), 400
+
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
+    # Fine-grained permission: allocate/approve matter
+    deny = enforce_permission(connection, 'matter_allocate')
+    if deny:
+        return jsonify({'error': 'Forbidden'}), 403
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             # First, verify the matter exists and has status 'Pending Approval'
@@ -14815,18 +17160,55 @@ def api_approve_matter(matter_id):
             
             if matter['status'] != 'Pending Approval':
                 return jsonify({'error': f'Matter is not pending approval. Current status: {matter["status"]}'}), 400
-            
-            # Update the matter status to 'Open'
+
+            # Ensure allocation metadata columns exist
+            if not column_exists('matters', 'allocation_description'):
+                try:
+                    cursor.execute("ALTER TABLE matters ADD COLUMN allocation_description TEXT NULL")
+                    connection.commit()
+                except Exception:
+                    pass
+            if not column_exists('matters', 'allocation_timeline'):
+                try:
+                    cursor.execute("ALTER TABLE matters ADD COLUMN allocation_timeline VARCHAR(500) NULL")
+                    connection.commit()
+                except Exception:
+                    pass
+
+            # Fetch and validate allowed assignee (Firm Administrator or Managing Partner)
+            cursor.execute("""
+                SELECT id, full_name, role
+                FROM employees
+                WHERE id = %s AND status = 'Active'
+            """, (allocated_employee_id,))
+            assignee = cursor.fetchone()
+            if not assignee:
+                return jsonify({'error': 'Allocated employee not found'}), 404
+            if assignee.get('role') not in ['Firm Administrator', 'Managing Partner']:
+                return jsonify({'error': 'Allocated employee must be a Firm Administrator or Managing Partner'}), 400
+
+            # Update allocation and approve the matter
             cursor.execute("""
                 UPDATE matters 
-                SET status = 'Open', updated_at = NOW()
+                SET assigned_employee_id = %s,
+                    assigned_employee_name = %s,
+                    allocation_description = %s,
+                    allocation_timeline = %s,
+                    status = 'Open',
+                    updated_at = NOW()
                 WHERE id = %s
-            """, (matter_id,))
+            """, (
+                assignee['id'],
+                assignee['full_name'],
+                allocation_description,
+                allocation_timeline,
+                matter_id
+            ))
             connection.commit()
-            
+
             return jsonify({
                 'success': True,
-                'message': 'Matter approved successfully'
+                'message': f"Matter approved and allocated to {assignee['full_name']} successfully"
             })
     except Exception as e:
         print(f"Error approving matter: {e}")
@@ -14944,47 +17326,52 @@ def api_allocate_matter(matter_id):
 
 @app.route('/api/matters/category/<path:category_name>', methods=['GET'])
 def api_matters_by_category(category_name):
-    """API endpoint to get matters for a specific category (only matters allocated to current user)"""
+    """API endpoint to get matters for a specific category (allocated to current user; active-only for Managing Partner)"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    current_employee_id = session['employee_id']
+
+    current_employee_id, is_mp, see_all_matters = _other_matters_api_scope()
+    active_clause = "AND m.status NOT IN ('Pending Approval', 'Closed', 'Completed')" if is_mp else ""
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
-    
+
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("""
-                SELECT 
-                    m.id,
-                    m.matter_reference_number,
-                    m.matter_title,
-                    m.matter_category,
-                    m.client_id,
-                    m.client_name,
-                    m.client_phone,
-                    m.client_instructions,
-                    m.assigned_employee_id,
-                    m.assigned_employee_name,
-                    m.date_opened,
-                    m.status,
-                    m.created_by_id,
-                    m.created_by_name,
-                    m.created_at,
-                    m.updated_at,
-                    cl.id as client_table_id,
-                    cl.full_name as client_full_name,
-                    cl.phone_number as client_phone_number,
-                    cl.email as client_email,
-                    cl.profile_picture as client_profile_picture,
-                    cl.client_type as client_type,
-                    cl.status as client_status
-                FROM matters m
-                LEFT JOIN clients cl ON m.client_id = cl.id
-                WHERE m.matter_category = %s AND m.assigned_employee_id = %s
-                ORDER BY m.date_opened DESC, m.created_at DESC
-            """, (category_name, current_employee_id))
+            if see_all_matters:
+                cursor.execute("""
+                    SELECT
+                        m.id, m.matter_reference_number, m.matter_title, m.matter_category,
+                        m.client_id, m.client_name, m.client_phone, m.client_instructions,
+                        m.assigned_employee_id, m.assigned_employee_name,
+                        m.date_opened, m.status, m.created_by_id, m.created_by_name,
+                        m.created_at, m.updated_at,
+                        cl.id as client_table_id, cl.full_name as client_full_name,
+                        cl.phone_number as client_phone_number, cl.email as client_email,
+                        cl.profile_picture as client_profile_picture,
+                        cl.client_type as client_type, cl.status as client_status
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.matter_category = %s
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """, (category_name,))
+            else:
+                cursor.execute("""
+                    SELECT
+                        m.id, m.matter_reference_number, m.matter_title, m.matter_category,
+                        m.client_id, m.client_name, m.client_phone, m.client_instructions,
+                        m.assigned_employee_id, m.assigned_employee_name,
+                        m.date_opened, m.status, m.created_by_id, m.created_by_name,
+                        m.created_at, m.updated_at,
+                        cl.id as client_table_id, cl.full_name as client_full_name,
+                        cl.phone_number as client_phone_number, cl.email as client_email,
+                        cl.profile_picture as client_profile_picture,
+                        cl.client_type as client_type, cl.status as client_status
+                    FROM matters m
+                    LEFT JOIN clients cl ON m.client_id = cl.id
+                    WHERE m.matter_category = %s AND m.assigned_employee_id = %s """ + active_clause + """
+                    ORDER BY m.date_opened DESC, m.created_at DESC
+                """, (category_name, current_employee_id))
             matters = cursor.fetchall()
             
             # Convert date objects to strings for JSON serialization
@@ -15126,11 +17513,12 @@ def matter_details(matter_id):
                 flash('Matter not found', 'error')
                 return redirect(url_for('other_matters'))
             
-            # Only the allocated user can view; if Pending Approval they must accept first
+            # Allocated user can view; IT Support (incl. role-switch) can view any matter
+            _, _, see_all_matters = _other_matters_api_scope()
             current_employee_id = session.get('employee_id')
             assigned_id = matter_data.get('assigned_employee_id')
             is_assigned = (assigned_id is not None and str(assigned_id) == str(current_employee_id))
-            if not is_assigned:
+            if not is_assigned and not see_all_matters:
                 flash('You do not have access to this matter.', 'error')
                 return redirect(url_for('other_matters'))
             
@@ -15308,9 +17696,11 @@ def matter_documents(matter_id):
                 flash('Matter not found', 'error')
                 return redirect(url_for('other_matters'))
             
+            _, _, see_all_matters = _other_matters_api_scope()
             current_employee_id = session.get('employee_id')
             assigned_id = matter_data.get('assigned_employee_id')
-            if assigned_id is None or str(assigned_id) != str(current_employee_id):
+            is_assigned = (assigned_id is not None and str(assigned_id) == str(current_employee_id))
+            if not is_assigned and not see_all_matters:
                 flash('You do not have access to this matter.', 'error')
                 return redirect(url_for('other_matters'))
             
@@ -15706,7 +18096,7 @@ def matter_audit_progress(matter_id):
 
 @app.route('/api/matters/clients/search', methods=['GET'])
 def api_matters_clients_search():
-    """API endpoint to search clients by phone number for matters"""
+    """API endpoint to search clients by name or phone number for matters"""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
@@ -15718,14 +18108,15 @@ def api_matters_clients_search():
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             if query:
+                like = f'%{query}%'
                 cursor.execute("""
                     SELECT id, full_name, email, phone_number, client_type
                     FROM clients 
                     WHERE status = 'Active' 
-                    AND phone_number LIKE %s
+                    AND (full_name LIKE %s OR COALESCE(phone_number, '') LIKE %s)
                     ORDER BY full_name ASC
                     LIMIT 20
-                """, (f'%{query}%',))
+                """, (like, like))
             else:
                 cursor.execute("""
                     SELECT id, full_name, email, phone_number, client_type
@@ -15780,6 +18171,52 @@ def api_matters_employees_search():
     finally:
         connection.close()
 
+@app.route('/api/matters/approvers/search', methods=['GET'])
+def api_matters_approvers_search():
+    """Search active employees eligible for matter approval allocation."""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    query = request.args.get('q', '').strip()
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            role_filter = "AND role IN ('Firm Administrator', 'Managing Partner')"
+            if query:
+                like = f'%{query}%'
+                cursor.execute(f"""
+                    SELECT id, full_name, employee_code, work_email, role
+                    FROM employees
+                    WHERE status = 'Active'
+                    {role_filter}
+                    AND (full_name LIKE %s OR COALESCE(employee_code, '') LIKE %s)
+                    ORDER BY
+                        CASE WHEN role = 'Managing Partner' THEN 0 ELSE 1 END,
+                        full_name ASC
+                    LIMIT 20
+                """, (like, like))
+            else:
+                cursor.execute(f"""
+                    SELECT id, full_name, employee_code, work_email, role
+                    FROM employees
+                    WHERE status = 'Active'
+                    {role_filter}
+                    ORDER BY
+                        CASE WHEN role = 'Managing Partner' THEN 0 ELSE 1 END,
+                        full_name ASC
+                    LIMIT 50
+                """)
+            employees = cursor.fetchall()
+            return jsonify({'employees': employees})
+    except Exception as e:
+        print(f"Error searching approver employees: {e}")
+        return jsonify({'error': 'Server error'}), 500
+    finally:
+        connection.close()
+
 @app.route('/api/matters/categories/search', methods=['GET'])
 def api_matters_categories_search():
     """API endpoint to search matter categories from existing matters"""
@@ -15827,8 +18264,8 @@ def api_register_matter():
     try:
         data = request.get_json()
         
-        # Validate required fields
-        required_fields = ['matter_title', 'matter_category', 'client_id', 'assigned_employee_id', 'date_opened', 'status']
+        # Validate required fields (assignee defaults to current user — no picker on register form)
+        required_fields = ['matter_title', 'matter_category', 'client_id', 'date_opened', 'status']
         for field in required_fields:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'{field} is required'}), 400
@@ -15850,8 +18287,17 @@ def api_register_matter():
                 if not client:
                     return jsonify({'success': False, 'error': 'Client not found'}), 404
                 
-                # Get assigned employee info
-                cursor.execute("SELECT id, full_name FROM employees WHERE id = %s", (data['assigned_employee_id'],))
+                # Assigned employee: optional in JSON; otherwise current user (form no longer picks assignee)
+                assignee_id = data.get('assigned_employee_id')
+                if assignee_id is not None and assignee_id != '':
+                    try:
+                        assignee_id = int(assignee_id)
+                    except (TypeError, ValueError):
+                        return jsonify({'success': False, 'error': 'Invalid assigned_employee_id'}), 400
+                else:
+                    assignee_id = int(session['employee_id'])
+                
+                cursor.execute("SELECT id, full_name FROM employees WHERE id = %s", (assignee_id,))
                 employee = cursor.fetchone()
                 if not employee:
                     return jsonify({'success': False, 'error': 'Employee not found'}), 404
@@ -15925,7 +18371,7 @@ def api_matters_update(matter_id):
     data = request.get_json()
     
     # Validate required fields
-    required_fields = ['matter_title', 'matter_category', 'assigned_employee_id', 'date_opened', 'status']
+    required_fields = ['matter_title', 'matter_category', 'date_opened', 'status']
     for field in required_fields:
         if not data.get(field):
             return jsonify({'success': False, 'error': f'{field} is required'}), 400
@@ -15936,13 +18382,24 @@ def api_matters_update(matter_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Check if matter exists
-            cursor.execute("SELECT id FROM matters WHERE id = %s", (matter_id,))
-            if not cursor.fetchone():
+            # Check if matter exists and get current assignee
+            cursor.execute("SELECT id, assigned_employee_id FROM matters WHERE id = %s", (matter_id,))
+            matter_row = cursor.fetchone()
+            if not matter_row:
                 return jsonify({'success': False, 'error': 'Matter not found'}), 404
             
+            # Keep current assignee if no new one is provided
+            assignee_id = data.get('assigned_employee_id')
+            if assignee_id is not None and assignee_id != '':
+                try:
+                    assignee_id = int(assignee_id)
+                except (TypeError, ValueError):
+                    return jsonify({'success': False, 'error': 'Invalid assigned_employee_id'}), 400
+            else:
+                assignee_id = matter_row['assigned_employee_id']
+
             # Get employee name
-            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (data['assigned_employee_id'],))
+            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (assignee_id,))
             employee = cursor.fetchone()
             if not employee:
                 return jsonify({'success': False, 'error': 'Assigned employee not found'}), 400
@@ -15964,7 +18421,7 @@ def api_matters_update(matter_id):
             """, (
                 data['matter_title'].upper().strip(),
                 data['matter_category'].upper().strip(),
-                data['assigned_employee_id'],
+                assignee_id,
                 assigned_employee_name,
                 data['date_opened'],
                 data['status'],
@@ -15983,6 +18440,83 @@ def api_matters_update(matter_id):
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         connection.close()
+
+@app.context_processor
+def inject_my_task_badge():
+    """Provide task and notification badge counts for nav UI."""
+    try:
+        employee_id = session.get('employee_id')
+        if not employee_id:
+            return {'my_task_badge_count': 0, 'notification_badge_count': 0}
+
+        connection = get_db_connection()
+        if not connection:
+            return {'my_task_badge_count': 0, 'notification_badge_count': 0}
+
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                ensure_task_management_table(cursor, connection)
+
+                # Match "My Tasks" visibility, but only count active work items.
+                cursor.execute("""
+                    SELECT COUNT(*) AS cnt
+                    FROM task_management t
+                    LEFT JOIN cases c
+                        ON t.task_type = 'case' AND t.linked_id = c.id
+                    LEFT JOIN matters m
+                        ON t.task_type = 'matter' AND t.linked_id = m.id
+                    WHERE
+                        t.task_status IN ('Pending', 'In Progress')
+                        AND (
+                            (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                            OR
+                            (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                        )
+                """, (employee_id, employee_id, employee_id))
+                base_cnt_row = cursor.fetchone() or {}
+                base_cnt = int(base_cnt_row.get('cnt') or 0)
+
+                # Session allocations (court-session materials) are always actionable in My Tasks.
+                session_cnt = 0
+                try:
+                    cursor.execute("""
+                        SELECT COUNT(*) AS cnt
+                        FROM case_proceeding_materials m
+                        WHERE m.allocated_to_id = %s
+                    """, (employee_id,))
+                    session_cnt_row = cursor.fetchone() or {}
+                    session_cnt = int(session_cnt_row.get('cnt') or 0)
+                except Exception:
+                    session_cnt = 0
+
+                calendar_cnt = 0
+                try:
+                    from datetime import date, timedelta
+                    start_date = date.today()
+                    end_date = start_date + timedelta(days=14)
+                    cursor.execute("""
+                        SELECT COUNT(*) AS cnt
+                        FROM case_proceedings p
+                        INNER JOIN cases c ON c.id = p.case_id
+                        WHERE p.next_court_date IS NOT NULL
+                          AND p.next_court_date >= %s
+                          AND p.next_court_date <= %s
+                          AND c.filled_by_id = %s
+                    """, (start_date, end_date, employee_id))
+                    calendar_cnt_row = cursor.fetchone() or {}
+                    calendar_cnt = int(calendar_cnt_row.get('cnt') or 0)
+                except Exception:
+                    calendar_cnt = 0
+
+                my_task_badge_count = base_cnt + session_cnt
+                return {
+                    'my_task_badge_count': my_task_badge_count,
+                    'notification_badge_count': my_task_badge_count + calendar_cnt
+                }
+        finally:
+            connection.close()
+    except Exception:
+        return {'my_task_badge_count': 0, 'notification_badge_count': 0}
 
 @app.before_request
 def cleanup_idle_connections_before_request():

@@ -68,73 +68,14 @@
         </h2>
         
         {% if proceedings_with_materials and proceedings_with_materials|length > 0 %}
-        <div class="overflow-x-auto mb-6">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Date</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Activity</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Case</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bring up date</th>
-                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for proceeding in proceedings_with_materials %}
-                    <tr class="hover:bg-gray-50 transition-colors border-l-4 border-indigo-500">
-                        <td class="px-3 py-2 whitespace-nowrap">
-                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
-                            {% if proceeding.days_until is defined %}
-                            {% if proceeding.days_until == 0 %}
-                            <div class="text-xs text-red-600 font-medium">Today</div>
-                            {% elif proceeding.days_until == 1 %}
-                            <div class="text-xs text-orange-600 font-medium">Tomorrow</div>
-                            {% elif proceeding.days_until <= 7 %}
-                            <div class="text-xs text-yellow-600 font-medium">{{ proceeding.days_until }} days</div>
-                            {% else %}
-                            <div class="text-xs text-blue-600 font-medium">{{ proceeding.days_until }} days</div>
-                            {% endif %}
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
-                            <div class="text-xs text-gray-500 mt-1">
-                                {% if proceeding.court_room %}<span><i class="fas fa-door-open mr-1"></i>{{ proceeding.court_room }}</span>{% endif %}
-                                {% if proceeding.judicial_officer %}<span class="ml-2"><i class="fas fa-user-tie mr-1"></i>{{ proceeding.judicial_officer }}</span>{% endif %}
-                            </div>
-                        </td>
-                        <td class="px-3 py-2">
-                            <div class="text-sm font-semibold text-indigo-600">
-                                {{ proceeding.tracking_number }}
-                            </div>
-                        </td>
-                        <td class="px-3 py-2">
-                            {% if proceeding.materials and proceeding.materials|length > 0 %}
-                            <div class="space-y-1.5">
-                                {% for material in proceeding.materials %}
-                                <div class="flex items-start text-xs bg-indigo-50 rounded px-2 py-1.5 border border-indigo-200">
-                                    <i class="fas fa-clipboard-list text-indigo-600 mr-1.5 mt-0.5 flex-shrink-0"></i>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="text-sm font-medium text-gray-900">{{ material.material_description }}</div>
-                                        <div class="flex items-center space-x-2 mt-0.5 text-xs text-gray-600">
-                                            {% if material.allocated_to_name %}
-                                            <span><i class="fas fa-user-tie mr-1 text-blue-600"></i>{{ material.allocated_to_name }}</span>
-                                            {% endif %}
-                                            {% if material.reminder_frequency %}
-                                            <span class="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 rounded text-xs font-semibold">
-                                                <i class="fas fa-bell mr-0.5"></i>{{ material.reminder_frequency }}
-                                            </span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            <span class="text-xs text-gray-400">No items</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2 whitespace-nowrap">
+        <div class="space-y-4 mb-6">
+            {% for proceeding in proceedings_with_materials %}
+            <div class="rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow transition p-5">
+                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                    <div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Court Date</div>
+                        <div class="text-xl font-bold text-gray-900">{{ proceeding.next_court_date or 'N/A' }}</div>
+                        <div class="mt-2">
                             {% if proceeding.days_until is defined %}
                             {% if proceeding.days_until == 0 %}
                             <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
@@ -154,11 +95,65 @@
                             </span>
                             {% endif %}
                             {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-gavel text-indigo-600"></i>
+                            <div class="text-lg font-bold text-gray-900">{{ proceeding.court_activity_type or 'N/A' }}</div>
+                        </div>
+                        <div class="text-sm text-gray-600 mt-2 space-y-1">
+                            {% if proceeding.court_room %}
+                            <div class="flex items-center gap-2"><i class="fas fa-door-open text-indigo-600"></i><span>{{ proceeding.court_room }}</span></div>
+                            {% endif %}
+                            {% if proceeding.judicial_officer %}
+                            <div class="flex items-center gap-2"><i class="fas fa-user-tie text-indigo-600"></i><span>{{ proceeding.judicial_officer }}</span></div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mt-3">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Case</div>
+                            <div class="text-sm font-semibold text-indigo-700">
+                                <i class="fas fa-hashtag mr-2"></i>{{ proceeding.tracking_number }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Reminder Items</div>
+                    {% if proceeding.materials and proceeding.materials|length > 0 %}
+                    <div class="space-y-2">
+                        {% for material in proceeding.materials %}
+                        <div class="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+                            <div class="text-indigo-700 pt-0.5"><i class="fas fa-clipboard-list"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-semibold text-gray-900">{{ material.material_description }}</div>
+                                <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                                    {% if material.allocated_to_name %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full bg-white border border-indigo-100 text-indigo-700 font-semibold">
+                                        <i class="fas fa-user-tie mr-1"></i>{{ material.allocated_to_name }}
+                                    </span>
+                                    {% endif %}
+                                    {% if material.reminder_frequency %}
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full bg-indigo-100 text-indigo-800 font-semibold">
+                                        <i class="fas fa-bell mr-1"></i>{{ material.reminder_frequency }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+                        No reminder items
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
         <div class="text-center py-12">

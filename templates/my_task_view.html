@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Task View - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+{% set st = task.task_status %}
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 pb-12">
+    <div class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-900 text-white shadow-xl mb-8">
+        <div class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl"></div>
+        <div class="absolute -left-16 bottom-0 h-48 w-48 rounded-full bg-teal-400/10 blur-2xl"></div>
+        <div class="relative px-6 sm:px-10 py-8 sm:py-9">
+            <a href="{{ url_for('my_tasks') }}" class="inline-flex items-center gap-2 text-sm font-medium text-emerald-200/90 hover:text-white mb-5 transition-colors">
+                <i class="fas fa-arrow-left text-xs"></i>
+                Back to my tasks
+            </a>
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div class="space-y-2">
+                    <p class="text-emerald-300/90 text-xs font-semibold uppercase tracking-widest">Task</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight leading-tight max-w-2xl">{{ task.task_title }}</h1>
+                    <p class="text-slate-300 text-sm sm:text-base max-w-xl">Review details, open linked records, and mark complete when finished.</p>
+                </div>
+                <span class="inline-flex shrink-0 items-center self-start px-3 py-1.5 rounded-xl text-xs font-semibold ring-1 bg-white/10 text-white ring-white/20">
+                    {{ st }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="rounded-2xl border border-gray-200/80 bg-white/90 backdrop-blur-sm shadow-sm p-6 sm:p-8 space-y-6">
+            <div>
+                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Linked record</p>
+                {% if task.task_type == 'case' %}
+                {% if task.allow_view_case_details %}
+                <a href="{{ url_for('case_details', case_id=task.linked_id, task_id=task.id) }}" class="text-lg font-semibold text-emerald-700 hover:text-emerald-800 hover:underline decoration-emerald-300 underline-offset-2">
+                    {{ task.case_tracking_number }} — {{ task.case_client_name }}
+                </a>
+                {% else %}
+                <p class="text-lg font-semibold text-gray-800">{{ task.case_tracking_number }} — {{ task.case_client_name }}</p>
+                <p class="mt-2 inline-flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg ring-1 ring-amber-100">
+                    <i class="fas fa-lock text-[10px]"></i>Viewing case details is restricted for this task.
+                </p>
+                {% endif %}
+                {% if task.allow_view_case_documents %}
+                <a href="{{ url_for('case_documents', case_id=task.linked_id, task_id=task.id) }}" class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 ring-1 ring-indigo-100 transition-colors">
+                    <i class="fas fa-folder-open"></i>Open case documents
+                </a>
+                {% endif %}
+                {% else %}
+                <a href="{{ url_for('matter_details', matter_id=task.linked_id) }}" class="text-lg font-semibold text-orange-700 hover:text-orange-800 hover:underline decoration-orange-300 underline-offset-2">
+                    {{ task.matter_reference_number }} — {{ task.matter_title }}
+                </a>
+                {% endif %}
+            </div>
+
+            <div class="rounded-xl bg-gray-50/90 ring-1 ring-gray-100 p-5">
+                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Description</p>
+                <p class="text-gray-800 whitespace-pre-line leading-relaxed">{{ task.task_description or 'No description provided.' }}</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+                    <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Due</p>
+                    <p class="text-sm font-bold text-gray-900 tabular-nums">{{ task.due_at }}</p>
+                </div>
+                <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+                    <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Reminders</p>
+                    <p class="text-sm font-bold text-gray-900">{{ task.reminder_intervals or '—' }}</p>
+                </div>
+                <div class="rounded-xl bg-white border border-gray-100 p-4 shadow-sm">
+                    <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Created by</p>
+                    <p class="text-sm font-bold text-gray-900">{{ task.created_by_name or 'Unknown' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/90 to-indigo-50/50 p-6 sm:p-8 shadow-sm ring-1 ring-blue-100/60">
+            <div class="flex items-start gap-3 mb-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm ring-1 ring-blue-100">
+                    <i class="fab fa-google-drive"></i>
+                </span>
+                <div>
+                    <p class="text-sm font-bold text-blue-900">Work in Google</p>
+                    <p class="text-sm text-blue-800/90 mt-0.5">Create and open a file linked to this {{ task.task_type }} task.</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" class="google-work-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-blue-200/80 text-blue-800 hover:bg-blue-50 text-sm font-semibold shadow-sm transition-colors" data-type="doc">
+                    <i class="fas fa-file-word text-blue-600"></i>Doc
+                </button>
+                <button type="button" class="google-work-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-blue-200/80 text-blue-800 hover:bg-blue-50 text-sm font-semibold shadow-sm transition-colors" data-type="sheet">
+                    <i class="fas fa-table text-blue-600"></i>Sheet
+                </button>
+                <button type="button" class="google-work-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-blue-200/80 text-blue-800 hover:bg-blue-50 text-sm font-semibold shadow-sm transition-colors" data-type="slides">
+                    <i class="fas fa-chalkboard text-blue-600"></i>Slides
+                </button>
+                <button type="button" class="google-work-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-blue-200/80 text-blue-800 hover:bg-blue-50 text-sm font-semibold shadow-sm transition-colors" data-type="notebook">
+                    <i class="fas fa-book text-blue-600"></i>Note
+                </button>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ url_for('my_tasks') }}" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 shadow-sm transition-colors">
+                <i class="fas fa-list text-sm"></i>
+                All tasks
+            </a>
+            {% if task.task_status == 'In Progress' %}
+            <form method="POST" action="{{ url_for('complete_my_task', task_id=task.id) }}">
+                <button type="submit" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all">
+                    <i class="fas fa-check-double"></i>
+                    Complete task
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        const buttons = document.querySelectorAll('.google-work-btn');
+        if (!buttons.length) return;
+        const taskId = {{ task.id }};
+        const taskType = "{{ task.task_type }}";
+        const linkedId = {{ task.linked_id }};
+
+        const endpoint = taskType === 'case'
+            ? `/api/case/${linkedId}/create-google-file`
+            : `/api/matter/${linkedId}/create-google-file`;
+
+        buttons.forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const fileType = btn.getAttribute('data-type');
+                const original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Opening...';
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: fileType, task_id: taskId })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || 'Unable to create Google file.');
+                    }
+                    const url = result.editLink || result.webViewLink;
+                    if (url) {
+                        window.open(url, '_blank');
+                    } else {
+                        throw new Error('No edit link returned.');
+                    }
+                } catch (err) {
+                    alert(err.message || 'Unable to open Google file.');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                }
+            });
+        });
+    })();
+</script>
+{% endblock %}

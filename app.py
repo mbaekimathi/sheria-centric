@@ -41,12 +41,32 @@ try:
 except Exception:
     pass
 
-# Load environment variables from .env file if it exists
+# Load environment variables from .env (robust on local + hosted environments)
+def _load_env_file_fallback(env_path):
+    """Minimal .env loader used when python-dotenv is unavailable."""
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r", encoding="utf-8") as fh:
+            for raw_line in fh:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("'").strip('"')
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except Exception as e:
+        print(f"[WARNING] Could not load .env fallback: {e}")
+
+
+ENV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(dotenv_path=ENV_PATH, override=False)
 except ImportError:
-    pass  # python-dotenv not installed, will use environment variables directly
+    _load_env_file_fallback(ENV_PATH)
 
 # Secret key from environment variable or generate one (must be fixed in production)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))

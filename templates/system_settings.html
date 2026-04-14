@@ -371,16 +371,34 @@
                     <i class="fas fa-palette text-indigo-600 mr-2"></i>
                     11. Branding Settings
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">For a professional look across the system.</p>
+                <p class="text-sm text-gray-500 mt-1">Set your theme colors to personalize header, sidebar, footer, and UI accents.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
-                    <input type="text" name="primary_brand_color" value="{{ cs.get('primary_brand_color') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. #4F46E5">
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="primary_brand_color_picker" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                        <input type="text" id="primary_brand_color" name="primary_brand_color" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#1E1A4E" pattern="^#([A-Fa-f0-9]{6})$">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Used for major surfaces and dark brand areas.</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
-                    <input type="text" name="secondary_color" value="{{ cs.get('secondary_color') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. #7C3AED">
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="secondary_color_picker" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                        <input type="text" id="secondary_color" name="secondary_color" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#6C5CE7" pattern="^#([A-Fa-f0-9]{6})$">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Used for buttons, highlights, links, and active states.</p>
+                </div>
+                <div class="md:col-span-2">
+                    <div class="p-4 rounded-xl border border-gray-200 bg-gray-50">
+                        <p class="text-sm font-semibold text-gray-700 mb-2">Theme Preview</p>
+                        <div class="flex items-center gap-3">
+                            <span id="preview-primary" class="inline-block h-8 w-8 rounded-full border border-gray-300"></span>
+                            <span id="preview-secondary" class="inline-block h-8 w-8 rounded-full border border-gray-300"></span>
+                            <span class="text-xs text-gray-500">Preview of selected colors</span>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
@@ -402,4 +420,42 @@
         </div>
     </form>
 </div>
+<script>
+(function () {
+    function normalizeHex(value, fallback) {
+        if (!value) return fallback;
+        const hex = value.trim();
+        const fullHex = /^#([A-Fa-f0-9]{6})$/;
+        const shortHex = /^#([A-Fa-f0-9]{3})$/;
+        if (fullHex.test(hex)) return hex;
+        if (shortHex.test(hex)) {
+            return '#' + hex.slice(1).split('').map(function (c) { return c + c; }).join('');
+        }
+        return fallback;
+    }
+
+    const primaryText = document.getElementById('primary_brand_color');
+    const primaryPicker = document.getElementById('primary_brand_color_picker');
+    const secondaryText = document.getElementById('secondary_color');
+    const secondaryPicker = document.getElementById('secondary_color_picker');
+    const previewPrimary = document.getElementById('preview-primary');
+    const previewSecondary = document.getElementById('preview-secondary');
+    if (!primaryText || !primaryPicker || !secondaryText || !secondaryPicker) return;
+
+    function syncAndPreview() {
+        const p = normalizeHex(primaryText.value, '#1E1A4E');
+        const s = normalizeHex(secondaryText.value, '#6C5CE7');
+        primaryPicker.value = p;
+        secondaryPicker.value = s;
+        previewPrimary.style.backgroundColor = p;
+        previewSecondary.style.backgroundColor = s;
+    }
+
+    primaryPicker.addEventListener('input', function () { primaryText.value = primaryPicker.value; syncAndPreview(); });
+    secondaryPicker.addEventListener('input', function () { secondaryText.value = secondaryPicker.value; syncAndPreview(); });
+    primaryText.addEventListener('input', syncAndPreview);
+    secondaryText.addEventListener('input', syncAndPreview);
+    syncAndPreview();
+})();
+</script>
 {% endblock %}

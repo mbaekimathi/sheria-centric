@@ -1,0 +1,180 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing | SHERIA CENTRIC</title>
+  <meta name="description" content="Simple pricing for solo advocates, growing firms, and enterprise legal teams using SHERIA CENTRIC.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+    <div class="container nav-wrap">
+      <a href="/" class="brand"><span>SHERIA CENTRIC</span></a>
+      <nav class="desktop-nav"><a href="/platform" class="nav-link">Platform</a><a href="/features" class="nav-link">Features</a><a href="/pricing" class="nav-link">Pricing</a><a href="/security" class="nav-link">Security</a><a href="/contact" class="nav-link">Contact</a></nav>
+      <div class="nav-actions"><details class="login-dropdown"><summary class="login-summary">Login</summary><div class="login-dropdown-menu"><a href="/client_login">Client Login</a><a href="/login">Employee Login</a></div></details><a href="/contact" class="btn btn-demo">Request Demo</a><button class="mobile-toggle" @click="open=!open"><i class="ph ph-list"></i></button></div>
+    </div>
+    <div class="mobile-menu" x-show="open"><a href="/platform">Platform</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/security">Security</a><a href="/contact">Contact</a><a href="/client_login">Client Login</a><a href="/login">Employee Login</a></div>
+  </header>
+
+  <main class="inner-page pricing" x-data="{annual:false, users:8, hours:18, rate:3500}">
+    <section class="page-hero section">
+      <div class="container hero-split">
+        <div>
+          <p class="eyebrow">PRICING</p>
+          <h1>Transparent plans that grow with your practice</h1>
+          <p>No hidden fees. Start with the right package and scale as your legal operations expand.</p>
+        </div>
+        <div class="hero-split-media">
+          <img src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=1000&auto=format&q=80" alt="Financial planning and legal billing analytics">
+          <span class="hero-chip chip-a">Predictable monthly costs</span>
+          <span class="hero-chip chip-b">14-day free trial</span>
+        </div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container">
+        <div class="finance-kpi-strip">
+          <article><p>Average billing cycle improvement</p><strong>+32%</strong></article>
+          <article><p>Reduction in invoice disputes</p><strong>-41%</strong></article>
+          <article><p>Collection time saved monthly</p><strong>18 hrs</strong></article>
+          <article><p>Firms on annual plan</p><strong>64%</strong></article>
+        </div>
+
+        <div class="billing-toggle">
+          <span :class="{active: !annual}">Monthly</span>
+          <button @click="annual=!annual" class="switch" aria-label="Toggle annual billing"><span :class="{on: annual}"></span></button>
+          <span :class="{active: annual}">Annual</span>
+          <small x-show="annual">Save 2 months</small>
+        </div>
+        <div class="pricing-grid">
+          <article class="price-card">
+            <p class="plan-chip">SOLO</p>
+            <h3>Solo practitioners</h3>
+            <p class="for">Lean setup for independent advocates</p>
+            <p class="price" data-price x-text="annual ? 'KES 45,000/yr' : 'KES 4,500/mo'">KES 4,500/mo</p>
+            <p class="price-sub">Approx. KES 150/day for full legal ops control</p>
+            <ul><li>1 user</li><li>10GB storage</li><li>Matter tracking</li><li>Document vault</li><li>Basic invoices</li></ul>
+            <a class="btn btn-outline" href="/contact">Get Started</a>
+          </article>
+          <article class="price-card featured">
+            <p class="popular">Most Popular</p>
+            <p class="plan-chip">FIRM</p>
+            <h3>Growing firms (up to 10 users)</h3>
+            <p class="for">Best value for collaborative legal teams</p>
+            <p class="price" data-price x-text="annual ? 'KES 140,000/yr' : 'KES 14,000/mo'">KES 14,000/mo</p>
+            <p class="price-sub">Approx. KES 47/day per user at full team capacity</p>
+            <ul><li>Everything in Solo</li><li>Client portal</li><li>Audit trail</li><li>Role access control</li><li>100GB storage</li><li>Priority support</li></ul>
+            <a class="btn btn-primary" href="/contact">Get Started</a>
+          </article>
+          <article class="price-card">
+            <p class="plan-chip">ENTERPRISE</p>
+            <h3>Large firms & legal departments</h3>
+            <p class="for">Custom architecture for scale and governance</p>
+            <p class="price">Custom</p>
+            <p class="price-sub">Tailored pricing based on users, data, and integration scope</p>
+            <ul><li>Unlimited users</li><li>SLA guarantee</li><li>Custom integrations</li><li>Dedicated onboarding</li><li>Data migration</li></ul>
+            <a class="btn btn-outline" href="/contact">Contact Sales</a>
+          </article>
+        </div>
+        <div class="feature-detail">
+          <article>
+            <h3>Implementation included</h3>
+            <p>Every paid plan includes guided onboarding with workflow mapping so your team adopts the platform quickly and confidently.</p>
+            <ul>
+              <li>Migration checklist and setup plan</li>
+              <li>Role mapping for legal and support teams</li>
+              <li>Best-practice templates for common matter types</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Designed for legal ROI</h3>
+            <p>The value is not just software access; it is faster legal delivery, cleaner records, and stronger billing discipline firm-wide.</p>
+            <ul>
+              <li>Reduced admin overhead and duplicated effort</li>
+              <li>Improved collection cycle and invoice accuracy</li>
+              <li>Better client transparency and responsiveness</li>
+            </ul>
+          </article>
+        </div>
+        <p class="pricing-note">All plans include 14-day trial access, implementation guidance, and transparent upgrade paths.</p>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">PLAN COMPARISON</p>
+          <h2>Compare capabilities before you commit</h2>
+          <p>A quick matrix to evaluate legal operations depth, finance controls, and governance readiness across all plans.</p>
+        </div>
+        <div class="pricing-matrix-wrap">
+          <table class="pricing-matrix">
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th>Solo</th>
+                <th>Firm</th>
+                <th>Enterprise</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Matter lifecycle tracking</td><td>Basic</td><td>Advanced</td><td>Advanced + custom workflows</td></tr>
+              <tr><td>Document version control</td><td>Standard</td><td>Full controls</td><td>Full + policy templates</td></tr>
+              <tr><td>Client portal access</td><td>-</td><td>Included</td><td>Included + white-label options</td></tr>
+              <tr><td>Billing + aging analytics</td><td>Basic invoices</td><td>Full billing engine</td><td>Enterprise finance insights</td></tr>
+              <tr><td>Role-based permissions</td><td>Limited</td><td>Role-level controls</td><td>Granular governance model</td></tr>
+              <tr><td>Onboarding support</td><td>Guided setup</td><td>Priority onboarding</td><td>Dedicated implementation team</td></tr>
+              <tr><td>Support SLA</td><td>Business hours</td><td>Priority support</td><td>Custom SLA guarantees</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container roi-wrap">
+        <div class="section-head">
+          <p class="eyebrow">ROI CALCULATOR</p>
+          <h2>Estimate monthly value from reduced admin time</h2>
+          <p>Use your team assumptions to estimate the financial impact of workflow automation and cleaner legal operations.</p>
+        </div>
+        <div class="roi-grid">
+          <article class="roi-card">
+            <label>Team users
+              <input type="range" min="1" max="40" x-model.number="users">
+              <strong><span x-text="users"></span> users</strong>
+            </label>
+            <label>Hours saved per user/month
+              <input type="range" min="4" max="40" x-model.number="hours">
+              <strong><span x-text="hours"></span> hrs</strong>
+            </label>
+            <label>Average billable value per hour (KES)
+              <input type="range" min="1000" max="10000" step="500" x-model.number="rate">
+              <strong>KES <span x-text="rate.toLocaleString()"></span></strong>
+            </label>
+          </article>
+          <article class="roi-output">
+            <p class="roi-label">Estimated monthly recovered value</p>
+            <h3>KES <span x-text="(users * hours * rate).toLocaleString()"></span></h3>
+            <p>Projected annual impact: <strong>KES <span x-text="(users * hours * rate * 12).toLocaleString()"></span></strong></p>
+            <ul>
+              <li>Less manual follow-up on hearings and documents</li>
+              <li>Faster billing cycles and cleaner collections</li>
+              <li>More advocate time available for billable legal work</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/features">Features</a><a href="/security">Security</a><a href="/contact">Contact</a></div></div></footer>
+  <script type="module" src="/static/main.js"></script>
+</body>
+</html>
+

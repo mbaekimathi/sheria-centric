@@ -261,7 +261,7 @@ function connectGoogleDrive() {
     showMessage('Opening Google account picker...', 'info');
     
     // Fetch authorization URL from server
-    fetch('/api/auth/google-drive/authorize')
+    fetch('/api/auth/google-drive/authorize', { credentials: 'same-origin' })
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -331,7 +331,7 @@ function handleGoogleDriveConnected(accountData) {
 
 // Check connection status
 function checkConnectionStatus() {
-    fetch('/api/auth/google-drive/status')
+    fetch('/api/auth/google-drive/status', { credentials: 'same-origin' })
         .then(response => response.json())
         .then(data => {
             if (data.connected) {

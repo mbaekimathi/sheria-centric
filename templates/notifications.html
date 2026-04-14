@@ -21,30 +21,46 @@
     </div>
 
     {% if notifications %}
-    <div class="space-y-3">
-        {% for n in notifications %}
-        <a href="{{ n.link }}" class="group block rounded-2xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm hover:shadow-md hover:border-emerald-200 transition-all">
-            <div class="p-4 sm:p-5 flex items-start gap-4">
-                <div class="shrink-0 w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 flex items-center justify-center">
-                    <i class="fas {{ n.icon }}"></i>
-                </div>
-                <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2 mb-1">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wide
+    <div class="rounded-2xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-50/90 border-b border-gray-200">
+                <tr class="text-left text-gray-700">
+                    <th class="px-4 py-3 font-semibold">Type</th>
+                    <th class="px-4 py-3 font-semibold">Title</th>
+                    <th class="px-4 py-3 font-semibold">Details</th>
+                    <th class="px-4 py-3 font-semibold">Meta</th>
+                    <th class="px-4 py-3 font-semibold text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for n in notifications %}
+                <tr class="hover:bg-gray-50/70 transition-colors">
+                    <td class="px-4 py-3 align-top">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide
                             {% if n.type == 'task' %}bg-emerald-100 text-emerald-700{% elif n.type == 'reminder' %}bg-amber-100 text-amber-700{% else %}bg-sky-100 text-sky-700{% endif %}">
+                            <i class="fas {{ n.icon }} text-[10px]"></i>
                             {{ n.type }}
                         </span>
-                    </div>
-                    <h2 class="text-base sm:text-lg font-bold text-gray-900 group-hover:text-emerald-800 transition-colors">{{ n.title }}</h2>
-                    <p class="text-sm text-gray-700 mt-0.5">{{ n.subtitle }}</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ n.meta }}</p>
-                </div>
-                <div class="shrink-0 text-gray-300 group-hover:text-emerald-500 transition-colors mt-2">
-                    <i class="fas fa-chevron-right"></i>
-                </div>
-            </div>
-        </a>
-        {% endfor %}
+                    </td>
+                    <td class="px-4 py-3 align-top">
+                        <p class="font-semibold text-gray-900">{{ n.title }}</p>
+                    </td>
+                    <td class="px-4 py-3 align-top">
+                        <p class="text-gray-700">{{ n.subtitle }}</p>
+                    </td>
+                    <td class="px-4 py-3 align-top">
+                        <p class="text-xs text-gray-500 leading-relaxed">{{ n.meta }}</p>
+                    </td>
+                    <td class="px-4 py-3 align-top text-right">
+                        <a href="{{ n.link }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors">
+                            Open
+                            <i class="fas fa-arrow-right text-[10px]"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% else %}
     <div class="rounded-2xl border border-dashed border-gray-300 bg-white/70 p-12 text-center">

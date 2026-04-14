@@ -2,38 +2,271 @@
 
 {% block title %}Login - SHERIA CENTRIC{% endblock %}
 
+{% block extra_css %}
+<style>
+    body {
+        background:
+            radial-gradient(circle at 12% 20%, rgba(108,92,231,0.2), transparent 42%),
+            radial-gradient(circle at 85% 22%, rgba(162,155,254,0.16), transparent 46%),
+            linear-gradient(135deg, #eef2ff 0%, #f7f4ff 45%, #faf9ff 100%) !important;
+    }
+    body::before {
+        background-image:
+            radial-gradient(circle at 20% 30%, rgba(108,92,231,0.12) 0%, transparent 50%),
+            radial-gradient(circle at 85% 75%, rgba(162,155,254,0.1) 0%, transparent 52%) !important;
+    }
+    header.glass-effect {
+        background: linear-gradient(145deg, rgba(19,16,55,0.92), rgba(34,28,86,0.9)) !important;
+        border-color: rgba(162, 155, 254, 0.35) !important;
+        box-shadow: 0 14px 30px rgba(17, 13, 47, 0.28) !important;
+    }
+    header .brand span,
+    header .desktop-nav .nav-link {
+        color: #f1efff !important;
+    }
+    header .desktop-nav .nav-link:hover {
+        color: #c7c2ff !important;
+    }
+    footer {
+        background: linear-gradient(145deg, rgba(25,22,66,0.96), rgba(43,34,103,0.95)) !important;
+        border-top: 1px solid rgba(162,155,254,0.3);
+    }
+    footer .container,
+    footer p,
+    footer a {
+        color: #fff7ed !important;
+    }
+    footer a:hover {
+        color: #c9c4ff !important;
+    }
+    .auth-page {
+        min-height: calc(100vh - 180px);
+        display: flex;
+        align-items: stretch;
+        transition: .35s ease;
+        border-radius: 24px;
+        padding: 6px;
+    }
+    .auth-shell {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        display: grid;
+        gap: 20px;
+    }
+    .auth-brand-panel {
+        background: linear-gradient(145deg, #17123f 0%, #231d5e 100%);
+        border-radius: 24px;
+        border: 1px solid rgba(162, 155, 254, 0.28);
+        color: #f5f3ff;
+        padding: 28px;
+        position: relative;
+        overflow: hidden;
+        min-height: 240px;
+    }
+    .auth-page.client-mode .auth-brand-panel {
+        background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
+        border-color: rgba(162, 155, 254, 0.35);
+    }
+    .auth-page.client-mode .auth-brand-panel::before {
+        background: radial-gradient(circle, rgba(162,155,254,0.35), rgba(162,155,254,0));
+    }
+    .auth-brand-panel::before {
+        content: '';
+        position: absolute;
+        width: 380px;
+        height: 380px;
+        right: -140px;
+        top: -180px;
+        background: radial-gradient(circle, rgba(162,155,254,0.28), rgba(162,155,254,0));
+        pointer-events: none;
+    }
+    .auth-brand-panel h2 {
+        font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+    .auth-brand-panel p {
+        color: #dddafd;
+        max-width: 50ch;
+    }
+    .auth-kpis {
+        margin-top: 18px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .auth-kpis article {
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 12px;
+        padding: 10px;
+        background: rgba(255,255,255,0.05);
+    }
+    .auth-kpis strong {
+        display: block;
+        font-size: 1.05rem;
+        color: #c7c2ff;
+    }
+    .auth-kpis span {
+        color: #dddafd;
+        font-size: 0.78rem;
+    }
+    .auth-card {
+        background: rgba(255,255,255,0.94);
+        border-radius: 24px;
+        border: 1px solid rgba(162, 155, 254, 0.24);
+        box-shadow: 0 24px 70px rgba(23, 18, 63, 0.18);
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+    }
+    .auth-page.client-mode .auth-card {
+        border-color: rgba(162, 155, 254, 0.28);
+        box-shadow: 0 24px 70px rgba(23, 18, 63, 0.2);
+    }
+    .auth-header {
+        background: linear-gradient(145deg, #24225e 0%, #1a1648 100%);
+        color: #fff;
+        padding: 24px;
+        text-align: center;
+    }
+    .auth-page.client-mode .auth-header {
+        background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
+    }
+    .auth-header h1 {
+        font-size: 1.7rem;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+    .auth-header p {
+        color: #dddafd;
+        font-size: 0.9rem;
+    }
+    .auth-tab {
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+    .auth-tab.active {
+        color: #4f46e5;
+        border-bottom-color: #4f46e5;
+        background: #f3f2ff;
+    }
+    .auth-tab.client-active {
+        color: #6c5ce7;
+        border-bottom-color: #6c5ce7;
+        background: #f3f2ff;
+    }
+    .auth-panel {
+        padding: 24px;
+    }
+    .panel-rotate-in {
+        animation: panelRotateIn .45s cubic-bezier(0.22, 1, 0.36, 1);
+        transform-origin: center top;
+    }
+    @keyframes panelRotateIn {
+        0% {
+            opacity: 0;
+            transform: perspective(900px) rotateY(-14deg) translateY(8px) scale(0.985);
+        }
+        100% {
+            opacity: 1;
+            transform: perspective(900px) rotateY(0deg) translateY(0) scale(1);
+        }
+    }
+    .client-mode .auth-header {
+        background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
+    }
+    .client-mode .auth-submit {
+        background: linear-gradient(145deg, #6c5ce7, #5747d6);
+    }
+    .client-mode .auth-submit:hover {
+        box-shadow: 0 12px 24px rgba(108, 92, 231, 0.3);
+    }
+    .auth-page.client-mode .auth-kpis strong {
+        color: #c7c2ff;
+    }
+    .auth-page.client-mode .auth-kpis span {
+        color: #dddafd;
+    }
+    .auth-input {
+        width: 100%;
+        border: 1px solid #d7d5f7;
+        border-radius: 12px;
+        padding: 12px 14px 12px 42px;
+        transition: .2s ease;
+        background: #fff;
+    }
+    .auth-input:focus {
+        outline: none;
+        border-color: #6c5ce7;
+        box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+    }
+    .auth-submit {
+        width: 100%;
+        border: none;
+        border-radius: 12px;
+        padding: 12px;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(145deg, #6c5ce7, #5747d6);
+        transition: .2s ease;
+    }
+    .auth-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(108, 92, 231, 0.28);
+    }
+    @media (min-width: 992px) {
+        .auth-shell {
+            grid-template-columns: 1.1fr 1.2fr;
+            align-items: stretch;
+        }
+        .auth-brand-panel {
+            min-height: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-md mx-auto">
-    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-        <!-- Header -->
-        <div class="bg-gradient-to-br from-gray-800 to-gray-900 px-8 pt-10 pb-8">
-            <div class="text-center">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm mb-4">
-                    <i class="fas fa-gavel text-white text-2xl"></i>
-                </div>
-                <h1 class="text-2xl font-bold text-white mb-2">Welcome Back</h1>
-                <p class="text-gray-300 text-sm">Select how you'd like to sign in</p>
-            </div>
+<div class="auth-page" id="auth-page-shell">
+<div class="auth-shell">
+    <aside class="auth-brand-panel">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-4">
+            <i class="fas fa-scale-balanced text-white text-xl"></i>
+        </div>
+        <h2>Secure access for legal teams and clients</h2>
+        <p>Choose your login path to continue with SHERIA CENTRIC. Employee access supports matter operations and finance controls, while client access provides secure case visibility.</p>
+        <div class="auth-kpis">
+            <article><strong>256-bit</strong><span>Encrypted sessions</span></article>
+            <article><strong>Audit-ready</strong><span>Tracked actions</span></article>
+            <article><strong>24/7</strong><span>Portal availability</span></article>
+        </div>
+    </aside>
+
+    <div class="auth-card" id="auth-card">
+        <div class="auth-header">
+            <h1>Welcome Back</h1>
+            <p>Select how you'd like to sign in</p>
         </div>
 
         <!-- Role Selector Tabs -->
         <div class="flex border-b border-gray-200">
             <button id="tab-employee" onclick="switchTab('employee')"
-                class="flex-1 py-4 text-sm font-semibold text-center transition-all duration-200 border-b-2 border-green-600 text-green-700 bg-green-50/50">
-                <i class="fas fa-briefcase mr-2"></i>Firm
+                class="auth-tab active flex-1 py-4 text-center transition-all duration-200 border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50">
+                <i class="fas fa-briefcase mr-2"></i>Employee Login
             </button>
             <button id="tab-client" onclick="switchTab('client')"
-                class="flex-1 py-4 text-sm font-semibold text-center transition-all duration-200 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50">
-                <i class="fas fa-user-tie mr-2"></i>Client
+                class="auth-tab flex-1 py-4 text-center transition-all duration-200 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50">
+                <i class="fas fa-user-tie mr-2"></i>Client Login
             </button>
         </div>
 
         <!-- Firm Login Panel -->
-        <div id="panel-employee" class="px-8 py-8">
+        <div id="panel-employee" class="auth-panel">
             <form method="POST" action="{{ url_for('login') }}" class="space-y-5">
                 <div>
                     <label for="employee_code" class="block text-sm font-semibold text-gray-700 mb-2">
-                        6-Digit Firm Code
+                        6-Digit Employee Code
                     </label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -46,7 +279,7 @@
                             maxlength="6"
                             pattern="[0-9]{6}"
                             required
-                            class="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                            class="auth-input"
                             placeholder="000000"
                         >
                     </div>
@@ -65,7 +298,7 @@
                             id="password" 
                             name="password" 
                             required
-                            class="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all outline-none text-gray-900 placeholder-gray-400"
+                            class="auth-input pr-12"
                             placeholder="Enter your password"
                         >
                         <button 
@@ -78,10 +311,7 @@
                     </div>
                 </div>
 
-                <button 
-                    type="submit"
-                    class="w-full py-3.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 active:scale-[0.98] transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                >
+                <button type="submit" class="auth-submit">
                     <i class="fas fa-sign-in-alt mr-2"></i>Sign In
                 </button>
             </form>
@@ -96,7 +326,7 @@
             </div>
 
             <div class="text-center">
-                <a href="{{ url_for('signup') }}" class="inline-flex items-center text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors">
+                <a href="{{ url_for('signup') }}" class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
                     Create an account
                     <i class="fas fa-arrow-right ml-2 text-xs"></i>
                 </a>
@@ -104,10 +334,10 @@
         </div>
 
         <!-- Client Login Panel -->
-        <div id="panel-client" class="px-8 py-8 hidden">
+        <div id="panel-client" class="auth-panel hidden">
             <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 mb-3">
-                    <i class="fas fa-shield-alt text-blue-600 text-lg"></i>
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 mb-3">
+                    <i class="fas fa-shield-alt text-indigo-600 text-lg"></i>
                 </div>
                 <p class="text-sm text-gray-600">Sign in securely with your Google account to access your client portal.</p>
             </div>
@@ -124,22 +354,22 @@
             </a>
 
             <a href="{{ url_for('client_manual_login') }}"
-               class="mt-3 w-full flex items-center justify-center px-4 py-3.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all duration-200">
+               class="mt-3 w-full flex items-center justify-center px-4 py-3.5 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200">
                 <i class="fas fa-envelope mr-2"></i>
                 Manual Login (Email + Password)
             </a>
 
             <div class="mt-4 text-center">
-                <a href="{{ url_for('client_signup') }}" class="inline-flex items-center text-sm font-medium text-blue-700 hover:text-blue-800 transition-colors">
+                <a href="{{ url_for('client_signup') }}" class="inline-flex items-center text-sm font-medium text-indigo-700 hover:text-indigo-800 transition-colors">
                     Client Signup
                     <i class="fas fa-arrow-right ml-2 text-xs"></i>
                 </a>
             </div>
 
-            <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <div class="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
                 <div class="flex items-start space-x-3">
-                    <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
-                    <p class="text-xs text-blue-700 leading-relaxed">
+                    <i class="fas fa-info-circle text-indigo-500 mt-0.5"></i>
+                    <p class="text-xs text-indigo-700 leading-relaxed">
                         Your Google account must be linked to an active case with the firm. If you have trouble signing in, please contact your advocate.
                     </p>
                 </div>
@@ -147,25 +377,42 @@
         </div>
     </div>
 </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     function switchTab(tab) {
         const tabs = ['employee', 'client'];
+        const authCard = document.getElementById('auth-card');
+        const authPage = document.getElementById('auth-page-shell');
         tabs.forEach(t => {
             const tabBtn = document.getElementById('tab-' + t);
             const panel = document.getElementById('panel-' + t);
             if (t === tab) {
                 panel.classList.remove('hidden');
-                tabBtn.classList.add('border-green-600', 'text-green-700', 'bg-green-50/50');
+                panel.classList.remove('panel-rotate-in');
+                void panel.offsetWidth;
+                panel.classList.add('panel-rotate-in');
+                tabBtn.classList.add('active');
                 tabBtn.classList.remove('border-transparent', 'text-gray-500');
+                if (tab === 'client') {
+                    tabBtn.classList.add('client-active');
+                } else {
+                    tabBtn.classList.remove('client-active');
+                }
             } else {
                 panel.classList.add('hidden');
-                tabBtn.classList.remove('border-green-600', 'text-green-700', 'bg-green-50/50');
+                tabBtn.classList.remove('active', 'client-active');
                 tabBtn.classList.add('border-transparent', 'text-gray-500');
             }
         });
+        if (authCard) {
+            authCard.classList.toggle('client-mode', tab === 'client');
+        }
+        if (authPage) {
+            authPage.classList.toggle('client-mode', tab === 'client');
+        }
     }
 
     function togglePassword(inputId) {

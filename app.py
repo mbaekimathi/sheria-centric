@@ -392,6 +392,23 @@ def ensure_case_proceeding_advocates_table(cursor, connection=None):
         print(f"[WARNING] ensure_case_proceeding_advocates_table: {e}")
 
 
+def ensure_google_drive_oauth_pending_table(cursor, connection=None):
+    """Store OAuth state server-side so the Drive popup callback works when the session cookie is not sent."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS google_drive_oauth_pending (
+                state VARCHAR(255) NOT NULL PRIMARY KEY,
+                employee_id INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_gdrive_oauth_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_google_drive_oauth_pending_table: {e}")
+
+
 def reconcile_additive_schema(cursor, connection=None):
     """Run additive DDL on every app startup (safe after git pull / cPanel deploy).
 
@@ -403,6 +420,7 @@ def reconcile_additive_schema(cursor, connection=None):
     try:
         ensure_task_management_table(cursor, connection)
         ensure_case_proceeding_advocates_table(cursor, connection)
+        ensure_google_drive_oauth_pending_table(cursor, connection)
     except Exception as e:
         print(f"[WARNING] reconcile_additive_schema: {e}")
 
@@ -2297,6 +2315,15 @@ def get_company_settings():
         if connection:
             connection.close()
 
+
+@app.context_processor
+def inject_global_theme_settings():
+    """Inject company settings into all templates for consistent theming."""
+    settings = get_company_settings()
+    if not settings:
+        settings = {'company_name': 'BAUNI LAW GROUP'}
+    return {'company_settings': settings}
+
 # ==================== WHATSAPP CLOUD API HELPERS ====================
 
 def get_whatsapp_settings():
@@ -2558,10 +2585,66 @@ def _send_sms_custom(phone, text, api_key, api_secret, sender_id, custom_url):
 
 @app.route('/')
 def index():
-    """Home page - redirects to login if not authenticated"""
+    """Public landing page for visitors; logged-in users go to their dashboard."""
     if 'employee_id' in session:
         return redirect(url_for('dashboard'))
-    return redirect(url_for('login'))
+    if 'client_id' in session:
+        return redirect(url_for('client_dashboard'))
+    return render_template('index.html')
+
+
+def _redirect_authenticated_user_from_public_site():
+    """Redirect signed-in users away from public marketing pages."""
+    if 'employee_id' in session:
+        return redirect(url_for('dashboard'))
+    if 'client_id' in session:
+        return redirect(url_for('client_dashboard'))
+    return None
+
+
+@app.route('/platform')
+def website_platform():
+    """Public website platform page."""
+    signed_in_redirect = _redirect_authenticated_user_from_public_site()
+    if signed_in_redirect:
+        return signed_in_redirect
+    return render_template('platform.html')
+
+
+@app.route('/features')
+def website_features():
+    """Public website features page."""
+    signed_in_redirect = _redirect_authenticated_user_from_public_site()
+    if signed_in_redirect:
+        return signed_in_redirect
+    return render_template('features.html')
+
+
+@app.route('/pricing')
+def website_pricing():
+    """Public website pricing page."""
+    signed_in_redirect = _redirect_authenticated_user_from_public_site()
+    if signed_in_redirect:
+        return signed_in_redirect
+    return render_template('pricing.html')
+
+
+@app.route('/security')
+def website_security():
+    """Public website security page."""
+    signed_in_redirect = _redirect_authenticated_user_from_public_site()
+    if signed_in_redirect:
+        return signed_in_redirect
+    return render_template('security.html')
+
+
+@app.route('/contact')
+def website_contact():
+    """Public website contact page."""
+    signed_in_redirect = _redirect_authenticated_user_from_public_site()
+    if signed_in_redirect:
+        return signed_in_redirect
+    return render_template('contact.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -2919,15 +3002,12 @@ def dashboard():
 
 @app.route('/user_management')
 def user_management():
-    """User Management page"""
+    """User Management hub with live stats and role-based modules."""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
-    # Check if user has permission (IT Support, Firm Administrator, Managing Partner, or Clerk)
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    
-    # Allow IT Support, Firm Administrator, Managing Partner, Clerk, or if IT Support is role-switched
     allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
@@ -2941,12 +3021,62 @@ def user_management():
         return redirect(url_for('dashboard'))
     
     try:
-        # Get company settings
-        company_settings = get_company_settings()
-        if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
-        
-        return render_template('user_management.html', company_settings=company_settings)
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            company_settings = get_company_settings() or {'company_name': 'BAUNI LAW GROUP'}
+
+            cursor.execute("SELECT COUNT(*) AS total FROM employees WHERE status = 'Active'")
+            total_active_employees = (cursor.fetchone() or {}).get('total', 0)
+
+            cursor.execute("SELECT COUNT(*) AS total FROM employees WHERE status = 'Pending Approval'")
+            pending_employee_approvals = (cursor.fetchone() or {}).get('total', 0)
+
+            cursor.execute("""
+                SELECT COUNT(DISTINCT role) AS total
+                FROM employees
+                WHERE status = 'Active' AND role IS NOT NULL AND role <> ''
+            """)
+            active_roles_count = (cursor.fetchone() or {}).get('total', 0)
+
+            cursor.execute("SELECT COUNT(*) AS total FROM clients WHERE status = 'Pending Approval'")
+            pending_client_approvals = (cursor.fetchone() or {}).get('total', 0)
+
+            modules = [
+                {
+                    'title': 'Employee Records',
+                    'description': 'View, filter, edit, and maintain employee records.',
+                    'icon': 'fa-user-tie',
+                    'endpoint': 'employee_management',
+                    'accent': 'green'
+                },
+                {
+                    'title': 'Roles & Permissions',
+                    'description': 'Define role access and enforce permission boundaries.',
+                    'icon': 'fa-shield-alt',
+                    'endpoint': 'roles_permissions',
+                    'accent': 'amber'
+                },
+                {
+                    'title': 'Client Management',
+                    'description': 'Manage client profiles, types, and onboarding flow.',
+                    'icon': 'fa-user-friends',
+                    'endpoint': 'client_management',
+                    'accent': 'blue'
+                },
+            ]
+
+            return render_template(
+                'user_management.html',
+                company_settings=company_settings,
+                user_role=user_role,
+                original_role=original_role,
+                module_cards=modules,
+                user_mgmt_stats={
+                    'total_active_employees': int(total_active_employees or 0),
+                    'pending_employee_approvals': int(pending_employee_approvals or 0),
+                    'active_roles_count': int(active_roles_count or 0),
+                    'pending_client_approvals': int(pending_client_approvals or 0),
+                }
+            )
     except Exception as e:
         print(f"User management error: {e}")
         flash('An error occurred.', 'error')
@@ -4182,7 +4312,7 @@ def logout():
     # Clear all session data including role switch
     session.clear()
     flash('You have been logged out successfully', 'success')
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/client_login')
 def client_login():
@@ -6380,7 +6510,7 @@ def client_calendar():
                 WHERE c.client_id = %s AND p.next_court_date IS NOT NULL AND p.next_court_date >= %s
                 ORDER BY p.next_court_date ASC
             """, (session['client_id'], today))
-            all_upcoming_proceedings = cursor.fetchall()
+            all_upcoming_proceedings = list(cursor.fetchall() or [])
             
             # Convert dates and calculate days until
             for proceeding in all_upcoming_proceedings:
@@ -6481,7 +6611,7 @@ def client_reminders():
                 WHERE c.client_id = %s AND p.next_court_date IS NOT NULL AND p.next_court_date >= %s
                 ORDER BY p.next_court_date ASC
             """, (session['client_id'], today))
-            all_upcoming_proceedings = cursor.fetchall()
+            all_upcoming_proceedings = list(cursor.fetchall() or [])
             
             # Convert dates and calculate days until
             proceedings_with_materials = []
@@ -7512,7 +7642,7 @@ def client_logout():
     session.pop('client_profile_picture', None)
     session.pop('client_type', None)
     flash('You have been logged out successfully', 'success')
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/profile')
 def profile():
@@ -12201,6 +12331,73 @@ def document_management():
                          clients=clients,
                          employees=employees)
 
+
+def _ensure_google_drive_oauth_pending(connection):
+    try:
+        with connection.cursor() as cursor:
+            ensure_google_drive_oauth_pending_table(cursor, connection)
+    except Exception as e:
+        print(f"[WARNING] _ensure_google_drive_oauth_pending: {e}")
+
+
+def _store_google_drive_oauth_state(state, employee_id):
+    """Bind OAuth state to employee in DB so the popup callback works without a session cookie."""
+    connection = get_db_connection()
+    if not connection:
+        return False
+    try:
+        _ensure_google_drive_oauth_pending(connection)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM google_drive_oauth_pending WHERE created_at < DATE_SUB(NOW(), INTERVAL 2 HOUR)"
+            )
+            cursor.execute(
+                """
+                INSERT INTO google_drive_oauth_pending (state, employee_id)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE employee_id = VALUES(employee_id), created_at = CURRENT_TIMESTAMP
+                """,
+                (state, employee_id),
+            )
+            connection.commit()
+        return True
+    except Exception as e:
+        print(f"[WARNING] _store_google_drive_oauth_state: {e}")
+        return False
+    finally:
+        connection.close()
+
+
+def _pop_google_drive_oauth_employee(state):
+    """Consume OAuth state and return the employee_id that started the flow, or None."""
+    if not state:
+        return None
+    connection = get_db_connection()
+    if not connection:
+        return None
+    try:
+        _ensure_google_drive_oauth_pending(connection)
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT employee_id FROM google_drive_oauth_pending
+                WHERE state = %s AND created_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+                """,
+                (state,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            cursor.execute("DELETE FROM google_drive_oauth_pending WHERE state = %s", (state,))
+            connection.commit()
+            return row["employee_id"]
+    except Exception as e:
+        print(f"[WARNING] _pop_google_drive_oauth_employee: {e}")
+        return None
+    finally:
+        connection.close()
+
+
 @app.route('/api/auth/google-drive/authorize')
 def google_drive_authorize():
     """Initiate Google Drive OAuth flow with account selection"""
@@ -12244,6 +12441,9 @@ def google_drive_authorize():
             prompt='select_account consent'  # Force account selection and consent
         )
         session['google_drive_oauth_state'] = state
+        session.modified = True
+        if not _store_google_drive_oauth_state(state, session['employee_id']):
+            return jsonify({'error': 'Could not start Google Drive link. Database unavailable; try again.'}), 500
         
         # Return authorization URL for popup window
         return jsonify({
@@ -12257,19 +12457,45 @@ def google_drive_authorize():
 @app.route('/api/auth/google-drive/callback')
 def google_drive_callback():
     """Handle Google Drive OAuth callback"""
-    if 'employee_id' not in session:
-        return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Unauthorized"}, "*"); window.close();</script>', 401
-    
+    if request.args.get('error'):
+        g_err = request.args.get('error', '')
+        g_desc = request.args.get('error_description', '')
+        print(f"Google Drive OAuth error from Google: {g_err} {g_desc}")
+        if g_err == 'access_denied':
+            user_msg = 'Google access was cancelled or denied.'
+        else:
+            user_msg = g_desc or g_err or 'Google OAuth error'
+        return (
+            '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: '
+            + json.dumps(user_msg)
+            + '}, "*"); window.close();</script>',
+            400,
+        )
+
     try:
-        state = session.get('google_drive_oauth_state')
-        if not state:
-            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Invalid state"}, "*"); window.close();</script>', 400
-        
-        # Validate state from request
         request_state = request.args.get('state')
-        if request_state != state:
-            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "State mismatch"}, "*"); window.close();</script>', 400
-        
+        if not request_state:
+            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Missing OAuth state"}, "*"); window.close();</script>', 400
+
+        # Popup return often does not include the Flask session cookie (host mismatch or browser).
+        # We persist state -> employee_id in DB on authorize and resolve it here.
+        oauth_employee_id = _pop_google_drive_oauth_employee(request_state)
+        session_employee_id = session.get('employee_id')
+        session_oauth_state = session.get('google_drive_oauth_state')
+
+        resolved_employee_id = None
+        if oauth_employee_id is not None:
+            resolved_employee_id = oauth_employee_id
+            if session_employee_id is not None and int(session_employee_id) != int(oauth_employee_id):
+                return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session mismatch. Refresh Documents Settings and try again."}, "*"); window.close();</script>', 400
+        elif session_employee_id is not None and session_oauth_state and request_state == session_oauth_state:
+            resolved_employee_id = session_employee_id
+
+        if resolved_employee_id is None:
+            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session expired or invalid. Refresh this page, then connect Google Drive again."}, "*"); window.close();</script>', 401
+
+        print(f"[OK] Google Drive OAuth callback validated for employee_id={resolved_employee_id}")
+
         # Google Drive API scopes (must match authorize function, including openid)
         drive_scopes = [
             'openid',
@@ -14426,7 +14652,7 @@ def calendar():
                 WHERE p.next_court_date IS NOT NULL AND p.next_court_date >= %s
                 ORDER BY p.next_court_date ASC
             """, (today,))
-            all_upcoming_proceedings = cursor.fetchall()
+            all_upcoming_proceedings = list(cursor.fetchall() or [])
 
             for proceeding in all_upcoming_proceedings:
                 proceeding['source'] = 'case'
@@ -14454,7 +14680,7 @@ def calendar():
                 WHERE m.status NOT IN ('Closed', 'Completed')
                 ORDER BY m.date_opened ASC
             """)
-            all_matters = cursor.fetchall()
+            all_matters = list(cursor.fetchall() or [])
 
             matter_events = []
             for matter in all_matters:
@@ -14544,7 +14770,7 @@ def reminders():
                 WHERE p.next_court_date IS NOT NULL AND p.next_court_date >= %s
                 ORDER BY p.next_court_date ASC
             """, (today,))
-            all_upcoming_proceedings = cursor.fetchall()
+            all_upcoming_proceedings = list(cursor.fetchall() or [])
 
             proceedings_with_materials = []
             all_reminders = []
@@ -14653,7 +14879,7 @@ def calendar_reminders():
                 WHERE p.next_court_date IS NOT NULL AND p.next_court_date >= %s
                 ORDER BY p.next_court_date ASC
             """, (today,))
-            all_upcoming_proceedings = cursor.fetchall()
+            all_upcoming_proceedings = list(cursor.fetchall() or [])
             
             # Convert dates and calculate days until
             for proceeding in all_upcoming_proceedings:
@@ -16460,6 +16686,18 @@ def update_company_settings():
         return deny
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            def _normalize_hex_color(value, fallback):
+                """Normalize hex colors to #RRGGBB."""
+                if value is None:
+                    return fallback
+                text = str(value).strip()
+                if re.fullmatch(r"#[0-9a-fA-F]{6}", text):
+                    return text
+                short = re.fullmatch(r"#([0-9a-fA-F]{3})", text)
+                if short:
+                    return "#" + "".join(ch * 2 for ch in short.group(1))
+                return fallback
+
             cursor.execute("SELECT id FROM company_settings ORDER BY id DESC LIMIT 1")
             row = cursor.fetchone()
             if not row:
@@ -16494,6 +16732,15 @@ def update_company_settings():
                 val = request.form.get(key)
                 if val is not None:
                     updates[key] = val.strip() if isinstance(val, str) else val
+            # Validate and normalize brand colors
+            updates['primary_brand_color'] = _normalize_hex_color(
+                updates.get('primary_brand_color'),
+                '#1E1A4E'
+            )
+            updates['secondary_color'] = _normalize_hex_color(
+                updates.get('secondary_color'),
+                '#6C5CE7'
+            )
             # Working days: multiple checkboxes stored as comma-separated
             wd = request.form.getlist('working_days')
             if wd is not None:

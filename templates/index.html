@@ -1,0 +1,138 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHERIA CENTRIC | ERP for East African Law Firms</title>
+  <meta name="description" content="SHERIA CENTRIC is the operating system for modern East African advocates: case management, document control, billing, client portal, compliance, and analytics in one platform.">
+  <meta property="og:title" content="SHERIA CENTRIC | ERP for East African Law Firms">
+  <meta property="og:description" content="From intake to invoice, SHERIA CENTRIC helps law firms run smarter, faster, and more compliant operations.">
+  <meta property="og:image" content="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&auto=format&q=80">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/typed.js/2.1.0/typed.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/countup.js/2.8.0/countUp.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+  <style>
+    body { margin: 0; }
+    .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
+    .skip-link:focus { top: 16px; }
+  </style>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" id="site-header" x-data="{open:false}">
+    <div class="container nav-wrap">
+      <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
+          <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
+        </svg>
+        <span>SHERIA CENTRIC</span>
+      </a>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="/platform" class="nav-link">Platform</a>
+        <a href="/features" class="nav-link">Features</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        <a href="/security" class="nav-link">Security</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <details class="login-dropdown">
+          <summary class="login-summary">Login</summary>
+          <div class="login-dropdown-menu">
+            <a href="/client_login">Client Login</a>
+            <a href="/login">Employee Login</a>
+          </div>
+        </details>
+        <a href="#final-cta" class="btn btn-demo">Request Demo</a>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
+          <i class="ph ph-list"></i>
+        </button>
+      </div>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
+      <a href="/platform" @click="open=false">Platform</a>
+      <a href="/features" @click="open=false">Features</a>
+      <a href="/pricing" @click="open=false">Pricing</a>
+      <a href="/security" @click="open=false">Security</a>
+      <a href="/contact" @click="open=false">Contact</a>
+      <a href="/client_login" @click="open=false">Client Login</a>
+      <a href="/login" @click="open=false">Employee Login</a>
+      <a href="#final-cta" @click="open=false" class="btn btn-demo">Request Demo</a>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero section" id="hero">
+      <div id="particles-js" aria-hidden="true"></div>
+      <div class="hero-grid-lines" aria-hidden="true"></div>
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="hero-badge">âš– Built for East African Advocates</p>
+          <h1>The Operating System for <br><span class="gradient-text">Modern Law Firms</span></h1>
+          <p class="typed-line"><span id="typed-text"></span></p>
+          <p class="hero-lead">
+            SHERIA CENTRIC brings every tool your firm needs into one intelligent platform â€” from matter intake to final invoice.
+            Built with deep understanding of how African advocates work.
+          </p>
+          <div class="hero-ctas">
+            <a href="#pricing" class="btn btn-primary">Start Free Trial â†’</a>
+            <a href="#how-it-works" class="btn btn-secondary">â–¶ Watch 3-Min Demo</a>
+          </div>
+          <div class="trust-row">
+            <span>ðŸ”’ 256-bit Encrypted</span>
+            <span>âœ“ LSK Compliant</span>
+            <span>â˜… 4.9/5 Rated</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-mockup">
+            <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&q=80" alt="SHERIA CENTRIC legal dashboard overview with analytics and matters" loading="eager" fetchpriority="high">
+          </div>
+          <div class="float-note note-1">ðŸ“ New document uploaded â€” Oduya v. State</div>
+          <div class="float-note note-2">âœ… Invoice KES 45,000 paid â€” Client: Kamau</div>
+          <div class="float-note note-3">âš– Hearing in 2 days â€” HCCC 034/2026</div>
+        </div>
+      </div>
+      <a href="#social-proof" class="scroll-cue" aria-label="Scroll to social proof"><i class="ph ph-arrow-down"></i></a>
+    </section>
+    <section class="social-proof" id="social-proof">
+      <div class="container">
+        <p class="proof-head">Trusted by leading firms across Kenya, Uganda &amp; Tanzania</p>
+        <div class="proof-stats">
+          <article><strong id="stat-advocates">0</strong><span>Advocates</span></article>
+          <article><strong id="stat-uptime">0</strong><span>Uptime</span></article>
+          <article><strong id="stat-time">0</strong><span>Less Admin Time</span></article>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer id="contact">
+    <div class="container footer-grid">
+      <div>
+        <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
+        <p>Building the future of legal practice in Africa.</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container bottom-wrap">
+      <p>Â© 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+  <script type="module" src="/static/main.js"></script>
+</body>
+</html>
+

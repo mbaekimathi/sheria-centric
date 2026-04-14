@@ -6,6 +6,15 @@
 <!-- Welcome Section -->
 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
     <div class="text-center">
+        <div class="mb-4 flex justify-center">
+            <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-sm font-semibold">
+                <i class="fas fa-id-badge"></i>
+                Session Role: {{ session.get('employee_role', user_role if user_role is defined else 'Employee') }}
+                {% if session.get('original_role') and session.get('original_role') != session.get('employee_role') %}
+                    <span class="text-xs text-indigo-600/80">(Original: {{ session.get('original_role') }})</span>
+                {% endif %}
+            </span>
+        </div>
         <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Welcome, {{ employee.full_name }}!</h1>
         <p class="text-gray-600 text-lg">{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}</p>
     </div>

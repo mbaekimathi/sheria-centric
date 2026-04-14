@@ -1,0 +1,76 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact | SHERIA CENTRIC</title>
+  <meta name="description" content="Request a SHERIA CENTRIC demo and talk to our legal-tech specialists in Nairobi.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+    <div class="container nav-wrap">
+      <a href="/" class="brand"><span>SHERIA CENTRIC</span></a>
+      <nav class="desktop-nav"><a href="/platform" class="nav-link">Platform</a><a href="/features" class="nav-link">Features</a><a href="/pricing" class="nav-link">Pricing</a><a href="/security" class="nav-link">Security</a><a href="/contact" class="nav-link">Contact</a></nav>
+      <div class="nav-actions"><details class="login-dropdown"><summary class="login-summary">Login</summary><div class="login-dropdown-menu"><a href="/client_login">Client Login</a><a href="/login">Employee Login</a></div></details><a href="/contact" class="btn btn-demo">Request Demo</a><button class="mobile-toggle" @click="open=!open"><i class="ph ph-list"></i></button></div>
+    </div>
+    <div class="mobile-menu" x-show="open"><a href="/platform">Platform</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/security">Security</a><a href="/contact">Contact</a><a href="/client_login">Client Login</a><a href="/login">Employee Login</a></div>
+  </header>
+  <main class="inner-page">
+    <section class="page-hero section">
+      <div class="container hero-split">
+        <div>
+          <p class="eyebrow">CONTACT</p>
+          <h1>Book a live walkthrough with our product team</h1>
+          <p>Tell us your firm size, workflow pain points, and priorities. We will tailor a practical demo around your current legal operations.</p>
+          <div class="glass-stat-grid">
+            <article class="glass-stat"><strong>30 min</strong><span>Typical live demo session</span></article>
+            <article class="glass-stat"><strong>1 day</strong><span>Average response time</span></article>
+            <article class="glass-stat"><strong>14 days</strong><span>Free trial setup support</span></article>
+          </div>
+        </div>
+        <div class="hero-split-media">
+          <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1000&auto=format&q=80" alt="Client success team in a professional meeting">
+          <span class="hero-chip chip-a">Guided onboarding</span>
+          <span class="hero-chip chip-b">Dedicated legal-tech support</span>
+        </div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="container contact-grid">
+        <article class="info-card">
+          <h3>Talk to SHERIA CENTRIC</h3>
+          <p>Email: hello@sheriacentric.com</p>
+          <p>Phone: +254 700 000 000</p>
+          <p>Office: Nairobi, Kenya</p>
+          <p>Response time: Within 1 business day</p>
+          <div class="trust-strip">
+            <strong>What to expect:</strong> a practical, tailored walkthrough based on your current workflows, pain points, and firm structure.
+          </div>
+        </article>
+        <form class="info-card contact-form" x-data="{sent:false}" @submit.prevent="sent=true">
+          <div class="split">
+            <label>Full name<input type="text" required></label>
+            <label>Work email<input type="email" required></label>
+          </div>
+          <div class="split">
+            <label>Firm size<select required><option value="">Select</option><option>1-5 users</option><option>6-20 users</option><option>21-50 users</option><option>50+ users</option></select></label>
+            <label>Primary focus<select required><option value="">Select</option><option>Case management</option><option>Document control</option><option>Billing and collections</option><option>Client portal</option><option>Security and compliance</option></select></label>
+          </div>
+          <label>What do you want to improve first?<textarea rows="4" placeholder="Case tracking, documents, billing, client portal..."></textarea></label>
+          <button type="submit" class="btn btn-primary">Request Demo</button>
+          <p x-show="sent" class="form-success">Thanks. Our team will contact you shortly.</p>
+        </form>
+      </div>
+    </section>
+  </main>
+  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/platform">Platform</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div></div></footer>
+  <script type="module" src="/static/main.js"></script>
+</body>
+</html>
+

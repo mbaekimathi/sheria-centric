@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SHERIA CENTRIC - Modern Advocates Firm{% endblock %}</title>
+    {% set cs = company_settings if company_settings is defined and company_settings else {} %}
+    {% set theme_primary = cs.get('primary_brand_color') or '#1E1A4E' %}
+    {% set theme_accent = cs.get('secondary_color') or '#6C5CE7' %}
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,12 +17,16 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
         :root {
-            --sheria-centric-green: #10b981;
-            --sheria-centric-green-dark: #059669;
-            --sheria-centric-green-light: #d1fae5;
-            --sheria-centric-orange: #f97316;
-            --sheria-centric-orange-dark: #ea580c;
-            --sheria-centric-orange-light: #fed7aa;
+            --brand-primary: {{ theme_primary }};
+            --brand-accent: {{ theme_accent }};
+            --app-footer-height: 74px;
+            --brand-primary-soft: #f5f6fb;
+            --brand-primary-border: #d6d9e6;
+            --brand-accent-dark: {{ theme_accent }};
+            --brand-accent-light: {{ theme_accent }};
+            --brand-accent-soft: #f3f2ff;
+            --brand-accent-border: #cfc9ff;
+            --brand-accent-glow: rgba(108, 92, 231, 0.28);
         }
         html, body {
             height: 100%;
@@ -28,7 +35,7 @@
         body {
             display: flex;
             flex-direction: column;
-            background: linear-gradient(135deg, #f0fdf4 0%, #fff7ed 50%, #f0fdf4 100%);
+            background: linear-gradient(135deg, #eef2ff 0%, #f7f4ff 50%, #eef2ff 100%);
             background-size: 400% 400%;
             animation: gradientShift 15s ease infinite;
             position: relative;
@@ -41,9 +48,9 @@
             width: 100%;
             height: 100%;
             background-image: 
-                radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-                radial-gradient(circle at 80% 80%, rgba(249, 115, 22, 0.05) 0%, transparent 50%),
-                radial-gradient(circle at 40% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+                radial-gradient(circle at 20% 50%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(162, 155, 254, 0.07) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(108, 92, 231, 0.05) 0%, transparent 50%);
             pointer-events: none;
             z-index: 0;
         }
@@ -56,8 +63,8 @@
             50% { transform: translateY(-10px); }
         }
         @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            0%, 100% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(108, 92, 231, 0); }
         }
         @keyframes rotate {
             from { transform: rotate(0deg); }
@@ -104,22 +111,92 @@
             position: relative;
             z-index: 50;
         }
+        .app-header.glass-effect {
+            background: linear-gradient(145deg, rgba(19, 16, 55, 0.94), rgba(34, 28, 86, 0.92));
+            border-color: var(--brand-accent-border) !important;
+            box-shadow: 0 14px 32px rgba(15, 13, 46, 0.24) !important;
+        }
+        .app-header .header-panel {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: var(--brand-accent-border) !important;
+        }
+        .app-header .header-panel i,
+        .app-header .header-panel span {
+            color: #e9e6ff !important;
+        }
+        .app-header .brand-mark {
+            background: linear-gradient(145deg, var(--brand-accent), var(--brand-accent-dark)) !important;
+        }
+        .app-header .brand-dot {
+            background: var(--brand-accent-light) !important;
+        }
+        .app-header .brand-word-main {
+            color: #f1efff !important;
+        }
+        .app-header .brand-word-accent {
+            color: var(--brand-accent-light) !important;
+        }
+        .app-footer.glass-effect {
+            background: linear-gradient(145deg, rgba(19, 16, 55, 0.95), rgba(34, 28, 86, 0.94));
+            border-color: var(--brand-accent-border) !important;
+            box-shadow: 0 -8px 24px rgba(15, 13, 46, 0.18) !important;
+            position: relative;
+            overflow: hidden;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            min-height: var(--app-footer-height);
+            margin-top: 0;
+        }
+        .app-footer.glass-effect::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 12% 28%, rgba(162, 155, 254, 0.16), transparent 42%),
+                radial-gradient(circle at 88% 72%, rgba(108, 92, 231, 0.12), transparent 45%);
+            pointer-events: none;
+        }
+        .app-footer-content {
+            position: relative;
+            z-index: 1;
+            min-height: var(--app-footer-height);
+            display: flex;
+            align-items: center;
+        }
+        .app-footer .footer-muted {
+            color: #d9d6ff !important;
+            letter-spacing: 0.01em;
+        }
+        .app-footer .footer-strong {
+            color: #f1efff !important;
+        }
+        .app-footer .footer-badge {
+            background: linear-gradient(145deg, var(--brand-accent), var(--brand-accent-dark)) !important;
+            box-shadow: 0 8px 18px var(--brand-accent-glow);
+        }
+        .app-footer .footer-chip {
+            border: 1px solid var(--brand-accent-border);
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
         .sidebar {
             position: fixed;
             left: 0;
             top: 80px;
             width: 280px;
-            height: calc(100vh - 80px - 60px);
-            background: rgba(255, 255, 255, 0.7);
+            height: calc(100vh - 80px - var(--app-footer-height));
+            background: linear-gradient(165deg, rgba(19, 16, 55, 0.96), rgba(34, 28, 86, 0.94));
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(229, 231, 235, 0.5);
-            box-shadow: 2px 0 15px rgba(0, 0, 0, 0.05);
+            border-right: 1px solid var(--brand-accent-border);
+            box-shadow: 8px 0 26px rgba(15, 13, 46, 0.22);
             z-index: 40;
             overflow-y: auto;
             overflow-x: hidden;
             transition: transform 0.3s ease;
-            border-top: 1px solid rgba(229, 231, 235, 0.3);
+            border-top: 1px solid var(--brand-accent-border);
             -webkit-overflow-scrolling: touch;
         }
         .sidebar::-webkit-scrollbar {
@@ -129,12 +206,12 @@
             background: transparent;
         }
         .sidebar::-webkit-scrollbar-thumb {
-            background: var(--role-color, rgba(16, 185, 129, 0.3));
+            background: var(--role-color, rgba(108, 92, 231, 0.3));
             border-radius: 3px;
             opacity: 0.3;
         }
         .sidebar::-webkit-scrollbar-thumb:hover {
-            background: var(--role-color, rgba(16, 185, 129, 0.5));
+            background: var(--role-color, rgba(108, 92, 231, 0.5));
             opacity: 0.5;
         }
         .sidebar.collapsed {
@@ -145,46 +222,226 @@
             transition: margin-left 0.3s ease;
         }
         /* Role-based color schemes */
-        .role-admin { --role-color: #8b5cf6; --role-color-dark: #7c3aed; --role-color-light: #ede9fe; }
-        .role-partner { --role-color: #1e40af; --role-color-dark: #1e3a8a; --role-color-light: #dbeafe; }
-        .role-finance { --role-color: #0891b2; --role-color-dark: #0e7490; --role-color-light: #cffafe; }
-        .role-advocate { --role-color: #10b981; --role-color-dark: #059669; --role-color-light: #d1fae5; }
-        .role-clerk { --role-color: #f97316; --role-color-dark: #ea580c; --role-color-light: #fed7aa; }
-        .role-it { --role-color: #6366f1; --role-color-dark: #4f46e5; --role-color-light: #e0e7ff; }
-        .role-employee { --role-color: #6b7280; --role-color-dark: #4b5563; --role-color-light: #f3f4f6; }
+        .role-admin { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+        .role-partner { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+        .role-finance { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+        .role-advocate { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+        .role-clerk { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+        .role-it { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+        .role-employee { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
+
+        /* Harmonize existing utility classes to website palette */
+        .text-orange-500, .text-blue-500, .text-green-500, .text-cyan-500, .text-emerald-500, .text-teal-500, .text-purple-500, .text-indigo-500,
+        .text-orange-600, .text-blue-600, .text-green-600, .text-cyan-600, .text-emerald-600, .text-teal-600, .text-purple-600, .text-indigo-600 {
+            color: var(--brand-accent) !important;
+        }
+        .text-orange-700, .text-blue-700, .text-green-700, .text-cyan-700, .text-emerald-700, .text-teal-700, .text-purple-700, .text-indigo-700,
+        .text-orange-800, .text-blue-800, .text-green-800, .text-cyan-800, .text-emerald-800, .text-teal-800, .text-purple-800, .text-indigo-800 {
+            color: var(--brand-primary) !important;
+        }
+        .bg-orange-50, .bg-orange-100, .bg-blue-50, .bg-blue-100,
+        .bg-green-50, .bg-green-100, .bg-indigo-50, .bg-indigo-100,
+        .bg-cyan-50, .bg-cyan-100, .bg-emerald-50, .bg-emerald-100,
+        .bg-teal-50, .bg-teal-100, .bg-purple-50, .bg-purple-100 {
+            background-color: var(--brand-primary-soft) !important;
+        }
+        .border-orange-100, .border-orange-200, .border-orange-300,
+        .border-blue-100, .border-blue-200, .border-blue-300,
+        .border-green-100, .border-green-200, .border-green-300,
+        .border-cyan-100, .border-cyan-200, .border-cyan-300,
+        .border-emerald-100, .border-emerald-200, .border-emerald-300,
+        .border-teal-100, .border-teal-200, .border-teal-300,
+        .border-purple-100, .border-purple-200, .border-purple-300,
+        .border-indigo-100, .border-indigo-200, .border-indigo-300, .border-indigo-600 {
+            border-color: var(--brand-primary-border) !important;
+        }
+        .bg-orange-500, .bg-orange-600, .bg-blue-500, .bg-blue-600,
+        .bg-green-500, .bg-green-600, .bg-indigo-500, .bg-indigo-600,
+        .bg-emerald-500, .bg-emerald-600, .bg-emerald-700,
+        .bg-cyan-500, .bg-cyan-600, .bg-cyan-700,
+        .bg-teal-500, .bg-teal-600, .bg-teal-700,
+        .bg-purple-500, .bg-purple-600, .bg-purple-700 {
+            background-color: var(--brand-accent) !important;
+        }
+        .bg-orange-700, .bg-blue-700, .bg-green-700, .bg-indigo-700,
+        .bg-cyan-700, .bg-emerald-700, .bg-teal-700, .bg-purple-700 {
+            background-color: var(--brand-primary) !important;
+        }
+        .hover\:bg-orange-50:hover, .hover\:bg-blue-50:hover, .hover\:bg-green-50:hover, .hover\:bg-indigo-50:hover,
+        .hover\:bg-cyan-50:hover, .hover\:bg-emerald-50:hover, .hover\:bg-teal-50:hover, .hover\:bg-purple-50:hover {
+            background-color: var(--brand-accent-soft) !important;
+        }
+        .hover\:bg-orange-700:hover, .hover\:bg-blue-700:hover, .hover\:bg-green-700:hover, .hover\:bg-indigo-700:hover,
+        .hover\:bg-cyan-700:hover, .hover\:bg-emerald-700:hover, .hover\:bg-teal-700:hover, .hover\:bg-purple-700:hover {
+            background-color: var(--brand-accent-dark) !important;
+        }
+        .ring-emerald-500\/40, .ring-green-500\/40, .ring-blue-500\/40, .ring-indigo-500\/40, .ring-purple-500\/40, .ring-cyan-500\/40, .ring-teal-500\/40 {
+            --tw-ring-color: rgba(108, 92, 231, 0.4) !important;
+        }
+        .hover\:text-orange-700:hover, .hover\:text-blue-700:hover, .hover\:text-green-700:hover, .hover\:text-indigo-700:hover,
+        .hover\:text-cyan-700:hover, .hover\:text-emerald-700:hover, .hover\:text-teal-700:hover, .hover\:text-purple-700:hover {
+            color: var(--brand-accent-dark) !important;
+        }
+        .from-green-50, .from-green-100, .from-green-500, .from-green-600, .from-green-700,
+        .from-blue-50, .from-blue-100, .from-blue-500, .from-blue-600, .from-blue-700,
+        .from-orange-50, .from-orange-100, .from-orange-500, .from-orange-600, .from-orange-700,
+        .from-cyan-50, .from-cyan-100, .from-cyan-500, .from-cyan-600, .from-cyan-700,
+        .from-emerald-50, .from-emerald-100, .from-emerald-500, .from-emerald-600, .from-emerald-700,
+        .from-teal-50, .from-teal-100, .from-teal-500, .from-teal-600, .from-teal-700,
+        .from-purple-50, .from-purple-100, .from-purple-500, .from-purple-600, .from-purple-700,
+        .from-indigo-50, .from-indigo-100, .from-indigo-500, .from-indigo-600, .from-indigo-700 {
+            --tw-gradient-from: var(--brand-primary) var(--tw-gradient-from-position) !important;
+            --tw-gradient-to: transparent var(--tw-gradient-to-position) !important;
+            --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+        }
+        .to-green-50, .to-green-100, .to-green-500, .to-green-600, .to-green-700,
+        .to-blue-50, .to-blue-100, .to-blue-500, .to-blue-600, .to-blue-700,
+        .to-orange-50, .to-orange-100, .to-orange-500, .to-orange-600, .to-orange-700,
+        .to-cyan-50, .to-cyan-100, .to-cyan-500, .to-cyan-600, .to-cyan-700,
+        .to-emerald-50, .to-emerald-100, .to-emerald-500, .to-emerald-600, .to-emerald-700,
+        .to-teal-50, .to-teal-100, .to-teal-500, .to-teal-600, .to-teal-700,
+        .to-purple-50, .to-purple-100, .to-purple-500, .to-purple-600, .to-purple-700,
+        .to-indigo-50, .to-indigo-100, .to-indigo-500, .to-indigo-600, .to-indigo-700 {
+            --tw-gradient-to: var(--brand-primary) var(--tw-gradient-to-position) !important;
+        }
+        .from-green-50, .from-green-100, .from-green-500, .from-green-600, .from-green-700,
+        .from-blue-50, .from-blue-100, .from-blue-500, .from-blue-600, .from-blue-700,
+        .from-orange-50, .from-orange-100, .from-orange-500, .from-orange-600, .from-orange-700,
+        .from-cyan-50, .from-cyan-100, .from-cyan-500, .from-cyan-600, .from-cyan-700,
+        .from-emerald-50, .from-emerald-100, .from-emerald-500, .from-emerald-600, .from-emerald-700,
+        .from-teal-50, .from-teal-100, .from-teal-500, .from-teal-600, .from-teal-700,
+        .from-purple-50, .from-purple-100, .from-purple-500, .from-purple-600, .from-purple-700,
+        .from-indigo-50, .from-indigo-100, .from-indigo-500, .from-indigo-600, .from-indigo-700,
+        .to-green-50, .to-green-100, .to-green-500, .to-green-600, .to-green-700,
+        .to-blue-50, .to-blue-100, .to-blue-500, .to-blue-600, .to-blue-700,
+        .to-orange-50, .to-orange-100, .to-orange-500, .to-orange-600, .to-orange-700,
+        .to-cyan-50, .to-cyan-100, .to-cyan-500, .to-cyan-600, .to-cyan-700,
+        .to-emerald-50, .to-emerald-100, .to-emerald-500, .to-emerald-600, .to-emerald-700,
+        .to-teal-50, .to-teal-100, .to-teal-500, .to-teal-600, .to-teal-700,
+        .to-purple-50, .to-purple-100, .to-purple-500, .to-purple-600, .to-purple-700,
+        .to-indigo-50, .to-indigo-100, .to-indigo-500, .to-indigo-600, .to-indigo-700 {
+            /* Force single-color gradients to avoid primary-secondary blending */
+            --tw-gradient-from: var(--brand-primary) var(--tw-gradient-from-position) !important;
+            --tw-gradient-to: var(--brand-primary) var(--tw-gradient-to-position) !important;
+            --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+        }
+        /* Keep table headers readable when gradient backgrounds are remapped */
+        thead[class*="bg-gradient"] th,
+        thead[class*="from-"] th,
+        thead[class*="to-"] th {
+            color: #eef0ff !important;
+        }
         
         .sidebar-link {
             display: flex;
             align-items: center;
             padding: 12px 16px;
-            color: #6b7280;
+            color: #dddafd;
             text-decoration: none;
             border-radius: 8px;
             transition: all 0.3s ease;
             border-left: 3px solid transparent;
             margin-bottom: 2px;
+            border: 1px solid transparent;
+        }
+        .sidebar nav {
+            padding-top: 8px;
+            padding-bottom: 10px;
+        }
+        .sidebar .px-4.py-2.mt-4.mb-2 {
+            margin-top: 14px;
+            margin-bottom: 8px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .sidebar p.text-xs.font-semibold.uppercase.tracking-wide {
+            color: #bfb9ef !important;
+            letter-spacing: 0.09em;
+            font-size: 0.68rem;
         }
         .sidebar-link:hover {
-            background: var(--role-color-light, rgba(16, 185, 129, 0.1));
-            color: var(--role-color, #10b981);
-            border-left-color: var(--role-color, #10b981);
+            background: color-mix(in srgb, var(--brand-accent) 18%, transparent);
+            color: #f3f2ff;
+            border-left-color: var(--role-color, var(--brand-accent));
+            border-color: var(--brand-accent-border);
             transform: translateX(4px);
         }
         .sidebar-link.active {
-            background: linear-gradient(90deg, var(--role-color-light, rgba(16, 185, 129, 0.15)) 0%, rgba(255, 255, 255, 0.1) 100%);
-            color: var(--role-color, #10b981);
+            background: linear-gradient(90deg, color-mix(in srgb, var(--brand-accent) 35%, transparent) 0%, color-mix(in srgb, var(--brand-accent-light) 14%, transparent) 100%);
+            color: #ffffff;
             font-weight: 600;
-            border-left: 3px solid var(--role-color, #10b981);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-left: 3px solid var(--role-color, var(--brand-accent));
+            box-shadow: 0 6px 16px rgba(15, 13, 46, 0.22);
+            border-color: var(--brand-accent-border);
         }
         .sidebar-link i {
             width: 24px;
             margin-right: 12px;
             text-align: center;
             font-size: 18px;
+            color: #cfc9ff;
+            opacity: 0.95;
         }
         .sidebar-link span {
             font-size: 14px;
+            line-height: 1.25rem;
+        }
+        .sidebar-link.ml-6 {
+            margin-left: 14px;
+            padding-left: 12px;
+            border-left: 2px dashed rgba(162, 155, 254, 0.35);
+            border-radius: 6px 8px 8px 6px;
+        }
+        .sidebar-link.ml-6 i {
+            font-size: 14px;
+            margin-right: 10px;
+            width: 20px;
+        }
+        .sidebar .text-gray-500,
+        .sidebar .text-gray-600,
+        .sidebar .text-gray-700 {
+            color: #c7c2ff !important;
+        }
+        .sidebar .text-gray-800,
+        .sidebar .text-gray-900 {
+            color: #f3f2ff !important;
+        }
+        .session-role-banner {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--brand-accent-border);
+            background: rgba(255, 255, 255, 0.86);
+            box-shadow: 0 4px 14px rgba(15, 13, 46, 0.08);
+        }
+        .session-role-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+        .session-role-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            background: var(--brand-accent-soft);
+            color: var(--brand-primary);
+            border: 1px solid var(--brand-accent-border);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .session-role-note {
+            font-size: 12px;
+            color: #6b7280;
         }
         @media (max-width: 1024px) {
             .sidebar {
@@ -263,30 +520,30 @@
 </head>
 <body class="min-h-screen antialiased">
     <!-- Header -->
-    <header class="glass-effect border-b border-gray-200/50 sticky top-0 z-50 shadow-lg">
+    <header class="app-header glass-effect border-b border-gray-200/50 sticky top-0 z-50 shadow-lg">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-20">
                 <!-- Left Section: Mobile Menu Toggle & Logo -->
                 <div class="flex items-center space-x-3">
                     <!-- Mobile Sidebar Toggle -->
                     {% if session.get('employee_id') or session.get('client_id') %}
-                    <button onclick="toggleSidebar()" class="lg:hidden px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
+                    <button onclick="toggleSidebar()" class="lg:hidden px-3 py-2 rounded-lg header-panel text-white transition-all duration-300 shadow-md hover:shadow-lg">
                         <i class="fas fa-bars text-lg" id="sidebar-toggle-icon"></i>
                     </button>
                     {% endif %}
                     
                     <!-- SHERIA CENTRIC Logo/Icon -->
-                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard') }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('login') }}{% endif %}" class="flex items-center space-x-3 group">
+                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard') }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('client_login') }}{% endif %}" class="flex items-center space-x-3 group">
                         <div class="relative">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 icon-pulse">
+                            <div class="w-12 h-12 rounded-xl brand-mark flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 icon-pulse">
                                 <i class="fas fa-hands-helping text-white text-xl icon-hover-effect"></i>
                             </div>
-                            <div class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-orange-500 rounded-full border-2 border-white shadow-md icon-bounce"></div>
+                            <div class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 brand-dot rounded-full border-2 border-white shadow-md icon-bounce"></div>
                             <div class="absolute -top-1 -right-1 w-5 h-5 bg-orange-400/30 rounded-full animate-ping"></div>
                         </div>
                         <div class="flex items-baseline space-x-0.5">
-                            <span class="text-2xl font-bold text-gray-900 tracking-tight group-hover:text-green-600 transition-colors duration-300">SHERIA</span>
-                            <span class="text-2xl font-bold text-orange-600 tracking-tight group-hover:text-orange-700 transition-colors duration-300">CENTRIC</span>
+                            <span class="text-2xl font-bold brand-word-main tracking-tight transition-colors duration-300">SHERIA</span>
+                            <span class="text-2xl font-bold brand-word-accent tracking-tight transition-colors duration-300">CENTRIC</span>
                         </div>
                     </a>
                 </div>
@@ -296,14 +553,14 @@
                     <!-- Date & Time Display -->
                     <div class="flex items-center space-x-3">
                         <!-- Date -->
-                        <div class="px-4 py-2.5 rounded-xl glass-effect border border-green-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
+                        <div class="px-4 py-2.5 rounded-xl glass-effect header-panel shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
                             <div class="flex items-center space-x-2">
                                 <i class="fas fa-calendar-alt text-green-600 text-sm icon-float"></i>
                                 <span id="current-date" class="text-xs font-semibold text-gray-800"></span>
                             </div>
                         </div>
                         <!-- Live Clock -->
-                        <div class="px-4 py-2.5 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
+                        <div class="px-4 py-2.5 rounded-xl header-panel shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105">
                             <div class="flex items-center space-x-2">
                                 <i class="fas fa-clock text-orange-600 text-sm icon-rotate"></i>
                                 <span id="live-clock" class="text-xs font-bold text-orange-700 font-mono"></span>
@@ -313,7 +570,7 @@
                     
                     <!-- Company Name Section -->
                     {% if session.get('company_name') %}
-                    <div class="flex items-center space-x-3 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-50/80 to-orange-50/80 border border-green-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 backdrop-blur-sm">
+                    <div class="flex items-center space-x-3 px-5 py-2.5 rounded-xl header-panel shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 backdrop-blur-sm">
                         <div class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm icon-bounce"></div>
                         <i class="fas fa-building text-green-600 text-sm icon-hover-effect"></i>
                         <span class="text-xs font-semibold text-gray-800">{{ session.get('company_name', 'BAUNI LAW GROUP') }}</span>
@@ -323,19 +580,32 @@
                 
                 <!-- Mobile Date & Time (shown on smaller screens) -->
                 <div class="lg:hidden flex items-center space-x-2">
-                    <div class="px-3 py-2 rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200/50 shadow-sm">
+                    <div class="px-3 py-2 rounded-lg header-panel shadow-sm">
                         <span id="live-clock-mobile" class="text-xs font-bold text-orange-700 font-mono"></span>
                     </div>
                 </div>
                 
                 <!-- Right Section: Client Login & User Menu -->
                 <div class="flex items-center space-x-3">
-                    <!-- Client Login Link (only when not logged in as employee or client) -->
+                    <!-- Sign in: employee vs client (only when logged out) -->
                     {% if not session.get('employee_id') and not session.get('client_id') %}
-                    <a href="{{ url_for('google_login') }}" class="hidden md:flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/50 hover:from-blue-100 hover:to-blue-200 transition-all duration-300 shadow-sm hover:shadow-md group">
-                        <i class="fas fa-user-tie text-blue-600 text-sm icon-hover-effect"></i>
-                        <span class="text-sm font-semibold text-blue-700 group-hover:text-blue-800 transition-colors">Client Login</span>
-                    </a>
+                    <div class="relative" id="public-login-menu-root">
+                        <button type="button" id="public-login-toggle" onclick="togglePublicLoginDropdown(event)" class="flex items-center space-x-2 px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200/50 hover:from-green-100 hover:to-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md group">
+                            <i class="fas fa-sign-in-alt text-green-700 text-sm icon-hover-effect"></i>
+                            <span class="text-sm font-semibold text-green-800 group-hover:text-green-900 transition-colors">Sign in</span>
+                            <i class="fas fa-chevron-down text-green-600/80 text-xs transition-transform duration-300" id="public-login-dropdown-icon"></i>
+                        </button>
+                        <div id="public-login-dropdown" class="dropdown-menu right-0 left-auto min-w-[220px]">
+                            <a href="{{ url_for('login') }}" class="dropdown-item">
+                                <i class="fas fa-building text-green-600"></i>
+                                <span>Firm / Employee login</span>
+                            </a>
+                            <a href="{{ url_for('client_login') }}" class="dropdown-item">
+                                <i class="fas fa-user text-blue-600"></i>
+                                <span>Client login</span>
+                            </a>
+                        </div>
+                    </div>
                     {% endif %}
                     
                     <!-- Client Menu (if logged in as client) -->
@@ -443,11 +713,6 @@
                                 <span>Logout</span>
                             </a>
                         </div>
-                    </div>
-                    {% else %}
-                    <div class="hidden md:flex items-center space-x-2 px-3 py-2 rounded-lg glass-effect border border-green-200/50 shadow-sm">
-                        <i class="fas fa-shield-alt text-green-600 icon-float"></i>
-                        <span class="text-sm font-medium text-gray-700">Secure Login</span>
                     </div>
                     {% endif %}
                 </div>
@@ -1389,42 +1654,61 @@
     <!-- Main Content -->
     <main class="flex-1 relative z-10 {% if session.get('employee_id') or session.get('client_id') %}main-content-with-sidebar{% endif %}">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {% if session.get('employee_id') or session.get('client_id') %}
+            <div class="session-role-banner">
+                <span class="session-role-label">Session Role</span>
+                {% if session.get('employee_id') %}
+                <span class="session-role-pill">
+                    <i class="fas fa-user-shield text-[11px]"></i>
+                    {{ session.get('employee_role', 'Employee') }}
+                </span>
+                {% if session.get('original_role') and session.get('original_role') != session.get('employee_role') %}
+                <span class="session-role-note">Original role: <strong>{{ session.get('original_role') }}</strong></span>
+                {% endif %}
+                {% elif session.get('client_id') %}
+                <span class="session-role-pill">
+                    <i class="fas fa-user-tie text-[11px]"></i>
+                    Client
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="glass-effect border-t border-gray-200/50 mt-auto shadow-lg w-full transition-all duration-300">
+    <footer class="app-footer glass-effect border-t border-gray-200/50 mt-auto shadow-lg w-full transition-all duration-300">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="py-4">
+            <div class="app-footer-content py-5">
                 <div class="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0">
                     <!-- Copyright -->
                     <div class="flex items-center space-x-2 group">
-                        <i class="fas fa-copyright text-gray-400 text-xs group-hover:text-green-600 transition-colors duration-300"></i>
-                        <p class="text-xs text-gray-600 group-hover:text-gray-900 transition-colors duration-300">
-                            2026 <span class="font-semibold text-gray-700">SHERIA CENTRIC Technologies Ltd.</span> All Rights Reserved.
+                        <i class="fas fa-copyright footer-muted text-xs transition-colors duration-300"></i>
+                        <p class="text-xs footer-muted transition-colors duration-300">
+                            2026 <span class="font-semibold footer-strong">SHERIA CENTRIC Technologies Ltd.</span> All Rights Reserved.
                         </p>
                     </div>
                     
                     <!-- Version -->
                     <div class="flex items-center space-x-2 group">
-                        <div class="w-6 h-6 rounded-md bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-300">
-                            <i class="fas fa-code-branch text-green-600 text-xs icon-rotate"></i>
+                        <div class="w-6 h-6 rounded-md footer-chip flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-300">
+                            <i class="fas fa-code-branch footer-strong text-xs icon-rotate"></i>
                         </div>
                         <div class="flex items-center space-x-1.5">
-                            <span class="text-xs text-gray-500 group-hover:text-gray-700 transition-colors duration-300">Version</span>
-                            <span class="text-xs font-bold text-gray-900 px-2 py-0.5 rounded bg-gradient-to-r from-green-50 to-orange-50 border border-green-200/50 group-hover:border-green-300 transition-all duration-300">1.0.0</span>
+                            <span class="text-xs footer-muted transition-colors duration-300">Version</span>
+                            <span class="text-xs font-bold footer-strong px-2 py-0.5 rounded footer-chip transition-all duration-300">1.0.0</span>
                         </div>
                     </div>
                     
                     <!-- Powered By -->
                     <div class="flex items-center space-x-2 group">
-                        <span class="text-xs text-gray-500 group-hover:text-gray-700 transition-colors duration-300">Powered by</span>
+                        <span class="text-xs footer-muted transition-colors duration-300">Powered by</span>
                         <div class="flex items-center space-x-1.5">
-                            <div class="w-6 h-6 rounded-md bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300 icon-bounce">
+                            <div class="w-6 h-6 rounded-md footer-badge flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300 icon-bounce">
                                 <i class="fas fa-bolt text-white text-xs"></i>
                             </div>
-                            <span class="text-xs font-bold text-gray-900 group-hover:text-green-600 transition-colors duration-300">SHERIA CENTRIC</span>
+                            <span class="text-xs font-bold footer-strong transition-colors duration-300">SHERIA CENTRIC</span>
                         </div>
                     </div>
                 </div>
@@ -1534,6 +1818,21 @@
                 }
             }
         }
+
+        function togglePublicLoginDropdown(event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            const dropdown = document.getElementById('public-login-dropdown');
+            const icon = document.getElementById('public-login-dropdown-icon');
+            if (!dropdown) {
+                return;
+            }
+            dropdown.classList.toggle('show');
+            if (icon) {
+                icon.style.transform = dropdown.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0deg)';
+            }
+        }
         
         // Sidebar toggle function
         function toggleSidebar() {
@@ -1611,6 +1910,18 @@
                 const clientIcon = document.getElementById('client-dropdown-icon');
                 if (clientIcon) {
                     clientIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+
+            const publicLoginDd = document.getElementById('public-login-dropdown');
+            const publicLoginToggle = document.getElementById('public-login-toggle');
+            if (publicLoginDd && publicLoginToggle) {
+                if (!publicLoginDd.contains(event.target) && !publicLoginToggle.contains(event.target)) {
+                    publicLoginDd.classList.remove('show');
+                    const plIcon = document.getElementById('public-login-dropdown-icon');
+                    if (plIcon) {
+                        plIcon.style.transform = 'rotate(0deg)';
+                    }
                 }
             }
         });

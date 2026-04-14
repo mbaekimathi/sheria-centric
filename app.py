@@ -150,41 +150,33 @@ SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://w
 import socket
 
 def get_db_config():
-    """Detect if running locally or on cPanel and return appropriate DB config"""
-    # Method 1: Check DB_ENV first to determine environment (cpanel or local)
+    """Return DB config from environment variables only."""
+    def build_env_db_config():
+        return {
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'user': os.environ.get('DB_USER', ''),
+            'password': os.environ.get('DB_PASSWORD', ''),
+            'database': os.environ.get('DB_NAME', ''),
+            'charset': 'utf8mb4'
+        }
+
     db_env = os.environ.get('DB_ENV', '').lower()
     
     if db_env == 'cpanel':
-        # Use environment variables for cPanel credentials with hosted defaults
-        print("[OK] Using cPanel database configuration (from DB_ENV)")
-        return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
-            'charset': 'utf8mb4'
-        }
+        print("[OK] Using cPanel database configuration (from environment)")
+        return build_env_db_config()
     
     if db_env == 'local':
-        print("[OK] Using local database configuration (from DB_ENV)")
-        return {
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'user': os.environ.get('DB_USER', 'root'),
-            'password': os.environ.get('DB_PASSWORD', ''),
-            'database': os.environ.get('DB_NAME', 'sheria_centric_db'),
-            'charset': 'utf8mb4'
-        }
+        print("[OK] Using local database configuration (from environment)")
+        return build_env_db_config()
     
-    # Method 2: If DB_ENV not set, check if all DB_* environment variables are provided
     db_host = os.environ.get('DB_HOST', 'localhost')
-    db_user = os.environ.get('DB_USER')
-    db_password = os.environ.get('DB_PASSWORD', '')  # Default to empty string
-    db_name = os.environ.get('DB_NAME')
+    db_user = os.environ.get('DB_USER', '')
+    db_password = os.environ.get('DB_PASSWORD', '')
+    db_name = os.environ.get('DB_NAME', '')
     
-    # If all DB environment variables are set, use them
     if db_user and db_name:
         print("[OK] Using database configuration from environment variables")
-        # Debug output (mask password for security)
         password_display = '*' * len(db_password) if db_password else '(empty)'
         print(f"  Host: {db_host}")
         print(f"  User: {db_user}")
@@ -198,50 +190,8 @@ def get_db_config():
             'charset': 'utf8mb4'
         }
     
-    # Method 3: Check FLASK_ENV to determine default behavior
-    flask_env = os.environ.get('FLASK_ENV', '').lower()
-    
-    # Default to local configuration when running on Windows (typical localhost dev)
-    # or when explicitly in development mode.
-    if os.name == 'nt' or flask_env == 'development':
-        try:
-            test_connection = pymysql.connect(
-                host='localhost',
-                user='root',
-                password='',
-                database='sheria_centric_db',
-                charset='utf8mb4'
-            )
-            test_connection.close()
-            print("[OK] Using local database configuration (auto-detected for localhost/development)")
-            return {
-                'host': 'localhost',
-                'user': 'root',
-                'password': '',
-                'database': 'sheria_centric_db',
-                'charset': 'utf8mb4'
-            }
-        except Exception as e:
-            # For development, still try local config even if connection test fails
-            print("[WARNING] Local database connection test failed, but using local config for localhost/development")
-            print(f"   Error: {e}")
-            return {
-                'host': 'localhost',
-                'user': 'root',
-                'password': '',
-                'database': 'sheria_centric_db',
-                'charset': 'utf8mb4'
-            }
-    
-    # Default to hosted configuration when in production/non-Windows.
-    print("[OK] Using hosted database configuration (default for production)")
-    return {
-        'host': os.environ.get('DB_HOST', 'localhost'),
-        'user': os.environ.get('DB_USER', 'baunilaw_sheria_centric'),
-        'password': os.environ.get('DB_PASSWORD', 'Itskimathi007'),
-        'database': os.environ.get('DB_NAME', 'baunilaw_sheria_centric'),
-        'charset': 'utf8mb4'
-    }
+    print("[WARNING] DB credentials missing in environment. Set DB_USER and DB_NAME in .env.")
+    return build_env_db_config()
 
 # Initialize DB_CONFIG
 DB_CONFIG = get_db_config()

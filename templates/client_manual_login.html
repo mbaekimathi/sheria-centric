@@ -2,6 +2,37 @@
 
 {% block title %}Client Manual Login - SHERIA CENTRIC{% endblock %}
 
+{% block extra_css %}
+<style>
+    header.glass-effect {
+        background: linear-gradient(145deg, rgba(19,16,55,0.94), rgba(34,28,86,0.92)) !important;
+        border-color: rgba(162, 155, 254, 0.35) !important;
+    }
+    header .brand span,
+    header .desktop-nav .nav-link,
+    header .mobile-toggle,
+    header .login-summary {
+        color: #f5f3ff !important;
+    }
+    header .desktop-nav .nav-link:hover {
+        color: #c7c2ff !important;
+    }
+    header .login-summary {
+        border-color: rgba(255, 255, 255, 0.32) !important;
+    }
+    footer {
+        background: linear-gradient(145deg, rgba(25,22,66,0.96), rgba(43,34,103,0.95)) !important;
+        border-top: 1px solid rgba(162,155,254,0.3) !important;
+    }
+    footer p,
+    footer a,
+    footer .footer-muted,
+    footer .footer-strong {
+        color: #f5f3ff !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-md mx-auto">
     <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">

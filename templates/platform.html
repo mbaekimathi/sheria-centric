@@ -41,11 +41,11 @@
           </div>
         </details>
         <a href="/contact" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open"><i class="ph ph-list"></i></button>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation"><i class="ph ph-list"></i></button>
       </div>
     </div>
-    <div class="mobile-menu" x-show="open" x-transition.origin.top>
-      <a href="/platform">Platform</a><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/security">Security</a><a href="/contact">Contact</a><a href="/client_login">Client Login</a><a href="/login">Employee Login</a>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top x-cloak>
+      <a href="/platform" @click="open=false">Platform</a><a href="/features" @click="open=false">Features</a><a href="/pricing" @click="open=false">Pricing</a><a href="/security" @click="open=false">Security</a><a href="/contact" @click="open=false">Contact</a><a href="/client_login" @click="open=false">Client Login</a><a href="/login" @click="open=false">Employee Login</a>
     </div>
   </header>
 

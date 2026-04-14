@@ -895,7 +895,7 @@ def create_clients_table():
                         phone_number VARCHAR(20),
                         profile_picture VARCHAR(500),
                         client_type ENUM('Pending', 'Individual', 'Corporate') DEFAULT 'Pending',
-                        status ENUM('Active', 'Inactive') DEFAULT 'Active',
+                        status ENUM('Active', 'Inactive', 'Onboarding', 'Pending Approval') DEFAULT 'Onboarding',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -926,14 +926,14 @@ def create_clients_table():
                     if 'Duplicate' not in str(e) and 'already exists' not in str(e).lower():
                         print(f"[WARNING] Could not update client_type ENUM: {e}")
 
-                # Update status ENUM to include Pending Approval for manual signups
+                # Update status ENUM to include onboarding + approval flow
                 try:
                     cursor.execute("""
                         ALTER TABLE clients
-                        MODIFY COLUMN status ENUM('Active', 'Inactive', 'Pending Approval') DEFAULT 'Active'
+                        MODIFY COLUMN status ENUM('Active', 'Inactive', 'Onboarding', 'Pending Approval') DEFAULT 'Onboarding'
                     """)
                     connection.commit()
-                    print("[OK] Updated clients status ENUM to include Pending Approval")
+                    print("[OK] Updated clients status ENUM for onboarding/approval flow")
                 except Exception as e:
                     if 'Duplicate' not in str(e) and 'already exists' not in str(e).lower():
                         print(f"[WARNING] Could not update clients status ENUM: {e}")
@@ -3081,7 +3081,12 @@ def employee_management():
         if not company_settings:
             company_settings = {'company_name': 'BAUNI LAW GROUP'}
         
-        return render_template('employee_management.html', company_settings=company_settings)
+        can_delete_employee = current_user_has_permission(connection, 'employee_delete')
+        return render_template(
+            'employee_management.html',
+            company_settings=company_settings,
+            can_delete_employee=can_delete_employee,
+        )
     except Exception as e:
         print(f"Employee Management error: {e}")
         flash('An error occurred.', 'error')
@@ -3825,7 +3830,9 @@ def client_management():
 
             cursor.execute("""
                 SELECT id, full_name, email, phone_number, profile_picture,
-                       client_type, status, created_at
+                       client_type, status, created_at,
+                       client_address, national_id, kra_pin,
+                       id_front, id_back, cr12_certificate, instruction_note
                 FROM clients
                 ORDER BY created_at DESC
             """)
@@ -3840,7 +3847,10 @@ def client_management():
                 if formatted.get('created_at'):
                     formatted['created_at'] = formatted['created_at'].strftime('%Y-%m-%d %H:%M:%S')
                 ctype = formatted.get('client_type', 'Pending')
-                if ctype == 'Individual':
+                cstatus = (formatted.get('status') or '').strip()
+                if cstatus == 'Pending Approval':
+                    pending_clients.append(formatted)
+                elif ctype == 'Individual':
                     individual_clients.append(formatted)
                 elif ctype == 'Corporate':
                     corporate_clients.append(formatted)
@@ -3902,7 +3912,7 @@ def register_client():
 
             cursor.execute("""
                 INSERT INTO clients (google_id, email, full_name, client_type, status)
-                VALUES (%s, %s, %s, 'Pending', 'Active')
+                VALUES (%s, %s, %s, 'Pending', 'Onboarding')
             """, (placeholder_google_id, email_addr, full_name))
             connection.commit()
 
@@ -4214,13 +4224,31 @@ def suspend_client(client_id):
 
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT id, full_name, status FROM clients WHERE id = %s", (client_id,))
+            cursor.execute("""
+                SELECT id, full_name, status, phone_number, client_type
+                FROM clients
+                WHERE id = %s
+            """, (client_id,))
             client = cursor.fetchone()
             if not client:
                 flash('Client not found', 'error')
                 return redirect(url_for('client_management'))
 
             new_status = 'Inactive' if client['status'] == 'Active' else 'Active'
+            if new_status == 'Active':
+                phone_number = (client.get('phone_number') or '').strip()
+                client_type = (client.get('client_type') or '').strip()
+                registration_complete = bool(phone_number) and client_type in ('Individual', 'Corporate')
+                if not registration_complete:
+                    cursor.execute("UPDATE clients SET status = 'Pending Approval' WHERE id = %s", (client_id,))
+                    connection.commit()
+                    flash(
+                        f'Client "{client["full_name"]}" cannot be approved yet. '
+                        'They must complete "Complete Your Registration" details first.',
+                        'error'
+                    )
+                    return redirect(url_for('client_management'))
+
             cursor.execute("UPDATE clients SET status = %s WHERE id = %s", (new_status, client_id))
             connection.commit()
 
@@ -4333,12 +4361,19 @@ def client_manual_login():
                     flash('Invalid email or password.', 'error')
                     return render_template('client_manual_login.html', company_settings=company_settings)
 
-                if client.get('status') == 'Pending Approval':
-                    flash('Your account is pending approval. Please wait for administrator approval.', 'warning')
-                    return render_template('client_manual_login.html', company_settings=company_settings)
+                client_status = (client.get('status') or '').strip()
+                if client_status == 'Onboarding':
+                    session['client_id'] = client['id']
+                    session['client_name'] = client.get('full_name', '')
+                    session['client_email'] = client.get('email', '')
+                    session['client_profile_picture'] = client.get('profile_picture', '')
+                    session['client_type'] = client.get('client_type', 'Pending')
+                    session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                    flash('Please complete your registration to continue.', 'info')
+                    return redirect(url_for('client_registration'))
 
-                if client.get('status') == 'Inactive':
-                    flash('Your account is inactive. Please contact support.', 'error')
+                if client_status != 'Active':
+                    flash('Welcome! Your account is undergoing the approval process. We will notify you once it is activated.', 'warning')
                     return render_template('client_manual_login.html', company_settings=company_settings)
 
                 session['client_id'] = client['id']
@@ -4360,7 +4395,7 @@ def client_manual_login():
 
 @app.route('/client_signup', methods=['GET', 'POST'])
 def client_signup():
-    """Client signup with active status"""
+    """Client signup with onboarding status"""
     if 'client_id' in session:
         return redirect(url_for('client_dashboard'))
 
@@ -4419,7 +4454,7 @@ def client_signup():
                     INSERT INTO clients (
                         google_id, email, full_name, phone_number, profile_picture,
                         client_type, status, password_hash
-                    ) VALUES (%s, %s, %s, %s, %s, 'Pending', 'Active', %s)
+                    ) VALUES (%s, %s, %s, %s, %s, 'Pending', 'Onboarding', %s)
                 """, (
                     f"manual_{secrets.token_hex(12)}",
                     email,
@@ -4430,7 +4465,7 @@ def client_signup():
                 ))
                 connection.commit()
 
-                flash('Signup successful. Your account is now active.', 'success')
+                flash('Signup successful. Please complete your registration to submit for approval.', 'success')
                 return redirect(url_for('client_manual_login'))
         except Exception as e:
             print(f"Client signup error: {e}")
@@ -4624,13 +4659,34 @@ def google_callback():
                     if not client:
                         # Create new client with 'Pending' client_type
                         cursor.execute("""
-                            INSERT INTO clients (google_id, email, full_name, profile_picture, client_type)
-                            VALUES (%s, %s, %s, %s, 'Pending')
+                            INSERT INTO clients (google_id, email, full_name, profile_picture, client_type, status)
+                            VALUES (%s, %s, %s, %s, 'Pending', 'Onboarding')
                         """, (google_id, email, full_name, profile_picture))
                         connection.commit()
                         cursor.execute("SELECT * FROM clients WHERE google_id = %s", (google_id,))
                         client = cursor.fetchone()
                     
+                    client_status = (client.get('status') or '').strip()
+                    if client_status == 'Onboarding':
+                        session['client_id'] = client['id']
+                        session['client_name'] = client['full_name']
+                        session['client_email'] = client['email']
+                        session['client_profile_picture'] = client.get('profile_picture', '')
+                        session['client_type'] = client.get('client_type', 'Pending')
+                        company_settings = get_company_settings()
+                        if company_settings:
+                            session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                        else:
+                            session['company_name'] = 'BAUNI LAW GROUP'
+                        session.pop('state', None)
+                        flash('Please complete your registration to continue.', 'info')
+                        return redirect(url_for('client_registration'))
+
+                    if client_status != 'Active':
+                        session.pop('state', None)
+                        flash('Welcome! Your account is undergoing the approval process. We will notify you once it is activated.', 'warning')
+                        return redirect(url_for('client_login'))
+
                     # Set session
                     session['client_id'] = client['id']
                     session['client_name'] = client['full_name']
@@ -4712,6 +4768,18 @@ def client_dashboard():
             
             if not client:
                 flash('Client not found', 'error')
+                return redirect(url_for('client_login'))
+
+            client_status = (client.get('status') or '').strip()
+            if client_status == 'Onboarding':
+                return redirect(url_for('client_registration'))
+            if client_status != 'Active':
+                session.pop('client_id', None)
+                session.pop('client_name', None)
+                session.pop('client_email', None)
+                session.pop('client_profile_picture', None)
+                session.pop('client_type', None)
+                flash('Welcome! Your account is undergoing the approval process. We will notify you once it is activated.', 'warning')
                 return redirect(url_for('client_login'))
             
             # Check if client has completed registration
@@ -7408,7 +7476,7 @@ def submit_client_registration():
         try:
             with connection.cursor(pymysql.cursors.DictCursor) as cursor:
                 # Build update query based on client type and provided data
-                update_fields = ['phone_number = %s', 'client_type = %s']
+                update_fields = ['phone_number = %s', 'client_type = %s', "status = 'Pending Approval'"]
                 update_values = [phone_number, client_type]
 
                 physical_address = request.form.get('physical_address', '').strip()
@@ -7455,7 +7523,7 @@ def submit_client_registration():
                 session['client_type'] = client_type
                 
                 connection.commit()
-                flash('Registration completed successfully!', 'success')
+                flash('Registration completed successfully! Your account is now undergoing approval.', 'success')
                 return redirect(url_for('client_dashboard'))
         except Exception as e:
             print(f"Error updating client registration: {e}")

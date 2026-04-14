@@ -90,6 +90,25 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500">Total Permissions</p>
+            <p class="text-xl font-bold text-slate-900 mt-1" id="perm-total">0</p>
+        </div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 shadow-sm">
+            <p class="text-[11px] uppercase tracking-wide text-emerald-700">Allowed</p>
+            <p class="text-xl font-bold text-emerald-700 mt-1" id="perm-allowed">0</p>
+        </div>
+        <div class="rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-3 shadow-sm">
+            <p class="text-[11px] uppercase tracking-wide text-rose-700">Blocked</p>
+            <p class="text-xl font-bold text-rose-700 mt-1" id="perm-blocked">0</p>
+        </div>
+        <div class="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3 shadow-sm">
+            <p class="text-[11px] uppercase tracking-wide text-sky-700">Coverage</p>
+            <p class="text-xl font-bold text-sky-700 mt-1" id="perm-coverage">0%</p>
+        </div>
+    </div>
+
     <!-- Permissions matrix -->
     <div class="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-slate-100">
         <div class="border-b border-slate-100 px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -641,7 +660,7 @@
         </div>
     </div>
 
-    <div class="flex items-center justify-between mt-4 text-xs text-slate-500">
+    <div class="sticky bottom-4 z-20 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur px-4 py-3 shadow-lg flex items-center justify-between mt-4 text-xs text-slate-500">
         <p id="unsaved-indicator" class="hidden sm:inline-flex items-center gap-2">
             <span class="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Changes are live on save. Use toggles above, then click Save.</span>
@@ -659,6 +678,18 @@
         const allOffBtn = document.getElementById('btn-all-off');
         const form = document.getElementById('permissions-form');
         const unsaved = document.getElementById('unsaved-indicator');
+        const totalEl = document.getElementById('perm-total');
+        const allowedEl = document.getElementById('perm-allowed');
+        const blockedEl = document.getElementById('perm-blocked');
+        const coverageEl = document.getElementById('perm-coverage');
+
+        function decorateSections() {
+            document.querySelectorAll('.divide-y > .px-5.py-4').forEach((section) => {
+                section.classList.add('permission-section');
+                const table = section.querySelector('table');
+                if (table) table.classList.add('modern-permission-table');
+            });
+        }
 
         function updatePill(toggle) {
             const key = toggle.dataset.permissionKey;
@@ -680,13 +711,27 @@
             }
         }
 
+        function updateSummary() {
+            const total = toggles.length;
+            const allowed = toggles.filter((t) => t.checked).length;
+            const blocked = total - allowed;
+            const coverage = total ? Math.round((allowed / total) * 100) : 0;
+            if (totalEl) totalEl.textContent = String(total);
+            if (allowedEl) allowedEl.textContent = String(allowed);
+            if (blockedEl) blockedEl.textContent = String(blocked);
+            if (coverageEl) coverageEl.textContent = `${coverage}%`;
+        }
+
+        decorateSections();
         toggles.forEach((toggle) => {
             updatePill(toggle);
             toggle.addEventListener('change', function () {
                 updatePill(this);
+                updateSummary();
                 markUnsaved();
             });
         });
+        updateSummary();
 
         if (allOnBtn) {
             allOnBtn.addEventListener('click', function () {
@@ -696,6 +741,7 @@
                         updatePill(t);
                     }
                 });
+                updateSummary();
                 markUnsaved();
             });
         }
@@ -708,6 +754,7 @@
                         updatePill(t);
                     }
                 });
+                updateSummary();
                 markUnsaved();
             });
         }
@@ -721,4 +768,27 @@
         }
     })();
 </script>
+<style>
+    .permission-section {
+        margin: 12px;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #fcfdff 100%);
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+    }
+    .modern-permission-table tbody tr td {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+    .modern-permission-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+    @media (max-width: 640px) {
+        .permission-section {
+            margin: 10px;
+            padding: 12px;
+        }
+    }
+</style>
 {% endblock %}

@@ -64,6 +64,70 @@
         overflow: hidden;
         min-height: 240px;
     }
+    .auth-brand-media {
+        margin: 16px auto 0;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+        box-shadow: 0 16px 30px rgba(10, 8, 35, 0.25);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        width: 100%;
+        max-width: 100%;
+        justify-content: center;
+    }
+    .auth-brand-media .brand-logo-img {
+        width: 100%;
+        height: 150px;
+        object-fit: contain;
+        object-position: center;
+        display: block;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 18px rgba(10, 8, 35, 0.2);
+        padding: 6px;
+    }
+    .auth-collab-tile {
+        width: 100%;
+        height: 150px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 8px 18px rgba(10, 8, 35, 0.2);
+    }
+    .auth-collab-tile img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        object-position: center;
+        display: block;
+        padding: 6px;
+    }
+    .auth-collab-copy {
+        margin-top: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #dddafd;
+        font-weight: 600;
+    }
+    .auth-collab-copy i {
+        color: #c7c2ff;
+    }
+    .auth-brand-media.fallback {
+        color: #f5f3ff;
+        font-size: 1.4rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
     .auth-page.client-mode .auth-brand-panel {
         background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
         border-color: rgba(162, 155, 254, 0.35);
@@ -231,11 +295,29 @@
 <div class="auth-page" id="auth-page-shell">
 <div class="auth-shell">
     <aside class="auth-brand-panel">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-4">
-            <i class="fas fa-scale-balanced text-white text-xl"></i>
-        </div>
         <h2>Secure access for legal teams and clients</h2>
         <p>Choose your login path to continue with SHERIA CENTRIC. Employee access supports matter operations and finance controls, while client access provides secure case visibility.</p>
+        {% if company_settings and company_settings.get('company_logo') %}
+        <div class="auth-brand-media">
+            <div class="auth-collab-tile" aria-hidden="true">
+                <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=320&auto=format&q=80" alt="Collaboration">
+            </div>
+            <img
+                src="{{ url_for('static', filename='uploads/profile_pictures/' ~ company_settings.get('company_logo')) }}"
+                alt="{{ (company_settings.get('company_name') or 'Company') ~ ' logo' }}"
+                class="brand-logo-img"
+                onerror="this.closest('.auth-brand-media').classList.add('fallback'); this.closest('.auth-brand-media').innerHTML = '<span>SHERIA CENTRIC</span>';"
+            >
+        </div>
+        {% else %}
+        <div class="auth-brand-media fallback">
+            <span>{{ (company_settings.get('company_name') if company_settings else 'SHERIA CENTRIC') or 'SHERIA CENTRIC' }}</span>
+        </div>
+        {% endif %}
+        <p class="auth-collab-copy">
+            <i class="fas fa-users"></i>
+            <span>Collaboration-first workspace for advocates and clients</span>
+        </p>
         <div class="auth-kpis">
             <article><strong>256-bit</strong><span>Encrypted sessions</span></article>
             <article><strong>Audit-ready</strong><span>Tracked actions</span></article>

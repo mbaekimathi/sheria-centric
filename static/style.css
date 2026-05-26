@@ -194,6 +194,8 @@ main { overflow: hidden; }
   background: rgba(162, 155, 254, 0.18);
   transform: translateX(2px);
 }
+/* `[x-cloak]` keeps Alpine-controlled elements hidden until x-data is initialised. */
+[x-cloak] { display: none !important; }
 
 /* ---- Mobile hamburger ---- */
 .mobile-toggle {
@@ -1463,6 +1465,18 @@ footer { background: var(--color-primary); color: var(--color-white); padding-to
 }
 
 @media (max-width: 767px) {
+  .container {
+    padding: 0 16px;
+  }
+  .nav-wrap {
+    min-height: 72px;
+  }
+  .brand {
+    font-size: 1.2rem;
+  }
+  .brand span {
+    white-space: nowrap;
+  }
   .section {
     padding: 72px 0;
   }

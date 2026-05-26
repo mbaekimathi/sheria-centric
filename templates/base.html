@@ -137,15 +137,14 @@
             color: var(--brand-accent-light) !important;
         }
         .app-footer.glass-effect {
-            background: linear-gradient(145deg, rgba(19, 16, 55, 0.95), rgba(34, 28, 86, 0.94));
+            background: linear-gradient(145deg, rgba(19, 16, 55, 0.97), rgba(34, 28, 86, 0.95));
             border-color: var(--brand-accent-border) !important;
-            box-shadow: 0 -8px 24px rgba(15, 13, 46, 0.18) !important;
+            box-shadow: 0 -10px 30px rgba(15, 13, 46, 0.22) !important;
             position: relative;
             overflow: hidden;
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
-            min-height: var(--app-footer-height);
             margin-top: 0;
         }
         .app-footer.glass-effect::before {
@@ -161,8 +160,66 @@
             position: relative;
             z-index: 1;
             min-height: var(--app-footer-height);
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
             align-items: center;
+            gap: 14px;
+            padding: 16px 0;
+        }
+        .footer-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .footer-info p {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .footer-pills {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .footer-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--brand-accent-border);
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .footer-pill:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        .footer-pill .label {
+            font-size: 11px;
+            color: #d9d6ff;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+        .footer-pill .value {
+            font-size: 12px;
+            color: #f1efff;
+            font-weight: 700;
+        }
+        .footer-pill-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid var(--brand-accent-border);
+            color: #f1efff;
+            font-size: 11px;
         }
         .app-footer .footer-muted {
             color: #d9d6ff !important;
@@ -181,12 +238,24 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
+        @media (max-width: 900px) {
+            .app-footer-content {
+                grid-template-columns: 1fr;
+                justify-items: center;
+                text-align: center;
+                gap: 10px;
+            }
+            .footer-info p {
+                white-space: normal;
+            }
+        }
         .sidebar {
             position: fixed;
             left: 0;
             top: 80px;
             width: 280px;
-            height: calc(100vh - 80px - var(--app-footer-height));
+            bottom: 0;
+            height: auto;
             background: linear-gradient(165deg, rgba(19, 16, 55, 0.96), rgba(34, 28, 86, 0.94));
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -198,6 +267,7 @@
             transition: transform 0.3s ease;
             border-top: 1px solid var(--brand-accent-border);
             -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
         }
         .sidebar::-webkit-scrollbar {
             width: 6px;
@@ -220,6 +290,10 @@
         .main-content-with-sidebar {
             margin-left: 280px;
             transition: margin-left 0.3s ease;
+        }
+        .app-footer.with-sidebar {
+            margin-left: 280px;
+            width: calc(100% - 280px);
         }
         /* Role-based color schemes */
         .role-admin { --role-color: var(--brand-accent); --role-color-dark: var(--brand-accent-dark); --role-color-light: var(--brand-accent-soft); }
@@ -446,12 +520,17 @@
         @media (max-width: 1024px) {
             .sidebar {
                 transform: translateX(-280px);
+                bottom: 0;
             }
             .sidebar.mobile-open {
                 transform: translateX(0);
             }
             .main-content-with-sidebar {
                 margin-left: 0;
+            }
+            .app-footer.with-sidebar {
+                margin-left: 0;
+                width: 100%;
             }
             .sidebar-overlay {
                 display: none;
@@ -811,9 +890,14 @@
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
+        {% set flash_ns = namespace(approval_popups=[]) %}
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-10">
             {% for category, message in messages %}
             {% if not (category == 'error' and 'permission' in message|lower) %}
+            {% set is_approval_popup = 'undergoing approval' in message|lower or 'pending approval' in message|lower %}
+            {% if is_approval_popup %}
+            {% set flash_ns.approval_popups = flash_ns.approval_popups + [[category, message]] %}
+            {% else %}
             <div class="mb-3 p-4 rounded-xl border-l-4 shadow-lg glass-effect animate-slide-in {% if category == 'error' %}border-red-500 text-red-800{% elif category == 'success' %}border-green-500 text-green-800{% elif category == 'warning' %}border-yellow-500 text-yellow-800{% else %}border-blue-500 text-blue-800{% endif %}">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center">
@@ -834,8 +918,66 @@
                 </div>
             </div>
             {% endif %}
+            {% endif %}
             {% endfor %}
         </div>
+        {% if flash_ns.approval_popups|length > 0 %}
+        <div id="approval-status-modal" class="fixed inset-0 z-[210] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="approval-status-title">
+            <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-lg" id="approval-status-backdrop"></div>
+            <div class="relative w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/15 bg-gradient-to-b from-slate-900 to-slate-950 text-white approval-modal-card">
+                <div class="px-6 sm:px-8 pt-7 pb-6 border-b border-white/10">
+                    <h2 id="approval-status-title" class="text-xl sm:text-2xl font-bold flex items-center gap-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/25 border border-indigo-300/35">
+                            <i class="fas fa-hand-sparkles text-indigo-200"></i>
+                        </span>
+                        Approval Status Update
+                    </h2>
+                    <p class="text-sm text-slate-300 mt-2">Your account update is in progress. You will be notified as soon as approval is complete.</p>
+                </div>
+                <div class="px-6 sm:px-8 py-5 space-y-3">
+                    {% for category, message in flash_ns.approval_popups %}
+                    <div class="rounded-2xl border p-4 {% if category == 'success' %}border-emerald-300/35 bg-emerald-500/10{% else %}border-amber-300/35 bg-amber-500/10{% endif %}">
+                        <div class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-lg {% if category == 'success' %}bg-emerald-500/30 text-emerald-200{% else %}bg-amber-500/30 text-amber-200{% endif %}">
+                                <i class="fas {% if category == 'success' %}fa-circle-check{% else %}fa-hourglass-half{% endif %}"></i>
+                            </span>
+                            <p class="text-sm sm:text-base leading-relaxed text-slate-100">{{ message }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="px-6 sm:px-8 pb-7 flex justify-end">
+                    <button type="button" id="approval-status-dismiss" class="px-5 py-2.5 rounded-xl bg-white text-slate-900 font-semibold text-sm hover:bg-slate-100 transition-colors">
+                        Okay, got it
+                    </button>
+                </div>
+            </div>
+        </div>
+        <style>
+            @keyframes approval-modal-in {
+                0% { opacity: 0; transform: translateY(12px) scale(0.97); }
+                100% { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            #approval-status-modal .approval-modal-card {
+                animation: approval-modal-in 0.28s cubic-bezier(.22,.61,.36,1);
+            }
+        </style>
+        <script>
+            (function() {
+                var modal = document.getElementById('approval-status-modal');
+                if (!modal) return;
+                var closeBtn = document.getElementById('approval-status-dismiss');
+                var backdrop = document.getElementById('approval-status-backdrop');
+                function closeModal() {
+                    modal.style.transition = 'opacity 0.22s ease';
+                    modal.style.opacity = '0';
+                    setTimeout(function() { modal.remove(); }, 220);
+                }
+                if (closeBtn) closeBtn.addEventListener('click', closeModal);
+                if (backdrop) backdrop.addEventListener('click', closeModal);
+            })();
+        </script>
+        {% endif %}
         <!-- Permission denied modal (modern padlock popup) -->
         {% set ns = namespace(permission_shown=false) %}
         {% for category, message in messages %}
@@ -1224,24 +1366,9 @@
                     </a>
                     {% endif %}
                     
-                    <!-- Client Management Section Links (standalone) -->
-                    {% if request.endpoint in ['individual_client_management', 'corporate_client_management'] %}
-                    <a href="{{ url_for('user_management') }}" class="sidebar-link" id="nav-user-management">
-                        <i class="fas fa-users-cog"></i>
-                        <span>User Management</span>
-                    </a>
-                    <a href="{{ url_for('employee_management') }}" class="sidebar-link" id="nav-employee-management">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Employee Records</span>
-                    </a>
-                    <a href="{{ url_for('client_management') }}" class="sidebar-link active" id="nav-client-management">
-                        <i class="fas fa-user-friends"></i>
-                        <span>Client Management</span>
-                    </a>
-                    {% endif %}
-                    
                     <!-- User Management Section Links -->
-                    {% if request.endpoint in ['user_management', 'client_management'] %}
+                    {% if request.endpoint in ['user_management', 'client_management', 'individual_client_management', 'corporate_client_management'] %}
+                    {% if request.endpoint != 'client_management' %}
                     <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint == 'user_management' %}active{% endif %}" id="nav-user-management">
                         <i class="fas fa-users-cog"></i>
                         <span>User Management</span>
@@ -1250,10 +1377,21 @@
                         <i class="fas fa-user-tie"></i>
                         <span>Employee Records</span>
                     </a>
+                    {% endif %}
                     <a href="{{ url_for('client_management') }}" class="sidebar-link {% if request.endpoint == 'client_management' %}active{% endif %}" id="nav-client-management">
                         <i class="fas fa-user-friends"></i>
                         <span>Client Management</span>
                     </a>
+                    {% if request.endpoint in ['individual_client_management', 'corporate_client_management'] %}
+                    <a href="{{ url_for('individual_client_management') }}" class="sidebar-link {% if request.endpoint == 'individual_client_management' %}active{% endif %}" id="nav-individual-client-management">
+                        <i class="fas fa-user"></i>
+                        <span>Individual Client Management</span>
+                    </a>
+                    <a href="{{ url_for('corporate_client_management') }}" class="sidebar-link {% if request.endpoint == 'corporate_client_management' %}active{% endif %}" id="nav-corporate-client-management">
+                        <i class="fas fa-building"></i>
+                        <span>Corporate Client Management</span>
+                    </a>
+                    {% endif %}
                     {% endif %}
                     
                     <!-- Roles & Permissions (Standalone) -->
@@ -1732,39 +1870,24 @@
     </main>
 
     <!-- Footer -->
-    <footer class="app-footer glass-effect border-t border-gray-200/50 mt-auto shadow-lg w-full transition-all duration-300">
+    <footer class="app-footer glass-effect border-t border-gray-200/50 mt-auto shadow-lg w-full transition-all duration-300 {% if session.get('employee_id') or session.get('client_id') %}with-sidebar{% endif %}">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="app-footer-content py-5">
-                <div class="flex flex-col md:flex-row items-center justify-between space-y-3 md:space-y-0">
-                    <!-- Copyright -->
-                    <div class="flex items-center space-x-2 group">
-                        <i class="fas fa-copyright footer-muted text-xs transition-colors duration-300"></i>
-                        <p class="text-xs footer-muted transition-colors duration-300">
-                            2026 <span class="font-semibold footer-strong">SHERIA CENTRIC Technologies Ltd.</span> All Rights Reserved.
-                        </p>
-                    </div>
-                    
-                    <!-- Version -->
-                    <div class="flex items-center space-x-2 group">
-                        <div class="w-6 h-6 rounded-md footer-chip flex items-center justify-center shadow-sm group-hover:shadow-md group-hover:scale-110 transition-all duration-300">
-                            <i class="fas fa-code-branch footer-strong text-xs icon-rotate"></i>
-                        </div>
-                        <div class="flex items-center space-x-1.5">
-                            <span class="text-xs footer-muted transition-colors duration-300">Version</span>
-                            <span class="text-xs font-bold footer-strong px-2 py-0.5 rounded footer-chip transition-all duration-300">1.0.0</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Powered By -->
-                    <div class="flex items-center space-x-2 group">
-                        <span class="text-xs footer-muted transition-colors duration-300">Powered by</span>
-                        <div class="flex items-center space-x-1.5">
-                            <div class="w-6 h-6 rounded-md footer-badge flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-110 transition-all duration-300 icon-bounce">
-                                <i class="fas fa-bolt text-white text-xs"></i>
-                            </div>
-                            <span class="text-xs font-bold footer-strong transition-colors duration-300">SHERIA CENTRIC</span>
-                        </div>
-                    </div>
+            <div class="app-footer-content">
+                <div class="footer-info">
+                    <i class="fas fa-copyright footer-muted text-xs"></i>
+                    <p class="text-xs footer-muted">
+                        2026 <span class="font-semibold footer-strong">SHERIA CENTRIC Technologies Ltd.</span> All Rights Reserved.
+                    </p>
+                </div>
+                <div class="footer-pill">
+                    <span class="footer-pill-icon"><i class="fas fa-code-branch icon-rotate"></i></span>
+                    <span class="label">Version</span>
+                    <span class="value">1.0.0</span>
+                </div>
+                <div class="footer-pill">
+                    <span class="label">Powered by</span>
+                    <span class="footer-pill-icon footer-badge icon-bounce"><i class="fas fa-bolt text-white text-[10px]"></i></span>
+                    <span class="value">SHERIA CENTRIC</span>
                 </div>
             </div>
         </div>

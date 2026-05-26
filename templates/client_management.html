@@ -27,6 +27,61 @@
         50% { opacity: 1; transform: translateY(3px); }
     }
     .pulse-arrow { animation: pulse-arrow 1.5s ease-in-out infinite; }
+    .pending-table thead {
+        background: linear-gradient(90deg, #fff7d1, #ffefad);
+        border-bottom: 1px solid #f5d66a;
+    }
+    .pending-table thead th {
+        color: #4a3400 !important;
+        font-weight: 700;
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 1 !important;
+    }
+    .pending-table tbody tr:hover {
+        background: #fffbeb;
+    }
+    .pending-action {
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+    .pending-details-backdrop {
+        background: rgba(2, 6, 23, 0.62);
+        backdrop-filter: blur(6px);
+    }
+    .details-grid-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+        padding: 10px 12px;
+    }
+    .doc-item {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: #fff;
+    }
+    .doc-actions a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 6px 9px;
+    }
+    .doc-view {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+    .doc-download {
+        background: #ecfdf3;
+        color: #166534;
+    }
 </style>
 {% endblock %}
 
@@ -92,7 +147,7 @@
              class="stat-card bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-5 text-white cursor-pointer hover:shadow-xl hover:scale-[1.03] transition-all duration-300">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-yellow-100 text-sm font-medium">Pending Onboarding</p>
+                    <p class="text-yellow-100 text-sm font-medium">Pending Clients</p>
                     <p class="text-3xl font-bold mt-1">{{ pending_clients|length }}</p>
                 </div>
                 <i class="fas fa-user-clock text-4xl opacity-50"></i>
@@ -140,14 +195,14 @@
             <div id="content-individual" class="tab-content p-6 hidden">
                 {% if individual_clients|length > 0 %}
                 <div class="overflow-x-auto">
-                    <table class="w-full">
+                    <table class="w-full pending-table">
                         <thead class="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
                             <tr>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Registered</th>
-                                <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                                <th class="px-6 py-4 text-left">Client</th>
+                                <th class="px-6 py-4 text-left">Contact</th>
+                                <th class="px-6 py-4 text-left">Status</th>
+                                <th class="px-6 py-4 text-left">Registered</th>
+                                <th class="px-6 py-4 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -183,11 +238,6 @@
                                         <a href="{{ url_for('view_as_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View client portal">
                                             <i class="fas fa-eye mr-1"></i>View
                                         </a>
-                                        {% if client.status != 'Active' %}
-                                        <a href="{{ url_for('onboard_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors" title="Onboard this client">
-                                            <i class="fas fa-user-check mr-1"></i>Onboard
-                                        </a>
-                                        {% endif %}
                                         <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
                                             <i class="fas fa-edit mr-1"></i>Edit
                                         </a>
@@ -259,11 +309,6 @@
                                         <a href="{{ url_for('view_as_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View client portal">
                                             <i class="fas fa-eye mr-1"></i>View
                                         </a>
-                                        {% if client.status != 'Active' %}
-                                        <a href="{{ url_for('onboard_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors" title="Onboard this client">
-                                            <i class="fas fa-user-check mr-1"></i>Onboard
-                                        </a>
-                                        {% endif %}
                                         <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
                                             <i class="fas fa-edit mr-1"></i>Edit
                                         </a>
@@ -330,16 +375,22 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ client.created_at }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center justify-center space-x-2">
-                                        <a href="{{ url_for('view_as_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View client portal">
-                                            <i class="fas fa-eye mr-1"></i>View
-                                        </a>
-                                        <a href="{{ url_for('onboard_client', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors" title="Onboard this client">
-                                            <i class="fas fa-user-check mr-1"></i>Onboard
-                                        </a>
-                                        <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
+                                        <button onclick='openPendingDetailsModal({{ client|tojson }})' class="pending-action inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors" title="View registration details">
+                                            <i class="fas fa-id-card mr-1"></i>View Details
+                                        </button>
+                                        {% set reg_complete = (client.phone_number and client.client_type in ['Individual', 'Corporate']) %}
+                                        <form method="POST" action="{{ url_for('suspend_client', client_id=client.id) }}" class="inline">
+                                            <button type="submit"
+                                                {% if not reg_complete %}disabled{% endif %}
+                                                class="pending-action inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors {% if reg_complete %}bg-green-50 text-green-700 hover:bg-green-100{% else %}bg-gray-100 text-gray-400 cursor-not-allowed{% endif %}"
+                                                title="{% if reg_complete %}Approve and onboard client{% else %}Complete registration required before approval{% endif %}">
+                                                <i class="fas fa-user-check mr-1"></i>Approve & Onboard
+                                            </button>
+                                        </form>
+                                        <a href="{{ url_for('edit_client_page', client_id=client.id) }}" class="pending-action inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors" title="Edit client details">
                                             <i class="fas fa-edit mr-1"></i>Edit
                                         </a>
-                                        <button onclick="openDeleteModal({{ client.id }}, '{{ client.full_name|e }}')" class="inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors" title="Delete client permanently">
+                                        <button onclick="openDeleteModal({{ client.id }}, '{{ client.full_name|e }}')" class="pending-action inline-flex items-center px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors" title="Delete client permanently">
                                             <i class="fas fa-trash-alt mr-1"></i>Delete
                                         </button>
                                     </div>
@@ -360,9 +411,26 @@
     </div>
 </div>
 
+<!-- Pending Client Details Modal -->
+<div id="pendingDetailsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 pending-details-backdrop">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-3xl w-full overflow-hidden border border-indigo-100">
+        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-slate-900">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-bold text-white flex items-center">
+                    <i class="fas fa-id-card text-indigo-200 mr-3"></i>Pending Client Registration Details
+                </h2>
+                <button onclick="closePendingDetailsModal()" class="text-indigo-200 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        <div id="pendingDetailsBody" class="p-6 max-h-[75vh] overflow-y-auto bg-slate-50"></div>
+    </div>
+</div>
+
 <!-- Suspend Client Modal -->
-<div id="suspendModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+<div id="suspendModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 pending-details-backdrop">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
         <div class="p-6 border-b border-gray-200" id="suspend-header">
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-bold text-gray-900 flex items-center">
@@ -397,8 +465,8 @@
 </div>
 
 <!-- Delete Client Modal -->
-<div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+<div id="deleteModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 pending-details-backdrop">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
         <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100">
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-bold text-gray-900 flex items-center">
@@ -432,8 +500,8 @@
 </div>
 
 <!-- Register Client Modal -->
-<div id="registerModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col">
+<div id="registerModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 pending-details-backdrop">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden max-h-[90vh] flex flex-col border border-slate-200">
         <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-100 flex-shrink-0">
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-bold text-gray-900 flex items-center">
@@ -560,6 +628,59 @@ function filterClients() {
     });
 }
 
+function detailCard(label, value) {
+    return `<div class="details-grid-card"><p class="text-[11px] uppercase tracking-wide text-gray-500">${label}</p><p class="text-sm font-semibold text-gray-800 mt-1 break-words">${value || 'N/A'}</p></div>`;
+}
+
+function fileLink(label, value) {
+    if (!value) return `<div class="doc-item"><span class="text-sm text-gray-600 font-medium">${label}</span><span class="text-xs text-gray-400">Not uploaded</span></div>`;
+    const viewHref = value.startsWith('http') ? value : `/static/uploads/profile_pictures/${value}`;
+    const downloadHref = `/download_document/client/${encodeURIComponent(value)}`;
+    return `<div class="doc-item">
+        <span class="text-sm text-gray-700 font-medium">${label}</span>
+        <span class="doc-actions inline-flex items-center gap-2">
+            <a class="doc-view" target="_blank" rel="noopener noreferrer" href="${viewHref}"><i class="fas fa-eye"></i>View</a>
+            <a class="doc-download" href="${downloadHref}"><i class="fas fa-download"></i>Download</a>
+        </span>
+    </div>`;
+}
+
+function openPendingDetailsModal(client) {
+    const body = document.getElementById('pendingDetailsBody');
+    const type = client.client_type || 'Pending';
+    body.innerHTML = `
+        <div class="space-y-5">
+            <div class="rounded-2xl bg-white border border-gray-200 p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${detailCard('Full Name', client.full_name)}
+                    ${detailCard('Email', client.email)}
+                    ${detailCard('Phone Number', client.phone_number)}
+                    ${detailCard('Client Type', type)}
+                    ${detailCard('Status', client.status)}
+                    ${detailCard('Address', client.client_address)}
+                    ${detailCard('National ID', client.national_id)}
+                    ${detailCard('KRA PIN', client.kra_pin)}
+                </div>
+            </div>
+            <div class="rounded-2xl bg-white border border-gray-200 p-4">
+                <h3 class="text-sm font-bold text-gray-800 mb-3 flex items-center"><i class="fas fa-folder-open text-indigo-600 mr-2"></i>Documents</h3>
+                <div class="space-y-2">
+                ${fileLink('ID Front / Passport', client.id_front)}
+                ${fileLink('KRA PIN Document', client.id_back)}
+                ${fileLink('CR12 Certificate', client.cr12_certificate)}
+                ${fileLink('Instruction Note', client.instruction_note)}
+                </div>
+            </div>
+        </div>`;
+    document.getElementById('pendingDetailsModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePendingDetailsModal() {
+    document.getElementById('pendingDetailsModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
 function openSuspendModal(id, name, status) {
     const isSuspending = status === 'Active';
     document.getElementById('suspendForm').action = '/client_management/suspend/' + id;
@@ -622,7 +743,7 @@ function closeRegisterModal() {
 }
 
 document.addEventListener('click', function(e) {
-    ['suspendModal', 'deleteModal', 'registerModal'].forEach(modalId => {
+    ['pendingDetailsModal', 'suspendModal', 'deleteModal', 'registerModal'].forEach(modalId => {
         const modal = document.getElementById(modalId);
         if (e.target === modal) {
             modal.classList.add('hidden');

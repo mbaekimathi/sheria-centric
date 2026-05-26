@@ -2616,6 +2616,69 @@ def _send_sms_custom(phone, text, api_key, api_secret, sender_id, custom_url):
     return False, resp.text[:200]
 
 
+# ----------------------------------------------------------------------
+# PWA endpoints
+# ----------------------------------------------------------------------
+# Browsers require the service worker to be served from a path that
+# covers the scopes it controls. Serving sw.js from /sw.js (instead of
+# /static/sw.js) lets a single worker control the whole site.
+# The manifest is served at root for the same reason; some browsers
+# look up icons relative to the manifest's URL.
+
+@app.route('/sw.js')
+def pwa_service_worker():
+    """Serve the service-worker script from the site root so its default
+    scope is '/'. We add ``Service-Worker-Allowed: /`` defensively, in
+    case the file gets cached behind a CDN that already constrains
+    scope."""
+    response = send_from_directory(app.static_folder, 'sw.js', mimetype='application/javascript')
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@app.route('/manifest.webmanifest')
+def pwa_manifest():
+    """Serve the PWA manifest at the site root with the correct MIME type."""
+    response = send_from_directory(
+        app.static_folder, 'manifest.webmanifest',
+        mimetype='application/manifest+json'
+    )
+    response.headers['Cache-Control'] = 'public, max-age=86400'
+    return response
+
+
+@app.route('/manifest.json')
+def pwa_manifest_alias():
+    """Legacy alias — some older tooling expects manifest.json."""
+    return pwa_manifest()
+
+
+@app.route('/favicon.ico')
+def pwa_favicon():
+    """Most browsers still probe /favicon.ico; serve our PNG favicon."""
+    return send_from_directory(
+        app.static_folder, 'favicon-32.png', mimetype='image/png'
+    )
+
+
+@app.route('/favicon.svg')
+def pwa_favicon_svg():
+    """Modern browsers prefer the SVG favicon — they scale it crisply."""
+    return send_from_directory(
+        app.static_folder, 'favicon.svg', mimetype='image/svg+xml'
+    )
+
+
+@app.route('/apple-touch-icon.png')
+@app.route('/apple-touch-icon-precomposed.png')
+def pwa_apple_touch_icon():
+    """iOS Safari auto-probes these paths when a user adds to Home Screen."""
+    return send_from_directory(
+        app.static_folder, 'apple-touch-icon.png', mimetype='image/png'
+    )
+
+
 @app.route('/')
 def index():
     """Public landing page for visitors; logged-in users go to their dashboard."""
@@ -2965,7 +3028,9 @@ _ROLE_PREFIX_SKIP_EXACT = {
     # OAuth callback
     '/callback',
     # Misc
-    '/favicon.ico', '/robots.txt', '/sw.js', '/manifest.json',
+    '/favicon.ico', '/favicon.svg', '/robots.txt',
+    '/sw.js', '/manifest.json', '/manifest.webmanifest',
+    '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png',
     # Session-mutating helpers - these redirect themselves to the right
     # role-prefixed dashboard immediately after running.
     '/exit_role_switch', '/exit_client_view',

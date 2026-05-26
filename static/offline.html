@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You are offline — SHERIA CENTRIC</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg-start: #1E1A4E;
+      --bg-end: #3D2E9C;
+      --accent: #A29BFE;
+      --text: #f5f3ff;
+      --muted: #c7c2ff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at 20% 10%, rgba(162,155,254,.25), transparent 55%),
+                  linear-gradient(135deg, var(--bg-start), var(--bg-end));
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .card {
+      max-width: 520px;
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 22px;
+      padding: 36px 30px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(8, 5, 30, 0.45);
+    }
+    .icon-wrap {
+      width: 84px; height: 84px;
+      margin: 0 auto 18px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, #1E1A4E, #6C5CE7);
+      display: grid; place-items: center;
+      box-shadow: 0 14px 28px rgba(8, 5, 30, 0.4);
+    }
+    .icon-wrap img { width: 56px; height: 56px; }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+    p { color: var(--muted); margin: 0 0 22px; line-height: 1.55; }
+    .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    button, a.btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      padding: 11px 18px;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: transform .15s ease, background .15s ease, border-color .15s ease;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #1E1A4E;
+    }
+    .btn-primary:hover { transform: translateY(-1px); background: #b8b0ff; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.28);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.55); }
+    .hint { font-size: .8rem; color: rgba(255,255,255,0.55); margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="card" role="alert" aria-live="polite">
+    <div class="icon-wrap"><img src="/static/icon.svg" alt="SHERIA CENTRIC"></div>
+    <h1>You're offline</h1>
+    <p>We can't reach the SHERIA CENTRIC servers right now. Check your connection and try again. Anything you've already opened in the app stays available.</p>
+    <div class="actions">
+      <button class="btn-primary" onclick="location.reload()">Try again</button>
+      <a class="btn-ghost" href="/">Go home</a>
+    </div>
+    <p class="hint">Tip: install SHERIA CENTRIC as an app for faster, offline-friendly access.</p>
+  </div>
+</body>
+</html>

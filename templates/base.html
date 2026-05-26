@@ -7,6 +7,8 @@
     {% set cs = company_settings if company_settings is defined and company_settings else {} %}
     {% set theme_primary = cs.get('primary_brand_color') or '#1E1A4E' %}
     {% set theme_accent = cs.get('secondary_color') or '#6C5CE7' %}
+    {# PWA: manifest, icons, theme-color, service worker registration. #}
+    {% include "_pwa_head.html" %}
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1846,25 +1848,6 @@
     <!-- Main Content -->
     <main class="flex-1 relative z-10 {% if session.get('employee_id') or session.get('client_id') %}main-content-with-sidebar{% endif %}">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {% if session.get('employee_id') or session.get('client_id') %}
-            <div class="session-role-banner">
-                <span class="session-role-label">Session Role</span>
-                {% if session.get('employee_id') %}
-                <span class="session-role-pill">
-                    <i class="fas fa-user-shield text-[11px]"></i>
-                    {{ session.get('employee_role', 'Employee') }}
-                </span>
-                {% if session.get('original_role') and session.get('original_role') != session.get('employee_role') %}
-                <span class="session-role-note">Original role: <strong>{{ session.get('original_role') }}</strong></span>
-                {% endif %}
-                {% elif session.get('client_id') %}
-                <span class="session-role-pill">
-                    <i class="fas fa-user-tie text-[11px]"></i>
-                    Client
-                </span>
-                {% endif %}
-            </div>
-            {% endif %}
             {% block content %}{% endblock %}
         </div>
     </main>

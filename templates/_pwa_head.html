@@ -1,0 +1,36 @@
+{# -----------------------------------------------------------------
+   SHERIA CENTRIC — PWA head fragment
+
+   Drop this anywhere inside a page's <head>. It wires up:
+     - manifest link
+     - icon & favicon links (SVG + PNG fallbacks)
+     - apple-touch-icon and apple-mobile-web-app meta tags
+     - theme-color and color-scheme meta tags
+     - the pwa.js bootstrap (SW registration + install prompt UI)
+
+   The PWA install banner is *not* rendered server-side — it's injected
+   on demand by pwa.js when the browser exposes a `beforeinstallprompt`
+   event (or when the user is on iOS Safari). That way the prompt only
+   appears on devices/browsers that can actually install the app.
+   ----------------------------------------------------------------- #}
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1E1A4E" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1E1A4E" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="application-name" content="SHERIA CENTRIC">
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{ url_for('static', filename='favicon-32.png') }}" sizes="32x32" type="image/png">
+<link rel="icon" href="{{ url_for('static', filename='favicon-16.png') }}" sizes="16x16" type="image/png">
+<link rel="shortcut icon" href="/favicon.ico">
+
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SHERIA CENTRIC">
+
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="msapplication-TileColor" content="#1E1A4E">
+<meta name="msapplication-TileImage" content="{{ url_for('static', filename='icon-192.png') }}">
+
+<script src="{{ url_for('static', filename='pwa.js') }}" defer></script>

@@ -1,0 +1,71 @@
+{# -----------------------------------------------------------------
+   Reusable "Install app" button.
+
+   Usage in any template (inside <body>):
+     {% include "_pwa_install_button.html" %}
+
+   The button is hidden by default. pwa.js shows it when the browser
+   can install the app (or when the user is on iOS Safari, in which
+   case clicking it shows the "Share -> Add to Home Screen" tip).
+   ----------------------------------------------------------------- #}
+<button
+    type="button"
+    id="pwa-install-btn"
+    class="pwa-install-btn"
+    aria-label="Install SHERIA CENTRIC as an app"
+    hidden
+    onclick="window.PWA && window.PWA.promptInstall();">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/>
+    </svg>
+    <span>Install app</span>
+</button>
+
+<style>
+    .pwa-install-btn {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(108, 92, 231, 0.45);
+        background: linear-gradient(135deg, #1E1A4E, #6C5CE7);
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .pwa-install-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(30, 26, 78, 0.25);
+    }
+    .pwa-install-btn svg { width: 16px; height: 16px; }
+    .pwa-install-btn.is-visible { display: inline-flex; }
+</style>
+
+<script>
+(function () {
+    function reveal() {
+        var btn = document.getElementById('pwa-install-btn');
+        if (!btn) return;
+        if (window.PWA && (window.PWA.isStandalone() || window.PWA.isInstalled())) {
+            btn.hidden = true;
+            btn.classList.remove('is-visible');
+            return;
+        }
+        btn.hidden = false;
+        btn.classList.add('is-visible');
+    }
+    window.addEventListener('beforeinstallprompt', reveal);
+    window.addEventListener('appinstalled', function () {
+        var btn = document.getElementById('pwa-install-btn');
+        if (btn) { btn.hidden = true; btn.classList.remove('is-visible'); }
+    });
+    /* iOS: show the button so users get the Share -> Add to Home Screen tip. */
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.PWA && window.PWA.isIOS() && !window.PWA.isStandalone()) reveal();
+    });
+})();
+</script>

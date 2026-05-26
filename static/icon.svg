@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SHERIA CENTRIC">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#1E1A4E"/>
+      <stop offset="55%" stop-color="#3D2E9C"/>
+      <stop offset="100%" stop-color="#6C5CE7"/>
+    </linearGradient>
+    <radialGradient id="hi" cx="22%" cy="20%" r="55%">
+      <stop offset="0%"  stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ic" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#E6E1FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#hi)"/>
+  <g fill="url(#ic)">
+    <!-- vertical pole of the scales -->
+    <rect x="247" y="120" width="18" height="270" rx="9"/>
+    <!-- finial / top -->
+    <polygon points="256,100 268,124 244,124"/>
+    <!-- yoke / horizontal beam -->
+    <rect x="120" y="160" width="272" height="14" rx="7"/>
+    <!-- chains / hanging arms -->
+    <rect x="140" y="174" width="6" height="36" rx="3"/>
+    <rect x="366" y="174" width="6" height="36" rx="3"/>
+    <!-- left pan -->
+    <path d="M86 215
+             C 86 245, 110 268, 143 268
+             C 176 268, 200 245, 200 215 Z" fill="url(#ic)"/>
+    <!-- right pan -->
+    <path d="M312 215
+             C 312 245, 336 268, 369 268
+             C 402 268, 426 245, 426 215 Z" fill="url(#ic)"/>
+    <!-- base plinth -->
+    <rect x="178" y="390" width="156" height="18" rx="9"/>
+    <rect x="158" y="408" width="196" height="14" rx="7"/>
+    <!-- subtle S monogram overlay (white with mild glow) -->
+    <path d="M298 222
+             c -3 -14 -16 -22 -34 -22
+             c -22 0 -36 11 -36 26
+             c 0 18 18 23 38 28
+             c 22 5 40 11 40 30
+             c 0 16 -16 28 -40 28
+             c -22 0 -38 -10 -42 -26"
+          fill="none" stroke="#1E1A4E" stroke-width="6" stroke-linecap="round" opacity="0.55"/>
+  </g>
+</svg>

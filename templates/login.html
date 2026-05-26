@@ -4,420 +4,1158 @@
 
 {% block extra_css %}
 <style>
+    /* =========================================================
+       LOGIN PAGE — modern, responsive, standard-sized.
+       Self-contained CSS that doesn't depend on Tailwind v3/v4
+       gradient classes (which broke under recent CDN upgrades).
+       ========================================================= */
+
+    :root {
+        /* Pull from the global theme set by company settings in base.html.
+           Falls back to the SHERIA CENTRIC defaults if theme vars unavailable. */
+        --auth-accent: var(--brand-accent, #6c5ce7);
+        --auth-accent-dark: var(--brand-accent-dark, #5747d6);
+        --auth-accent-soft: var(--brand-accent-soft, #f1efff);
+        --auth-accent-border: var(--brand-accent-border, #ddd6ff);
+        --auth-text: #1a1c2e;
+        --auth-text-muted: #6b7280;
+        --auth-border: #e5e3f5;
+        --auth-radius: 20px;
+        --auth-shadow: 0 24px 60px -12px rgba(23, 18, 63, 0.22),
+                       0 10px 24px -8px rgba(23, 18, 63, 0.12);
+    }
+
     body {
         background:
-            radial-gradient(circle at 12% 20%, rgba(108,92,231,0.2), transparent 42%),
-            radial-gradient(circle at 85% 22%, rgba(162,155,254,0.16), transparent 46%),
-            linear-gradient(135deg, #eef2ff 0%, #f7f4ff 45%, #faf9ff 100%) !important;
+            radial-gradient(circle at 12% 18%, rgba(108, 92, 231, 0.18), transparent 42%),
+            radial-gradient(circle at 88% 78%, rgba(162, 155, 254, 0.14), transparent 50%),
+            linear-gradient(135deg, #eef2ff 0%, #f7f4ff 50%, #faf9ff 100%) !important;
     }
     body::before {
         background-image:
-            radial-gradient(circle at 20% 30%, rgba(108,92,231,0.12) 0%, transparent 50%),
-            radial-gradient(circle at 85% 75%, rgba(162,155,254,0.1) 0%, transparent 52%) !important;
+            radial-gradient(circle at 20% 30%, rgba(108, 92, 231, 0.10) 0%, transparent 50%),
+            radial-gradient(circle at 85% 75%, rgba(162, 155, 254, 0.08) 0%, transparent 52%) !important;
     }
+
+    /* Inherit landing header styling from base.html — keep it dark */
     header.glass-effect {
-        background: linear-gradient(145deg, rgba(19,16,55,0.92), rgba(34,28,86,0.9)) !important;
+        background: linear-gradient(145deg, rgba(19, 16, 55, 0.92), rgba(34, 28, 86, 0.9)) !important;
         border-color: rgba(162, 155, 254, 0.35) !important;
         box-shadow: 0 14px 30px rgba(17, 13, 47, 0.28) !important;
     }
     header .brand span,
-    header .desktop-nav .nav-link {
-        color: #f1efff !important;
-    }
-    header .desktop-nav .nav-link:hover {
-        color: #c7c2ff !important;
-    }
+    header .desktop-nav .nav-link { color: #f1efff !important; }
+    header .desktop-nav .nav-link:hover { color: #c7c2ff !important; }
     footer {
-        background: linear-gradient(145deg, rgba(25,22,66,0.96), rgba(43,34,103,0.95)) !important;
-        border-top: 1px solid rgba(162,155,254,0.3);
+        background: linear-gradient(145deg, rgba(25, 22, 66, 0.96), rgba(43, 34, 103, 0.95)) !important;
+        border-top: 1px solid rgba(162, 155, 254, 0.3);
     }
-    footer .container,
-    footer p,
-    footer a {
-        color: #fff7ed !important;
-    }
-    footer a:hover {
-        color: #c9c4ff !important;
-    }
+    footer .container, footer p, footer a { color: #fff7ed !important; }
+    footer a:hover { color: #c9c4ff !important; }
+
+    /* ---- Page shell ---- */
     .auth-page {
-        min-height: calc(100vh - 180px);
+        min-height: calc(100vh - 200px);
         display: flex;
-        align-items: stretch;
-        transition: .35s ease;
-        border-radius: 24px;
-        padding: 6px;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 16px;
     }
     .auth-shell {
         width: 100%;
-        max-width: none;
-        margin: 0;
+        max-width: 1080px;
         display: grid;
+        grid-template-columns: 1fr;
         gap: 20px;
+        align-items: stretch;
     }
+
+    /* ---- Brand panel (left) ---- */
     .auth-brand-panel {
-        background: linear-gradient(145deg, #17123f 0%, #231d5e 100%);
-        border-radius: 24px;
+        background: linear-gradient(145deg, #17123f 0%, #2b2374 60%, #3b2f8f 100%);
+        border-radius: var(--auth-radius);
         border: 1px solid rgba(162, 155, 254, 0.28);
         color: #f5f3ff;
-        padding: 28px;
+        padding: clamp(24px, 4vw, 40px);
         position: relative;
         overflow: hidden;
-        min-height: 240px;
-    }
-    .auth-page.client-mode .auth-brand-panel {
-        background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
-        border-color: rgba(162, 155, 254, 0.35);
-    }
-    .auth-page.client-mode .auth-brand-panel::before {
-        background: radial-gradient(circle, rgba(162,155,254,0.35), rgba(162,155,254,0));
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-height: 220px;
     }
     .auth-brand-panel::before {
         content: '';
         position: absolute;
-        width: 380px;
-        height: 380px;
-        right: -140px;
-        top: -180px;
-        background: radial-gradient(circle, rgba(162,155,254,0.28), rgba(162,155,254,0));
+        width: 420px;
+        height: 420px;
+        right: -160px;
+        top: -200px;
+        background: radial-gradient(circle, rgba(162, 155, 254, 0.32), transparent 65%);
         pointer-events: none;
     }
+    .auth-brand-panel::after {
+        content: '';
+        position: absolute;
+        width: 280px;
+        height: 280px;
+        left: -100px;
+        bottom: -140px;
+        background: radial-gradient(circle, rgba(253, 203, 110, 0.16), transparent 65%);
+        pointer-events: none;
+    }
+    .auth-page.client-mode .auth-brand-panel {
+        background: linear-gradient(145deg, #1f1853 0%, #3a2e95 60%, #5444c8 100%);
+    }
+
+    .auth-brand-mark {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        color: #ffffff;
+        font-size: 1.35rem;
+    }
+    .auth-brand-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        align-self: flex-start;
+        padding: 6px 12px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #fdcb6e;
+        background: rgba(253, 203, 110, 0.12);
+        border: 1px solid rgba(253, 203, 110, 0.32);
+        border-radius: 999px;
+    }
     .auth-brand-panel h2 {
-        font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+        font-size: clamp(1.5rem, 3.2vw, 2rem);
         font-weight: 800;
-        margin-bottom: 8px;
+        line-height: 1.2;
+        margin: 0;
+        color: #ffffff;
     }
     .auth-brand-panel p {
-        color: #dddafd;
-        max-width: 50ch;
+        color: #d8d4f6;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        max-width: 52ch;
+        margin: 0;
     }
     .auth-kpis {
-        margin-top: 18px;
+        margin-top: auto;
         display: grid;
         gap: 10px;
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .auth-kpis article {
-        border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 12px;
-        padding: 10px;
-        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        padding: 12px 10px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(6px);
     }
     .auth-kpis strong {
         display: block;
         font-size: 1.05rem;
-        color: #c7c2ff;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 2px;
     }
     .auth-kpis span {
-        color: #dddafd;
-        font-size: 0.78rem;
+        color: #c9c4ec;
+        font-size: 0.72rem;
+        line-height: 1.3;
     }
+    .auth-feature-list {
+        list-style: none;
+        margin: 4px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+    }
+    .auth-feature-list li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.88rem;
+        color: #e8e5fd;
+    }
+    .auth-feature-list i {
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: rgba(0, 184, 148, 0.18);
+        color: #5eead4;
+        font-size: 0.7rem;
+    }
+
+    /* ---- Auth card (right) ---- */
     .auth-card {
-        background: rgba(255,255,255,0.94);
-        border-radius: 24px;
-        border: 1px solid rgba(162, 155, 254, 0.24);
-        box-shadow: 0 24px 70px rgba(23, 18, 63, 0.18);
+        background: #ffffff;
+        border-radius: var(--auth-radius);
+        border: 1px solid var(--auth-border);
+        box-shadow: var(--auth-shadow);
         overflow: hidden;
-        backdrop-filter: blur(12px);
-    }
-    .auth-page.client-mode .auth-card {
-        border-color: rgba(162, 155, 254, 0.28);
-        box-shadow: 0 24px 70px rgba(23, 18, 63, 0.2);
+        display: flex;
+        flex-direction: column;
     }
     .auth-header {
-        background: linear-gradient(145deg, #24225e 0%, #1a1648 100%);
-        color: #fff;
-        padding: 24px;
+        padding: clamp(20px, 4vw, 28px) clamp(20px, 4vw, 32px) 18px;
         text-align: center;
-    }
-    .auth-page.client-mode .auth-header {
-        background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
+        background: linear-gradient(180deg, #ffffff 0%, #f8f7ff 100%);
+        border-bottom: 1px solid var(--auth-border);
     }
     .auth-header h1 {
-        font-size: 1.7rem;
+        font-size: clamp(1.35rem, 2.6vw, 1.6rem);
         font-weight: 800;
-        margin-bottom: 6px;
+        color: var(--auth-text);
+        margin: 0 0 4px;
     }
     .auth-header p {
-        color: #dddafd;
-        font-size: 0.9rem;
+        color: var(--auth-text-muted);
+        font-size: 0.88rem;
+        margin: 0;
+    }
+
+    /* ---- Tabs ---- */
+    .auth-tabs {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        background: #f8f7ff;
+        border-bottom: 1px solid var(--auth-border);
     }
     .auth-tab {
+        position: relative;
+        padding: 14px 12px;
         font-size: 0.9rem;
-        font-weight: 700;
+        font-weight: 600;
+        color: #6b7280;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: color 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        z-index: 1;
+    }
+    .auth-tab:hover { color: var(--auth-text); }
+    .auth-tab[aria-selected="true"] { color: var(--auth-accent); }
+    .auth-tab i { font-size: 0.85rem; }
+    .auth-tab-external {
+        font-size: 0.7rem !important;
+        opacity: 0.55;
+        margin-left: 2px;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    a.auth-tab:hover .auth-tab-external,
+    a.auth-tab:focus-visible .auth-tab-external {
+        opacity: 1;
+        transform: translate(2px, -2px);
+    }
+    .auth-tab-indicator {
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        height: 2px;
+        width: 50%;
+        background: linear-gradient(90deg, var(--auth-accent), #8478ec);
+        border-radius: 2px;
+        transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+    }
+    .auth-tabs[data-active="client"] .auth-tab-indicator {
+        transform: translateX(100%);
+    }
+
+    /* ---- Panels ---- */
+    .auth-panel {
+        padding: clamp(20px, 4vw, 28px) clamp(20px, 4vw, 32px);
+    }
+    .auth-panel.hidden { display: none; }
+    .panel-fade-in { animation: panelFadeIn 0.28s ease both; }
+    @keyframes panelFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---- Form fields ---- */
+    .auth-field { margin-bottom: 18px; }
+    .auth-field:last-of-type { margin-bottom: 22px; }
+    .auth-label {
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
         letter-spacing: 0.01em;
     }
-    .auth-tab.active {
-        color: #4f46e5;
-        border-bottom-color: #4f46e5;
-        background: #f3f2ff;
+    .auth-input-wrap {
+        position: relative;
     }
-    .auth-tab.client-active {
-        color: #6c5ce7;
-        border-bottom-color: #6c5ce7;
-        background: #f3f2ff;
+    .auth-input-wrap .field-icon {
+        position: absolute;
+        top: 50%;
+        left: 14px;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.9rem;
+        pointer-events: none;
+        transition: color 0.2s ease;
     }
-    .auth-panel {
-        padding: 24px;
+    .auth-input-wrap .field-toggle {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        padding: 8px;
+        color: #9ca3af;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: color 0.2s ease, background 0.2s ease;
     }
-    .panel-rotate-in {
-        animation: panelRotateIn .45s cubic-bezier(0.22, 1, 0.36, 1);
-        transform-origin: center top;
-    }
-    @keyframes panelRotateIn {
-        0% {
-            opacity: 0;
-            transform: perspective(900px) rotateY(-14deg) translateY(8px) scale(0.985);
-        }
-        100% {
-            opacity: 1;
-            transform: perspective(900px) rotateY(0deg) translateY(0) scale(1);
-        }
-    }
-    .client-mode .auth-header {
-        background: linear-gradient(145deg, #2a206a 0%, #3b2f8f 100%);
-    }
-    .client-mode .auth-submit {
-        background: linear-gradient(145deg, #6c5ce7, #5747d6);
-    }
-    .client-mode .auth-submit:hover {
-        box-shadow: 0 12px 24px rgba(108, 92, 231, 0.3);
-    }
-    .auth-page.client-mode .auth-kpis strong {
-        color: #c7c2ff;
-    }
-    .auth-page.client-mode .auth-kpis span {
-        color: #dddafd;
+    .auth-input-wrap .field-toggle:hover {
+        color: var(--auth-accent);
+        background: var(--auth-accent-soft);
     }
     .auth-input {
         width: 100%;
-        border: 1px solid #d7d5f7;
+        min-height: 48px;
+        border: 1.5px solid var(--auth-border);
         border-radius: 12px;
         padding: 12px 14px 12px 42px;
-        transition: .2s ease;
-        background: #fff;
+        font-size: 0.95rem;
+        color: var(--auth-text);
+        background: #ffffff;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        font-family: inherit;
     }
+    .auth-input.has-toggle { padding-right: 46px; }
+    .auth-input::placeholder { color: #b9b9c9; }
+    .auth-input:hover { border-color: #c9c4f1; }
     .auth-input:focus {
         outline: none;
-        border-color: #6c5ce7;
-        box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.15);
+        border-color: var(--auth-accent);
+        box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.14);
+        background: #fcfbff;
     }
+    .auth-input:focus + .field-icon,
+    .auth-input-wrap:focus-within .field-icon {
+        color: var(--auth-accent);
+    }
+
+    /* ---- Submit button ---- */
     .auth-submit {
         width: 100%;
+        min-height: 50px;
         border: none;
         border-radius: 12px;
-        padding: 12px;
+        padding: 13px 16px;
+        font-size: 0.95rem;
         font-weight: 700;
-        color: #fff;
-        background: linear-gradient(145deg, #6c5ce7, #5747d6);
-        transition: .2s ease;
+        color: #ffffff;
+        background: linear-gradient(135deg, #6c5ce7 0%, #8478ec 100%);
+        box-shadow: 0 8px 22px rgba(108, 92, 231, 0.35),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
     }
     .auth-submit:hover {
         transform: translateY(-1px);
-        box-shadow: 0 12px 24px rgba(108, 92, 231, 0.28);
+        background: linear-gradient(135deg, #7a6cef 0%, #998df1 100%);
+        box-shadow: 0 12px 28px rgba(108, 92, 231, 0.5),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.25);
     }
-    @media (min-width: 992px) {
+    .auth-submit:active { transform: translateY(0); }
+    .auth-submit:focus-visible {
+        outline: 3px solid rgba(108, 92, 231, 0.35);
+        outline-offset: 3px;
+    }
+
+    /* ---- Divider + footer link ---- */
+    .auth-divider {
+        position: relative;
+        text-align: center;
+        margin: 22px 0 18px;
+    }
+    .auth-divider::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 100%;
+        height: 1px;
+        background: var(--auth-border);
+    }
+    .auth-divider span {
+        position: relative;
+        display: inline-block;
+        background: #ffffff;
+        padding: 0 14px;
+        color: var(--auth-text-muted);
+        font-size: 0.8rem;
+    }
+    .auth-foot-link {
+        text-align: center;
+    }
+    .auth-foot-link a {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--auth-accent);
+        font-weight: 700;
+        font-size: 0.92rem;
+        text-decoration: underline;
+        text-decoration-color: transparent;
+        text-underline-offset: 3px;
+        transition: color 0.2s ease, gap 0.2s ease, text-decoration-color 0.2s ease;
+    }
+    .auth-foot-link a:hover {
+        color: var(--auth-accent-dark);
+        text-decoration-color: currentColor;
+        gap: 10px;
+    }
+    .auth-foot-link a:focus-visible {
+        outline: 2px solid var(--auth-accent);
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
+    /* ---- Client panel content ---- */
+    .auth-client-intro {
+        text-align: center;
+        margin-bottom: 18px;
+    }
+    .auth-client-intro .ring-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, var(--auth-accent-soft), #e0d9ff);
+        color: var(--auth-accent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        margin-bottom: 10px;
+        box-shadow: 0 8px 20px rgba(108, 92, 231, 0.18);
+    }
+    .auth-client-intro p {
+        color: var(--auth-text-muted);
+        font-size: 0.88rem;
+        margin: 0 auto;
+        max-width: 38ch;
+        line-height: 1.55;
+    }
+    .auth-google {
+        width: 100%;
+        min-height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1.5px solid var(--auth-border);
+        background: #ffffff;
+        color: #374151;
+        font-weight: 600;
+        font-size: 0.92rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    }
+    .auth-google:hover {
+        border-color: #c9c4f1;
+        box-shadow: 0 8px 22px rgba(23, 18, 63, 0.08);
+        transform: translateY(-1px);
+    }
+    .auth-google svg { width: 20px; height: 20px; }
+    .auth-manual {
+        margin-top: 10px;
+        width: 100%;
+        min-height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, var(--auth-accent) 0%, var(--auth-accent-dark) 100%);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.92rem;
+        box-shadow: 0 8px 22px rgba(108, 92, 231, 0.32);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .auth-manual:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px rgba(108, 92, 231, 0.45);
+    }
+    .auth-info-note {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: var(--auth-accent-soft);
+        border: 1px solid #ddd6ff;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .auth-info-note i {
+        flex-shrink: 0;
+        color: var(--auth-accent);
+        margin-top: 2px;
+        font-size: 0.95rem;
+    }
+    .auth-info-note p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #4b4b6b;
+        line-height: 1.55;
+    }
+
+    /* ---- Responsive layout ---- */
+    @media (min-width: 900px) {
+        .auth-page {
+            padding: 40px 24px;
+            min-height: calc(100vh - 220px);
+        }
         .auth-shell {
-            grid-template-columns: 1.1fr 1.2fr;
-            align-items: stretch;
+            grid-template-columns: 1fr 1.05fr;
+            gap: 24px;
         }
-        .auth-brand-panel {
-            min-height: 100%;
-        }
+        .auth-brand-panel { min-height: 100%; }
+    }
+
+    /* Mobile & small screens: show only the sign-in card at a standard width */
+    @media (max-width: 899px) {
+        .auth-brand-panel { display: none; }
+        .auth-shell { max-width: 420px; gap: 0; }
+        .auth-card { width: 100%; }
+        .auth-header { padding: 22px 24px 16px; }
+        .auth-panel { padding: 22px 24px 26px; }
+    }
+
+    /* ========== Forgot password link & modal ========== */
+    .auth-forgot-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 6px;
+    }
+    .auth-forgot-link {
+        background: none;
+        border: none;
+        padding: 4px 2px;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--auth-accent);
+        cursor: pointer;
+        transition: color 0.2s ease;
+    }
+    .auth-forgot-link:hover { color: var(--auth-accent-dark); text-decoration: underline; }
+    .auth-forgot-link:focus-visible {
+        outline: 2px solid var(--auth-accent);
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
+    .forgot-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 1300;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .forgot-modal[aria-hidden="false"] {
+        display: flex;
+        animation: fadeIn 0.18s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .forgot-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 13, 46, 0.55);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+    .forgot-dialog {
+        position: relative;
+        width: 100%;
+        max-width: 460px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+        background: #ffffff;
+        border-radius: 20px;
+        border: 1px solid var(--auth-border);
+        box-shadow: 0 30px 80px -10px rgba(15, 13, 46, 0.45);
+        padding: clamp(20px, 4vw, 28px) clamp(20px, 4vw, 28px) clamp(22px, 4vw, 28px);
+        animation: dialogIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes dialogIn {
+        from { opacity: 0; transform: translateY(10px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .forgot-close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: transparent;
+        border: 1px solid transparent;
+        color: #6b7280;
+        font-size: 1rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    }
+    .forgot-close:hover {
+        background: #f3f2ff;
+        border-color: var(--auth-accent-border);
+        color: var(--auth-accent);
+    }
+
+    .forgot-header {
+        text-align: center;
+        margin-bottom: 18px;
+    }
+    .forgot-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        margin: 0 auto 12px;
+        background: linear-gradient(135deg, var(--auth-accent-soft), #e0d9ff);
+        color: var(--auth-accent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        box-shadow: 0 8px 22px rgba(108, 92, 231, 0.2);
+    }
+    .forgot-header h2 {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: var(--auth-text);
+        margin: 0 0 4px;
+    }
+    .forgot-header p {
+        font-size: 0.88rem;
+        color: var(--auth-text-muted);
+        margin: 0;
+    }
+
+    .forgot-steps {
+        list-style: none;
+        margin: 0 0 16px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+    }
+    .forgot-steps li {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #9ca3af;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
+    .forgot-steps li span {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #f3f2ff;
+        border: 1px solid var(--auth-accent-border);
+        color: var(--auth-accent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+    .forgot-steps li.active { color: var(--auth-text); }
+    .forgot-steps li.active span {
+        background: var(--auth-accent);
+        color: #ffffff;
+        border-color: var(--auth-accent);
+        box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.15);
+    }
+    .forgot-steps li.done span {
+        background: var(--auth-accent-soft);
+        color: var(--auth-accent);
+        border-color: var(--auth-accent-border);
+    }
+    .forgot-steps li.done span::before {
+        content: "\f00c"; /* fa-check */
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+    }
+    .forgot-steps li.done span > * { display: none; }
+
+    .forgot-alert {
+        margin-bottom: 14px;
+        padding: 11px 14px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+    .forgot-alert.success {
+        background: #ecfdf5;
+        color: #065f46;
+        border-color: #a7f3d0;
+    }
+
+    .forgot-step { display: none; flex-direction: column; gap: 14px; }
+    .forgot-step.active { display: flex; animation: stepIn 0.22s ease; }
+    @keyframes stepIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .forgot-helper {
+        margin: 0;
+        font-size: 0.88rem;
+        color: var(--auth-text-muted);
+        line-height: 1.55;
+        text-align: center;
+    }
+    .forgot-helper strong { color: var(--auth-text); }
+    #forgot-countdown { color: var(--auth-accent); font-weight: 700; }
+
+    .otp-row {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 8px;
+        margin: 4px 0;
+    }
+    .otp-cell {
+        width: 100%;
+        aspect-ratio: 1 / 1.05;
+        text-align: center;
+        font-size: 1.4rem;
+        font-weight: 700;
+        font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+        color: var(--auth-text);
+        border: 1.5px solid var(--auth-border);
+        border-radius: 12px;
+        background: #ffffff;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .otp-cell:focus {
+        outline: none;
+        border-color: var(--auth-accent);
+        box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.15);
+        background: #fcfbff;
+    }
+
+    .forgot-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 4px;
+    }
+    .forgot-submit-inline { width: auto; flex: 1; min-height: 46px; padding: 10px 16px; }
+    .auth-link-btn {
+        background: none;
+        border: none;
+        padding: 8px 4px;
+        font: inherit;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: var(--auth-accent);
+        cursor: pointer;
+        transition: color 0.2s ease;
+    }
+    .auth-link-btn:disabled { color: #c9c4f1; cursor: not-allowed; }
+    .auth-link-btn:not(:disabled):hover { color: var(--auth-accent-dark); text-decoration: underline; }
+
+    .auth-hint {
+        margin: 6px 0 0;
+        font-size: 0.78rem;
+        color: var(--auth-text-muted);
+        line-height: 1.5;
+    }
+    .auth-label .muted { color: var(--auth-text-muted); font-weight: 500; font-size: 0.76rem; margin-left: 4px; }
+
+    .btn-spinner { margin-left: 4px; }
+    .auth-submit:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+    .auth-submit:disabled:hover { transform: none; box-shadow: 0 8px 22px rgba(108, 92, 231, 0.35); }
+
+    .forgot-success {
+        text-align: center;
+        padding: 6px 0 2px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .forgot-success-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto;
+        border-radius: 50%;
+        background: #ecfdf5;
+        color: #10b981;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+    }
+    .forgot-success h3 { margin: 0; color: var(--auth-text); font-size: 1.15rem; font-weight: 800; }
+    .forgot-success p { margin: 0; color: var(--auth-text-muted); font-size: 0.9rem; }
+
+    @media (max-width: 420px) {
+        .otp-cell { font-size: 1.15rem; }
+        .forgot-dialog { padding: 18px; }
+    }
+    @media (max-width: 480px) {
+        .auth-page { padding: 18px 12px; }
+        .auth-tab { padding: 12px 8px; font-size: 0.85rem; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="auth-page" id="auth-page-shell">
-<div class="auth-shell">
-    <aside class="auth-brand-panel">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-4">
-            <i class="fas fa-scale-balanced text-white text-xl"></i>
-        </div>
-        <h2>Secure access for legal teams and clients</h2>
-        <p>Choose your login path to continue with SHERIA CENTRIC. Employee access supports matter operations and finance controls, while client access provides secure case visibility.</p>
-        <div class="auth-kpis">
-            <article><strong>256-bit</strong><span>Encrypted sessions</span></article>
-            <article><strong>Audit-ready</strong><span>Tracked actions</span></article>
-            <article><strong>24/7</strong><span>Portal availability</span></article>
-        </div>
-    </aside>
+    <div class="auth-shell">
 
-    <div class="auth-card" id="auth-card">
-        <div class="auth-header">
-            <h1>Welcome Back</h1>
-            <p>Select how you'd like to sign in</p>
-        </div>
+        <!-- ============ Brand panel ============ -->
+        <aside class="auth-brand-panel" aria-label="SHERIA CENTRIC info">
+            <span class="auth-brand-tag"><i class="fas fa-shield-halved" aria-hidden="true"></i> Secure access</span>
 
-        <!-- Role Selector Tabs -->
-        <div class="flex border-b border-gray-200">
-            <button id="tab-employee" onclick="switchTab('employee')"
-                class="auth-tab active flex-1 py-4 text-center transition-all duration-200 border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50">
-                <i class="fas fa-briefcase mr-2"></i>Employee Login
-            </button>
-            <button id="tab-client" onclick="switchTab('client')"
-                class="auth-tab flex-1 py-4 text-center transition-all duration-200 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50">
-                <i class="fas fa-user-tie mr-2"></i>Client Login
-            </button>
-        </div>
+            <div class="auth-brand-mark" aria-hidden="true">
+                <i class="fas fa-scale-balanced"></i>
+            </div>
 
-        <!-- Firm Login Panel -->
-        <div id="panel-employee" class="auth-panel">
-            <form method="POST" action="{{ url_for('login') }}" class="space-y-5">
-                <div>
-                    <label for="employee_code" class="block text-sm font-semibold text-gray-700 mb-2">
-                        6-Digit Employee Code
-                    </label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fas fa-id-card text-gray-400"></i>
-                        </div>
-                        <input 
-                            type="text" 
-                            id="employee_code" 
-                            name="employee_code" 
-                            maxlength="6"
-                            pattern="[0-9]{6}"
-                            required
-                            class="auth-input"
-                            placeholder="000000"
-                        >
-                    </div>
-                </div>
+            <h2>Welcome back to SHERIA CENTRIC</h2>
+            <p>The operating system for modern East African law firms. Firm members manage matters, hearings, and billing; clients securely track case progress.</p>
 
-                <div>
-                    <label for="password" class="block text-sm font-semibold text-gray-700 mb-2">
-                        Password
-                    </label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fas fa-lock text-gray-400"></i>
-                        </div>
-                        <input 
-                            type="password" 
-                            id="password" 
-                            name="password" 
-                            required
-                            class="auth-input pr-12"
-                            placeholder="Enter your password"
-                        >
-                        <button 
-                            type="button" 
-                            onclick="togglePassword('password')"
-                            class="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                        >
-                            <i id="password-icon" class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
+            <ul class="auth-feature-list" aria-hidden="false">
+                <li><i class="fas fa-check"></i> End-to-end encrypted sessions</li>
+                <li><i class="fas fa-check"></i> LSK-compliant audit trails</li>
+                <li><i class="fas fa-check"></i> Real-time case &amp; document sync</li>
+            </ul>
 
-                <button type="submit" class="auth-submit">
-                    <i class="fas fa-sign-in-alt mr-2"></i>Sign In
+            <div class="auth-kpis">
+                <article><strong>256-bit</strong><span>Encryption</span></article>
+                <article><strong>Audit-ready</strong><span>Action log</span></article>
+                <article><strong>24/7</strong><span>Availability</span></article>
+            </div>
+        </aside>
+
+        <!-- ============ Auth card ============ -->
+        <div class="auth-card" id="auth-card">
+            <div class="auth-header">
+                <h1>Sign in to your account</h1>
+                <p>Select the path that matches your role</p>
+            </div>
+
+            <div class="auth-tabs" id="auth-tabs" data-active="employee" role="tablist" aria-label="Account type">
+                <button id="tab-employee"
+                        class="auth-tab"
+                        role="tab"
+                        type="button"
+                        aria-selected="true"
+                        aria-controls="panel-employee"
+                        onclick="switchTab('employee')">
+                    <i class="fas fa-briefcase" aria-hidden="true"></i>
+                    <span>Firm</span>
                 </button>
-            </form>
-
-            <div class="relative my-6">
-                <div class="absolute inset-0 flex items-center">
-                    <div class="w-full border-t border-gray-200"></div>
-                </div>
-                <div class="relative flex justify-center text-sm">
-                    <span class="px-4 bg-white text-gray-500">New to SHERIA CENTRIC?</span>
-                </div>
-            </div>
-
-            <div class="text-center">
-                <a href="{{ url_for('signup') }}" class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors">
-                    Create an account
-                    <i class="fas fa-arrow-right ml-2 text-xs"></i>
+                <a id="tab-client"
+                   class="auth-tab"
+                   role="tab"
+                   aria-selected="false"
+                   href="{{ url_for('client_login') }}"
+                   title="Go to the client portal sign-in"
+                   onclick="return goToClientLogin(event)">
+                    <i class="fas fa-user-tie" aria-hidden="true"></i>
+                    <span>Client</span>
+                    <i class="fas fa-arrow-up-right-from-square auth-tab-external" aria-hidden="true"></i>
                 </a>
+                <span class="auth-tab-indicator" aria-hidden="true"></span>
             </div>
-        </div>
 
-        <!-- Client Login Panel -->
-        <div id="panel-client" class="auth-panel hidden">
-            <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 mb-3">
-                    <i class="fas fa-shield-alt text-indigo-600 text-lg"></i>
+            <!-- Firm panel -->
+            <div id="panel-employee" class="auth-panel" role="tabpanel" aria-labelledby="tab-employee">
+                <form method="POST" action="{{ url_for('login') }}" novalidate>
+                    <div class="auth-field">
+                        <label for="employee_code" class="auth-label">6-Digit Firm Code</label>
+                        <div class="auth-input-wrap">
+                            <input type="text"
+                                   id="employee_code"
+                                   name="employee_code"
+                                   maxlength="6"
+                                   pattern="[0-9]{6}"
+                                   inputmode="numeric"
+                                   autocomplete="username"
+                                   required
+                                   class="auth-input"
+                                   placeholder="000000">
+                            <i class="fas fa-id-card field-icon" aria-hidden="true"></i>
+                        </div>
+                    </div>
+
+                    <div class="auth-field">
+                        <label for="password" class="auth-label">Password</label>
+                        <div class="auth-input-wrap">
+                            <input type="password"
+                                   id="password"
+                                   name="password"
+                                   autocomplete="current-password"
+                                   required
+                                   class="auth-input has-toggle"
+                                   placeholder="Enter your password">
+                            <i class="fas fa-lock field-icon" aria-hidden="true"></i>
+                            <button type="button"
+                                    class="field-toggle"
+                                    onclick="togglePassword('password')"
+                                    aria-label="Show or hide password">
+                                <i id="password-icon" class="fas fa-eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="auth-forgot-row">
+                            <button type="button" class="auth-forgot-link" onclick="openForgotPassword()">
+                                Forgot password?
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="auth-submit">
+                        <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="auth-divider"><span>New to SHERIA CENTRIC?</span></div>
+
+                <div class="auth-foot-link">
+                    <a href="{{ url_for('signup') }}">
+                        Create an account
+                        <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                    </a>
                 </div>
-                <p class="text-sm text-gray-600">Sign in securely with your Google account to access your client portal.</p>
             </div>
 
-            <a href="{{ url_for('google_login') }}" 
-               class="w-full flex items-center justify-center px-4 py-3.5 border border-gray-300 rounded-lg shadow-sm text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 hover:shadow-md active:scale-[0.98] transition-all duration-200">
-                <svg class="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Sign in with Google
-            </a>
-
-            <a href="{{ url_for('client_manual_login') }}"
-               class="mt-3 w-full flex items-center justify-center px-4 py-3.5 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200">
-                <i class="fas fa-envelope mr-2"></i>
-                Manual Login (Email + Password)
-            </a>
-
-            <div class="mt-4 text-center">
-                <a href="{{ url_for('client_signup') }}" class="inline-flex items-center text-sm font-medium text-indigo-700 hover:text-indigo-800 transition-colors">
-                    Client Signup
-                    <i class="fas fa-arrow-right ml-2 text-xs"></i>
-                </a>
-            </div>
-
-            <div class="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                <div class="flex items-start space-x-3">
-                    <i class="fas fa-info-circle text-indigo-500 mt-0.5"></i>
-                    <p class="text-xs text-indigo-700 leading-relaxed">
-                        Your Google account must be linked to an active case with the firm. If you have trouble signing in, please contact your advocate.
+            <!-- The Client tab now redirects to the dedicated /client_login page,
+                 so no inline panel is needed here. -->
+            <noscript>
+                <div class="auth-panel">
+                    <p style="text-align:center; margin:0;">
+                        Are you a client?
+                        <a href="{{ url_for('client_login') }}" style="color: var(--auth-accent); font-weight:600;">
+                            Sign in to the client portal &rarr;
+                        </a>
                     </p>
                 </div>
-            </div>
+            </noscript>
         </div>
     </div>
 </div>
+
+<!-- ====== FORGOT PASSWORD MODAL ====== -->
+<div id="forgot-modal" class="forgot-modal" role="dialog" aria-modal="true" aria-labelledby="forgot-title" aria-hidden="true">
+    <div class="forgot-backdrop" onclick="closeForgotPassword()"></div>
+    <div class="forgot-dialog" role="document">
+        <button type="button" class="forgot-close" onclick="closeForgotPassword()" aria-label="Close">
+            <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
+
+        <div class="forgot-header">
+            <div class="forgot-icon" aria-hidden="true">
+                <i class="fas fa-key"></i>
+            </div>
+            <h2 id="forgot-title">Reset your password</h2>
+            <p id="forgot-subtitle">Enter your work email or personal email and we'll send a 6-digit verification code.</p>
+        </div>
+
+        <ol class="forgot-steps" aria-hidden="true">
+            <li data-step="1" class="active"><span>1</span> Email</li>
+            <li data-step="2"><span>2</span> Code</li>
+            <li data-step="3"><span>3</span> New credentials</li>
+        </ol>
+
+        <div id="forgot-alert" class="forgot-alert" role="alert" hidden></div>
+
+        <!-- Step 1: email -->
+        <form id="forgot-step-1" class="forgot-step active" onsubmit="return submitForgotEmail(event)">
+            <div class="auth-field">
+                <label for="forgot-email" class="auth-label">Work or personal email</label>
+                <div class="auth-input-wrap">
+                    <input type="email" id="forgot-email" class="auth-input" required
+                           autocomplete="email" placeholder="you@firm.com">
+                    <i class="fas fa-envelope field-icon" aria-hidden="true"></i>
+                </div>
+                <p class="forgot-helper" style="margin-top:.5rem;">We'll send the code to your personal email on file.</p>
+            </div>
+            <button type="submit" class="auth-submit" id="forgot-step-1-submit">
+                <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                <span class="btn-label">Send code</span>
+                <i class="fas fa-spinner fa-spin btn-spinner" aria-hidden="true" hidden></i>
+            </button>
+        </form>
+
+        <!-- Step 2: code -->
+        <form id="forgot-step-2" class="forgot-step" onsubmit="return submitForgotCode(event)">
+            <p class="forgot-helper">
+                We sent a 6-digit code to <strong id="forgot-email-display">your email</strong>.
+                It expires in <span id="forgot-countdown">10:00</span>.
+            </p>
+            <div class="otp-row" id="otp-row" aria-label="6-digit code">
+                <input type="text" inputmode="numeric" maxlength="1" class="otp-cell" data-i="0" autocomplete="one-time-code">
+                <input type="text" inputmode="numeric" maxlength="1" class="otp-cell" data-i="1">
+                <input type="text" inputmode="numeric" maxlength="1" class="otp-cell" data-i="2">
+                <input type="text" inputmode="numeric" maxlength="1" class="otp-cell" data-i="3">
+                <input type="text" inputmode="numeric" maxlength="1" class="otp-cell" data-i="4">
+                <input type="text" inputmode="numeric" maxlength="1" class="otp-cell" data-i="5">
+            </div>
+            <div class="forgot-actions">
+                <button type="button" class="auth-link-btn" id="forgot-resend" onclick="resendForgotCode()" disabled>
+                    Resend code
+                </button>
+                <button type="submit" class="auth-submit forgot-submit-inline" id="forgot-step-2-submit">
+                    <span class="btn-label">Verify code</span>
+                    <i class="fas fa-spinner fa-spin btn-spinner" aria-hidden="true" hidden></i>
+                </button>
+            </div>
+        </form>
+
+        <!-- Step 3: new credentials -->
+        <form id="forgot-step-3" class="forgot-step" onsubmit="return submitForgotReset(event)">
+            <div class="auth-field">
+                <label for="new-password" class="auth-label">New password</label>
+                <div class="auth-input-wrap">
+                    <input type="password" id="new-password" class="auth-input has-toggle"
+                           required minlength="8" placeholder="At least 8 characters">
+                    <i class="fas fa-lock field-icon" aria-hidden="true"></i>
+                    <button type="button" class="field-toggle" onclick="togglePassword('new-password')" aria-label="Show or hide password">
+                        <i id="new-password-icon" class="fas fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="auth-field">
+                <label for="confirm-password" class="auth-label">Confirm new password</label>
+                <div class="auth-input-wrap">
+                    <input type="password" id="confirm-password" class="auth-input has-toggle"
+                           required minlength="8" placeholder="Re-enter password">
+                    <i class="fas fa-lock field-icon" aria-hidden="true"></i>
+                    <button type="button" class="field-toggle" onclick="togglePassword('confirm-password')" aria-label="Show or hide password">
+                        <i id="confirm-password-icon" class="fas fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="auth-field">
+                <label for="new-employee-code" class="auth-label">
+                    New 6-digit firm code <span class="muted">(optional)</span>
+                </label>
+                <div class="auth-input-wrap">
+                    <input type="text" id="new-employee-code" class="auth-input"
+                           inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                           placeholder="Leave blank to keep current code">
+                    <i class="fas fa-id-card field-icon" aria-hidden="true"></i>
+                </div>
+                <p class="auth-hint">Changing this is optional. If left blank, your current code stays the same.</p>
+            </div>
+            <button type="submit" class="auth-submit" id="forgot-step-3-submit">
+                <i class="fas fa-check" aria-hidden="true"></i>
+                <span class="btn-label">Update password</span>
+                <i class="fas fa-spinner fa-spin btn-spinner" aria-hidden="true" hidden></i>
+            </button>
+        </form>
+
+        <div id="forgot-success" class="forgot-success" hidden>
+            <div class="forgot-success-icon"><i class="fas fa-circle-check" aria-hidden="true"></i></div>
+            <h3>All done</h3>
+            <p>Your password has been updated. You can now sign in with your new credentials.</p>
+            <button type="button" class="auth-submit" onclick="closeForgotPassword()">
+                Back to sign in
+            </button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // The Client tab is a navigation target rather than an in-page panel.
+    // Centralising the URL keeps the link/JS in sync.
+    const CLIENT_LOGIN_URL = "{{ url_for('client_login') }}";
+
+    function goToClientLogin(e) {
+        // Let modifier-clicks (new tab / new window) and middle-clicks behave
+        // like a normal link. Otherwise, navigate in-place.
+        if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1)) return true;
+        if (e && e.preventDefault) e.preventDefault();
+        window.location.href = CLIENT_LOGIN_URL;
+        return false;
+    }
+
     function switchTab(tab) {
-        const tabs = ['employee', 'client'];
+        // The "client" tab now redirects to the dedicated /client_login page.
+        if (tab === 'client') {
+            window.location.href = CLIENT_LOGIN_URL;
+            return;
+        }
+
         const authCard = document.getElementById('auth-card');
         const authPage = document.getElementById('auth-page-shell');
-        tabs.forEach(t => {
-            const tabBtn = document.getElementById('tab-' + t);
-            const panel = document.getElementById('panel-' + t);
-            if (t === tab) {
-                panel.classList.remove('hidden');
-                panel.classList.remove('panel-rotate-in');
-                void panel.offsetWidth;
-                panel.classList.add('panel-rotate-in');
-                tabBtn.classList.add('active');
-                tabBtn.classList.remove('border-transparent', 'text-gray-500');
-                if (tab === 'client') {
-                    tabBtn.classList.add('client-active');
-                } else {
-                    tabBtn.classList.remove('client-active');
-                }
-            } else {
-                panel.classList.add('hidden');
-                tabBtn.classList.remove('active', 'client-active');
-                tabBtn.classList.add('border-transparent', 'text-gray-500');
-            }
-        });
-        if (authCard) {
-            authCard.classList.toggle('client-mode', tab === 'client');
+        const tabsWrap = document.getElementById('auth-tabs');
+
+        // Only the employee panel exists in the DOM now.
+        const tabBtn = document.getElementById('tab-employee');
+        const panel = document.getElementById('panel-employee');
+        if (tabBtn && panel) {
+            tabBtn.setAttribute('aria-selected', 'true');
+            panel.classList.remove('hidden');
+            panel.classList.remove('panel-fade-in');
+            void panel.offsetWidth;
+            panel.classList.add('panel-fade-in');
         }
-        if (authPage) {
-            authPage.classList.toggle('client-mode', tab === 'client');
-        }
+        const clientTab = document.getElementById('tab-client');
+        if (clientTab) clientTab.setAttribute('aria-selected', 'false');
+
+        if (tabsWrap) tabsWrap.setAttribute('data-active', 'employee');
+        if (authCard) authCard.classList.remove('client-mode');
+        if (authPage) authPage.classList.remove('client-mode');
     }
 
     function togglePassword(inputId) {
         const input = document.getElementById(inputId);
         const icon = document.getElementById(inputId + '-icon');
+        if (!input || !icon) return;
         if (input.type === 'password') {
             input.type = 'text';
             icon.classList.remove('fa-eye');
@@ -429,8 +1167,311 @@
         }
     }
 
-    document.getElementById('employee_code').addEventListener('input', function(e) {
-        this.value = this.value.replace(/[^0-9]/g, '');
+    document.addEventListener('DOMContentLoaded', function () {
+        const employeeCode = document.getElementById('employee_code');
+        if (employeeCode) {
+            employeeCode.addEventListener('input', function () {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+            employeeCode.focus();
+        }
+
+        const newCodeInput = document.getElementById('new-employee-code');
+        if (newCodeInput) {
+            newCodeInput.addEventListener('input', function () {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);
+            });
+        }
+
+        // Keyboard navigation between tabs (Left/Right arrows).
+        // Arrow keys only move focus — they do NOT trigger the client redirect.
+        // The user must press Enter/Space (or click) on the Client tab to navigate.
+        const tabs = document.querySelectorAll('#auth-tabs [role="tab"]');
+        tabs.forEach((tab, idx) => {
+            tab.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const dir = e.key === 'ArrowRight' ? 1 : -1;
+                    const next = tabs[(idx + dir + tabs.length) % tabs.length];
+                    const target = next.id.replace('tab-', '');
+                    if (target === 'client') {
+                        next.focus();
+                    } else {
+                        switchTab(target);
+                        next.focus();
+                    }
+                }
+            });
+        });
+
+        // OTP input wiring (auto-advance, backspace, paste)
+        const otpCells = Array.from(document.querySelectorAll('#otp-row .otp-cell'));
+        otpCells.forEach((cell, idx) => {
+            cell.addEventListener('input', function (e) {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 1);
+                if (this.value && idx < otpCells.length - 1) otpCells[idx + 1].focus();
+            });
+            cell.addEventListener('keydown', function (e) {
+                if (e.key === 'Backspace' && !this.value && idx > 0) {
+                    otpCells[idx - 1].focus();
+                } else if (e.key === 'ArrowLeft' && idx > 0) {
+                    e.preventDefault(); otpCells[idx - 1].focus();
+                } else if (e.key === 'ArrowRight' && idx < otpCells.length - 1) {
+                    e.preventDefault(); otpCells[idx + 1].focus();
+                }
+            });
+            cell.addEventListener('paste', function (e) {
+                e.preventDefault();
+                const digits = (e.clipboardData.getData('text') || '').replace(/[^0-9]/g, '').slice(0, otpCells.length);
+                digits.split('').forEach((d, i) => { if (otpCells[i]) otpCells[i].value = d; });
+                const nextEmpty = otpCells.findIndex(c => !c.value);
+                (nextEmpty === -1 ? otpCells[otpCells.length - 1] : otpCells[nextEmpty]).focus();
+            });
+        });
+
+        // Close on Escape
+        document.addEventListener('keydown', function (e) {
+            const modal = document.getElementById('forgot-modal');
+            if (e.key === 'Escape' && modal && modal.getAttribute('aria-hidden') === 'false') {
+                closeForgotPassword();
+            }
+        });
     });
+
+    // ===== Forgot password flow =====
+    let forgotState = {
+        email: '',
+        countdownTimer: null,
+        secondsLeft: 600,
+        resendUnlockTimer: null,
+    };
+
+    function openForgotPassword(prefillEmail) {
+        const modal = document.getElementById('forgot-modal');
+        if (!modal) return;
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        showForgotStep(1);
+        clearForgotAlert();
+        const emailField = document.getElementById('forgot-email');
+        if (emailField) {
+            if (prefillEmail) emailField.value = prefillEmail;
+            setTimeout(() => emailField.focus(), 80);
+        }
+    }
+
+    function closeForgotPassword() {
+        const modal = document.getElementById('forgot-modal');
+        if (!modal) return;
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        stopForgotCountdown();
+        document.getElementById('forgot-success').hidden = true;
+        ['forgot-step-1', 'forgot-step-2', 'forgot-step-3'].forEach(id => {
+            document.getElementById(id).classList.remove('active');
+            document.getElementById(id).reset && document.getElementById(id).reset();
+        });
+        document.querySelectorAll('#otp-row .otp-cell').forEach(c => c.value = '');
+        forgotState.email = '';
+    }
+
+    function showForgotStep(step) {
+        document.getElementById('forgot-success').hidden = true;
+        [1, 2, 3].forEach(n => {
+            document.getElementById('forgot-step-' + n).classList.toggle('active', n === step);
+        });
+        document.querySelectorAll('.forgot-steps li').forEach(li => {
+            const n = parseInt(li.getAttribute('data-step'), 10);
+            li.classList.toggle('active', n === step);
+            li.classList.toggle('done', n < step);
+        });
+
+        const subtitle = document.getElementById('forgot-subtitle');
+        if (subtitle) {
+            subtitle.textContent = ({
+                1: "Enter your work email or personal email and we'll send a 6-digit verification code.",
+                2: "Enter the 6-digit code we sent to your email.",
+                3: "Set a new password. You can also change your 6-digit firm code."
+            })[step];
+        }
+    }
+
+    function setForgotAlert(msg, kind) {
+        const el = document.getElementById('forgot-alert');
+        if (!el) return;
+        if (!msg) { el.hidden = true; el.textContent = ''; return; }
+        el.hidden = false;
+        el.textContent = msg;
+        el.classList.toggle('success', kind === 'success');
+    }
+    function clearForgotAlert() { setForgotAlert(''); }
+
+    function setSubmitLoading(formId, loading) {
+        const btn = document.getElementById(formId + '-submit');
+        if (!btn) return;
+        btn.disabled = loading;
+        const spinner = btn.querySelector('.btn-spinner');
+        const label = btn.querySelector('.btn-label');
+        if (spinner) spinner.hidden = !loading;
+        if (label) label.style.opacity = loading ? '0.7' : '1';
+    }
+
+    async function postJSON(url, payload) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(payload || {}),
+            credentials: 'same-origin'
+        });
+        let data = null;
+        try { data = await res.json(); } catch (_) { data = null; }
+        return { ok: res.ok, status: res.status, data: data || {} };
+    }
+
+    async function submitForgotEmail(e) {
+        e.preventDefault();
+        clearForgotAlert();
+        const email = document.getElementById('forgot-email').value.trim();
+        if (!email) { setForgotAlert('Please enter your work email or personal email.'); return false; }
+
+        setSubmitLoading('forgot-step-1', true);
+        const { ok, data } = await postJSON("{{ url_for('forgot_password') }}", { email });
+        setSubmitLoading('forgot-step-1', false);
+
+        if (!ok || data.success === false) {
+            setForgotAlert(data.error || 'Could not send the code. Please try again.');
+            return false;
+        }
+
+        forgotState.email = email;
+        // Show the (possibly masked) delivery address from the server,
+        // since the code goes to the personal email rather than whatever
+        // the user typed.
+        document.getElementById('forgot-email-display').textContent = data.delivery_email || email;
+        startForgotCountdown(data.expires_in_minutes ? data.expires_in_minutes * 60 : 600);
+        showForgotStep(2);
+        setForgotAlert(data.message || 'Code sent! Check your inbox.', 'success');
+        const firstCell = document.querySelector('#otp-row .otp-cell');
+        if (firstCell) setTimeout(() => firstCell.focus(), 120);
+        return false;
+    }
+
+    function readOtp() {
+        return Array.from(document.querySelectorAll('#otp-row .otp-cell'))
+            .map(c => c.value.trim()).join('');
+    }
+
+    async function submitForgotCode(e) {
+        e.preventDefault();
+        clearForgotAlert();
+        const code = readOtp();
+        if (code.length !== 6) { setForgotAlert('Enter the full 6-digit code.'); return false; }
+
+        setSubmitLoading('forgot-step-2', true);
+        const { ok, data } = await postJSON("{{ url_for('verify_reset_code') }}", {
+            email: forgotState.email, code
+        });
+        setSubmitLoading('forgot-step-2', false);
+
+        if (!ok || data.success === false) {
+            setForgotAlert(data.error || 'Invalid or expired code.');
+            return false;
+        }
+        showForgotStep(3);
+        stopForgotCountdown();
+        setForgotAlert('');
+        setTimeout(() => document.getElementById('new-password').focus(), 120);
+        return false;
+    }
+
+    async function resendForgotCode() {
+        if (!forgotState.email) return;
+        setForgotAlert('');
+        const btn = document.getElementById('forgot-resend');
+        btn.disabled = true;
+        const { ok, data } = await postJSON("{{ url_for('forgot_password') }}", { email: forgotState.email });
+        if (!ok || data.success === false) {
+            setForgotAlert(data.error || 'Could not resend the code.');
+            btn.disabled = false;
+            return;
+        }
+        document.querySelectorAll('#otp-row .otp-cell').forEach(c => c.value = '');
+        startForgotCountdown(data.expires_in_minutes ? data.expires_in_minutes * 60 : 600);
+        setForgotAlert('A new code has been sent.', 'success');
+    }
+
+    function startForgotCountdown(seconds) {
+        stopForgotCountdown();
+        forgotState.secondsLeft = seconds;
+        const el = document.getElementById('forgot-countdown');
+        const resendBtn = document.getElementById('forgot-resend');
+        if (resendBtn) resendBtn.disabled = true;
+
+        // Re-enable resend after 30 seconds.
+        if (forgotState.resendUnlockTimer) clearTimeout(forgotState.resendUnlockTimer);
+        forgotState.resendUnlockTimer = setTimeout(() => {
+            if (resendBtn) resendBtn.disabled = false;
+        }, 30000);
+
+        const tick = () => {
+            const m = String(Math.floor(forgotState.secondsLeft / 60)).padStart(2, '0');
+            const s = String(forgotState.secondsLeft % 60).padStart(2, '0');
+            if (el) el.textContent = `${m}:${s}`;
+            if (forgotState.secondsLeft <= 0) {
+                stopForgotCountdown();
+                if (el) el.textContent = 'expired';
+                if (resendBtn) resendBtn.disabled = false;
+                return;
+            }
+            forgotState.secondsLeft -= 1;
+        };
+        tick();
+        forgotState.countdownTimer = setInterval(tick, 1000);
+    }
+
+    function stopForgotCountdown() {
+        if (forgotState.countdownTimer) {
+            clearInterval(forgotState.countdownTimer);
+            forgotState.countdownTimer = null;
+        }
+    }
+
+    async function submitForgotReset(e) {
+        e.preventDefault();
+        clearForgotAlert();
+        const password = document.getElementById('new-password').value;
+        const confirm_password = document.getElementById('confirm-password').value;
+        const employee_code = document.getElementById('new-employee-code').value.trim();
+
+        if (password.length < 8) {
+            setForgotAlert('Password must be at least 8 characters.'); return false;
+        }
+        if (password !== confirm_password) {
+            setForgotAlert('Passwords do not match.'); return false;
+        }
+        if (employee_code && (!/^[0-9]{6}$/.test(employee_code))) {
+            setForgotAlert('Firm code must be exactly 6 digits.'); return false;
+        }
+
+        setSubmitLoading('forgot-step-3', true);
+        const { ok, data } = await postJSON("{{ url_for('reset_password') }}", {
+            password, confirm_password, employee_code
+        });
+        setSubmitLoading('forgot-step-3', false);
+
+        if (!ok || data.success === false) {
+            setForgotAlert(data.error || 'Could not update your password.');
+            return false;
+        }
+
+        // Success screen
+        document.querySelectorAll('.forgot-step').forEach(s => s.classList.remove('active'));
+        document.getElementById('forgot-success').hidden = false;
+        document.querySelectorAll('.forgot-steps li').forEach(li => {
+            li.classList.add('done');
+            li.classList.remove('active');
+        });
+        return false;
+    }
 </script>
 {% endblock %}

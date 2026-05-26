@@ -289,6 +289,7 @@ function getFilteredEmployees() {
         list = list.filter(e =>
             (e.full_name || '').toLowerCase().includes(query) ||
             (e.work_email || '').toLowerCase().includes(query) ||
+            (e.personal_email || '').toLowerCase().includes(query) ||
             (e.employee_code || '').toLowerCase().includes(query) ||
             (e.phone_number || '').includes(query) ||
             (e.role || '').toLowerCase().includes(query)
@@ -341,7 +342,14 @@ function renderEmployees() {
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br ${avatarColors} flex items-center justify-center text-white text-sm font-bold flex-shrink-0">${initials}</div>
                     <div class="min-w-0"><p class="text-sm font-semibold text-gray-900 truncate">${emp.full_name}</p><p class="text-xs text-gray-400">${emp.employee_code || '-'}</p></div>
                 </div></td>
-                <td class="py-4"><p class="text-sm text-gray-700 truncate max-w-[200px]">${emp.work_email || '-'}</p><p class="text-xs text-gray-400">${emp.phone_number || '-'}</p></td>
+                <td class="py-4">
+                    <p class="text-sm text-gray-700 truncate max-w-[220px]" title="${emp.personal_email || ''}">${emp.personal_email || '-'}</p>
+                    ${emp.work_email
+                        ? `<p class="text-[11px] text-gray-500 truncate max-w-[220px]" title="${emp.work_email}"><i class="fas fa-briefcase mr-1 text-gray-400"></i>${emp.work_email}</p>`
+                        : `<p class="text-[11px] text-amber-600 truncate max-w-[220px]"><i class="fas fa-clock mr-1"></i>Work email pending</p>`
+                    }
+                    <p class="text-xs text-gray-400">${emp.phone_number || '-'}</p>
+                </td>
                 <td class="py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${roleClass}">${emp.role || 'Employee'}</span></td>
                 <td class="py-4">${onboardingBadge}</td>
                 <td class="py-4"><p class="text-sm text-gray-500">${formatDate(emp.created_at)}</p></td>
@@ -370,7 +378,11 @@ function renderEmployees() {
                         <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-gray-900 truncate">${emp.full_name}</p>
-                                <p class="text-xs text-gray-500 truncate">${emp.work_email || '-'}</p>
+                                <p class="text-xs text-gray-500 truncate">${emp.personal_email || '-'}</p>
+                                ${emp.work_email
+                                    ? `<p class="text-[10px] text-gray-400 truncate"><i class="fas fa-briefcase mr-1"></i>${emp.work_email}</p>`
+                                    : `<p class="text-[10px] text-amber-600 truncate"><i class="fas fa-clock mr-1"></i>Work email pending</p>`
+                                }
                             </div>
                             ${onboardingBadge}
                         </div>
@@ -437,8 +449,13 @@ function confirmApproval() {
     .then(r => r.json())
     .then(data => {
         closeApproveModal();
-        if (data.success) { showToast('Employee approved successfully!', 'success'); loadPendingApprovals(); }
-        else { showToast(data.error || 'Error approving employee', 'error'); }
+        if (data.success) {
+            const msg = data.message || 'Employee approved successfully!';
+            showToast(msg, 'success');
+            loadPendingApprovals();
+        } else {
+            showToast(data.error || 'Error approving employee', 'error');
+        }
     })
     .catch(() => { closeApproveModal(); showToast('An error occurred while approving.', 'error'); });
 }
@@ -488,7 +505,21 @@ function viewEmployeeDetails(id) {
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Full Name</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.full_name || 'N/A'}</p></div>
                         <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Employee Code</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.employee_code || 'N/A'}</p></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Email</p><p class="text-xs sm:text-sm font-semibold text-gray-900 break-all">${emp.work_email || 'N/A'}</p></div>
+                        <div>
+                            <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">
+                                <i class="fas fa-envelope mr-1 text-gray-400"></i>Personal Email
+                            </p>
+                            <p class="text-xs sm:text-sm font-semibold text-gray-900 break-all">${emp.personal_email || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">
+                                <i class="fas fa-briefcase mr-1 text-gray-400"></i>Work Email
+                            </p>
+                            ${emp.work_email
+                                ? `<p class="text-xs sm:text-sm font-semibold text-gray-900 break-all">${emp.work_email}</p>`
+                                : `<p class="text-xs sm:text-sm font-semibold text-amber-600"><i class="fas fa-clock mr-1"></i>Pending allocation</p>`
+                            }
+                        </div>
                         <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Phone</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.phone_number || 'N/A'}</p></div>
                         <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Role</p><span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold ${roleClass}">${emp.role || 'N/A'}</span></div>
                         <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Status</p><span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-yellow-100 text-yellow-800">${emp.status || 'N/A'}</span></div>
@@ -624,8 +655,14 @@ function switchToEditMode() {
                         <input type="text" name="employee_code" value="${(e.employee_code || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Optional">
                     </div>
                     <div class="edit-field">
-                        <label class="edit-label">Email <span class="text-red-500">*</span></label>
-                        <input type="email" name="work_email" value="${(e.work_email || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="work@example.com">
+                        <label class="edit-label"><i class="fas fa-envelope mr-1 text-gray-400"></i>Personal Email <span class="text-red-500">*</span></label>
+                        <input type="email" name="personal_email" value="${(e.personal_email || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="personal@example.com">
+                        <p class="edit-hint">Used for approval &amp; password-reset notifications.</p>
+                    </div>
+                    <div class="edit-field">
+                        <label class="edit-label"><i class="fas fa-briefcase mr-1 text-gray-400"></i>Work Email</label>
+                        <input type="email" name="work_email" value="${(e.work_email || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Allocated on approval">
+                        <p class="edit-hint">${e.work_email ? 'Firm-domain address.' : 'Allocated automatically when you approve this employee.'}</p>
                     </div>
                     <div class="edit-field">
                         <label class="edit-label">Phone <span class="text-red-500">*</span></label>

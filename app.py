@@ -782,6 +782,7 @@ def create_employees_table():
                     ('full_name', 'VARCHAR(255) NOT NULL'),
                     ('phone_number', 'VARCHAR(20) NOT NULL'),
                     ('work_email', 'VARCHAR(255) UNIQUE NOT NULL'),
+                    ('personal_email', 'VARCHAR(255) NULL'),
                     ('employee_code', 'VARCHAR(6) UNIQUE NOT NULL'),
                     ('password_hash', 'VARCHAR(255) NOT NULL'),
                     ('profile_picture', 'VARCHAR(255)'),
@@ -799,7 +800,26 @@ def create_employees_table():
                             print(f"[OK] Added column '{column_name}' to employees table")
                         except Exception as e:
                             print(f"[WARNING] Could not add column '{column_name}': {e}")
-                
+
+                # Make work_email nullable so pending signups can wait for allocation,
+                # and backfill personal_email from work_email for any legacy rows.
+                try:
+                    cursor.execute("ALTER TABLE employees MODIFY COLUMN work_email VARCHAR(255) NULL")
+                    connection.commit()
+                except Exception as e:
+                    print(f"[INFO] work_email already nullable or could not alter: {e}")
+                try:
+                    cursor.execute("""
+                        UPDATE employees
+                        SET personal_email = work_email
+                        WHERE (personal_email IS NULL OR personal_email = '')
+                          AND work_email IS NOT NULL
+                          AND work_email <> ''
+                    """)
+                    connection.commit()
+                except Exception as e:
+                    print(f"[INFO] personal_email backfill skipped: {e}")
+
                 # Add onboarding columns if they don't exist
                 onboarding_columns = [
                     ('account_number', 'VARCHAR(50)'),
@@ -2294,6 +2314,49 @@ def inject_global_theme_settings():
         settings = {'company_name': 'BAUNI LAW GROUP'}
     return {'company_settings': settings}
 
+
+@app.context_processor
+def inject_role_slug_helpers():
+    """Expose the active role slug + helpers to all templates.
+
+    Templates can use:
+        {{ current_role_slug }}                          -> 'managing-partner'
+        {{ role_to_slug('Firm Administrator') }}         -> 'firm-administrator'
+        {{ role_url('employee_management') }}            -> '/managing-partner/employee_management'
+        {{ url_for('dashboard', role_slug=current_role_slug) }}
+
+    ``role_url`` is the recommended helper for in-app links — it produces
+    URLs that are already role-prefixed for the active session, avoiding
+    the 302 hop that ``url_for`` would otherwise trigger.
+    """
+    try:
+        active_slug = current_role_slug()
+    except Exception:
+        active_slug = 'employee'
+
+    def role_url(endpoint, **values):
+        """url_for with the active role slug prepended for employee URLs."""
+        try:
+            base = url_for(endpoint, **values)
+        except Exception:
+            return '#'
+        if 'employee_id' not in session:
+            return base
+        if not _is_role_prefixable(base):
+            return base
+        # Don't double-prefix if the URL already has a role slug
+        # (e.g. when called with role_slug=... explicitly).
+        for slug in SLUG_TO_ROLE:
+            if base.startswith('/' + slug + '/') or base == '/' + slug:
+                return base
+        return '/' + active_slug + base
+
+    return {
+        'current_role_slug': active_slug,
+        'role_to_slug': role_to_slug,
+        'role_url': role_url,
+    }
+
 # ==================== WHATSAPP CLOUD API HELPERS ====================
 
 def get_whatsapp_settings():
@@ -2689,7 +2752,9 @@ def login():
                         if not employee.get('onboarding_completed'):
                             return redirect(url_for('onboarding'))
                         
-                        return redirect(url_for('dashboard'))
+                        # Redirect straight to the role-prefixed dashboard so
+                        # the URL reflects the active role from the first hop.
+                        return redirect(url_for('dashboard', role_slug=role_to_slug(employee['role'])))
                 else:
                     flash('Invalid employee code or password', 'error')
         except Exception as e:
@@ -2699,6 +2764,818 @@ def login():
             connection.close()
     
     return render_template('login.html')
+
+# =====================================================================
+# Forgot password flow for FIRM (employee) accounts
+# - /forgot_password : email -> 6-digit code mailed to employee
+# - /verify_reset_code : verify the code, opens a short reset window
+# - /reset_password : set new password (+ optional new 6-digit firm code)
+# =====================================================================
+
+def _ensure_password_resets_table():
+    """Create the password_resets table on first use. Safe to call repeatedly."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS password_resets (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        employee_id INT NOT NULL,
+                        email VARCHAR(255) NOT NULL,
+                        code_hash VARCHAR(255) NOT NULL,
+                        expires_at DATETIME NOT NULL,
+                        used TINYINT(1) NOT NULL DEFAULT 0,
+                        verified_at DATETIME NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_pwd_resets_email (email),
+                        INDEX idx_pwd_resets_employee (employee_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+            return True
+        finally:
+            connection.close()
+    except Exception as e:
+        print(f"[password_resets] Failed to ensure table: {e}")
+        return False
+
+
+def _send_reset_code_email(to_email, code, full_name):
+    """Send a password reset code via SMTP using configured email settings."""
+    try:
+        email_settings = get_email_settings()
+        if not email_settings:
+            print("[password_resets] No email settings configured")
+            return False
+
+        from_email = email_settings.get('main_email') or ''
+        password = email_settings.get('main_email_password') or ''
+        smtp_host = email_settings.get('smtp_host') or ''
+        smtp_port = int(email_settings.get('smtp_port') or 587)
+        use_tls = bool(email_settings.get('smtp_use_tls', True))
+        sender_name = email_settings.get('sender_name') or 'SHERIA CENTRIC'
+
+        if not from_email or not password or not smtp_host:
+            print("[password_resets] Email settings incomplete")
+            return False
+
+        subject = 'Your SHERIA CENTRIC password reset code'
+        greeting_name = (full_name or 'there').split(' ')[0]
+
+        text_body = (
+            f"Hi {greeting_name},\n\n"
+            f"Your verification code is: {code}\n\n"
+            f"It expires in 10 minutes. Enter it on the password reset screen "
+            f"to set a new password and (optionally) a new 6-digit firm code.\n\n"
+            f"If you didn't request this, you can ignore this email.\n\n"
+            f"— SHERIA CENTRIC"
+        )
+
+        html_body = f"""
+        <div style="font-family: -apple-system, Segoe UI, Inter, Arial, sans-serif; background:#f4f3fb; padding:32px 12px;">
+          <div style="max-width:520px; margin:0 auto; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 18px 40px rgba(23,18,63,0.12); border:1px solid #e5e3f5;">
+            <div style="padding:28px 32px 22px; background:linear-gradient(135deg,#1f1853 0%,#3a2e95 100%); color:#fff;">
+              <div style="font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; opacity:0.8;">Password reset</div>
+              <div style="font-size:1.4rem; font-weight:800; margin-top:4px;">Your verification code</div>
+            </div>
+            <div style="padding:28px 32px;">
+              <p style="margin:0 0 14px; color:#374151; font-size:0.95rem;">Hi {greeting_name},</p>
+              <p style="margin:0 0 18px; color:#374151; font-size:0.95rem; line-height:1.55;">
+                Use the code below to reset your firm login password. It expires in <strong>10 minutes</strong>.
+              </p>
+              <div style="text-align:center; margin:22px 0;">
+                <div style="display:inline-block; padding:18px 28px; border-radius:14px; background:#f3f2ff; border:1px solid #cfc9ff; font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:2rem; font-weight:800; letter-spacing:0.4em; color:#1E1A4E;">
+                  {code}
+                </div>
+              </div>
+              <p style="margin:0 0 8px; color:#6b7280; font-size:0.85rem; line-height:1.55;">
+                After entering the code you'll be able to set a new password and, optionally, a new 6-digit firm code.
+              </p>
+              <p style="margin:14px 0 0; color:#9ca3af; font-size:0.8rem; line-height:1.55;">
+                If you didn't request this, you can safely ignore this email.
+              </p>
+            </div>
+            <div style="padding:14px 32px; background:#fafafd; border-top:1px solid #eeecf7; color:#9ca3af; font-size:0.75rem;">
+              SHERIA CENTRIC · Secure access for legal teams
+            </div>
+          </div>
+        </div>
+        """
+
+        return send_email_via_smtp(
+            from_email, password, to_email, subject, text_body,
+            smtp_host, smtp_port, use_tls, html_body=html_body,
+            sender_name=sender_name
+        )
+    except Exception as e:
+        print(f"[password_resets] Send error: {e}")
+        return False
+
+
+def _slugify_name_part(s):
+    """Lowercase, strip diacritics, keep [a-z0-9], drop the rest."""
+    import unicodedata, re as _re
+    if not s:
+        return ''
+    s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+    s = s.lower()
+    return _re.sub(r'[^a-z0-9]+', '', s)
+
+
+# ---------------------------------------------------------------------------
+# Role-aware URLs
+# ---------------------------------------------------------------------------
+# We expose the active role as the first path segment of authenticated URLs
+# (e.g. /managing-partner/dashboard) so users — especially IT Support
+# technicians who can switch roles — can tell at a glance which role the
+# current session is acting as. The session remains the source of truth;
+# the URL is a reflection of it and is normalised automatically on every
+# request.
+
+ROLE_SLUGS = {
+    'Managing Partner':   'managing-partner',
+    'Firm Administrator': 'firm-administrator',
+    'Finance Office':     'finance-office',
+    'Associate Advocate': 'associate-advocate',
+    'Clerk':              'clerk',
+    'IT Support':         'it-support',
+    'Employee':           'employee',
+}
+SLUG_TO_ROLE = {v: k for k, v in ROLE_SLUGS.items()}
+
+
+def role_to_slug(role):
+    """Convert a role label ('Managing Partner') to its URL slug ('managing-partner')."""
+    if not role:
+        return 'employee'
+    if role in ROLE_SLUGS:
+        return ROLE_SLUGS[role]
+    # Fallback for any future / custom roles.
+    import re as _re
+    return _re.sub(r'[^a-z0-9]+', '-', role.lower()).strip('-') or 'employee'
+
+
+def slug_to_role(slug):
+    """Inverse of role_to_slug; returns None for an unknown slug."""
+    if not slug:
+        return None
+    return SLUG_TO_ROLE.get(slug)
+
+
+def current_role_slug():
+    """The slug for the role currently active in the session."""
+    return role_to_slug(session.get('employee_role') or 'Employee')
+
+
+# Paths that should never be prefixed with a role slug.
+# These are public pages, auth flows, APIs, webhooks, the *client portal*
+# (NOT the employee-facing /client_management pages), Google OAuth, static
+# / uploaded files, and session-mutating endpoints that exist outside the
+# role context.
+_ROLE_PREFIX_SKIP_PATH_STARTS = (
+    '/static/', '/uploads/', '/api/', '/webhook/',
+    '/google_',          # Google login init endpoints
+    # ----- True client-portal sub-trees (browsed while in a client session) -----
+    '/client_documents',  # /client_documents, /client_documents/<type>, etc.
+    '/client_cases',      # /client_cases, /client_cases/<id>
+    '/client_calendar',
+    '/client_reminders',
+    '/client_messages',
+    '/client_profile',
+    '/update_client_profile',
+)
+_ROLE_PREFIX_SKIP_EXACT = {
+    '/', '',
+    # Public marketing pages
+    '/platform', '/features', '/pricing', '/security', '/contact',
+    # Auth flows (no session role yet, or session being mutated)
+    '/login', '/logout', '/signup',
+    '/forgot_password', '/verify_reset_code', '/reset_password',
+    '/check_employee_code',
+    # Client portal entry / auth / dashboard pages — these all live in a
+    # client (not employee) session, so they don't get a role prefix.
+    '/client_login', '/client_logout',
+    '/client_manual_login',
+    '/client_signup',
+    '/client_dashboard',
+    '/client_registration', '/submit_client_registration',
+    # OAuth callback
+    '/callback',
+    # Misc
+    '/favicon.ico', '/robots.txt', '/sw.js', '/manifest.json',
+    # Session-mutating helpers - these redirect themselves to the right
+    # role-prefixed dashboard immediately after running.
+    '/exit_role_switch', '/exit_client_view',
+}
+_ROLE_PREFIX_SKIP_DYNAMIC_STARTS = (
+    '/switch_role/',     # mutates session role
+    '/view_as_client/',  # enters client view (clears employee session)
+)
+
+
+def _is_role_prefixable(path):
+    """True if a logged-in employee should see this URL with a role-slug prefix."""
+    if not path:
+        return False
+    if path in _ROLE_PREFIX_SKIP_EXACT:
+        return False
+    if path.startswith(_ROLE_PREFIX_SKIP_PATH_STARTS):
+        return False
+    if path.startswith(_ROLE_PREFIX_SKIP_DYNAMIC_STARTS):
+        return False
+    return True
+
+
+class _RolePrefixWSGIMiddleware:
+    """WSGI middleware that strips a leading ``/<role-slug>/`` from PATH_INFO
+    before Flask routes the request. This lets every existing route keep its
+    canonical, unprefixed URL while the address bar still shows the role.
+
+    The stripped slug is preserved in ``environ['ROLE_SLUG_PREFIX']`` so the
+    Flask ``before_request`` handler can decide whether to redirect.
+    """
+
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        path = environ.get('PATH_INFO', '') or ''
+        # Only strip when the URL has the shape "/<slug>/<rest…>" with at
+        # least one more segment after the slug. This avoids turning a bare
+        # "/managing-partner" into "/", which would silently render the home
+        # page on a non-existent URL.
+        if len(path) > 1 and path.startswith('/'):
+            slash_idx = path.find('/', 1)
+            if slash_idx != -1:
+                first = path[1:slash_idx]
+                rest = path[slash_idx:]
+                if first in SLUG_TO_ROLE:
+                    environ['ROLE_SLUG_PREFIX'] = first
+                    environ['ORIGINAL_PATH_INFO'] = path
+                    environ['PATH_INFO'] = rest
+        return self.wsgi_app(environ, start_response)
+
+
+# Install the middleware (idempotent on reload).
+app.wsgi_app = _RolePrefixWSGIMiddleware(app.wsgi_app)
+
+
+@app.before_request
+def _enforce_role_prefix_on_employee_urls():
+    """For logged-in employees, ensure all employee URLs include the active
+    role slug. Public, client-portal, API, and session-mutating routes are
+    skipped. POST/PUT/DELETE/PATCH requests are not redirected (the unprefixed
+    canonical route still serves them, so the form/AJAX flow is preserved).
+    """
+    if 'employee_id' not in session:
+        return None
+    # Only normalise navigations (GET/HEAD). Mutating methods stay on the
+    # canonical path so POST bodies aren't lost to a 302→GET round-trip.
+    if request.method not in ('GET', 'HEAD'):
+        return None
+    path = request.path  # already stripped by the middleware
+    if not _is_role_prefixable(path):
+        return None
+
+    incoming_slug = request.environ.get('ROLE_SLUG_PREFIX')
+    expected_slug = current_role_slug()
+    if incoming_slug == expected_slug:
+        return None  # already on the canonical role-prefixed URL
+
+    new_url = '/' + expected_slug + path
+    qs = request.query_string.decode('utf-8', errors='ignore') if request.query_string else ''
+    if qs:
+        new_url += '?' + qs
+    return redirect(new_url)
+
+
+def _generate_unique_work_email(full_name, domain):
+    """Build a unique 'first.last@domain' (or first@domain) work-email address.
+
+    Falls back to numeric suffixes if the address is already taken.
+    Returns the lowercase address string, or None if a base local-part can't
+    be derived from the name."""
+    if not domain:
+        return None
+    parts = [p for p in (full_name or '').split() if p.strip()]
+    if not parts:
+        return None
+    first = _slugify_name_part(parts[0])
+    last = _slugify_name_part(parts[-1]) if len(parts) > 1 else ''
+    if not first:
+        return None
+
+    base_local = f"{first}.{last}" if last and last != first else first
+    domain = str(domain).strip().lstrip('@').lower()
+
+    connection = get_db_connection()
+    if not connection:
+        # Best-effort fallback without uniqueness check.
+        return f"{base_local}@{domain}"
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            candidate = f"{base_local}@{domain}"
+            for attempt in range(1, 100):
+                cursor.execute(
+                    "SELECT id FROM employees WHERE LOWER(work_email) = %s LIMIT 1",
+                    (candidate.lower(),)
+                )
+                if not cursor.fetchone():
+                    return candidate
+                candidate = f"{base_local}{attempt + 1}@{domain}"
+            return candidate  # Highly unlikely collision after 100 attempts.
+    except Exception as e:
+        print(f"[work_email] uniqueness check failed: {e}")
+        return f"{base_local}@{domain}"
+    finally:
+        connection.close()
+
+
+def _generate_temp_password(length=12):
+    """Generate a memorable but strong temporary password.
+
+    Format: 4 letters + 4 digits + 4 letters (mixed case), e.g. 'Hxqp4827Lemr'."""
+    import string
+    alpha = string.ascii_letters
+    digits = string.digits
+    pieces = (
+        ''.join(secrets.choice(alpha) for _ in range(4)),
+        ''.join(secrets.choice(digits) for _ in range(4)),
+        ''.join(secrets.choice(alpha) for _ in range(4)),
+    )
+    return ''.join(pieces)[:length]
+
+
+def _send_approval_welcome_email(personal_email, full_name, work_email,
+                                  temp_password, employee_code, role,
+                                  webmail_url=None):
+    """Send a congratulations email to the employee's PERSONAL inbox with
+    their newly issued work email + temporary password."""
+    try:
+        email_settings = get_email_settings()
+        if not email_settings:
+            print("[approval_email] No email settings configured")
+            return False
+
+        from_email = email_settings.get('main_email') or ''
+        password = email_settings.get('main_email_password') or ''
+        smtp_host = email_settings.get('smtp_host') or ''
+        smtp_port = int(email_settings.get('smtp_port') or 587)
+        use_tls = bool(email_settings.get('smtp_use_tls', True))
+        sender_name = email_settings.get('sender_name') or 'SHERIA CENTRIC'
+
+        if not from_email or not password or not smtp_host:
+            print("[approval_email] Email settings incomplete")
+            return False
+
+        try:
+            cs = get_company_settings() or {}
+            firm_name = cs.get('company_name') or 'SHERIA CENTRIC'
+        except Exception:
+            firm_name = 'SHERIA CENTRIC'
+
+        greeting_name = (full_name or 'there').split(' ')[0].title()
+        subject = f"Welcome to {firm_name} — your account has been approved"
+
+        text_body = (
+            f"Hi {greeting_name},\n\n"
+            f"Great news — your {firm_name} account has been approved!\n\n"
+            f"Here are your sign-in details:\n"
+            f"  • New work email: {work_email}\n"
+            f"  • Temporary email password: {temp_password}\n"
+            f"  • Your role: {role}\n"
+            f"  • Firm code (for app login): {employee_code}\n\n"
+            f"Please sign in to the staff portal and change your temporary password "
+            f"as soon as possible. Your work email above is your new primary contact "
+            f"address for the firm.\n\n"
+            f"— {firm_name}"
+        )
+
+        webmail_block = ""
+        if webmail_url:
+            webmail_block = (
+                f"<a href='{webmail_url}' style=\"display:inline-block; margin-top:10px; padding:10px 16px; border-radius:10px; "
+                "background:#6c5ce7; color:#fff; text-decoration:none; font-weight:600; font-size:0.9rem;\">Open webmail →</a>"
+            )
+
+        html_body = f"""
+        <div style="font-family: -apple-system, Segoe UI, Inter, Arial, sans-serif; background:#f4f3fb; padding:32px 12px;">
+          <div style="max-width:580px; margin:0 auto; background:#ffffff; border-radius:20px; overflow:hidden; box-shadow:0 18px 40px rgba(23,18,63,0.12); border:1px solid #e5e3f5;">
+            <div style="padding:30px 32px 24px; background:linear-gradient(135deg,#1f1853 0%,#3a2e95 60%,#5444c8 100%); color:#fff;">
+              <div style="font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; opacity:0.85;">Account approved</div>
+              <div style="font-size:1.6rem; font-weight:800; margin-top:4px;">🎉 Welcome aboard, {greeting_name}.</div>
+              <div style="font-size:0.95rem; opacity:0.92; margin-top:6px;">Your {firm_name} account is now active.</div>
+            </div>
+            <div style="padding:26px 32px 22px;">
+              <p style="margin:0 0 18px; color:#374151; font-size:0.96rem; line-height:1.6;">
+                Congratulations — your application has been approved and you've been issued a brand-new work email for use with {firm_name}.
+              </p>
+
+              <div style="margin:18px 0; padding:18px 18px; border-radius:14px; background:#f3f2ff; border:1px solid #cfc9ff;">
+                <div style="font-size:0.72rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#4f46e5;">New work email</div>
+                <div style="font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:1.18rem; font-weight:700; color:#1E1A4E; margin-top:4px; word-break:break-all;">{work_email}</div>
+
+                <div style="margin-top:14px; font-size:0.72rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#4f46e5;">Temporary email password</div>
+                <div style="font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:1.18rem; font-weight:700; color:#1E1A4E; margin-top:4px; letter-spacing:0.08em;">{temp_password}</div>
+
+                <p style="margin:10px 0 0; font-size:0.78rem; color:#6b7280;">
+                  Please change this temporary password after your first sign-in.
+                </p>
+                {webmail_block}
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+                <div style="padding:12px 14px; border-radius:12px; background:#fafafd; border:1px solid #eeecf7;">
+                  <div style="font-size:0.7rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#6b7280;">Role</div>
+                  <div style="font-size:0.95rem; color:#1E1A4E; font-weight:700; margin-top:2px;">{role}</div>
+                </div>
+                <div style="padding:12px 14px; border-radius:12px; background:#fafafd; border:1px solid #eeecf7;">
+                  <div style="font-size:0.7rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#6b7280;">Firm code</div>
+                  <div style="font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:1.05rem; color:#1E1A4E; font-weight:700; letter-spacing:0.18em; margin-top:2px;">{employee_code}</div>
+                </div>
+              </div>
+
+              <p style="margin:18px 0 0; color:#6b7280; font-size:0.85rem; line-height:1.55;">
+                Use your <strong>firm code</strong> and your existing application password to sign in to the {firm_name} staff portal. The work email above is for receiving firm correspondence and is separate from your portal login.
+              </p>
+
+              <p style="margin:14px 0 0; color:#9ca3af; font-size:0.78rem; line-height:1.55;">
+                If you didn't expect this email or believe it was sent in error, please reply to let us know.
+              </p>
+            </div>
+            <div style="padding:14px 32px; background:#fafafd; border-top:1px solid #eeecf7; color:#9ca3af; font-size:0.75rem;">
+              {firm_name} · Secure access for legal teams
+            </div>
+          </div>
+        </div>
+        """
+
+        return send_email_via_smtp(
+            from_email, password, personal_email, subject, text_body,
+            smtp_host, smtp_port, use_tls, html_body=html_body,
+            sender_name=sender_name
+        )
+    except Exception as e:
+        print(f"[approval_email] Send error: {e}")
+        return False
+
+
+def _send_signup_received_email(to_email, full_name, employee_code):
+    """Send a 'Application received - pending approval' email after signup.
+    Uses the same SMTP plumbing as the password-reset flow."""
+    try:
+        email_settings = get_email_settings()
+        if not email_settings:
+            print("[signup_email] No email settings configured")
+            return False
+
+        from_email = email_settings.get('main_email') or ''
+        password = email_settings.get('main_email_password') or ''
+        smtp_host = email_settings.get('smtp_host') or ''
+        smtp_port = int(email_settings.get('smtp_port') or 587)
+        use_tls = bool(email_settings.get('smtp_use_tls', True))
+        sender_name = email_settings.get('sender_name') or 'SHERIA CENTRIC'
+
+        if not from_email or not password or not smtp_host:
+            print("[signup_email] Email settings incomplete")
+            return False
+
+        # Try to use the firm's brand name from company settings.
+        try:
+            cs = get_company_settings() or {}
+            firm_name = cs.get('company_name') or 'SHERIA CENTRIC'
+        except Exception:
+            firm_name = 'SHERIA CENTRIC'
+
+        greeting_name = (full_name or 'there').split(' ')[0].title()
+        subject = f"Your {firm_name} application has been received"
+
+        text_body = (
+            f"Hi {greeting_name},\n\n"
+            f"Thanks for registering with {firm_name}. We've received your application "
+            f"and it is now waiting for administrator approval.\n\n"
+            f"What happens next:\n"
+            f"  1. A firm administrator will review your details.\n"
+            f"  2. You will receive a follow-up email once your account is approved.\n"
+            f"  3. After approval, sign in with your 6-digit firm code and password.\n\n"
+            f"Your submitted firm code: {employee_code}\n\n"
+            f"If you did not register with {firm_name}, you can safely ignore this email.\n\n"
+            f"— {firm_name}"
+        )
+
+        html_body = f"""
+        <div style="font-family: -apple-system, Segoe UI, Inter, Arial, sans-serif; background:#f4f3fb; padding:32px 12px;">
+          <div style="max-width:560px; margin:0 auto; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 18px 40px rgba(23,18,63,0.12); border:1px solid #e5e3f5;">
+            <div style="padding:28px 32px 22px; background:linear-gradient(135deg,#1f1853 0%,#3a2e95 100%); color:#fff;">
+              <div style="font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; opacity:0.85;">Application received</div>
+              <div style="font-size:1.45rem; font-weight:800; margin-top:4px;">Welcome, {greeting_name}.</div>
+              <div style="font-size:0.95rem; opacity:0.9; margin-top:6px;">Your {firm_name} account is pending approval.</div>
+            </div>
+            <div style="padding:26px 32px;">
+              <p style="margin:0 0 14px; color:#374151; font-size:0.96rem; line-height:1.6;">
+                Thanks for registering with <strong>{firm_name}</strong>. We've received your application and it's now waiting for a firm administrator to review and approve your account.
+              </p>
+
+              <div style="margin:18px 0; padding:14px 16px; border-radius:12px; background:#f3f2ff; border:1px solid #cfc9ff;">
+                <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#4f46e5; margin-bottom:6px;">Status</div>
+                <div style="font-size:0.95rem; color:#1E1A4E; font-weight:700;">Pending administrator approval</div>
+              </div>
+
+              <div style="margin:18px 0;">
+                <div style="font-size:0.85rem; font-weight:700; color:#1E1A4E; margin-bottom:8px;">What happens next</div>
+                <ol style="margin:0; padding-left:18px; color:#374151; font-size:0.92rem; line-height:1.7;">
+                  <li>A firm administrator reviews your details.</li>
+                  <li>You'll receive a follow-up email once your account is approved.</li>
+                  <li>After approval, sign in with your 6-digit firm code and password.</li>
+                </ol>
+              </div>
+
+              <div style="margin:18px 0 0; padding:14px 16px; border-radius:12px; background:#fffaf0; border:1px solid #fde4b3;">
+                <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#92400e; margin-bottom:4px;">Your submitted firm code</div>
+                <div style="font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:1.4rem; font-weight:800; letter-spacing:0.3em; color:#1E1A4E;">{employee_code}</div>
+                <div style="font-size:0.78rem; color:#92400e; margin-top:6px;">Keep this safe — you'll use it to sign in after approval.</div>
+              </div>
+
+              <p style="margin:22px 0 0; color:#9ca3af; font-size:0.78rem; line-height:1.55;">
+                If you didn't register with {firm_name}, you can safely ignore this email.
+              </p>
+            </div>
+            <div style="padding:14px 32px; background:#fafafd; border-top:1px solid #eeecf7; color:#9ca3af; font-size:0.75rem;">
+              {firm_name} · Secure access for legal teams
+            </div>
+          </div>
+        </div>
+        """
+
+        return send_email_via_smtp(
+            from_email, password, to_email, subject, text_body,
+            smtp_host, smtp_port, use_tls, html_body=html_body,
+            sender_name=sender_name
+        )
+    except Exception as e:
+        print(f"[signup_email] Send error: {e}")
+        return False
+
+
+@app.route('/forgot_password', methods=['POST'])
+def forgot_password():
+    """Step 1: accept work email, issue & mail a 6-digit code."""
+    _ensure_password_resets_table()
+
+    data = request.get_json(silent=True) or request.form
+    email = (data.get('email') or '').strip().lower()
+
+    if not email:
+        return jsonify({'success': False, 'error': 'Please enter your email.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error. Try again later.'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Match either the firm-issued work email or the personal email
+            # that was provided at signup.
+            cursor.execute(
+                """
+                SELECT id, full_name, work_email, personal_email, status
+                FROM employees
+                WHERE LOWER(work_email) = %s OR LOWER(personal_email) = %s
+                LIMIT 1
+                """,
+                (email, email)
+            )
+            employee = cursor.fetchone()
+
+            # Explicitly tell the user if the email isn't registered.
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': "This email is not registered. Please check the address or contact your administrator.",
+                    'code': 'email_not_registered'
+                }), 404
+
+            if employee.get('status') == 'Suspended':
+                return jsonify({
+                    'success': False,
+                    'error': 'This account is suspended. Please contact your administrator.'
+                }), 403
+
+            # Invalidate any active unused codes for this employee.
+            cursor.execute(
+                "UPDATE password_resets SET used = 1 WHERE employee_id = %s AND used = 0",
+                (employee['id'],)
+            )
+
+            from datetime import datetime as _dt, timedelta as _td
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            code_hash = generate_password_hash(code)
+            expires_at = _dt.utcnow() + _td(minutes=10)
+
+            # Prefer to deliver to the personal email (the user always has one);
+            # fall back to the work email for legacy accounts.
+            delivery_email = (employee.get('personal_email') or employee.get('work_email') or email).strip()
+
+            cursor.execute(
+                """
+                INSERT INTO password_resets (employee_id, email, code_hash, expires_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (employee['id'], delivery_email.lower(), code_hash, expires_at)
+            )
+            connection.commit()
+
+        sent = _send_reset_code_email(delivery_email, code, employee.get('full_name'))
+        if not sent:
+            return jsonify({
+                'success': False,
+                'error': 'We could not send the email. Please contact your administrator or try again later.'
+            }), 500
+
+        # Lightly mask the delivery address in the response so the UI can show it.
+        try:
+            local, _, domain = delivery_email.partition('@')
+            if local and domain:
+                masked_local = local[0] + '*' * max(0, len(local) - 2) + (local[-1] if len(local) > 1 else '')
+                masked_email = f"{masked_local}@{domain}"
+            else:
+                masked_email = delivery_email
+        except Exception:
+            masked_email = delivery_email
+
+        return jsonify({
+            'success': True,
+            'message': f'A verification code has been sent to {masked_email}.',
+            'delivery_email': masked_email,
+            'expires_in_minutes': 10
+        })
+    except Exception as e:
+        print(f"[forgot_password] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/verify_reset_code', methods=['POST'])
+def verify_reset_code():
+    """Step 2: verify the 6-digit code; opens a 15-minute reset window in session."""
+    _ensure_password_resets_table()
+
+    data = request.get_json(silent=True) or request.form
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+
+    if not email or not code:
+        return jsonify({'success': False, 'error': 'Email and code are required.'}), 400
+    if not code.isdigit() or len(code) != 6:
+        return jsonify({'success': False, 'error': 'Code must be 6 digits.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT pr.id, pr.employee_id, pr.code_hash, pr.expires_at, pr.used
+                FROM password_resets pr
+                WHERE pr.email = %s
+                ORDER BY pr.id DESC
+                LIMIT 1
+                """,
+                (email,)
+            )
+            row = cursor.fetchone()
+            if not row or row['used']:
+                return jsonify({'success': False, 'error': 'Invalid or expired code. Request a new one.'}), 400
+
+            if row['expires_at'] and row['expires_at'] < _dt.utcnow():
+                return jsonify({'success': False, 'error': 'Code expired. Please request a new one.'}), 400
+
+            if not check_password_hash(row['code_hash'], code):
+                return jsonify({'success': False, 'error': 'Incorrect verification code.'}), 400
+
+            cursor.execute(
+                "UPDATE password_resets SET verified_at = %s WHERE id = %s",
+                (_dt.utcnow(), row['id'])
+            )
+            connection.commit()
+
+        # Open a short-lived reset window for this user.
+        from datetime import datetime as _dt2, timedelta as _td2
+        session['pwd_reset_employee_id'] = row['employee_id']
+        session['pwd_reset_row_id'] = row['id']
+        session['pwd_reset_expires_at'] = (_dt2.utcnow() + _td2(minutes=15)).isoformat()
+
+        return jsonify({'success': True, 'message': 'Code verified. You may now reset your credentials.'})
+    except Exception as e:
+        print(f"[verify_reset_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/reset_password', methods=['POST'])
+def reset_password():
+    """Step 3: update password (and optionally employee_code) once code is verified."""
+    from datetime import datetime as _dt
+
+    employee_id = session.get('pwd_reset_employee_id')
+    expires_at = session.get('pwd_reset_expires_at')
+    reset_row_id = session.get('pwd_reset_row_id')
+
+    if not employee_id or not expires_at:
+        return jsonify({'success': False, 'error': 'Reset session expired. Please start again.'}), 401
+
+    try:
+        if _dt.fromisoformat(expires_at) < _dt.utcnow():
+            session.pop('pwd_reset_employee_id', None)
+            session.pop('pwd_reset_expires_at', None)
+            session.pop('pwd_reset_row_id', None)
+            return jsonify({'success': False, 'error': 'Reset window expired. Please start again.'}), 401
+    except Exception:
+        return jsonify({'success': False, 'error': 'Reset session invalid. Please start again.'}), 401
+
+    data = request.get_json(silent=True) or request.form
+    new_password = (data.get('password') or '')
+    confirm_password = (data.get('confirm_password') or '')
+    new_employee_code = (data.get('employee_code') or '').strip()
+
+    if not new_password or not confirm_password:
+        return jsonify({'success': False, 'error': 'Password and confirmation are required.'}), 400
+    if len(new_password) < 8:
+        return jsonify({'success': False, 'error': 'Password must be at least 8 characters.'}), 400
+    if new_password != confirm_password:
+        return jsonify({'success': False, 'error': 'Passwords do not match.'}), 400
+
+    if new_employee_code:
+        if not new_employee_code.isdigit() or len(new_employee_code) != 6:
+            return jsonify({'success': False, 'error': 'Firm code must be exactly 6 digits.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id, employee_code FROM employees WHERE id = %s", (employee_id,))
+            employee = cursor.fetchone()
+            if not employee:
+                return jsonify({'success': False, 'error': 'Account not found.'}), 404
+
+            if new_employee_code and new_employee_code != employee['employee_code']:
+                cursor.execute(
+                    "SELECT id FROM employees WHERE employee_code = %s AND id <> %s LIMIT 1",
+                    (new_employee_code, employee_id)
+                )
+                if cursor.fetchone():
+                    return jsonify({
+                        'success': False,
+                        'error': 'That 6-digit code is already in use. Please choose another.'
+                    }), 409
+
+            password_hash = generate_password_hash(new_password)
+
+            if new_employee_code and new_employee_code != employee['employee_code']:
+                cursor.execute(
+                    "UPDATE employees SET password_hash = %s, employee_code = %s WHERE id = %s",
+                    (password_hash, new_employee_code, employee_id)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE employees SET password_hash = %s WHERE id = %s",
+                    (password_hash, employee_id)
+                )
+
+            if reset_row_id:
+                cursor.execute(
+                    "UPDATE password_resets SET used = 1 WHERE id = %s",
+                    (reset_row_id,)
+                )
+            connection.commit()
+
+        # Clear the reset window from session.
+        session.pop('pwd_reset_employee_id', None)
+        session.pop('pwd_reset_expires_at', None)
+        session.pop('pwd_reset_row_id', None)
+
+        return jsonify({
+            'success': True,
+            'message': 'Password updated successfully. You can sign in now.',
+            'redirect': url_for('login')
+        })
+    except Exception as e:
+        print(f"[reset_password] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -2716,7 +3593,12 @@ def signup():
         if country_digits and phone_number_local.startswith(country_digits) and len(phone_number_local) > len(country_digits):
             phone_number_local = phone_number_local[len(country_digits):]
         phone_number = f"+{country_digits}{phone_number_local}" if country_digits and phone_number_local else phone_number_local
-        work_email = request.form.get('work_email', '').strip().lower()
+        # Accept either personal_email (new field) or work_email (legacy field name)
+        # so older clients posting work_email don't break.
+        personal_email = (
+            request.form.get('personal_email') or
+            request.form.get('work_email') or ''
+        ).strip().lower()
         employee_code = request.form.get('employee_code', '').strip().upper()
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
@@ -2728,8 +3610,8 @@ def signup():
             errors.append('Full name is required')
         if not phone_number_local:
             errors.append('Phone number is required')
-        if not work_email:
-            errors.append('Email is required')
+        if not personal_email:
+            errors.append('Personal email is required')
         if not employee_code or len(employee_code) != 6:
             errors.append('Firm code must be 6 digits')
         if not password or len(password) < 6:
@@ -2764,20 +3646,51 @@ def signup():
             return render_template('signup.html')
         
         try:
-            with connection.cursor() as cursor:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                # Reject duplicate personal_email up-front for a clean message.
+                cursor.execute(
+                    "SELECT id FROM employees WHERE LOWER(personal_email) = %s LIMIT 1",
+                    (personal_email,)
+                )
+                if cursor.fetchone():
+                    flash('That personal email is already registered.', 'error')
+                    return render_template('signup.html')
+
                 password_hash = generate_password_hash(password)
+                # Personal email is stored explicitly; work email is allocated
+                # later on approval (so we leave it NULL for now).
                 cursor.execute("""
-                    INSERT INTO employees 
-                    (full_name, phone_number, work_email, employee_code, password_hash, profile_picture, role, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, 'Employee', 'Pending Approval')
-                """, (full_name, phone_number, work_email, employee_code, password_hash, profile_picture))
+                    INSERT INTO employees
+                    (full_name, phone_number, personal_email, work_email, employee_code,
+                     password_hash, profile_picture, role, status)
+                    VALUES (%s, %s, %s, NULL, %s, %s, %s, 'Employee', 'Pending Approval')
+                """, (full_name, phone_number, personal_email, employee_code, password_hash, profile_picture))
                 connection.commit()
-                flash('Registration successful! Your account is pending approval.', 'success')
+
+                # Send confirmation email (best-effort; never block registration on email failures)
+                email_sent = False
+                try:
+                    email_sent = _send_signup_received_email(personal_email, full_name, employee_code)
+                except Exception as mail_err:
+                    print(f"[signup] Confirmation email error: {mail_err}")
+
+                if email_sent:
+                    flash(
+                        f"Registration successful! A confirmation has been sent to {personal_email}. "
+                        "Your account is pending administrator approval.",
+                        'success'
+                    )
+                else:
+                    flash(
+                        "Registration successful! Your account is pending administrator approval. "
+                        "(We could not send the confirmation email — please check with your administrator.)",
+                        'success'
+                    )
                 return redirect(url_for('login'))
         except pymysql.IntegrityError as e:
             if 'employee_code' in str(e):
                 flash('Firm code already exists', 'error')
-            elif 'work_email' in str(e):
+            elif 'personal_email' in str(e) or 'work_email' in str(e):
                 flash('Email already registered', 'error')
             else:
                 flash('Registration failed. Please try again.', 'error')
@@ -2821,9 +3734,16 @@ def check_employee_code():
         print(f"Error in check_employee_code endpoint: {e}")
         return jsonify({'available': False, 'message': 'Server error'})
 
-@app.route('/dashboard')
-def dashboard():
-    """Employee dashboard"""
+@app.route('/dashboard', defaults={'role_slug': None})
+@app.route('/<role_slug>/dashboard')
+def dashboard(role_slug):
+    """Employee dashboard.
+
+    Two URL shapes are accepted; the role-prefix normalisation is handled
+    globally by ``_RolePrefixWSGIMiddleware`` + ``_enforce_role_prefix_on_employee_urls``.
+    The ``role_slug`` parameter exists only so ``url_for('dashboard', role_slug=...)``
+    can generate role-prefixed URLs explicitly.
+    """
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
@@ -3110,8 +4030,9 @@ def get_pending_approvals():
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
-                SELECT id, full_name, phone_number, work_email, employee_code,
-                       role, status, created_at, onboarding_completed, profile_picture
+                SELECT id, full_name, phone_number, work_email, personal_email,
+                       employee_code, role, status, created_at, onboarding_completed,
+                       profile_picture
                 FROM employees 
                 WHERE status = 'Pending Approval'
                 ORDER BY onboarding_completed DESC, created_at DESC
@@ -3176,20 +4097,153 @@ def assign_role_and_approve():
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT onboarding_completed FROM employees WHERE id = %s", (employee_id,))
+            cursor.execute(
+                """
+                SELECT id, full_name, work_email, personal_email, employee_code, role, status,
+                       onboarding_completed
+                FROM employees WHERE id = %s
+                """,
+                (employee_id,)
+            )
             employee = cursor.fetchone()
             if not employee:
                 return jsonify({'success': False, 'error': 'Employee not found'}), 404
             if not employee.get('onboarding_completed'):
                 return jsonify({'success': False, 'error': 'Cannot approve. Onboarding must be completed first.'}), 400
-            
+
+            effective_role = new_role or employee.get('role') or 'Employee'
+
             if new_role:
                 cursor.execute("UPDATE employees SET role = %s, status = 'Active' WHERE id = %s", (new_role, employee_id))
             else:
                 cursor.execute("UPDATE employees SET status = 'Active' WHERE id = %s", (employee_id,))
             connection.commit()
-            
-            return jsonify({'success': True, 'message': 'Employee approved successfully'})
+
+        # ---- Allocate a work email under the configured cPanel domain. ----
+        work_email_info = {
+            'allocated': False,
+            'work_email': employee.get('work_email'),
+            'reason': None,
+        }
+        email_sent = False
+
+        try:
+            email_settings = get_email_settings()
+            cpanel_domain = (email_settings or {}).get('cpanel_domain') or ''
+            cpanel_token = (email_settings or {}).get('cpanel_api_token') or ''
+            cpanel_user = (email_settings or {}).get('cpanel_user') or ''
+            cpanel_port = (email_settings or {}).get('cpanel_api_port') or 2083
+
+            current_email = (employee.get('work_email') or '').lower()
+            current_domain = current_email.split('@', 1)[1] if '@' in current_email else ''
+            already_on_domain = (
+                cpanel_domain and current_domain and
+                current_domain == str(cpanel_domain).lower()
+            )
+
+            if not email_settings or not cpanel_domain or not cpanel_token or not cpanel_user:
+                work_email_info['reason'] = 'Email settings not configured (work email not allocated).'
+            elif already_on_domain:
+                work_email_info['allocated'] = True
+                work_email_info['work_email'] = current_email
+                work_email_info['reason'] = 'Employee already has a work email on the firm domain.'
+            else:
+                new_work_email = _generate_unique_work_email(employee.get('full_name') or '', cpanel_domain)
+                if not new_work_email:
+                    work_email_info['reason'] = "Could not derive a work email from the employee's name."
+                else:
+                    temp_password = _generate_temp_password(12)
+                    cpanel_result = create_sub_email(
+                        cpanel_token, cpanel_domain, cpanel_user, cpanel_port,
+                        new_work_email, temp_password
+                    )
+
+                    if cpanel_result and cpanel_result.get('status') == 1:
+                        # Assign the new firm-domain work email. We never touch
+                        # personal_email here — it was captured at signup and
+                        # remains the employee's private contact address.
+                        # For any legacy account where personal_email is still
+                        # NULL we copy the prior work_email into it as a
+                        # one-time rescue, so we don't lose the only address
+                        # the employee gave us.
+                        connection2 = get_db_connection()
+                        try:
+                            with connection2.cursor() as cur2:
+                                if employee.get('personal_email'):
+                                    cur2.execute(
+                                        "UPDATE employees SET work_email = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                                        (new_work_email, employee_id)
+                                    )
+                                else:
+                                    cur2.execute(
+                                        """
+                                        UPDATE employees
+                                        SET work_email = %s,
+                                            personal_email = COALESCE(personal_email, %s),
+                                            updated_at = CURRENT_TIMESTAMP
+                                        WHERE id = %s
+                                        """,
+                                        (new_work_email, employee.get('work_email'), employee_id)
+                                    )
+                                connection2.commit()
+                        finally:
+                            connection2.close()
+
+                        # Save in local email_accounts so the firm SMTP/IMAP can use it.
+                        try:
+                            save_email_account_to_db(
+                                new_work_email, temp_password,
+                                employee.get('full_name') or new_work_email,
+                                False, session.get('employee_id')
+                            )
+                        except Exception as ee:
+                            print(f"[approval] Failed to save email_accounts row: {ee}")
+
+                        work_email_info['allocated'] = True
+                        work_email_info['work_email'] = new_work_email
+
+                        # Personal email is the authoritative contact address.
+                        # For brand-new accounts it was captured at signup; for
+                        # legacy accounts we just copied work_email into it above.
+                        personal_email = employee.get('personal_email') or employee.get('work_email')
+                        if personal_email:
+                            try:
+                                email_sent = _send_approval_welcome_email(
+                                    personal_email,
+                                    employee.get('full_name') or '',
+                                    new_work_email,
+                                    temp_password,
+                                    employee.get('employee_code') or '',
+                                    effective_role,
+                                    webmail_url=f"https://{cpanel_domain}/webmail"
+                                )
+                            except Exception as me:
+                                print(f"[approval] Welcome email send error: {me}")
+                    else:
+                        err = (cpanel_result or {}).get('errors') or []
+                        err_msg = (err[0].get('message') if err and isinstance(err[0], dict) else None) or 'cPanel email creation failed.'
+                        work_email_info['reason'] = err_msg
+                        print(f"[approval] cPanel email creation failed for {new_work_email}: {cpanel_result}")
+        except Exception as e:
+            print(f"[approval] Work-email allocation error: {e}")
+            work_email_info['reason'] = 'Work email allocation failed; please configure it manually.'
+
+        message = 'Employee approved successfully'
+        if work_email_info['allocated']:
+            message += f" and assigned work email {work_email_info['work_email']}."
+            if email_sent:
+                message += ' A welcome email has been sent to their personal address.'
+        elif work_email_info['reason']:
+            message += f". (Work email not allocated: {work_email_info['reason']})"
+
+        return jsonify({
+            'success': True,
+            'message': message,
+            'work_email_allocated': work_email_info['allocated'],
+            'work_email': work_email_info['work_email'],
+            'personal_email': employee.get('personal_email') or employee.get('work_email'),
+            'welcome_email_sent': email_sent
+        })
     except Exception as e:
         print(f"Error assigning role and approving: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -3357,7 +4411,8 @@ def get_employee_onboarding_details():
                     print(f"Could not add kra_pin_document column: {e}")
             cursor.execute("""
                 SELECT 
-                    id, full_name, phone_number, work_email, employee_code, role, status,
+                    id, full_name, phone_number, work_email, personal_email,
+                    employee_code, role, status,
                     account_number, account_name, salary, salary_components, tax_pin, pay_frequency,
                     payment_method, bank_name, mobile_money_company,
                     employment_contract, id_front, id_back, kra_pin_document, signature, stamp,
@@ -3403,6 +4458,7 @@ def update_employee_onboarding():
     full_name = request.form.get('full_name', '').strip()
     employee_code = request.form.get('employee_code', '').strip()
     work_email = request.form.get('work_email', '').strip()
+    personal_email = request.form.get('personal_email', '').strip().lower()
     phone_number = request.form.get('phone_number', '').strip()
     role = request.form.get('role', 'Employee').strip()
     status = request.form.get('status', 'Pending Approval').strip()
@@ -3414,8 +4470,10 @@ def update_employee_onboarding():
     pay_frequency = request.form.get('pay_frequency', '').strip() or None
     salary = request.form.get('salary', '').strip() or None
     salary_components = request.form.get('salary_components', '').strip() or None
-    if not full_name or not work_email or not phone_number:
-        return jsonify({'success': False, 'error': 'Full name, email and phone are required'}), 400
+    # work_email may legitimately be blank for not-yet-approved employees,
+    # but personal_email is always required because it's the contact address.
+    if not full_name or not personal_email or not phone_number:
+        return jsonify({'success': False, 'error': 'Full name, personal email and phone are required'}), 400
 
     upload_folder = app.config['UPLOAD_FOLDER']
     employment_contract = None
@@ -3459,18 +4517,29 @@ def update_employee_onboarding():
             row = cur.fetchone()
             if not row:
                 return jsonify({'success': False, 'error': 'Employee not found'}), 404
-            cur.execute("SELECT id FROM employees WHERE work_email = %s AND id != %s", (work_email, employee_id))
+
+            # Uniqueness checks (skip empty work_email since pending accounts may have none).
+            if work_email:
+                cur.execute("SELECT id FROM employees WHERE LOWER(work_email) = %s AND id != %s",
+                            (work_email.lower(), employee_id))
+                if cur.fetchone():
+                    return jsonify({'success': False, 'error': 'Work email already in use by another employee'}), 400
+
+            cur.execute("SELECT id FROM employees WHERE LOWER(personal_email) = %s AND id != %s",
+                        (personal_email, employee_id))
             if cur.fetchone():
-                return jsonify({'success': False, 'error': 'Work email already in use by another employee'}), 400
+                return jsonify({'success': False, 'error': 'Personal email already in use by another employee'}), 400
 
             set_parts = [
-                "full_name = %s", "work_email = %s", "phone_number = %s", "role = %s", "status = %s",
+                "full_name = %s", "work_email = %s", "personal_email = %s",
+                "phone_number = %s", "role = %s", "status = %s",
                 "payment_method = %s", "bank_name = %s", "mobile_money_company = %s",
                 "account_number = %s", "account_name = %s",
                 "pay_frequency = %s", "salary = %s", "salary_components = %s"
             ]
             params = [
-                full_name, work_email, phone_number, role, status,
+                full_name, (work_email or None), personal_email,
+                phone_number, role, status,
                 payment_method, bank_name, mobile_money_company,
                 account_number, account_name,
                 pay_frequency, salary, salary_components
@@ -7836,7 +8905,8 @@ def switch_role(role_name):
     # Switch to the selected role
     session['employee_role'] = role_name
     flash(f'Switched to {role_name} role', 'success')
-    return redirect(url_for('dashboard'))
+    # Land on the role-prefixed dashboard so the URL changes too.
+    return redirect(url_for('dashboard', role_slug=role_to_slug(role_name)))
 
 @app.route('/exit_role_switch')
 def exit_role_switch():
@@ -7853,7 +8923,7 @@ def exit_role_switch():
     session['employee_role'] = original_role
     session.pop('original_role', None)
     flash('Returned to IT Support role', 'success')
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard', role_slug=role_to_slug(original_role)))
 
 @app.route('/view_as_client/<int:client_id>')
 def view_as_client(client_id):
@@ -7920,9 +8990,10 @@ def exit_client_view():
         return redirect(url_for('client_login'))
     
     # Restore employee session
+    restored_role = session.get('original_employee_role')
     session['employee_id'] = session.get('original_employee_id')
     session['employee_name'] = session.get('original_employee_name')
-    session['employee_role'] = session.get('original_employee_role')
+    session['employee_role'] = restored_role
     session['profile_picture'] = session.get('original_profile_picture')
     
     # Clear client session and original employee info
@@ -7935,7 +9006,7 @@ def exit_client_view():
     session.pop('original_profile_picture', None)
     
     flash('Returned to employee dashboard', 'success')
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard', role_slug=role_to_slug(restored_role)))
 
 @app.route('/employee_communications')
 def employee_communications():

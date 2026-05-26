@@ -2,20 +2,736 @@
 
 {% block title %}Client Login - SHERIA CENTRIC{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* =========================================================
+       CLIENT LOGIN — matches /login visual system, simpler card.
+       Self-contained CSS (no Tailwind-version dependence).
+       ========================================================= */
+    :root {
+        /* Pull from the global theme set by company settings in base.html.
+           Falls back to the SHERIA CENTRIC defaults if theme vars unavailable. */
+        --auth-accent: var(--brand-accent, #6c5ce7);
+        --auth-accent-dark: var(--brand-accent-dark, #5747d6);
+        --auth-accent-soft: var(--brand-accent-soft, #f1efff);
+        --auth-accent-border: var(--brand-accent-border, #ddd6ff);
+        --auth-text: #1a1c2e;
+        --auth-text-muted: #6b7280;
+        --auth-border: #e5e3f5;
+        --auth-radius: 20px;
+        --auth-shadow: 0 24px 60px -12px rgba(23, 18, 63, 0.22),
+                       0 10px 24px -8px rgba(23, 18, 63, 0.12);
+    }
+
+    body {
+        background:
+            radial-gradient(circle at 12% 18%, rgba(108, 92, 231, 0.18), transparent 42%),
+            radial-gradient(circle at 88% 78%, rgba(162, 155, 254, 0.14), transparent 50%),
+            linear-gradient(135deg, #eef2ff 0%, #f7f4ff 50%, #faf9ff 100%) !important;
+    }
+    body::before {
+        background-image:
+            radial-gradient(circle at 20% 30%, rgba(108, 92, 231, 0.10) 0%, transparent 50%),
+            radial-gradient(circle at 85% 75%, rgba(162, 155, 254, 0.08) 0%, transparent 52%) !important;
+    }
+
+    header.glass-effect {
+        background: linear-gradient(145deg, rgba(19, 16, 55, 0.92), rgba(34, 28, 86, 0.9)) !important;
+        border-color: rgba(162, 155, 254, 0.35) !important;
+        box-shadow: 0 14px 30px rgba(17, 13, 47, 0.28) !important;
+    }
+    header .brand span,
+    header .desktop-nav .nav-link { color: #f1efff !important; }
+    header .desktop-nav .nav-link:hover { color: #c7c2ff !important; }
+    footer {
+        background: linear-gradient(145deg, rgba(25, 22, 66, 0.96), rgba(43, 34, 103, 0.95)) !important;
+        border-top: 1px solid rgba(162, 155, 254, 0.3);
+    }
+    footer .container, footer p, footer a { color: #fff7ed !important; }
+    footer a:hover { color: #c9c4ff !important; }
+
+    .auth-page {
+        min-height: calc(100vh - 200px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 16px;
+    }
+    .auth-shell {
+        width: 100%;
+        max-width: 1020px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+        align-items: stretch;
+    }
+
+    /* ---- Brand panel (client-focused) ---- */
+    .auth-brand-panel {
+        background: linear-gradient(145deg, #1f1853 0%, #3a2e95 60%, #5444c8 100%);
+        border-radius: var(--auth-radius);
+        border: 1px solid rgba(162, 155, 254, 0.32);
+        color: #f5f3ff;
+        padding: clamp(24px, 4vw, 40px);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        min-height: 220px;
+    }
+    .auth-brand-panel::before {
+        content: '';
+        position: absolute;
+        width: 420px;
+        height: 420px;
+        right: -160px;
+        top: -200px;
+        background: radial-gradient(circle, rgba(162, 155, 254, 0.34), transparent 65%);
+        pointer-events: none;
+    }
+    .auth-brand-panel::after {
+        content: '';
+        position: absolute;
+        width: 280px;
+        height: 280px;
+        left: -100px;
+        bottom: -140px;
+        background: radial-gradient(circle, rgba(94, 234, 212, 0.16), transparent 65%);
+        pointer-events: none;
+    }
+    .auth-brand-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        align-self: flex-start;
+        padding: 6px 12px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #fdcb6e;
+        background: rgba(253, 203, 110, 0.12);
+        border: 1px solid rgba(253, 203, 110, 0.32);
+        border-radius: 999px;
+    }
+    .auth-brand-mark {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.10);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        color: #ffffff;
+        font-size: 1.35rem;
+    }
+    .auth-brand-panel h2 {
+        font-size: clamp(1.5rem, 3.2vw, 2rem);
+        font-weight: 800;
+        line-height: 1.2;
+        margin: 0;
+        color: #ffffff;
+    }
+    .auth-brand-panel > p {
+        color: #d8d4f6;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        max-width: 52ch;
+        margin: 0;
+    }
+
+    .auth-feature-list {
+        list-style: none;
+        margin: 4px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+    }
+    .auth-feature-list li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        color: #e8e5fd;
+    }
+    .auth-feature-list i {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: rgba(94, 234, 212, 0.16);
+        color: #5eead4;
+        font-size: 0.75rem;
+    }
+
+    .auth-kpis {
+        margin-top: auto;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .auth-kpis article {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 14px;
+        padding: 12px 10px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(6px);
+    }
+    .auth-kpis strong {
+        display: block;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #ffffff;
+        margin-bottom: 2px;
+    }
+    .auth-kpis span {
+        color: #c9c4ec;
+        font-size: 0.72rem;
+        line-height: 1.3;
+    }
+
+    /* ---- Auth card ---- */
+    .auth-card {
+        background: #ffffff;
+        border-radius: var(--auth-radius);
+        border: 1px solid var(--auth-border);
+        box-shadow: var(--auth-shadow);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .auth-header {
+        padding: clamp(22px, 4vw, 32px) clamp(20px, 4vw, 32px) 18px;
+        text-align: center;
+        background: linear-gradient(180deg, #ffffff 0%, #f8f7ff 100%);
+        border-bottom: 1px solid var(--auth-border);
+    }
+    .auth-header .ring-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--auth-accent-soft), #e0d9ff);
+        color: var(--auth-accent);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        margin: 0 auto 12px;
+        box-shadow: 0 10px 24px rgba(108, 92, 231, 0.2);
+    }
+    .auth-header h1 {
+        font-size: clamp(1.35rem, 2.6vw, 1.6rem);
+        font-weight: 800;
+        color: var(--auth-text);
+        margin: 0 0 4px;
+    }
+    .auth-header p {
+        color: var(--auth-text-muted);
+        font-size: 0.9rem;
+        margin: 0;
+    }
+
+    .auth-panel {
+        padding: clamp(22px, 4vw, 30px) clamp(20px, 4vw, 32px) clamp(24px, 4vw, 32px);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* ---- Primary Google button ---- */
+    .auth-google {
+        width: 100%;
+        min-height: 52px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 13px 16px;
+        border-radius: 12px;
+        border: 1.5px solid var(--auth-border);
+        background: #ffffff;
+        color: #1f2937;
+        font-weight: 600;
+        font-size: 0.95rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, background 0.2s ease;
+    }
+    .auth-google:hover {
+        border-color: #c9c4f1;
+        background: #fcfbff;
+        box-shadow: 0 10px 24px rgba(23, 18, 63, 0.10);
+        transform: translateY(-1px);
+    }
+    .auth-google:active { transform: translateY(0); }
+    .auth-google svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    .auth-divider {
+        position: relative;
+        text-align: center;
+        margin: 6px 0;
+    }
+    .auth-divider::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        width: 100%;
+        height: 1px;
+        background: var(--auth-border);
+    }
+    .auth-divider span {
+        position: relative;
+        display: inline-block;
+        background: #ffffff;
+        padding: 0 12px;
+        color: var(--auth-text-muted);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    /* ---- Inline email/password form ---- */
+    .auth-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .auth-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .auth-label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #374151;
+        letter-spacing: 0.01em;
+    }
+    .auth-input-wrap {
+        position: relative;
+    }
+    .auth-input-wrap .field-icon {
+        position: absolute;
+        top: 50%;
+        left: 14px;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.9rem;
+        pointer-events: none;
+        transition: color 0.2s ease;
+    }
+    .auth-input-wrap .field-toggle {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        padding: 8px;
+        color: #9ca3af;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: color 0.2s ease, background 0.2s ease;
+    }
+    .auth-input-wrap .field-toggle:hover {
+        color: var(--auth-accent);
+        background: var(--auth-accent-soft);
+    }
+    .auth-input {
+        width: 100%;
+        min-height: 48px;
+        border: 1.5px solid var(--auth-border);
+        border-radius: 12px;
+        padding: 12px 14px 12px 42px;
+        font-size: 0.95rem;
+        color: var(--auth-text);
+        background: #ffffff;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        font-family: inherit;
+    }
+    .auth-input.has-toggle { padding-right: 46px; }
+    .auth-input::placeholder { color: #b9b9c9; }
+    .auth-input:hover { border-color: #c9c4f1; }
+    .auth-input:focus {
+        outline: none;
+        border-color: var(--auth-accent);
+        box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.14);
+        background: #fcfbff;
+    }
+    .auth-input-wrap:focus-within .field-icon { color: var(--auth-accent); }
+
+    /* ---- Submit button (replaces the old auth-manual) ---- */
+    .auth-submit {
+        width: 100%;
+        min-height: 50px;
+        border: none;
+        border-radius: 12px;
+        padding: 13px 16px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #ffffff;
+        background: linear-gradient(135deg, var(--auth-accent) 0%, #8478ec 100%);
+        box-shadow: 0 8px 22px rgba(108, 92, 231, 0.35),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 2px;
+    }
+    .auth-submit:hover {
+        transform: translateY(-1px);
+        background: linear-gradient(135deg, #7a6cef 0%, #998df1 100%);
+        box-shadow: 0 12px 28px rgba(108, 92, 231, 0.5),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+    .auth-submit:active { transform: translateY(0); }
+    .auth-submit:focus-visible {
+        outline: 3px solid rgba(108, 92, 231, 0.35);
+        outline-offset: 3px;
+    }
+
+    .auth-forgot {
+        align-self: flex-end;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--auth-text-muted);
+        transition: color 0.2s ease;
+    }
+    .auth-forgot:hover { color: var(--auth-accent); }
+
+    /* ---- Toggle for email/password form ---- */
+    .email-toggle {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 16px;
+        min-height: 48px;
+        border-radius: 12px;
+        border: 1.5px dashed var(--auth-border);
+        background: transparent;
+        color: var(--auth-accent);
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+    .email-toggle:hover {
+        border-color: var(--auth-accent);
+        background: var(--auth-accent-soft);
+        color: var(--auth-accent-dark);
+    }
+    .email-toggle i.chev {
+        font-size: 0.75rem;
+        transition: transform 0.25s ease;
+    }
+    .email-toggle[aria-expanded="true"] i.chev { transform: rotate(180deg); }
+    .email-toggle[aria-expanded="true"] {
+        border-style: solid;
+        border-color: var(--auth-accent);
+        background: var(--auth-accent-soft);
+    }
+
+    /* Collapsible form wrapper */
+    .auth-form-wrap {
+        display: grid;
+        grid-template-rows: 0fr;
+        overflow: hidden;
+        transition: grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+                    margin-top 0.25s ease,
+                    opacity 0.25s ease;
+        opacity: 0;
+    }
+    .auth-form-wrap[data-open="true"] {
+        grid-template-rows: 1fr;
+        opacity: 1;
+        margin-top: 4px;
+    }
+    .auth-form-wrap > .auth-form-inner {
+        min-height: 0;
+        overflow: hidden;
+    }
+    .auth-form-wrap > .auth-form-inner > .auth-form {
+        padding-top: 2px;
+    }
+
+    /* Fallback (no JS / older browsers): show form */
+    .no-js .email-toggle { display: none; }
+    .no-js .auth-form-wrap {
+        grid-template-rows: 1fr;
+        opacity: 1;
+    }
+
+    /* ---- Footer links (theme-aware) ---- */
+    .auth-foot {
+        margin-top: 6px;
+        text-align: center;
+        font-size: 0.9rem;
+        color: var(--auth-text);
+    }
+    .auth-foot a,
+    .auth-switch a {
+        color: var(--auth-accent);
+        font-weight: 700;
+        margin-left: 6px;
+        text-decoration: underline;
+        text-decoration-color: transparent;
+        text-underline-offset: 3px;
+        transition: color 0.2s ease, text-decoration-color 0.2s ease;
+    }
+    .auth-foot a:hover,
+    .auth-switch a:hover {
+        color: var(--auth-accent-dark);
+        text-decoration-color: currentColor;
+    }
+    .auth-foot a:focus-visible,
+    .auth-switch a:focus-visible {
+        outline: 2px solid var(--auth-accent);
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
+    .auth-info-note {
+        margin-top: 8px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--auth-accent-soft);
+        border: 1px solid #ddd6ff;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .auth-info-note i {
+        flex-shrink: 0;
+        color: var(--auth-accent);
+        margin-top: 2px;
+        font-size: 0.95rem;
+    }
+    .auth-info-note p {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #4b4b6b;
+        line-height: 1.55;
+    }
+
+    .auth-switch {
+        margin-top: 4px;
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--auth-text);
+    }
+
+    /* ---- Responsive layout ---- */
+    @media (min-width: 900px) {
+        .auth-page {
+            padding: 40px 24px;
+            min-height: calc(100vh - 220px);
+        }
+        .auth-shell {
+            grid-template-columns: 1fr 1.05fr;
+            gap: 24px;
+        }
+        .auth-brand-panel { min-height: 100%; }
+    }
+
+    /* Mobile & small screens: show only the sign-in card at a standard width */
+    @media (max-width: 899px) {
+        .auth-brand-panel { display: none; }
+        .auth-shell { max-width: 420px; gap: 0; }
+        .auth-card { width: 100%; }
+        .auth-header { padding: 22px 24px 16px; }
+        .auth-panel { padding: 22px 24px 26px; }
+    }
+    @media (max-width: 480px) {
+        .auth-page { padding: 18px 12px; }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-white py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full">
-        <a href="{{ url_for('google_login') }}" 
-           class="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200">
-            <svg class="w-5 h-5 mr-3" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Sign in with Google
-        </a>
+<div class="auth-page">
+    <div class="auth-shell">
+
+        <!-- ============ Brand panel ============ -->
+        <aside class="auth-brand-panel" aria-label="Client portal info">
+            <span class="auth-brand-tag"><i class="fas fa-shield-halved" aria-hidden="true"></i> Client portal</span>
+
+            <div class="auth-brand-mark" aria-hidden="true">
+                <i class="fas fa-user-shield"></i>
+            </div>
+
+            <h2>Your case progress, always in reach</h2>
+            <p>Sign in to track hearings, review documents, message your advocate, and stay updated on every milestone — securely from any device.</p>
+
+            <ul class="auth-feature-list">
+                <li><i class="fas fa-check"></i> Real-time case progress &amp; hearings</li>
+                <li><i class="fas fa-check"></i> Secure document &amp; invoice portal</li>
+                <li><i class="fas fa-check"></i> Direct messaging with your advocate</li>
+                <li><i class="fas fa-check"></i> Encrypted, audit-ready sessions</li>
+            </ul>
+
+            <div class="auth-kpis">
+                <article><strong>256-bit</strong><span>Encryption</span></article>
+                <article><strong>24/7</strong><span>Portal access</span></article>
+                <article><strong>Private</strong><span>By design</span></article>
+            </div>
+        </aside>
+
+        <!-- ============ Auth card ============ -->
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="ring-icon" aria-hidden="true">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h1>Welcome back</h1>
+                <p>Sign in to your SHERIA CENTRIC client portal</p>
+            </div>
+
+            <div class="auth-panel">
+                <a href="{{ url_for('google_login') }}" class="auth-google" aria-label="Sign in with Google">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Sign in with Google
+                </a>
+
+                <div class="auth-divider"><span>or</span></div>
+
+                <button type="button"
+                        id="email-toggle"
+                        class="email-toggle"
+                        aria-expanded="false"
+                        aria-controls="email-form-wrap"
+                        onclick="toggleEmailForm()">
+                    <i class="fas fa-envelope" aria-hidden="true"></i>
+                    <span id="email-toggle-label">Sign in with email &amp; password</span>
+                    <i class="fas fa-chevron-down chev" aria-hidden="true"></i>
+                </button>
+
+                <div id="email-form-wrap" class="auth-form-wrap" data-open="false" aria-hidden="true">
+                    <div class="auth-form-inner">
+                        <form method="POST" action="{{ url_for('client_manual_login') }}" class="auth-form" novalidate>
+                            <div class="auth-field">
+                                <label for="email" class="auth-label">Email address</label>
+                                <div class="auth-input-wrap">
+                                    <input type="email"
+                                           id="email"
+                                           name="email"
+                                           autocomplete="email"
+                                           required
+                                           class="auth-input"
+                                           placeholder="your.email@example.com">
+                                    <i class="fas fa-envelope field-icon" aria-hidden="true"></i>
+                                </div>
+                            </div>
+
+                            <div class="auth-field">
+                                <label for="password" class="auth-label">Password</label>
+                                <div class="auth-input-wrap">
+                                    <input type="password"
+                                           id="password"
+                                           name="password"
+                                           autocomplete="current-password"
+                                           required
+                                           class="auth-input has-toggle"
+                                           placeholder="Enter your password">
+                                    <i class="fas fa-lock field-icon" aria-hidden="true"></i>
+                                    <button type="button"
+                                            class="field-toggle"
+                                            onclick="togglePassword('password')"
+                                            aria-label="Show or hide password">
+                                        <i id="password-icon" class="fas fa-eye" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="auth-submit">
+                                <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
+                                Sign In
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="auth-foot">
+                    Don't have an account?
+                    <a href="{{ url_for('client_signup') }}">Create one</a>
+                </div>
+
+                <div class="auth-switch">
+                    Firm member?
+                    <a href="{{ url_for('login') }}">Sign in here</a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(inputId + '-icon');
+        if (!input || !icon) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    function setEmailFormOpen(open) {
+        const wrap = document.getElementById('email-form-wrap');
+        const toggle = document.getElementById('email-toggle');
+        const label = document.getElementById('email-toggle-label');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        if (!wrap || !toggle) return;
+
+        wrap.setAttribute('data-open', open ? 'true' : 'false');
+        wrap.setAttribute('aria-hidden', open ? 'false' : 'true');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (label) {
+            label.textContent = open ? 'Use Google instead' : 'Sign in with email & password';
+        }
+
+        if (emailInput && passwordInput) {
+            emailInput.disabled = !open;
+            passwordInput.disabled = !open;
+            if (open) {
+                setTimeout(() => emailInput.focus(), 220);
+            }
+        }
+    }
+
+    function toggleEmailForm() {
+        const toggle = document.getElementById('email-toggle');
+        const isOpen = toggle && toggle.getAttribute('aria-expanded') === 'true';
+        setEmailFormOpen(!isOpen);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Start collapsed; disable inputs so they don't autofill / submit empty.
+        setEmailFormOpen(false);
+    });
+</script>
+{% endblock %}

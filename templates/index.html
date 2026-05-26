@@ -26,6 +26,25 @@
     body { margin: 0; }
     .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
     .skip-link:focus { top: 16px; }
+    /* Native <details> styling tuned to match the .faq-item button look */
+    .faq-item details { border: none; }
+    .faq-item summary {
+      list-style: none;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding: 14px 0;
+      cursor: pointer;
+      font-size: 1.05rem;
+      color: #1E1A4E;
+      font-weight: 600;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary .chev { transition: transform 0.25s ease; color: #6C5CE7; }
+    .faq-item details[open] summary .chev { transform: rotate(180deg); }
+    .faq-item details p { color: #6b7280; padding: 0 0 14px; margin: 0; }
   </style>
   <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -50,26 +69,33 @@
       </nav>
       <div class="nav-actions">
         <details class="login-dropdown">
-          <summary class="login-summary">Login</summary>
+          <summary class="login-summary" aria-label="Login menu">
+            <i class="ph ph-sign-in" aria-hidden="true"></i>
+            <span>Login</span>
+            <i class="ph ph-caret-down" aria-hidden="true"></i>
+          </summary>
           <div class="login-dropdown-menu">
-            <a href="/client_login">Client Login</a>
-            <a href="/login">Employee Login</a>
+            <a href="/client_login"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
+            <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
           </div>
         </details>
         <a href="#final-cta" class="btn btn-demo">Request Demo</a>
         <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
-          <i class="ph ph-list"></i>
+          <i class="ph ph-list" x-show="!open"></i>
+          <i class="ph ph-x" x-show="open" style="display:none"></i>
         </button>
       </div>
     </div>
     <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
+      <span class="mobile-section-label">Navigate</span>
       <a href="/platform" @click="open=false">Platform</a>
       <a href="/features" @click="open=false">Features</a>
       <a href="/pricing" @click="open=false">Pricing</a>
       <a href="/security" @click="open=false">Security</a>
       <a href="/contact" @click="open=false">Contact</a>
-      <a href="/client_login" @click="open=false">Client Login</a>
-      <a href="/login" @click="open=false">Employee Login</a>
+      <span class="mobile-section-label">Account</span>
+      <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
+      <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
       <a href="#final-cta" @click="open=false" class="btn btn-demo">Request Demo</a>
     </div>
   </header>
@@ -80,34 +106,26 @@
       <div class="hero-grid-lines" aria-hidden="true"></div>
       <div class="container hero-grid">
         <div class="hero-copy">
-          <p class="hero-badge">âš– Built for East African Advocates</p>
+          <p class="hero-badge">Built for East African Advocates</p>
           <h1>The Operating System for <br><span class="gradient-text">Modern Law Firms</span></h1>
           <p class="typed-line"><span id="typed-text"></span></p>
           <p class="hero-lead">
-            SHERIA CENTRIC brings every tool your firm needs into one intelligent platform â€” from matter intake to final invoice.
-            Built with deep understanding of how African advocates work.
+            SHERIA CENTRIC brings every tool your firm needs into one intelligent platform &mdash; from matter intake to final invoice. Built with deep understanding of how African advocates work.
           </p>
           <div class="hero-ctas">
-            <a href="#pricing" class="btn btn-primary">Start Free Trial â†’</a>
-            <a href="#how-it-works" class="btn btn-secondary">â–¶ Watch 3-Min Demo</a>
-          </div>
-          <div class="trust-row">
-            <span>ðŸ”’ 256-bit Encrypted</span>
-            <span>âœ“ LSK Compliant</span>
-            <span>â˜… 4.9/5 Rated</span>
+            <a href="#pricing" class="btn btn-primary">Start Free Trial</a>
+            <a href="#how-it-works" class="btn btn-secondary">Watch 3-Min Demo</a>
           </div>
         </div>
         <div class="hero-visual">
           <div class="hero-mockup">
             <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&q=80" alt="SHERIA CENTRIC legal dashboard overview with analytics and matters" loading="eager" fetchpriority="high">
           </div>
-          <div class="float-note note-1">ðŸ“ New document uploaded â€” Oduya v. State</div>
-          <div class="float-note note-2">âœ… Invoice KES 45,000 paid â€” Client: Kamau</div>
-          <div class="float-note note-3">âš– Hearing in 2 days â€” HCCC 034/2026</div>
         </div>
       </div>
       <a href="#social-proof" class="scroll-cue" aria-label="Scroll to social proof"><i class="ph ph-arrow-down"></i></a>
     </section>
+
     <section class="social-proof" id="social-proof">
       <div class="container">
         <p class="proof-head">Trusted by leading firms across Kenya, Uganda &amp; Tanzania</p>
@@ -118,21 +136,425 @@
         </div>
       </div>
     </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Why SHERIA CENTRIC</p>
+          <h2>Built for the way advocates actually work</h2>
+          <p>One unified platform replaces the spreadsheets, sticky notes, WhatsApp updates and folder mazes that slow legal teams down.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card" data-aos="fade-up">
+            <div class="feature-card-top">
+              <span class="feature-badge">Practice</span>
+            </div>
+            <div class="icon" aria-hidden="true"><i class="ph ph-scales"></i></div>
+            <h3>End-to-end case management</h3>
+            <p>Track every matter from intake to closure with structured workflows, ownership, and live status.</p>
+            <ul class="feature-points">
+              <li>Smart matter timelines</li>
+              <li>Stage-based ownership</li>
+              <li>Audit-ready records</li>
+            </ul>
+          </article>
+          <article class="feature-card" data-aos="fade-up" data-aos-delay="80">
+            <div class="feature-card-top">
+              <span class="feature-badge">Documents</span>
+            </div>
+            <div class="icon" aria-hidden="true"><i class="ph ph-files"></i></div>
+            <h3>Secure document vault</h3>
+            <p>Version-controlled file system with tags, approvals and controlled external sharing.</p>
+            <ul class="feature-points">
+              <li>Version history</li>
+              <li>Role-based access</li>
+              <li>Encrypted at rest</li>
+            </ul>
+          </article>
+          <article class="feature-card" data-aos="fade-up" data-aos-delay="160">
+            <div class="feature-card-top">
+              <span class="feature-badge">Calendar</span>
+            </div>
+            <div class="icon" aria-hidden="true"><i class="ph ph-calendar-check"></i></div>
+            <h3>Never miss a court date</h3>
+            <p>Hearings, mentions and filings with cascading reminders and team escalation.</p>
+            <ul class="feature-points">
+              <li>Court-aware reminders</li>
+              <li>Conflict detection</li>
+              <li>Hearing prep checklist</li>
+            </ul>
+          </article>
+          <article class="feature-card" data-aos="fade-up" data-aos-delay="240">
+            <div class="feature-card-top">
+              <span class="feature-badge">Finance</span>
+            </div>
+            <div class="icon" aria-hidden="true"><i class="ph ph-receipt"></i></div>
+            <h3>Billing that runs itself</h3>
+            <p>Invoices from billable activity, retainer balances, disbursements and collections in one view.</p>
+            <ul class="feature-points">
+              <li>Time &amp; expense capture</li>
+              <li>Aging analytics</li>
+              <li>M-Pesa &amp; bank ready</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="how-it-works" id="how-it-works">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">How it works</p>
+          <h2>From client intake to closed matter &mdash; in four steps</h2>
+        </div>
+      </div>
+      <div class="steps-wrap">
+        <div class="workflow-step" data-aos="fade-up">
+          <div class="step-image">
+            <img src="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1200&auto=format&q=80" alt="Client intake meeting with structured forms">
+          </div>
+          <div class="step-copy">
+            <span class="step-num">01</span>
+            <h3>Onboard the client</h3>
+            <p>Capture client details with structured KYC, conflict checks and engagement letters all in one place.</p>
+            <ul>
+              <li>Individual &amp; corporate intake</li>
+              <li>Automated conflict checks</li>
+              <li>Digital engagement letter</li>
+            </ul>
+          </div>
+        </div>
+        <div class="workflow-step alt" data-aos="fade-up">
+          <div class="step-image">
+            <img src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&auto=format&q=80" alt="Open and assign new matter">
+          </div>
+          <div class="step-copy">
+            <span class="step-num">02</span>
+            <h3>Open the matter</h3>
+            <p>Set up the case file with type, court, opposing parties and a complete task plan from day one.</p>
+            <ul>
+              <li>Templated matter plans</li>
+              <li>Assign advocates &amp; clerks</li>
+              <li>Link relevant documents</li>
+            </ul>
+          </div>
+        </div>
+        <div class="workflow-step" data-aos="fade-up">
+          <div class="step-image">
+            <img src="https://images.unsplash.com/photo-1521791055366-0d553872952f?w=1200&auto=format&q=80" alt="Court calendar with reminders">
+          </div>
+          <div class="step-copy">
+            <span class="step-num">03</span>
+            <h3>Work the matter</h3>
+            <p>Move work forward with shared calendars, tasks, document drafting and client communications.</p>
+            <ul>
+              <li>Daily hearing pipeline</li>
+              <li>Document version control</li>
+              <li>Internal &amp; client messaging</li>
+            </ul>
+          </div>
+        </div>
+        <div class="workflow-step alt" data-aos="fade-up">
+          <div class="step-image">
+            <img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1200&auto=format&q=80" alt="Generate invoice and collect payment">
+          </div>
+          <div class="step-copy">
+            <span class="step-num">04</span>
+            <h3>Bill &amp; close</h3>
+            <p>Convert work into accurate invoices, track collections, archive the file and capture lessons learned.</p>
+            <ul>
+              <li>One-click invoicing</li>
+              <li>Aging &amp; collections queue</li>
+              <li>Searchable matter archive</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="modules section" id="modules">
+      <div class="container">
+        <div class="section-head dark" data-aos="fade-up">
+          <p class="eyebrow">Modules</p>
+          <h2>Every part of the firm, connected</h2>
+          <p>Eight integrated modules that share the same data, so nothing falls through the cracks.</p>
+        </div>
+        <div class="module-grid">
+          <article data-aos="fade-up">
+            <i class="ph ph-folder-lock"></i>
+            <h3>Document Vault</h3>
+            <p>Pleadings, evidence and drafts with governance built in.</p>
+          </article>
+          <article data-aos="fade-up" data-aos-delay="60">
+            <i class="ph ph-briefcase"></i>
+            <h3>Matter Management</h3>
+            <p>Command center for every case from open to close.</p>
+          </article>
+          <article data-aos="fade-up" data-aos-delay="120">
+            <i class="ph ph-calendar-dots"></i>
+            <h3>Court Calendar</h3>
+            <p>Hearings, deadlines and prep with escalation rules.</p>
+          </article>
+          <article data-aos="fade-up" data-aos-delay="180">
+            <i class="ph ph-money"></i>
+            <h3>Billing Engine</h3>
+            <p>Invoices, retainers, disbursements and collections.</p>
+          </article>
+          <article data-aos="fade-up">
+            <i class="ph ph-shield-check"></i>
+            <h3>Audit Trail</h3>
+            <p>Who changed what, when &mdash; across every module.</p>
+          </article>
+          <article data-aos="fade-up" data-aos-delay="60">
+            <i class="ph ph-lock-key"></i>
+            <h3>Access Control</h3>
+            <p>Role-based permissions aligned to legal duties.</p>
+          </article>
+          <article data-aos="fade-up" data-aos-delay="120">
+            <i class="ph ph-users-three"></i>
+            <h3>Client Portal</h3>
+            <p>Approved updates, shared docs and secure messaging.</p>
+          </article>
+          <article data-aos="fade-up" data-aos-delay="180">
+            <i class="ph ph-chart-line-up"></i>
+            <h3>Performance Analytics</h3>
+            <p>Throughput, utilization, revenue and bottlenecks.</p>
+          </article>
+        </div>
+        <div style="text-align:center; margin-top:36px;">
+          <a href="/platform" class="btn btn-secondary">Explore the full platform</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="testimonials section">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">What firms say</p>
+          <h2>Loved by advocates, partners and clerks</h2>
+        </div>
+        <div class="swiper testimonials-swiper" data-aos="fade-up">
+          <div class="swiper-wrapper">
+            <div class="swiper-slide">
+              <div class="testimonial-card">
+                <div class="stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <blockquote>&ldquo;We cut admin time by nearly half. Our partners now actually have visibility on every matter without chasing clerks.&rdquo;</blockquote>
+                <div class="author">
+                  <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&q=80" alt="Sarah Wanjiku">
+                  <div>
+                    <strong>Sarah Wanjiku</strong>
+                    <span>Managing Partner, Wanjiku &amp; Associates</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testimonial-card">
+                <div class="stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <blockquote>&ldquo;The court calendar alone is worth it. Zero missed mentions since we switched over.&rdquo;</blockquote>
+                <div class="author">
+                  <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&q=80" alt="James Okello">
+                  <div>
+                    <strong>James Okello</strong>
+                    <span>Senior Advocate, Okello &amp; Co.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testimonial-card">
+                <div class="stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <blockquote>&ldquo;Billing finally makes sense. We invoice the day work happens, not the week after.&rdquo;</blockquote>
+                <div class="author">
+                  <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=200&auto=format&q=80" alt="Amina Hassan">
+                  <div>
+                    <strong>Amina Hassan</strong>
+                    <span>Finance Lead, Hassan Advocates LLP</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testimonial-card">
+                <div class="stars" aria-label="5 out of 5 stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+                <blockquote>&ldquo;Clients love the portal. They stop calling for updates because they can see them.&rdquo;</blockquote>
+                <div class="author">
+                  <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&q=80" alt="Daniel Mwangi">
+                  <div>
+                    <strong>Daniel Mwangi</strong>
+                    <span>Partner, Mwangi Legal Group</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="swiper-pagination"></div>
+          <div class="swiper-button-prev"></div>
+          <div class="swiper-button-next"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pricing section" id="pricing">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Pricing</p>
+          <h2>Simple plans that grow with your firm</h2>
+          <p>Start free for 30 days. No credit card required. Cancel anytime.</p>
+        </div>
+        <div class="pricing-grid">
+          <article class="price-card" data-aos="fade-up">
+            <span class="plan-chip">Solo</span>
+            <h3>Starter</h3>
+            <p class="for">Sole practitioners &amp; small firms</p>
+            <div class="price" data-price>KES 4,900<span style="font-size:0.9rem;color:#6b7280;">/mo</span></div>
+            <p class="price-sub">Per user, billed monthly</p>
+            <ul>
+              <li>Up to 3 users</li>
+              <li>Matter &amp; document core</li>
+              <li>Court calendar &amp; reminders</li>
+              <li>Email support</li>
+            </ul>
+            <a href="/pricing" class="btn btn-outline">Start free trial</a>
+          </article>
+          <article class="price-card featured" data-aos="fade-up" data-aos-delay="80">
+            <span class="popular">Most Popular</span>
+            <span class="plan-chip">Growing firms</span>
+            <h3>Professional</h3>
+            <p class="for">Mid-size practices</p>
+            <div class="price" data-price>KES 9,900<span style="font-size:0.9rem;color:#6b7280;">/mo</span></div>
+            <p class="price-sub">Per user, billed monthly</p>
+            <ul>
+              <li>Up to 25 users</li>
+              <li>Everything in Starter</li>
+              <li>Billing engine &amp; client portal</li>
+              <li>Analytics dashboards</li>
+              <li>Priority support</li>
+            </ul>
+            <a href="/pricing" class="btn btn-primary">Start free trial</a>
+          </article>
+          <article class="price-card" data-aos="fade-up" data-aos-delay="160">
+            <span class="plan-chip">Enterprise</span>
+            <h3>Firm</h3>
+            <p class="for">Large &amp; multi-branch firms</p>
+            <div class="price" data-price>Custom</div>
+            <p class="price-sub">Volume pricing &amp; SLAs</p>
+            <ul>
+              <li>Unlimited users</li>
+              <li>Everything in Professional</li>
+              <li>SSO &amp; advanced audit</li>
+              <li>Dedicated success manager</li>
+              <li>Onboarding &amp; training</li>
+            </ul>
+            <a href="/contact" class="btn btn-outline">Talk to sales</a>
+          </article>
+        </div>
+        <p class="pricing-note">All plans include 256-bit encryption, daily backups and LSK-aligned compliance controls.</p>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">FAQ</p>
+          <h2>Questions firms ask us</h2>
+        </div>
+        <div class="faq-list">
+          <div class="faq-item" data-aos="fade-up">
+            <details>
+              <summary>Is my firm&rsquo;s data secure?</summary>
+              <p>All data is encrypted in transit (TLS 1.2+) and at rest (AES-256). We run daily backups, role-based access control and a full audit trail on every action.</p>
+            </details>
+          </div>
+          <div class="faq-item" data-aos="fade-up">
+            <details>
+              <summary>Can we import our existing matters and documents?</summary>
+              <p>Yes. Our onboarding team helps you bulk-import matters, clients and documents from spreadsheets or your current system. Most firms are fully live within 2&ndash;3 weeks.</p>
+            </details>
+          </div>
+          <div class="faq-item" data-aos="fade-up">
+            <details>
+              <summary>Does it work on mobile?</summary>
+              <p>Yes. SHERIA CENTRIC is a responsive web app that works on any modern phone or tablet &mdash; ideal for advocates checking matters in court.</p>
+            </details>
+          </div>
+          <div class="faq-item" data-aos="fade-up">
+            <details>
+              <summary>Is it compliant with LSK and East African regulations?</summary>
+              <p>The platform is built around LSK practice standards and supports compliance reporting for Kenya, Uganda and Tanzania.</p>
+            </details>
+          </div>
+          <div class="faq-item" data-aos="fade-up">
+            <details>
+              <summary>What if we need to cancel?</summary>
+              <p>Cancel any time from your billing settings. You keep access until the end of your billing period and can export all your data on the way out.</p>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="final-cta section" id="final-cta">
+      <div id="particles-cta" aria-hidden="true"></div>
+      <div class="container">
+        <div class="cta-icon" aria-hidden="true"><i class="ph ph-rocket-launch"></i></div>
+        <h2>Run your firm like the best in the region</h2>
+        <p>Join the East African advocates who replaced spreadsheets and sticky notes with SHERIA CENTRIC.</p>
+        <div class="hero-ctas" style="justify-content:center;">
+          <a href="#pricing" class="btn btn-primary">Start your free 30-day trial</a>
+          <a href="/contact" class="btn btn-secondary">Book a live demo</a>
+        </div>
+        <small>No credit card. No setup fee. Cancel anytime.</small>
+      </div>
+    </section>
   </main>
+
   <footer id="contact">
     <div class="container footer-grid">
       <div>
         <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
         <p>Building the future of legal practice in Africa.</p>
+        <div class="socials">
+          <a href="#" aria-label="LinkedIn"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="#" aria-label="X / Twitter"><i class="ph ph-x-logo"></i></a>
+          <a href="#" aria-label="Facebook"><i class="ph ph-facebook-logo"></i></a>
+        </div>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <a href="/platform">Platform</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/security">Security</a>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <a href="/contact">Contact</a>
+        <a href="#faq">FAQ</a>
+        <a href="/client_login">Client Login</a>
+        <a href="/login">Employee Login</a>
+      </div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <p>Monthly product updates &amp; legal-tech insights for East African firms.</p>
+        <form class="newsletter" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';">
+          <label for="newsletter-email" class="skip-link">Email address</label>
+          <input id="newsletter-email" type="email" placeholder="you@firm.co.ke" required>
+          <button type="submit">Join</button>
+        </form>
       </div>
     </div>
     <div class="footer-bottom">
       <div class="container bottom-wrap">
-      <p>Â© 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <p>&copy; 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <div>
+          <a href="/security">Privacy</a>
+          <a href="/security">Terms</a>
+          <a href="/contact">Support</a>
+        </div>
       </div>
     </div>
   </footer>
   <script type="module" src="/static/main.js"></script>
 </body>
 </html>
-

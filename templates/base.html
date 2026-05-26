@@ -515,6 +515,87 @@
             margin-right: 10px;
             width: 20px;
         }
+
+        /* =========================================================
+           PUBLIC SIGN-IN BUTTON (visible on dark navy header)
+           Tailwind v4 changed gradient classes; this guarantees
+           the button shows correctly regardless of the CDN version.
+           ========================================================= */
+        #public-login-toggle.public-login-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 9999px;
+            background: linear-gradient(135deg, #FDCB6E 0%, #FFE49A 100%);
+            color: #1E1A4E !important;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            box-shadow:
+                0 6px 18px rgba(253, 203, 110, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.01em;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            white-space: nowrap;
+        }
+        #public-login-toggle.public-login-btn:hover {
+            transform: translateY(-1px);
+            background: linear-gradient(135deg, #FFD37E 0%, #FFEBA8 100%);
+            box-shadow:
+                0 10px 24px rgba(253, 203, 110, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.45);
+        }
+        #public-login-toggle.public-login-btn:focus-visible {
+            outline: 2px solid #FFE49A;
+            outline-offset: 3px;
+        }
+        #public-login-toggle.public-login-btn i,
+        #public-login-toggle.public-login-btn span {
+            color: #1E1A4E !important;
+        }
+        #public-login-toggle.public-login-btn .fa-sign-in-alt { font-size: 0.95rem; }
+        #public-login-toggle.public-login-btn .fa-chevron-down {
+            font-size: 0.7rem;
+            transition: transform 0.25s ease;
+            opacity: 0.85;
+        }
+        #public-login-toggle.public-login-btn[aria-expanded="true"] .fa-chevron-down,
+        #public-login-toggle.public-login-btn.is-open .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        /* Public login dropdown panel: stays readable on any header */
+        #public-login-dropdown.dropdown-menu {
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(108, 92, 231, 0.18);
+            box-shadow: 0 18px 40px rgba(15, 13, 46, 0.28);
+            padding: 6px;
+            border-radius: 14px;
+        }
+        #public-login-dropdown .dropdown-item {
+            border-radius: 10px;
+            border-bottom: none;
+            padding: 11px 12px;
+            gap: 10px;
+            font-weight: 500;
+            color: #1E1A4E;
+        }
+        #public-login-dropdown .dropdown-item:hover {
+            background: rgba(108, 92, 231, 0.08);
+            color: #1E1A4E;
+        }
+
+        /* Compact button on very small phones */
+        @media (max-width: 380px) {
+            #public-login-toggle.public-login-btn {
+                padding: 8px 12px;
+                font-size: 0.78rem;
+                gap: 6px;
+            }
+            #public-login-toggle.public-login-btn .fa-sign-in-alt { display: none; }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -533,7 +614,7 @@
                     {% endif %}
                     
                     <!-- SHERIA CENTRIC Logo/Icon -->
-                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard') }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('client_login') }}{% endif %}" class="flex items-center space-x-3 group">
+                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard', role_slug=current_role_slug) }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('client_login') }}{% endif %}" class="flex items-center space-x-3 group">
                         <div class="relative">
                             <div class="w-12 h-12 rounded-xl brand-mark flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 icon-pulse">
                                 <i class="fas fa-hands-helping text-white text-xl icon-hover-effect"></i>
@@ -590,18 +671,25 @@
                     <!-- Sign in: employee vs client (only when logged out) -->
                     {% if not session.get('employee_id') and not session.get('client_id') %}
                     <div class="relative" id="public-login-menu-root">
-                        <button type="button" id="public-login-toggle" onclick="togglePublicLoginDropdown(event)" class="flex items-center space-x-2 px-3 sm:px-4 py-2.5 rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 border border-green-200/50 hover:from-green-100 hover:to-emerald-200 transition-all duration-300 shadow-sm hover:shadow-md group">
-                            <i class="fas fa-sign-in-alt text-green-700 text-sm icon-hover-effect"></i>
-                            <span class="text-sm font-semibold text-green-800 group-hover:text-green-900 transition-colors">Sign in</span>
-                            <i class="fas fa-chevron-down text-green-600/80 text-xs transition-transform duration-300" id="public-login-dropdown-icon"></i>
+                        <button type="button"
+                                id="public-login-toggle"
+                                class="public-login-btn"
+                                aria-haspopup="true"
+                                aria-expanded="false"
+                                aria-controls="public-login-dropdown"
+                                aria-label="Sign in menu"
+                                onclick="togglePublicLoginDropdown(event)">
+                            <i class="fas fa-sign-in-alt" aria-hidden="true"></i>
+                            <span>Sign in</span>
+                            <i class="fas fa-chevron-down" aria-hidden="true" id="public-login-dropdown-icon"></i>
                         </button>
-                        <div id="public-login-dropdown" class="dropdown-menu right-0 left-auto min-w-[220px]">
-                            <a href="{{ url_for('login') }}" class="dropdown-item">
-                                <i class="fas fa-building text-green-600"></i>
-                                <span>Firm / Employee login</span>
+                        <div id="public-login-dropdown" class="dropdown-menu right-0 left-auto min-w-[220px]" role="menu">
+                            <a href="{{ url_for('login') }}" class="dropdown-item" role="menuitem">
+                                <i class="fas fa-building text-green-600" aria-hidden="true"></i>
+                                <span>Firm login</span>
                             </a>
-                            <a href="{{ url_for('client_login') }}" class="dropdown-item">
-                                <i class="fas fa-user text-blue-600"></i>
+                            <a href="{{ url_for('client_login') }}" class="dropdown-item" role="menuitem">
+                                <i class="fas fa-user text-blue-600" aria-hidden="true"></i>
                                 <span>Client login</span>
                             </a>
                         </div>
@@ -913,13 +1001,13 @@
                     <!-- Employee Sidebar Links -->
                     {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
                     {% set matter_mgmt_pages = ['matter_management', 'case_management', 'case_tracking', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
-                    <!-- Common Links (All Roles) - hidden on case_documents / matter_documents so only Case/Matter Actions show -->
-                    {% if request.endpoint not in user_mgmt_pages and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
-                    <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+                    <!-- Dashboard (pinned to the top of every employee sidebar) -->
+                    <a href="{{ url_for('dashboard', role_slug=current_role_slug) }}"
+                       class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
+                       id="nav-dashboard">
                         <i class="fas fa-home"></i>
                         <span>Dashboard</span>
                     </a>
-                    {% endif %}
                     
                     <!-- Role Switch Indicator (hidden on case_documents / matter_documents) -->
                     {% if is_role_switched and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
@@ -946,22 +1034,23 @@
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
-                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-administration">
-                        <i class="fas fa-route"></i>
-                        <span>Case tracking</span>
-                    </a>
-                    {% if user_role in ['Firm Administrator', 'Associate Advocate', 'IT Support'] %}
+                    {# Register Case - kept for Associate Advocate and IT Support only #}
+                    {% if user_role in ['Associate Advocate', 'IT Support'] %}
                     <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
                         <i class="fas fa-plus-circle"></i>
                         <span>Register Case</span>
                     </a>
-                    {# Show "Register Matter" only on the Other Matters listing page #}
+                    {% endif %}
+                    {# Register Matter - shown to Firm Admin, Associate Advocate, and IT Support only on the Other Matters listing page #}
+                    {% if user_role in ['Firm Administrator', 'Associate Advocate', 'IT Support'] %}
                     <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %} {% if request.endpoint != 'other_matters' %}hidden{% endif %}" id="nav-register-matter">
                         <i class="fas fa-folder-plus"></i>
                         <span>Register Matter</span>
                     </a>
                     {% endif %}
-                    {% if user_role == 'Firm Administrator' %}
+                    {# Finance & Billing, Calendar, Reminders - shown to both
+                       Firm Administrator and Managing Partner. #}
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] %}
                     <a href="{{ url_for('finance_billing') }}" class="sidebar-link {% if request.endpoint == 'finance_billing' %}active{% endif %}" id="nav-finance-billing">
                         <i class="fas fa-dollar-sign"></i>
                         <span>Finance &amp; Billing</span>
@@ -975,10 +1064,8 @@
                         <span>Reminders</span>
                     </a>
                     {% endif %}
-                    <a href="#" class="sidebar-link" id="nav-reports">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>Reports & Analytics</span>
-                    </a>
+                    {# Case tracking and Reports & Analytics removed from the Administration block
+                       per request for both Firm Administrator and Managing Partner. #}
                     {% endif %}
 
                     <!-- Matter Management page only: sidebar shows Litigation Matters + Other Matters (no Case tracking here) -->
@@ -1069,45 +1156,19 @@
                     </a>
                     {% endif %}
 
-                    <!-- Managing Partner Links: Litigation Matters + Other Matters (when not on matter pages) -->
-                    {% if user_role == 'Managing Partner' and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case'] %}active{% endif %}" id="nav-case-management">
-                        <i class="fas fa-gavel"></i>
-                        <span>Litigation Matters</span>
-                    </a>
-                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-mp">
-                        <i class="fas fa-route"></i>
-                        <span>Case tracking</span>
-                    </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'case_tracking', 'matter_tracking', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
-                    </a>
-                    {% endif %}
-                    
-                    <!-- Associate Advocate Links: Litigation Matters + Other Matters (when not on matter pages) -->
-                    {% if user_role == 'Associate Advocate' and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
-                    </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link {% if request.endpoint in ['case_management', 'case_details', 'case_proceedings', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case'] %}active{% endif %}" id="nav-case-management">
-                        <i class="fas fa-gavel"></i>
-                        <span>Litigation Matters</span>
-                    </a>
-                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-assoc">
-                        <i class="fas fa-route"></i>
-                        <span>Case tracking</span>
-                    </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link {% if request.endpoint in ['other_matters', 'register_matter', 'case_tracking', 'matter_tracking', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress'] %}active{% endif %}" id="nav-other-matters">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
-                    </a>
-                    {% endif %}
+                    {# Managing Partner's "Matter Management" panel (Litigation Matters, Case
+                       tracking, Other Matters) removed per request. #}
 
+                    
+                    <!-- Associate Advocate: Matter Management + Calendar + Reminders -->
                     {% if user_role == 'Associate Advocate' and request.endpoint not in user_mgmt_pages and request.endpoint != 'matter_documents' %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Workspace</p>
+                    </div>
+                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Matter Management</span>
+                    </a>
                     <a href="{{ url_for('calendar') }}" class="sidebar-link {% if request.endpoint == 'calendar' %}active{% endif %}" id="nav-calendar">
                         <i class="fas fa-calendar-alt"></i>
                         <span>Calendar</span>
@@ -1128,15 +1189,8 @@
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
-                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-clerk">
-                        <i class="fas fa-route"></i>
-                        <span>Case tracking</span>
-                    </a>
                     {% endif %}
-                    <a href="{{ url_for('user_management') }}" class="sidebar-link {% if request.endpoint in ['user_management', 'employee_management', 'client_management', 'individual_client_management', 'corporate_client_management'] %}active{% endif %}" id="nav-user-management">
-                        <i class="fas fa-users"></i>
-                        <span>User Management</span>
-                    </a>
+                    {# Case tracking and User Management removed for Clerk per request. #}
                     <a href="{{ url_for('calendar') }}" class="sidebar-link {% if request.endpoint == 'calendar' %}active{% endif %}" id="nav-calendar">
                         <i class="fas fa-calendar-alt"></i>
                         <span>Calendar</span>
@@ -1824,13 +1878,14 @@
                 event.stopPropagation();
             }
             const dropdown = document.getElementById('public-login-dropdown');
-            const icon = document.getElementById('public-login-dropdown-icon');
+            const toggle = document.getElementById('public-login-toggle');
             if (!dropdown) {
                 return;
             }
-            dropdown.classList.toggle('show');
-            if (icon) {
-                icon.style.transform = dropdown.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0deg)';
+            const isOpen = dropdown.classList.toggle('show');
+            if (toggle) {
+                toggle.classList.toggle('is-open', isOpen);
+                toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             }
         }
         
@@ -1918,10 +1973,8 @@
             if (publicLoginDd && publicLoginToggle) {
                 if (!publicLoginDd.contains(event.target) && !publicLoginToggle.contains(event.target)) {
                     publicLoginDd.classList.remove('show');
-                    const plIcon = document.getElementById('public-login-dropdown-icon');
-                    if (plIcon) {
-                        plIcon.style.transform = 'rotate(0deg)';
-                    }
+                    publicLoginToggle.classList.remove('is-open');
+                    publicLoginToggle.setAttribute('aria-expanded', 'false');
                 }
             }
         });

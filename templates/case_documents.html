@@ -64,6 +64,108 @@
     .doc-alert { border-radius: 0.75rem; border-left: 4px solid #eab308; }
     .doc-modal { backdrop-filter: blur(4px); }
     .doc-modal-inner { border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+    .party-group-chevron { transition: transform 0.18s ease; }
+    .party-group.open > .party-group-header .party-group-chevron { transform: rotate(90deg); color: #4f46e5; }
+    .party-group.open > .party-group-header { background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%); }
+
+    /* Profile avatar */
+    .party-avatar {
+        width: 3rem; height: 3rem; border-radius: 9999px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #ffffff; font-weight: 700; font-size: 1rem;
+        flex-shrink: 0;
+        border: 2px solid rgba(255,255,255,0.85);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+        background-image: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        letter-spacing: 0.02em;
+    }
+    .party-avatar.party-color-indigo  { background-image: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
+    .party-avatar.party-color-rose    { background-image: linear-gradient(135deg, #fb7185 0%, #e11d48 100%); }
+    .party-avatar.party-color-emerald { background-image: linear-gradient(135deg, #10b981 0%, #047857 100%); }
+    .party-avatar.party-color-purple  { background-image: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); }
+    .party-avatar.party-color-amber   { background-image: linear-gradient(135deg, #f59e0b 0%, #b45309 100%); }
+    .party-avatar.party-color-slate   { background-image: linear-gradient(135deg, #94a3b8 0%, #475569 100%); }
+    .party-avatar-ring {
+        padding: 2px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #c7d2fe 0%, #fbcfe8 60%, #fde68a 100%);
+        display: inline-flex; flex-shrink: 0;
+    }
+    .party-profile-header {
+        padding: 0.875rem 1rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    }
+    .party-group.open > .party-profile-header {
+        background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+    }
+    .party-type-chip {
+        display: inline-flex; align-items: center; gap: 0.25rem;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+        border-radius: 9999px; text-transform: uppercase;
+        border: 1px solid currentColor;
+    }
+    .party-type-chip.party-color-indigo  { color: #4338ca; background: #eef2ff; }
+    .party-type-chip.party-color-rose    { color: #be123c; background: #ffe4e6; }
+    .party-type-chip.party-color-emerald { color: #047857; background: #d1fae5; }
+    .party-type-chip.party-color-purple  { color: #7e22ce; background: #f3e8ff; }
+    .party-type-chip.party-color-amber   { color: #b45309; background: #fef3c7; }
+    .party-type-chip.party-color-slate   { color: #475569; background: #f1f5f9; }
+    .party-meta-row {
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        font-size: 0.75rem; color: #475569; font-weight: 500;
+    }
+    .party-meta-row i { color: #94a3b8; font-size: 0.7rem; }
+
+    /* "Add a document" action choice cards */
+    .action-choice-card {
+        display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem;
+        padding: 1.25rem 1.25rem;
+        border: 2px solid #e2e8f0;
+        border-radius: 0.875rem;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+    .action-choice-card:hover:not(:disabled) {
+        border-color: #6366f1;
+        background: linear-gradient(180deg, #ffffff 0%, #eef2ff 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(79, 70, 229, 0.12);
+    }
+    .action-choice-card:disabled {
+        opacity: 0.55; cursor: not-allowed; background: #f1f5f9; border-style: dashed;
+    }
+    .action-choice-icon {
+        width: 3rem; height: 3rem;
+        border-radius: 0.75rem;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #ffffff; font-size: 1.25rem;
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+    }
+    .action-choice-icon.upload-icon { background: linear-gradient(135deg, #10b981 0%, #047857 100%); }
+    .action-choice-icon.create-icon { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+    .action-choice-title { font-weight: 700; color: #0f172a; font-size: 1rem; }
+    .action-choice-desc { font-size: 0.8125rem; color: #64748b; line-height: 1.35; }
+    .action-switch-btn {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        font-size: 0.875rem; font-weight: 700; color: #ffffff;
+        padding: 0.55rem 1rem; border-radius: 0.625rem;
+        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        border: 1px solid rgba(79, 70, 229, 0.4);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28);
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.18s ease, filter 0.18s ease;
+        letter-spacing: 0.01em;
+    }
+    .action-switch-btn:hover {
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.36);
+    }
+    .action-switch-btn:active { transform: translateY(0); }
+    .action-switch-btn i { font-size: 0.75rem; }
 </style>
 
 <div class="doc-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -139,152 +241,340 @@
     </div>
     {% endif %}
 
-    <!-- Upload Section -->
+    <!-- Add a Document – unified entry point: choose Upload or Create with Google -->
     <div class="doc-card doc-form-card p-5 sm:p-6 mb-6">
-        <h2 class="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
-            <i class="fas fa-cloud-upload-alt text-emerald-600"></i>
-            Upload document
-        </h2>
-        <form id="documentUploadForm" enctype="multipart/form-data" class="space-y-5">
-            <div>
-                <label for="document_file" class="doc-label">Select file <span class="text-red-500">*</span></label>
-                <div class="doc-file-wrap">
-                    <input type="file" id="document_file" name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required class="doc-input block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+        <div class="flex items-center justify-between gap-3 mb-5">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-plus-circle text-emerald-600"></i>
+                Add a document
+            </h2>
+            <button type="button" id="actionSwitchBtn" class="action-switch-btn hidden">
+                <i class="fas fa-arrow-left text-xs"></i> Choose a different option
+            </button>
+        </div>
+
+        <!-- Step 1: action selector -->
+        <div id="actionSelector">
+            <p class="text-sm text-gray-600 mb-4">How would you like to add a document to this case?</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button type="button" data-action="upload" class="action-choice-card" {% if not google_drive_connected %}disabled{% endif %}>
+                    <span class="action-choice-icon upload-icon"><i class="fas fa-cloud-upload-alt"></i></span>
+                    <span class="action-choice-title">Upload existing file</span>
+                    <span class="action-choice-desc">Upload a PDF, Word, image or scan (max 16MB) into this case's Google Drive folder.</span>
+                </button>
+                <button type="button" data-action="create" class="action-choice-card" {% if not google_drive_connected %}disabled{% endif %}>
+                    <span class="action-choice-icon create-icon"><i class="fab fa-google-drive"></i></span>
+                    <span class="action-choice-title">Create with Google</span>
+                    <span class="action-choice-desc">Start a new Google Doc, Sheet, Slides or Notebook directly inside this case's Drive folder.</span>
+                </button>
+            </div>
+            {% if not google_drive_connected %}
+            <p class="text-xs text-amber-700 mt-3"><i class="fas fa-exclamation-triangle mr-1"></i>Connect Google Drive in Documents Settings to enable these options.</p>
+            {% endif %}
+        </div>
+
+        <!-- Step 2a: Upload pane -->
+        <div id="actionPaneUpload" class="hidden">
+            <form id="documentUploadForm" enctype="multipart/form-data" class="space-y-5">
+                <div>
+                    <label for="document_file" class="doc-label">Select file <span class="text-red-500">*</span></label>
+                    <div class="doc-file-wrap">
+                        <input type="file" id="document_file" name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required class="doc-input block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1.5">PDF, DOC, DOCX, JPG, JPEG, PNG — max 16MB</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-1.5">PDF, DOC, DOCX, JPG, JPEG, PNG — max 16MB</p>
+                <div>
+                    <label for="document_description" class="doc-label">Description <span class="text-red-500">*</span></label>
+                    <input type="text" id="document_description" name="document_description" class="doc-input" placeholder="Max 5 words (e.g. client affidavit scan)" required maxlength="500" autocomplete="off" />
+                    <p class="text-xs text-gray-500 mt-1.5" id="description-word-hint">Maximum <span class="font-semibold">5 words</span>. <span id="description-word-count" class="text-indigo-600">0 / 5 words</span></p>
+                </div>
+                <div>
+                    <label for="document_party_id" class="doc-label">Linked Party</label>
+                    <select id="document_party_id" name="party_id" class="doc-input" {% if not parties or parties|length == 0 %}disabled{% endif %}>
+                        <option value="">— Not party-specific —</option>
+                        {% for p in parties or [] %}
+                        <option value="{{ p.id }}"
+                                data-party-type="{{ p.party_type|upper }}"
+                                data-party-name="{{ p.party_name }}">
+                            {{ p.party_type|upper }} — {{ p.party_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if not parties or parties|length == 0 %}
+                    <p class="text-xs text-amber-700 mt-1.5">No parties registered for this case yet. Add parties on the case edit page to link documents to them.</p>
+                    {% else %}
+                    <p class="text-xs text-gray-500 mt-1.5">Optional. Pick the party this document relates to so it can be filtered by party type.</p>
+                    {% endif %}
+                </div>
+                <div class="flex flex-wrap justify-end gap-3 pt-4 border-t border-gray-200">
+                    <button type="button" onclick="window.history.back()" class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" id="uploadBtn" class="doc-btn-primary flex items-center gap-2 transition-all" {% if not google_drive_connected %}disabled{% endif %}>
+                        <i class="fas fa-upload"></i>
+                        <span id="uploadBtnText">Upload document</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Step 2b: Create with Google pane -->
+        <div id="actionPaneCreate" class="hidden">
+            <p class="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                <i class="fab fa-google-drive text-blue-600"></i>
+                Creates a new file directly inside this case's Google Drive folder, then opens it in a new tab.
+            </p>
+            {% if suggested_doc_title %}
+            <p class="text-xs text-gray-700 mb-4">
+                <span class="font-semibold">Suggested title:</span>
+                <code id="suggested-doc-title" class="ml-1 px-1.5 py-0.5 bg-slate-50 rounded border border-slate-200 text-slate-800">{{ suggested_doc_title }}</code>
+                <button type="button" id="copy-suggested-title-btn" class="ml-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800">Copy</button>
+            </p>
+            {% endif %}
+
+            <div class="mb-4">
+                <label for="create_description" class="doc-label">Description <span class="text-red-500">*</span></label>
+                <input type="text" id="create_description" class="doc-input" placeholder="Max 5 words (e.g. settlement draft notes)" required maxlength="500" autocomplete="off" />
+                <p class="text-xs text-gray-500 mt-1.5">Maximum <span class="font-semibold">5 words</span>. <span id="create-description-word-count" class="text-indigo-600">0 / 5 words</span></p>
             </div>
-            <div>
-                <label for="document_description" class="doc-label">Description <span class="text-red-500">*</span></label>
-                <input type="text" id="document_description" name="document_description" class="doc-input" placeholder="Max 5 words (e.g. client affidavit scan)" required maxlength="500" autocomplete="off" />
-                <p class="text-xs text-gray-500 mt-1.5" id="description-word-hint">Maximum <span class="font-semibold">5 words</span>. <span id="description-word-count" class="text-indigo-600">0 / 5 words</span></p>
+
+            <div class="mb-4">
+                <label for="create_party_id" class="doc-label">Linked Party (optional)</label>
+                <select id="create_party_id" class="doc-input" {% if not parties or parties|length == 0 %}disabled{% endif %}>
+                    <option value="">— Not party-specific —</option>
+                    {% for p in parties or [] %}
+                    <option value="{{ p.id }}"
+                            data-party-type="{{ p.party_type|upper }}"
+                            data-party-name="{{ p.party_name }}">
+                        {{ p.party_type|upper }} — {{ p.party_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if not parties or parties|length == 0 %}
+                <p class="text-xs text-amber-700 mt-1.5">No parties registered yet — file will be created without a party link.</p>
+                {% else %}
+                <p class="text-xs text-gray-500 mt-1.5">If set, the new file is tagged with this party so it appears in their group below.</p>
+                {% endif %}
             </div>
-            <div class="flex flex-wrap justify-end gap-3 pt-4 border-t border-gray-200">
-                <button type="button" onclick="window.history.back()" class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-colors">
-                    Cancel
+
+            <p class="text-sm font-semibold text-slate-700 mb-2">Choose a file type to create:</p>
+            <div class="flex flex-wrap gap-3">
+                <button type="button" data-google-app="doc" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow">
+                    <i class="fas fa-file-word"></i> Google Doc
                 </button>
-                <button type="submit" id="uploadBtn" class="doc-btn-primary flex items-center gap-2 transition-all" {% if not google_drive_connected %}disabled{% endif %}>
-                    <i class="fas fa-upload"></i>
-                    <span id="uploadBtnText">Upload document</span>
+                <button type="button" data-google-app="sheet" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow">
+                    <i class="fas fa-table"></i> Google Sheet
+                </button>
+                <button type="button" data-google-app="slides" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-sm hover:shadow">
+                    <i class="fas fa-file-powerpoint"></i> Google Slides
+                </button>
+                <button type="button" data-google-app="notebook" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm hover:shadow">
+                    <i class="fas fa-book"></i> Google Notebook
                 </button>
             </div>
-        </form>
+        </div>
     </div>
 
-    <!-- Uploaded Documents Section -->
+    <!-- Uploaded Documents Section (grouped per party) -->
     <div class="doc-card doc-list-card p-5 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
             <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <i class="fas fa-folder-open text-amber-600"></i>
-                Documents <span class="text-gray-500 font-normal text-base">({{ documents|length if documents else 0 }})</span>
+                Documents
+                <span class="text-gray-500 font-normal text-base">(<span id="doc-visible-count">{{ documents|length if documents else 0 }}</span>{% if documents %} / {{ documents|length }}{% endif %})</span>
             </h2>
-            <button type="button" onclick="refreshDocuments()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-semibold text-sm transition-colors w-full sm:w-auto justify-center">
-                <i class="fas fa-sync-alt"></i> Refresh
-            </button>
+            <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                {% if document_groups and document_groups|length > 0 %}
+                <div class="flex items-center gap-2">
+                    <label for="party-select" class="text-sm font-semibold text-slate-700">Select Party</label>
+                    <select id="party-select" class="doc-input !py-2 !text-sm" style="min-width: 16rem;">
+                        <option value="__all__">All parties ({{ documents|length }})</option>
+                        {% for group in document_groups %}
+                        <option value="{{ group.key }}">
+                            {% if group.is_unlinked %}— Not party-specific —{% else %}{{ group.party_type|upper }}{% if group.party_name %} — {{ group.party_name }}{% endif %}{% endif %}
+                            ({{ group.documents|length }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <button type="button" onclick="refreshDocuments()" class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-semibold text-sm transition-colors justify-center">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
         </div>
         <div id="documentsList">
-            {% if documents and documents|length > 0 %}
-            <div class="doc-table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Document</th>
-                            <th>Size</th>
-                            <th>Description</th>
-                            <th>Uploaded</th>
-                            <th>Modified</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for doc in documents %}
-                        <tr>
-                            <td>
-                                <div class="flex items-center gap-3">
-                                    {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
-                                    {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
-                                    <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
-                                    {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
-                                    <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
-                                    {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
-                                    <i class="fas fa-file-image text-emerald-600 text-xl flex-shrink-0"></i>
-                                    {% else %}
-                                    <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
-                                    {% endif %}
-                                    <span class="font-medium text-gray-900 truncate max-w-[200px] sm:max-w-none">{{ doc.name }}</span>
-                                </div>
-                            </td>
-                            <td class="text-gray-600">{{ doc.size }}</td>
-                            <td class="text-gray-600 max-w-[260px]">
-                                <span class="block truncate" title="{{ doc.description or '—' }}">{{ doc.description or '—' }}</span>
-                            </td>
-                            <td class="text-gray-600">
-                                <div class="leading-tight">
-                                    <div>{{ doc.created_time or '—' }}</div>
-                                    <div class="text-xs text-slate-500 mt-1">By: {{ doc.uploaded_by or 'Unknown' }}</div>
-                                </div>
-                            </td>
-                            <td class="text-gray-600">
-                                <div class="leading-tight">
-                                    <div>{{ doc.modified_time or '—' }}</div>
-                                    <div class="text-xs text-slate-500 mt-1">By: {{ doc.modified_by or 'Unknown' }}</div>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
-                                    <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-sm" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
-                                    {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
-                                    <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-sm" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
-                                    {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
-                                    <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-sm" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
-                                    {% elif doc.url %}
-                                    <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800 font-semibold text-sm" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
-                                    {% endif %}
-                                    <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
-                                    <button type="button" class="case-doc-delete inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <!-- Mobile: document cards -->
-            <div class="doc-mobile-cards hidden">
-                {% for doc in documents %}
-                {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
-                <div class="doc-mobile-card">
-                    <div class="flex items-start justify-between gap-3">
-                        <div class="flex items-center gap-3 min-w-0 flex-1">
-                            {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
-                            <i class="fas fa-file-pdf text-red-600 text-2xl flex-shrink-0"></i>
-                            {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
-                            <i class="fas fa-file-word text-blue-600 text-2xl flex-shrink-0"></i>
-                            {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
-                            <i class="fas fa-file-image text-emerald-600 text-2xl flex-shrink-0"></i>
-                            {% else %}
-                            <i class="fas fa-file text-slate-500 text-2xl flex-shrink-0"></i>
-                            {% endif %}
-                            <div class="min-w-0">
-                                <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5">Size: {{ doc.size }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5 truncate" title="{{ doc.description or '—' }}">Description: {{ doc.description or '—' }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5">Uploaded: {{ doc.created_time or '—' }} · By: {{ doc.uploaded_by or 'Unknown' }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5">Modified: {{ doc.modified_time or '—' }} · By: {{ doc.modified_by or 'Unknown' }}</p>
+            {% if document_groups and document_groups|length > 0 %}
+            <div class="space-y-3">
+                {% for group in document_groups %}
+                <div class="party-group rounded-xl border border-slate-200 bg-white overflow-hidden"
+                     data-party-key="{{ group.key }}"
+                     data-doc-count="{{ group.documents|length }}">
+                    <button type="button" class="party-group-header party-profile-header w-full flex items-center justify-between gap-3 transition-colors text-left"
+                            aria-expanded="false">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <i class="fas fa-chevron-right text-slate-400 party-group-chevron flex-shrink-0"></i>
+                            {% if group.is_unlinked %}
+                            <div class="party-avatar party-color-slate" aria-hidden="true">
+                                <i class="fas fa-question"></i>
                             </div>
-                        </div>
-                        <div class="flex flex-shrink-0 flex-wrap items-center gap-2">
-                            {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
-                            <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-100"><i class="fas fa-edit text-xs"></i> Edit</a>
-                            {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
-                            <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-100"><i class="fas fa-edit text-xs"></i> Edit</a>
-                            {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
-                            <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-100"><i class="fas fa-edit text-xs"></i> Edit</a>
-                            {% elif doc.url %}
-                            <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                            <div class="min-w-0">
+                                <p class="font-bold text-gray-800 truncate text-[15px] leading-tight">— Not party-specific —</p>
+                                <p class="text-xs text-slate-500 mt-1">Documents not linked to any party</p>
+                            </div>
+                            {% else %}
+                            <div class="party-avatar-ring">
+                                <div class="party-avatar party-color-{{ group.party_color }}" aria-hidden="true">
+                                    {{ group.party_initials }}
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="font-bold text-gray-900 truncate text-[15px] leading-tight">{{ group.party_name or '—' }}</p>
+                                    {% if group.is_orphan %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide" title="Party no longer registered on this case">unlisted</span>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                    {% if group.party_type %}
+                                    <span class="party-type-chip party-color-{{ group.party_color }}">{{ group.party_type|upper }}</span>
+                                    {% endif %}
+                                    {% if group.party_category %}
+                                    <span class="text-[11px] text-slate-500 font-medium">{{ group.party_category }}</span>
+                                    {% endif %}
+                                    {% if group.firm_agent %}
+                                    <span class="party-meta-row"><i class="fas fa-briefcase"></i> {{ group.firm_agent }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if group.party_phone or group.party_email %}
+                                <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                    {% if group.party_phone %}
+                                    <span class="party-meta-row"><i class="fas fa-phone"></i> {{ group.party_phone }}</span>
+                                    {% endif %}
+                                    {% if group.party_email %}
+                                    <span class="party-meta-row truncate max-w-[12rem]" title="{{ group.party_email }}"><i class="fas fa-envelope"></i> {{ group.party_email }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
                             {% endif %}
-                            <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
-                            <button type="button" class="case-doc-delete inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                        </div>
+                        <span class="flex-shrink-0 inline-flex flex-col items-end gap-0.5 text-right">
+                            <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                                <i class="fas fa-folder text-slate-400 text-xs"></i>
+                                {{ group.documents|length }}
+                            </span>
+                            <span class="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold">{{ 'document' if group.documents|length == 1 else 'documents' }}</span>
+                        </span>
+                    </button>
+                    <div class="party-group-body hidden border-t border-slate-200">
+                        <!-- Desktop table -->
+                        <div class="doc-table-wrap !border-0 !rounded-none">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Document</th>
+                                        <th>Size</th>
+                                        <th>Description</th>
+                                        <th>Uploaded</th>
+                                        <th>Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in group.documents %}
+                                    <tr class="doc-row">
+                                        <td>
+                                            <div class="flex items-center gap-3">
+                                                {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
+                                                {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
+                                                <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
+                                                {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
+                                                <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
+                                                {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
+                                                <i class="fas fa-file-image text-emerald-600 text-xl flex-shrink-0"></i>
+                                                {% else %}
+                                                <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
+                                                {% endif %}
+                                                <span class="font-medium text-gray-900 truncate max-w-[200px] sm:max-w-none">{{ doc.name }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-gray-600">{{ doc.size }}</td>
+                                        <td class="text-gray-600 max-w-[260px]">
+                                            <span class="block truncate" title="{{ doc.description or '—' }}">{{ doc.description or '—' }}</span>
+                                        </td>
+                                        <td class="text-gray-600">
+                                            <div class="leading-tight">
+                                                <div>{{ doc.created_time or '—' }}</div>
+                                                <div class="text-xs text-slate-500 mt-1">By: {{ doc.uploaded_by or 'Unknown' }}</div>
+                                            </div>
+                                        </td>
+                                        <td class="text-gray-600">
+                                            <div class="leading-tight">
+                                                <div>{{ doc.modified_time or '—' }}</div>
+                                                <div class="text-xs text-slate-500 mt-1">By: {{ doc.modified_by or 'Unknown' }}</div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
+                                                <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-sm" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
+                                                {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
+                                                <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-sm" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
+                                                {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
+                                                <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold text-sm" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
+                                                {% elif doc.url %}
+                                                <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800 font-semibold text-sm" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                                                {% endif %}
+                                                <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
+                                                <button type="button" class="case-doc-delete inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Mobile cards -->
+                        <div class="doc-mobile-cards hidden p-3">
+                            {% for doc in group.documents %}
+                            {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
+                            <div class="doc-mobile-card doc-row">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                                        {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
+                                        <i class="fas fa-file-pdf text-red-600 text-2xl flex-shrink-0"></i>
+                                        {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
+                                        <i class="fas fa-file-word text-blue-600 text-2xl flex-shrink-0"></i>
+                                        {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
+                                        <i class="fas fa-file-image text-emerald-600 text-2xl flex-shrink-0"></i>
+                                        {% else %}
+                                        <i class="fas fa-file text-slate-500 text-2xl flex-shrink-0"></i>
+                                        {% endif %}
+                                        <div class="min-w-0">
+                                            <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
+                                            <p class="text-xs text-gray-500 mt-0.5">Size: {{ doc.size }}</p>
+                                            <p class="text-xs text-gray-500 mt-0.5 truncate" title="{{ doc.description or '—' }}">Description: {{ doc.description or '—' }}</p>
+                                            <p class="text-xs text-gray-500 mt-0.5">Uploaded: {{ doc.created_time or '—' }} · By: {{ doc.uploaded_by or 'Unknown' }}</p>
+                                            <p class="text-xs text-gray-500 mt-0.5">Modified: {{ doc.modified_time or '—' }} · By: {{ doc.modified_by or 'Unknown' }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-shrink-0 flex-wrap items-center gap-2">
+                                        {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
+                                        <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-100"><i class="fas fa-edit text-xs"></i> Edit</a>
+                                        {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
+                                        <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-100"><i class="fas fa-edit text-xs"></i> Edit</a>
+                                        {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
+                                        <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg font-semibold text-sm hover:bg-blue-100"><i class="fas fa-edit text-xs"></i> Edit</a>
+                                        {% elif doc.url %}
+                                        <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                                        {% endif %}
+                                        <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
+                                        <button type="button" class="case-doc-delete inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -323,23 +613,234 @@ const caseId = {{ case_id }};
 const accessTaskId = {{ access_task_id|tojson if access_task_id else 'null' }};
 const googleDriveConnected = {{ 'true' if google_drive_connected else 'false' }};
 
-(function updateDescriptionWordCount() {
-    const el = document.getElementById('document_description');
-    const countEl = document.getElementById('description-word-count');
+function attachWordCounter(inputId, counterId, limit) {
+    const el = document.getElementById(inputId);
+    const countEl = document.getElementById(counterId);
     if (!el || !countEl) return;
     function sync() {
         const text = (el.value || '').trim();
         const n = text ? text.split(/\s+/).filter(Boolean).length : 0;
-        countEl.textContent = n + ' / 5 words';
-        countEl.className = n > 5 ? 'text-red-600 font-semibold' : 'text-indigo-600';
+        countEl.textContent = n + ' / ' + limit + ' words';
+        countEl.className = n > limit ? 'text-red-600 font-semibold' : 'text-indigo-600';
     }
     el.addEventListener('input', sync);
     sync();
-})();
+}
+attachWordCounter('document_description', 'description-word-count', 5);
+attachWordCounter('create_description', 'create-description-word-count', 5);
 
 function refreshDocuments() {
     window.location.reload();
 }
+
+// "Add a document" action selector — choose Upload vs Create with Google
+(function setupActionSelector() {
+    const selector = document.getElementById('actionSelector');
+    const paneUpload = document.getElementById('actionPaneUpload');
+    const paneCreate = document.getElementById('actionPaneCreate');
+    const switchBtn = document.getElementById('actionSwitchBtn');
+    if (!selector || !paneUpload || !paneCreate || !switchBtn) return;
+
+    function showSelector() {
+        selector.classList.remove('hidden');
+        paneUpload.classList.add('hidden');
+        paneCreate.classList.add('hidden');
+        switchBtn.classList.add('hidden');
+    }
+    function showPane(action) {
+        selector.classList.add('hidden');
+        switchBtn.classList.remove('hidden');
+        if (action === 'upload') {
+            paneUpload.classList.remove('hidden');
+            paneCreate.classList.add('hidden');
+            const fileInput = document.getElementById('document_file');
+            if (fileInput) { try { fileInput.focus(); } catch (e) {} }
+        } else if (action === 'create') {
+            paneCreate.classList.remove('hidden');
+            paneUpload.classList.add('hidden');
+        }
+    }
+
+    selector.querySelectorAll('[data-action]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            if (this.disabled) return;
+            showPane(this.getAttribute('data-action'));
+        });
+    });
+    switchBtn.addEventListener('click', showSelector);
+})();
+
+// Copy the suggested doc title to the clipboard
+(function setupCopySuggestedTitle() {
+    var copyBtn = document.getElementById('copy-suggested-title-btn');
+    if (!copyBtn) return;
+    copyBtn.addEventListener('click', function() {
+        var el = document.getElementById('suggested-doc-title');
+        if (!el) return;
+        var text = (el.textContent || '').trim();
+        var done = function() {
+            var btn = copyBtn;
+            var orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function() { btn.textContent = orig || 'Copy'; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(done);
+        } else {
+            // Fallback for older browsers
+            var ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            done();
+        }
+    });
+})();
+
+// Create a new Google Doc / Sheet / Slides / Notebook in this case's Drive folder
+document.querySelectorAll('.open-google-app').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+        var app = this.getAttribute('data-google-app');
+        if (!app) return;
+
+        // Validate description (same 5-word rule as upload)
+        var descEl = document.getElementById('create_description');
+        var description = (descEl && descEl.value) ? descEl.value.trim() : '';
+        var wordCount = description ? description.split(/\s+/).filter(Boolean).length : 0;
+        if (!description) {
+            alert('Description is required.');
+            if (descEl) descEl.focus();
+            return;
+        }
+        if (wordCount > 5) {
+            alert('Description must be 5 words or fewer.');
+            if (descEl) descEl.focus();
+            return;
+        }
+
+        var originalHtml = this.innerHTML;
+        this.disabled = true;
+        this.classList.add('opacity-70', 'cursor-not-allowed');
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+        try {
+            var payload = { type: app, description: description };
+            if (accessTaskId) { payload.task_id = accessTaskId; }
+
+            var titleEl = document.getElementById('suggested-doc-title');
+            if (titleEl && titleEl.textContent) {
+                payload.name = titleEl.textContent.trim();
+            }
+
+            // Optional party link for the newly created file (verified server-side)
+            var createPartyEl = document.getElementById('create_party_id');
+            if (createPartyEl && createPartyEl.value) {
+                payload.party_id = createPartyEl.value.trim();
+                var opt = createPartyEl.options[createPartyEl.selectedIndex];
+                if (opt) {
+                    payload.party_type = (opt.getAttribute('data-party-type') || '').trim();
+                    payload.party_name = (opt.getAttribute('data-party-name') || '').trim();
+                }
+            }
+
+            var res = await fetch('/api/case/' + caseId + '/create-google-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            var data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to create Google file.');
+            }
+            var openUrl = data.editLink || data.webViewLink;
+            if (openUrl) {
+                window.open(openUrl, '_blank', 'noopener,noreferrer');
+            }
+            if (descEl) descEl.value = '';
+            if (createPartyEl) createPartyEl.value = '';
+            setTimeout(function() { window.location.reload(); }, 600);
+        } catch (err) {
+            console.error(err);
+            alert(err.message || 'Failed to create file in company Google Drive.');
+        } finally {
+            this.disabled = false;
+            this.classList.remove('opacity-70', 'cursor-not-allowed');
+            this.innerHTML = originalHtml;
+        }
+    });
+});
+
+(function setupPartyGroupsAndSelect() {
+    const groups = document.querySelectorAll('.party-group');
+    if (!groups.length) return;
+    const visibleCountEl = document.getElementById('doc-visible-count');
+    const partySelectEl = document.getElementById('party-select');
+
+    function setGroupOpen(group, open) {
+        const body = group.querySelector('.party-group-body');
+        const headerBtn = group.querySelector('.party-group-header');
+        if (!body || !headerBtn) return;
+        if (open) {
+            group.classList.add('open');
+            body.classList.remove('hidden');
+            headerBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            group.classList.remove('open');
+            body.classList.add('hidden');
+            headerBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    // Toggle a group when its header is clicked.
+    groups.forEach(function(group) {
+        const headerBtn = group.querySelector('.party-group-header');
+        if (!headerBtn) return;
+        headerBtn.addEventListener('click', function(e) {
+            // Don't toggle if user clicked on a button/link inside the body
+            if (e.target.closest('.party-group-body')) return;
+            const isOpen = group.classList.contains('open');
+            setGroupOpen(group, !isOpen);
+        });
+    });
+
+    function updateVisibleCount() {
+        let total = 0;
+        groups.forEach(function(g) {
+            if (g.style.display !== 'none') {
+                total += parseInt(g.getAttribute('data-doc-count') || '0', 10) || 0;
+            }
+        });
+        if (visibleCountEl) visibleCountEl.textContent = total;
+    }
+
+    function applyPartySelection() {
+        if (!partySelectEl) return;
+        const selected = partySelectEl.value || '__all__';
+        groups.forEach(function(g) {
+            const key = g.getAttribute('data-party-key');
+            if (selected === '__all__') {
+                g.style.display = '';
+                setGroupOpen(g, false);
+            } else if (key === selected) {
+                g.style.display = '';
+                setGroupOpen(g, true);
+                // Smoothly scroll the selected group into view
+                if (g.scrollIntoView) {
+                    g.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                g.style.display = 'none';
+                setGroupOpen(g, false);
+            }
+        });
+        updateVisibleCount();
+    }
+
+    if (partySelectEl) {
+        partySelectEl.addEventListener('change', applyPartySelection);
+    }
+    updateVisibleCount();
+})();
 
 document.getElementById('documentUploadForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -392,9 +893,23 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     uploadBtn.disabled = true;
     uploadBtnText.textContent = 'Uploading...';
     
+    const partySelectEl = document.getElementById('document_party_id');
+    let partyId = '', partyType = '', partyName = '';
+    if (partySelectEl && partySelectEl.value) {
+        partyId = partySelectEl.value.trim();
+        const opt = partySelectEl.options[partySelectEl.selectedIndex];
+        if (opt) {
+            partyType = (opt.getAttribute('data-party-type') || '').trim();
+            partyName = (opt.getAttribute('data-party-name') || '').trim();
+        }
+    }
+
     const formData = new FormData();
     formData.append('document_file', file);
     formData.append('description', description);
+    formData.append('party_id', partyId);
+    formData.append('party_type', partyType);
+    formData.append('party_name', partyName);
     formData.append('case_id', caseId);
     
     try {
@@ -431,6 +946,7 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
                 uploadBtnText.textContent = 'Upload Document';
                 fileInput.value = '';
                 document.getElementById('document_description').value = '';
+                if (partySelectEl) partySelectEl.value = '';
                 
                 // Reload page to show new document
                 window.location.reload();

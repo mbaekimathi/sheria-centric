@@ -15,13 +15,13 @@
 
     <form action="{{ url_for('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6">
         <!-- 1. Basic Company Information -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-building text-indigo-600 mr-2"></i>
+        <div id="section-1" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-building settings-section-icon"></i>
                     1. Basic Company Information
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Main identity details of the law firm.</p>
+                <p class="settings-section-subtitle">Main identity details of the law firm.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="md:col-span-2">
@@ -55,13 +55,13 @@
         </div>
 
         <!-- 2. Contact Information -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-address-book text-indigo-600 mr-2"></i>
+        <div id="section-2" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-address-book settings-section-icon"></i>
                     2. Contact Information
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Used for communication with clients.</p>
+                <p class="settings-section-subtitle">Used for communication with clients.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -88,13 +88,13 @@
         </div>
 
         <!-- 3. Physical Address -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-map-marker-alt text-indigo-600 mr-2"></i>
+        <div id="section-3" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-map-marker-alt settings-section-icon"></i>
                     3. Physical Address
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Used on invoices, legal letters, and documents.</p>
+                <p class="settings-section-subtitle">Used on invoices, legal letters, and documents.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -129,13 +129,13 @@
         </div>
 
         <!-- 4. Business Hours -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-clock text-indigo-600 mr-2"></i>
+        <div id="section-4" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-clock settings-section-icon"></i>
                     4. Business Hours
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Used for appointment scheduling.</p>
+                <p class="settings-section-subtitle">Used for appointment scheduling.</p>
             </div>
             <div class="p-6 space-y-6">
                 <!-- Regular hours: clock/time pickers -->
@@ -209,13 +209,13 @@
         </script>
 
         <!-- 5. Social Media Links -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-share-alt text-indigo-600 mr-2"></i>
+        <div id="section-5" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-share-alt settings-section-icon"></i>
                     5. Social Media Links
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Optional but useful for visibility.</p>
+                <p class="settings-section-subtitle">Optional but useful for visibility.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="md:col-span-2">
@@ -242,13 +242,13 @@
         </div>
 
         <!-- 6. Legal & Professional Information -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-balance-scale text-indigo-600 mr-2"></i>
+        <div id="section-6" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-balance-scale settings-section-icon"></i>
                     6. Legal & Professional Information
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Important for law firms.</p>
+                <p class="settings-section-subtitle">Important for law firms.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -271,13 +271,13 @@
         </div>
 
         <!-- 7. Document Settings -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-file-alt text-indigo-600 mr-2"></i>
+        <div id="section-7" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-file-alt settings-section-icon"></i>
                     7. Document Settings
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Used when generating legal documents.</p>
+                <p class="settings-section-subtitle">Used when generating legal documents.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -303,13 +303,13 @@
         </div>
 
         <!-- 8. Billing & Finance Settings -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-dollar-sign text-indigo-600 mr-2"></i>
+        <div id="section-8" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-dollar-sign settings-section-icon"></i>
                     8. Billing & Finance Settings
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Used for invoices and payments.</p>
+                <p class="settings-section-subtitle">Used for invoices and payments.</p>
             </div>
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -336,13 +336,13 @@
         </div>
 
         <!-- 9. Notification Settings -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-bell text-indigo-600 mr-2"></i>
+        <div id="section-9" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-bell settings-section-icon"></i>
                     9. Notification Settings
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Controls system communication.</p>
+                <p class="settings-section-subtitle">Controls system communication.</p>
             </div>
             <div class="p-6 space-y-3">
                 <label class="flex items-center gap-3">
@@ -365,50 +365,185 @@
         </div>
 
         <!-- 11. Branding Settings -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-white">
-                <h2 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-palette text-indigo-600 mr-2"></i>
-                    11. Branding Settings
+        <div id="section-11" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-palette settings-section-icon"></i>
+                    11. Branding, Theme &amp; Typography
                 </h2>
-                <p class="text-sm text-gray-500 mt-1">Set your theme colors to personalize header, sidebar, footer, and UI accents.</p>
+                <p class="settings-section-subtitle">Pick a modern, eye-comfortable theme and a font for the entire system. Header, sidebar, buttons, links and active states will update everywhere.</p>
             </div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-6 space-y-8">
+
+                <!-- Theme Presets -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
-                    <div class="flex items-center gap-3">
-                        <input type="color" id="primary_brand_color_picker" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
-                        <input type="text" id="primary_brand_color" name="primary_brand_color" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#1E1A4E" pattern="^#([A-Fa-f0-9]{6})$">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-swatchbook text-indigo-600"></i>
+                                Theme Presets
+                            </h3>
+                            <p class="text-xs text-gray-500">Curated low-glare palettes designed for long reading sessions. Click a card to apply.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: legal teams often prefer Slate Ocean or Forest Calm.</span>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Used for major surfaces and dark brand areas.</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Secondary Color</label>
-                    <div class="flex items-center gap-3">
-                        <input type="color" id="secondary_color_picker" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
-                        <input type="text" id="secondary_color" name="secondary_color" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#6C5CE7" pattern="^#([A-Fa-f0-9]{6})$">
+
+                    <input type="hidden" name="theme_preset" id="theme_preset" value="{{ cs.get('theme_preset') or 'custom' }}">
+
+                    <div id="theme-preset-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        <!-- Cards are populated dynamically by the theme script for consistency -->
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Used for buttons, highlights, links, and active states.</p>
                 </div>
-                <div class="md:col-span-2">
-                    <div class="p-4 rounded-xl border border-gray-200 bg-gray-50">
-                        <p class="text-sm font-semibold text-gray-700 mb-2">Theme Preview</p>
+
+                <!-- Custom Color Pickers (3 colors for a richer modern theme) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
                         <div class="flex items-center gap-3">
-                            <span id="preview-primary" class="inline-block h-8 w-8 rounded-full border border-gray-300"></span>
-                            <span id="preview-secondary" class="inline-block h-8 w-8 rounded-full border border-gray-300"></span>
-                            <span class="text-xs text-gray-500">Preview of selected colors</span>
+                            <input type="color" id="primary_brand_color_picker" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                            <input type="text" id="primary_brand_color" name="primary_brand_color" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#1E1A4E" pattern="^#([A-Fa-f0-9]{6})$">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Deep brand color &ndash; header, sidebar, dark surfaces.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Secondary / Accent Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="secondary_color_picker" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                            <input type="text" id="secondary_color" name="secondary_color" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#6C5CE7" pattern="^#([A-Fa-f0-9]{6})$">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Vibrant accent &ndash; buttons, links, active states.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tertiary / Highlight Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="tertiary_color_picker" value="{{ cs.get('tertiary_color') or '#A29BFE' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                            <input type="text" id="tertiary_color" name="tertiary_color" value="{{ cs.get('tertiary_color') or '#A29BFE' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#A29BFE" pattern="^#([A-Fa-f0-9]{6})$">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Soft highlight &ndash; badges, hover tints, subtle surfaces.</p>
+                    </div>
+                </div>
+
+                <!-- Live Theme Preview -->
+                <div class="rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <p class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <i class="fas fa-eye text-indigo-600"></i>
+                            Live Theme Preview
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <span id="preview-primary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Primary"></span>
+                            <span id="preview-secondary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Accent"></span>
+                            <span id="preview-tertiary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Tertiary"></span>
+                        </div>
+                    </div>
+                    <div id="theme-preview-shell" class="p-4">
+                        <div id="theme-preview-header" class="rounded-t-xl px-4 py-3 flex items-center justify-between text-white">
+                            <div class="flex items-center gap-2">
+                                <span class="h-8 w-8 rounded-lg flex items-center justify-center" id="theme-preview-logo">
+                                    <i class="fas fa-balance-scale"></i>
+                                </span>
+                                <span class="font-bold tracking-wide">SHERIA <span id="theme-preview-accent-text">CENTRIC</span></span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-3 text-xs opacity-90">
+                                <span><i class="far fa-bell"></i></span>
+                                <span><i class="far fa-user-circle"></i></span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-0 border border-gray-200 rounded-b-xl overflow-hidden">
+                            <aside id="theme-preview-sidebar" class="sm:col-span-1 p-3 text-white text-xs space-y-2">
+                                <div class="opacity-80 uppercase tracking-wide text-[10px]">Menu</div>
+                                <div class="flex items-center gap-2 px-2 py-1 rounded-md" id="theme-preview-active"><i class="fas fa-home"></i> Dashboard</div>
+                                <div class="flex items-center gap-2 px-2 py-1 rounded-md opacity-80"><i class="far fa-folder"></i> Matters</div>
+                                <div class="flex items-center gap-2 px-2 py-1 rounded-md opacity-80"><i class="far fa-user"></i> Clients</div>
+                            </aside>
+                            <div class="sm:col-span-3 bg-white p-4 space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span id="theme-preview-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"><i class="fas fa-star text-[10px]"></i> Featured</span>
+                                    <span id="theme-preview-chip" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium">In Progress</span>
+                                </div>
+                                <p id="theme-preview-text" class="text-sm text-gray-700">The quick brown fox jumps over the lazy dog. 1234567890 &ndash; preview of body text in your chosen font.</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" id="theme-preview-btn-primary" class="px-3 py-1.5 rounded-lg text-white text-sm font-medium">Primary Button</button>
+                                    <button type="button" id="theme-preview-btn-outline" class="px-3 py-1.5 rounded-lg text-sm font-medium border bg-white">Secondary</button>
+                                    <button type="button" id="theme-preview-btn-soft" class="px-3 py-1.5 rounded-lg text-sm font-medium">Tertiary</button>
+                                    <a href="#" id="theme-preview-link" class="text-sm font-medium hover:underline">A sample link</a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Typography / Fonts -->
+                {% set saved_font = cs.get('font_family') or 'Inter' %}
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
-                    <input type="file" name="favicon" accept="image/*,.ico" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
-                    {% if cs.get('favicon') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.favicon }}</p>{% endif %}
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-font text-indigo-600"></i>
+                                System Font Presets
+                            </h3>
+                            <p class="text-xs text-gray-500">Curated professional typefaces tuned for long reading. Click a card to apply.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: Inter or DM Sans pair beautifully with any palette.</span>
+                    </div>
+
+                    <input type="hidden" name="font_family" id="font_family" value="{{ saved_font }}">
+
+                    <div id="font-preset-grid" class="space-y-5">
+                        <!-- Grouped font cards are populated dynamically -->
+                    </div>
+
+                    <div class="mt-5">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Live Font Preview</label>
+                        <div id="font-preview" class="rounded-xl border border-gray-200 bg-white p-4 space-y-1">
+                            <p class="text-xs uppercase tracking-wider text-gray-400">Heading</p>
+                            <p class="text-2xl font-bold text-gray-900">SHERIA CENTRIC &mdash; Modern Practice Management</p>
+                            <p class="text-sm text-gray-600">The quick brown fox jumps over the lazy dog. 1234567890 &mdash; abcdefghijklmnopqrstuvwxyz.</p>
+                            <p class="text-xs text-gray-500">Body copy preview at 12px / 14px / 16px sizes.</p>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Text Size Presets -->
+                {% set saved_font_size = cs.get('font_size') or 'comfortable' %}
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Login Page Background</label>
-                    <input type="file" name="login_page_background" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
-                    {% if cs.get('login_page_background') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.login_page_background }}</p>{% endif %}
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-text-height text-indigo-600"></i>
+                                Text Size
+                            </h3>
+                            <p class="text-xs text-gray-500">One global setting that scales every page consistently. Click a card to apply.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: Comfortable suits most users; Large is friendlier for long reading.</span>
+                    </div>
+
+                    <input type="hidden" name="font_size" id="font_size" value="{{ saved_font_size }}">
+
+                    <div id="font-size-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <!-- Cards populated dynamically -->
+                    </div>
+
+                    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4" id="font-size-preview">
+                        <p class="text-xs uppercase tracking-wider text-gray-400 mb-1">Live Size Preview</p>
+                        <p class="text-3xl font-bold text-gray-900" data-fs-role="display">Page heading at this size</p>
+                        <p class="text-base text-gray-700 mt-1" data-fs-role="body">Body text reads at this comfort level. The quick brown fox jumps over the lazy dog. 1234567890.</p>
+                        <p class="text-xs text-gray-500 mt-1" data-fs-role="meta">Small captions, table headers and helper text scale together.</p>
+                    </div>
+                </div>
+
+                <!-- Branding Assets -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
+                        <input type="file" name="favicon" accept="image/*,.ico" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if cs.get('favicon') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.favicon }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Login Page Background</label>
+                        <input type="file" name="login_page_background" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if cs.get('login_page_background') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.login_page_background }}</p>{% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -420,11 +555,33 @@
         </div>
     </form>
 </div>
+<!-- Google fonts (full set used in font preview) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;700&family=Inter:wght@400;500;700&family=Lato:wght@400;700&family=Lora:wght@400;500;700&family=Manrope:wght@400;500;700&family=Merriweather:wght@400;700&family=Nunito:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@400;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <script>
 (function () {
+    // Eye-comfortable 3-color theme presets (primary + accent + tertiary highlight)
+    // All palettes are low-glare and tuned for long reading sessions.
+    const THEME_PRESETS = [
+        { id: 'midnight_indigo',  name: 'Midnight Indigo',  primary: '#1E1A4E', accent: '#6C5CE7', tertiary: '#A29BFE', desc: 'Indigo + violet + lilac' },
+        { id: 'forest_calm',      name: 'Forest Calm',      primary: '#1F3A2E', accent: '#4FAE7D', tertiary: '#C8E6C9', desc: 'Forest + sage + mint' },
+        { id: 'slate_ocean',      name: 'Slate Ocean',      primary: '#0F3D56', accent: '#3B97D3', tertiary: '#A8DADC', desc: 'Slate + ocean + cyan' },
+        { id: 'royal_plum',       name: 'Royal Plum',       primary: '#3B1F4C', accent: '#9B6FB5', tertiary: '#E1BEE7', desc: 'Plum + violet + lavender' },
+        { id: 'charcoal_amber',   name: 'Charcoal Amber',   primary: '#2B2A33', accent: '#E2A24F', tertiary: '#FFE0B2', desc: 'Charcoal + amber + cream' },
+        { id: 'olive_mist',       name: 'Olive Mist',       primary: '#2C3A2A', accent: '#9CB071', tertiary: '#DCEDC8', desc: 'Olive + sage + moss mist' },
+        { id: 'burgundy_rose',    name: 'Burgundy Rose',    primary: '#4B1F2D', accent: '#C97A8E', tertiary: '#F8BBD0', desc: 'Burgundy + rose + blush' },
+        { id: 'mocha_sand',       name: 'Mocha Sand',       primary: '#3A2F2A', accent: '#C9A87C', tertiary: '#F5E6D3', desc: 'Mocha + sand + cream' },
+        { id: 'steel_teal',       name: 'Steel Teal',       primary: '#1F3B47', accent: '#3FB6A8', tertiary: '#B2DFDB', desc: 'Steel + teal + mint' },
+        { id: 'graphite_sky',     name: 'Graphite Sky',     primary: '#23262E', accent: '#7AA7D9', tertiary: '#BBDEFB', desc: 'Graphite + sky + powder' },
+        { id: 'soft_lavender',    name: 'Soft Lavender',    primary: '#3D365C', accent: '#B8A1E3', tertiary: '#E1D5F5', desc: 'Lavender depth + mist' },
+        { id: 'rose_quartz',      name: 'Rose Quartz',      primary: '#3F2E3E', accent: '#E6A4B4', tertiary: '#FCE4EC', desc: 'Mauve + rose + blush' }
+    ];
+
     function normalizeHex(value, fallback) {
         if (!value) return fallback;
-        const hex = value.trim();
+        const hex = String(value).trim();
         const fullHex = /^#([A-Fa-f0-9]{6})$/;
         const shortHex = /^#([A-Fa-f0-9]{3})$/;
         if (fullHex.test(hex)) return hex;
@@ -434,28 +591,527 @@
         return fallback;
     }
 
+    function hexToRgba(hex, alpha) {
+        const h = normalizeHex(hex, '#000000').slice(1);
+        const r = parseInt(h.slice(0, 2), 16);
+        const g = parseInt(h.slice(2, 4), 16);
+        const b = parseInt(h.slice(4, 6), 16);
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
     const primaryText = document.getElementById('primary_brand_color');
     const primaryPicker = document.getElementById('primary_brand_color_picker');
     const secondaryText = document.getElementById('secondary_color');
     const secondaryPicker = document.getElementById('secondary_color_picker');
+    const tertiaryText = document.getElementById('tertiary_color');
+    const tertiaryPicker = document.getElementById('tertiary_color_picker');
     const previewPrimary = document.getElementById('preview-primary');
     const previewSecondary = document.getElementById('preview-secondary');
-    if (!primaryText || !primaryPicker || !secondaryText || !secondaryPicker) return;
+    const previewTertiary = document.getElementById('preview-tertiary');
+    const themePresetInput = document.getElementById('theme_preset');
+    const themeGrid = document.getElementById('theme-preset-grid');
+
+    const previewHeader = document.getElementById('theme-preview-header');
+    const previewSidebar = document.getElementById('theme-preview-sidebar');
+    const previewBtnPrimary = document.getElementById('theme-preview-btn-primary');
+    const previewBtnOutline = document.getElementById('theme-preview-btn-outline');
+    const previewBtnSoft = document.getElementById('theme-preview-btn-soft');
+    const previewLink = document.getElementById('theme-preview-link');
+    const previewLogo = document.getElementById('theme-preview-logo');
+    const previewAccentText = document.getElementById('theme-preview-accent-text');
+    const previewActive = document.getElementById('theme-preview-active');
+    const previewText = document.getElementById('theme-preview-text');
+    const previewBadge = document.getElementById('theme-preview-badge');
+    const previewChip = document.getElementById('theme-preview-chip');
+
+    const fontSelect = document.getElementById('font_family');
+    const fontPreview = document.getElementById('font-preview');
+    const themePreviewShell = document.getElementById('theme-preview-shell');
+
+    if (!primaryText || !primaryPicker || !secondaryText || !secondaryPicker || !tertiaryText || !tertiaryPicker) return;
+
+    // Pick black or white for legible text on a given hex background
+    function contrastColor(hex) {
+        const h = normalizeHex(hex, '#000000').slice(1);
+        const r = parseInt(h.slice(0, 2), 16);
+        const g = parseInt(h.slice(2, 4), 16);
+        const b = parseInt(h.slice(4, 6), 16);
+        // Relative luminance (sRGB)
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return lum > 0.6 ? '#1f2937' : '#ffffff';
+    }
+
+    // Build theme preset cards — each card shows all 3 palette colors as stripes
+    function renderThemeCards() {
+        if (!themeGrid) return;
+        const html = THEME_PRESETS.map(function (t) {
+            const swatch = ''
+                + '<div class="h-14 w-full flex overflow-hidden">'
+                +     '<div class="flex-1 flex items-center justify-center" style="background:' + t.primary + ';">'
+                +         '<span class="text-[10px] font-semibold tracking-wider text-white/90">Aa</span>'
+                +     '</div>'
+                +     '<div class="flex-1" style="background:' + t.accent + ';"></div>'
+                +     '<div class="flex-1" style="background:' + t.tertiary + ';"></div>'
+                + '</div>';
+            return ''
+                + '<button type="button" data-preset="' + t.id + '" data-primary="' + t.primary + '" data-accent="' + t.accent + '" data-tertiary="' + t.tertiary + '" '
+                + 'class="theme-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+                + swatch
+                + '<div class="p-2.5">'
+                +     '<div class="flex items-center justify-between">'
+                +         '<p class="text-xs font-semibold text-gray-900 truncate">' + t.name + '</p>'
+                +         '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px]"><i class="fas fa-check"></i></span>'
+                +     '</div>'
+                +     '<p class="text-[10px] text-gray-500 truncate">' + t.desc + '</p>'
+                + '</div>'
+                + '</button>';
+        }).join('');
+        themeGrid.innerHTML = html
+            + '<button type="button" data-preset="custom" class="theme-card group relative text-left rounded-xl border border-dashed border-gray-300 bg-gray-50 hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+            +     '<div class="h-14 w-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-white text-gray-400">'
+            +         '<i class="fas fa-paint-brush"></i>'
+            +     '</div>'
+            +     '<div class="p-2.5">'
+            +         '<p class="text-xs font-semibold text-gray-900">Custom</p>'
+            +         '<p class="text-[10px] text-gray-500 truncate">Pick your own 3 colors</p>'
+            +     '</div>'
+            + '</button>';
+
+        themeGrid.querySelectorAll('.theme-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                const preset = card.getAttribute('data-preset');
+                const p = card.getAttribute('data-primary');
+                const a = card.getAttribute('data-accent');
+                const ter = card.getAttribute('data-tertiary');
+                themePresetInput.value = preset;
+                if (preset !== 'custom' && p && a && ter) {
+                    primaryText.value = p;
+                    secondaryText.value = a;
+                    tertiaryText.value = ter;
+                    primaryPicker.value = p;
+                    secondaryPicker.value = a;
+                    tertiaryPicker.value = ter;
+                }
+                updateActiveCard();
+                syncAndPreview();
+            });
+        });
+    }
+
+    function updateActiveCard() {
+        if (!themeGrid) return;
+        const current = themePresetInput.value || 'custom';
+        themeGrid.querySelectorAll('.theme-card').forEach(function (card) {
+            const isActive = card.getAttribute('data-preset') === current;
+            card.classList.toggle('is-active', isActive);
+            card.classList.toggle('ring-2', isActive);
+            card.classList.toggle('ring-indigo-500', isActive);
+            card.classList.toggle('border-indigo-500', isActive);
+        });
+    }
+
+    function detectPresetFromColors(p, a, ter) {
+        const pl = p.toLowerCase();
+        const al = a.toLowerCase();
+        const tl = (ter || '').toLowerCase();
+        const match = THEME_PRESETS.find(function (t) {
+            return t.primary.toLowerCase() === pl
+                && t.accent.toLowerCase() === al
+                && t.tertiary.toLowerCase() === tl;
+        });
+        return match ? match.id : 'custom';
+    }
 
     function syncAndPreview() {
         const p = normalizeHex(primaryText.value, '#1E1A4E');
         const s = normalizeHex(secondaryText.value, '#6C5CE7');
+        const ter = normalizeHex(tertiaryText.value, '#A29BFE');
         primaryPicker.value = p;
         secondaryPicker.value = s;
-        previewPrimary.style.backgroundColor = p;
-        previewSecondary.style.backgroundColor = s;
+        tertiaryPicker.value = ter;
+        if (previewPrimary) previewPrimary.style.backgroundColor = p;
+        if (previewSecondary) previewSecondary.style.backgroundColor = s;
+        if (previewTertiary) previewTertiary.style.backgroundColor = ter;
+
+        const terText = contrastColor(ter);
+
+        // Live theme preview pieces — header now subtly blends all 3 colors
+        if (previewHeader) previewHeader.style.background = 'linear-gradient(135deg, ' + p + ' 0%, ' + p + ' 55%, ' + s + ' 95%, ' + ter + ' 140%)';
+        if (previewSidebar) previewSidebar.style.background = p;
+        if (previewLogo) previewLogo.style.background = s;
+        if (previewAccentText) previewAccentText.style.color = s;
+        if (previewActive) {
+            previewActive.style.background = hexToRgba(ter, 0.85);
+            previewActive.style.color = terText;
+        }
+        if (previewBtnPrimary) previewBtnPrimary.style.background = s;
+        if (previewBtnOutline) { previewBtnOutline.style.borderColor = s; previewBtnOutline.style.color = s; }
+        if (previewBtnSoft) {
+            previewBtnSoft.style.background = ter;
+            previewBtnSoft.style.color = terText;
+            previewBtnSoft.style.borderColor = 'transparent';
+        }
+        if (previewLink) previewLink.style.color = s;
+        if (previewBadge) {
+            previewBadge.style.background = ter;
+            previewBadge.style.color = terText;
+        }
+        if (previewChip) {
+            previewChip.style.background = hexToRgba(s, 0.14);
+            previewChip.style.color = s;
+            previewChip.style.border = '1px solid ' + hexToRgba(s, 0.35);
+        }
+
+        // If user manually changes colors, reflect a matching preset (or "custom")
+        if (themePresetInput && themeGrid) {
+            const detected = detectPresetFromColors(p, s, ter);
+            if (themePresetInput.value !== detected) {
+                themePresetInput.value = detected;
+                updateActiveCard();
+            }
+        }
+    }
+
+    function applyFontPreview() {
+        if (!fontSelect) return;
+        const f = fontSelect.value || 'Inter';
+        const isSerif = SERIF_FONTS.has(f);
+        const stack = "'" + f + "', " + (isSerif
+            ? "Georgia, 'Times New Roman', serif"
+            : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+        if (fontPreview) fontPreview.style.fontFamily = stack;
+        if (themePreviewShell) themePreviewShell.style.fontFamily = stack;
+    }
+
+    // ----- Modern, professionally curated font presets -----
+    const SERIF_FONTS = new Set(['Merriweather', 'Lora', 'Source Serif 4']);
+    const FONT_PRESETS = [
+        // Modern Sans-Serif — clean, neutral workhorses
+        { id: 'Inter',             name: 'Inter',             desc: 'Neutral, highly legible (default)', category: 'Modern Sans-Serif' },
+        { id: 'Roboto',            name: 'Roboto',            desc: 'Friendly Google classic',           category: 'Modern Sans-Serif' },
+        { id: 'Open Sans',         name: 'Open Sans',         desc: 'Approachable everywhere',           category: 'Modern Sans-Serif' },
+        { id: 'Lato',              name: 'Lato',              desc: 'Warm and humanist',                 category: 'Modern Sans-Serif' },
+        { id: 'Source Sans 3',     name: 'Source Sans 3',     desc: "Adobe's UI staple",                 category: 'Modern Sans-Serif' },
+        { id: 'Nunito',            name: 'Nunito',            desc: 'Soft, rounded edges',               category: 'Modern Sans-Serif' },
+        // Geometric & Editorial — modern, distinctive sans-serif
+        { id: 'Poppins',           name: 'Poppins',           desc: 'Geometric & cheerful',              category: 'Geometric & Editorial' },
+        { id: 'Plus Jakarta Sans', name: 'Plus Jakarta Sans', desc: 'Modern & confident',                category: 'Geometric & Editorial' },
+        { id: 'DM Sans',           name: 'DM Sans',           desc: 'Crisp low-contrast',                category: 'Geometric & Editorial' },
+        { id: 'Manrope',           name: 'Manrope',           desc: 'Balanced & open',                   category: 'Geometric & Editorial' },
+        { id: 'IBM Plex Sans',     name: 'IBM Plex Sans',     desc: 'Engineered character',              category: 'Geometric & Editorial' },
+        { id: 'Work Sans',         name: 'Work Sans',         desc: 'Friendly & versatile',              category: 'Geometric & Editorial' },
+        // Professional Serif — editorial feel, ideal for legal documents
+        { id: 'Merriweather',      name: 'Merriweather',      desc: 'Reading-optimised serif',           category: 'Professional Serif' },
+        { id: 'Lora',              name: 'Lora',              desc: 'Elegant editorial serif',           category: 'Professional Serif' },
+        { id: 'Source Serif 4',    name: 'Source Serif 4',    desc: 'Refined & timeless',                category: 'Professional Serif' }
+    ];
+
+    const fontGrid = document.getElementById('font-preset-grid');
+
+    function renderFontCards() {
+        if (!fontGrid) return;
+        // Group by category, preserving order from FONT_PRESETS
+        const groups = [];
+        const groupMap = new Map();
+        FONT_PRESETS.forEach(function (f) {
+            if (!groupMap.has(f.category)) {
+                const g = { name: f.category, items: [] };
+                groupMap.set(f.category, g);
+                groups.push(g);
+            }
+            groupMap.get(f.category).items.push(f);
+        });
+
+        const html = groups.map(function (g) {
+            const cards = g.items.map(function (f) {
+                const stack = "'" + f.id + "', " + (SERIF_FONTS.has(f.id)
+                    ? "Georgia, 'Times New Roman', serif"
+                    : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+                return ''
+                    + '<button type="button" data-font="' + f.id + '" '
+                    + 'class="font-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+                    +     '<div class="h-16 w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-white border-b border-gray-100" style="font-family:' + stack + ';">'
+                    +         '<span class="text-3xl font-semibold text-gray-900 leading-none">Aa</span>'
+                    +     '</div>'
+                    +     '<div class="p-2.5">'
+                    +         '<div class="flex items-center justify-between gap-2">'
+                    +             '<p class="text-xs font-semibold text-gray-900 truncate" style="font-family:' + stack + ';">' + f.name + '</p>'
+                    +             '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
+                    +         '</div>'
+                    +         '<p class="text-[10px] text-gray-500 truncate">' + f.desc + '</p>'
+                    +     '</div>'
+                    + '</button>';
+            }).join('');
+            return ''
+                + '<div>'
+                +     '<div class="flex items-center gap-2 mb-2">'
+                +         '<span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">' + g.name + '</span>'
+                +         '<span class="flex-1 h-px bg-gray-200"></span>'
+                +     '</div>'
+                +     '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">' + cards + '</div>'
+                + '</div>';
+        }).join('');
+
+        fontGrid.innerHTML = html;
+
+        fontGrid.querySelectorAll('.font-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                const f = card.getAttribute('data-font');
+                if (!f) return;
+                fontSelect.value = f;
+                updateActiveFontCard();
+                applyFontPreview();
+            });
+        });
+    }
+
+    function updateActiveFontCard() {
+        if (!fontGrid) return;
+        const current = (fontSelect && fontSelect.value) || 'Inter';
+        fontGrid.querySelectorAll('.font-card').forEach(function (card) {
+            const isActive = card.getAttribute('data-font') === current;
+            card.classList.toggle('is-active', isActive);
+            card.classList.toggle('ring-2', isActive);
+            card.classList.toggle('ring-indigo-500', isActive);
+            card.classList.toggle('border-indigo-500', isActive);
+        });
+    }
+
+    // ----- Text Size presets (consistent global scale) -----
+    // Numbers here MUST match the server-side allowlist in app.py and the
+    // {% raw %}{{ allowed_font_sizes }}{% endraw %} map in base.html.
+    const FONT_SIZE_PRESETS = [
+        { id: 'compact',     name: 'Compact',     px: '14px', desc: 'Dense — fits more on screen', sample: 14 },
+        { id: 'comfortable', name: 'Comfortable', px: '16px', desc: 'Balanced default',            sample: 16 },
+        { id: 'large',       name: 'Large',       px: '17px', desc: 'Easier for long reading',     sample: 17 },
+        { id: 'xl',          name: 'X-Large',     px: '18px', desc: 'Maximum readability',         sample: 18 }
+    ];
+
+    const fontSizeInput = document.getElementById('font_size');
+    const fontSizeGrid  = document.getElementById('font-size-grid');
+    const fontSizePreview = document.getElementById('font-size-preview');
+
+    function renderFontSizeCards() {
+        if (!fontSizeGrid) return;
+        const html = FONT_SIZE_PRESETS.map(function (s) {
+            return ''
+                + '<button type="button" data-size="' + s.id + '" '
+                + 'class="size-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+                +     '<div class="h-16 w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">'
+                +         '<span class="font-semibold text-gray-900 leading-none" style="font-size:' + (s.sample + 6) + 'px;">Aa</span>'
+                +         '<span class="ml-2 text-[10px] text-gray-500">' + s.px + '</span>'
+                +     '</div>'
+                +     '<div class="p-2.5">'
+                +         '<div class="flex items-center justify-between gap-2">'
+                +             '<p class="text-xs font-semibold text-gray-900 truncate">' + s.name + '</p>'
+                +             '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
+                +         '</div>'
+                +         '<p class="text-[10px] text-gray-500 truncate">' + s.desc + '</p>'
+                +     '</div>'
+                + '</button>';
+        }).join('');
+        fontSizeGrid.innerHTML = html;
+        fontSizeGrid.querySelectorAll('.size-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                const id = card.getAttribute('data-size');
+                if (!id) return;
+                fontSizeInput.value = id;
+                updateActiveFontSizeCard();
+                applyFontSizePreview();
+            });
+        });
+    }
+
+    function updateActiveFontSizeCard() {
+        if (!fontSizeGrid) return;
+        const current = (fontSizeInput && fontSizeInput.value) || 'comfortable';
+        fontSizeGrid.querySelectorAll('.size-card').forEach(function (card) {
+            const isActive = card.getAttribute('data-size') === current;
+            card.classList.toggle('is-active', isActive);
+            card.classList.toggle('ring-2', isActive);
+            card.classList.toggle('ring-indigo-500', isActive);
+            card.classList.toggle('border-indigo-500', isActive);
+        });
+    }
+
+    function applyFontSizePreview() {
+        if (!fontSizePreview || !fontSizeInput) return;
+        const id = fontSizeInput.value || 'comfortable';
+        const map = { compact: 14, comfortable: 16, large: 17, xl: 18 };
+        const base = map[id] || 16;
+        // Scale the live preview block as if html font-size were `base`px.
+        // Tailwind's text-3xl/base/xs are 1.875rem/1rem/0.75rem respectively.
+        const set = function (role, rem) {
+            const el = fontSizePreview.querySelector('[data-fs-role="' + role + '"]');
+            if (el) el.style.fontSize = (base * rem) + 'px';
+        };
+        set('display', 1.875);
+        set('body',    1.0);
+        set('meta',    0.75);
     }
 
     primaryPicker.addEventListener('input', function () { primaryText.value = primaryPicker.value; syncAndPreview(); });
     secondaryPicker.addEventListener('input', function () { secondaryText.value = secondaryPicker.value; syncAndPreview(); });
+    tertiaryPicker.addEventListener('input', function () { tertiaryText.value = tertiaryPicker.value; syncAndPreview(); });
     primaryText.addEventListener('input', syncAndPreview);
     secondaryText.addEventListener('input', syncAndPreview);
+    tertiaryText.addEventListener('input', syncAndPreview);
+
+    renderThemeCards();
+    updateActiveCard();
     syncAndPreview();
+    renderFontCards();
+    updateActiveFontCard();
+    applyFontPreview();
+    renderFontSizeCards();
+    updateActiveFontSizeCard();
+    applyFontSizePreview();
+})();
+</script>
+
+<!-- ----- Sidebar Table-of-Contents: smooth scroll + active highlight ----- -->
+<style>
+    /* Reserve room beneath any sticky header so anchor jumps don't hide titles */
+    html { scroll-behavior: smooth; }
+    .settings-section { scroll-margin-top: 96px; }
+
+    /* Themed section header — stays readable on ANY selected system theme.
+       Uses brand-primary as the background and the light brand-tertiary for
+       the icon, with white text for the title and translucent white for the
+       subtitle so contrast is preserved across every preset palette. */
+    .settings-section-header {
+        padding: 1rem 1.5rem;
+        background: linear-gradient(
+            135deg,
+            var(--brand-primary) 0%,
+            var(--brand-primary) 65%,
+            color-mix(in srgb, var(--brand-primary) 78%, var(--brand-accent)) 100%
+        );
+        border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+        color: #ffffff;
+    }
+    .settings-section-header .settings-section-title {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        font-size: 1.125rem;
+        line-height: 1.5;
+        font-weight: 700;
+        color: #ffffff !important;
+    }
+    .settings-section-header .settings-section-icon {
+        margin-right: 0.5rem;
+        color: var(--brand-tertiary, #A29BFE) !important;
+    }
+    .settings-section-header .settings-section-subtitle {
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        color: rgba(255, 255, 255, 0.78) !important;
+    }
+
+    /* Indented sub-link styling for the in-page TOC */
+    .sidebar-link-sub {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        opacity: 0.85;
+        border-left: 2px solid transparent;
+        border-radius: 0 8px 8px 0;
+    }
+    .sidebar-link-sub:hover {
+        opacity: 1;
+        background: var(--brand-accent-soft, #f3f2ff) !important;
+    }
+    .sidebar-link-sub.is-current {
+        opacity: 1;
+        font-weight: 600;
+        color: var(--brand-accent, #6C5CE7) !important;
+        background: var(--brand-accent-soft, #f3f2ff) !important;
+        border-left-color: var(--brand-accent, #6C5CE7);
+    }
+    .sidebar-link-sub.is-current i { color: var(--brand-accent, #6C5CE7) !important; }
+    /* Brief flash when a section receives focus from a TOC click */
+    @keyframes section-flash {
+        0%   { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0.45); }
+        70%  { box-shadow: 0 0 0 8px rgba(108, 92, 231, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(108, 92, 231, 0); }
+    }
+    .settings-section.flash { animation: section-flash 1s ease-out 1; }
+</style>
+
+<script>
+(function () {
+    const toc = document.getElementById('system-settings-toc');
+    if (!toc) return;
+    const links = Array.from(toc.querySelectorAll('a[data-toc]'));
+    if (!links.length) return;
+
+    function setActive(id) {
+        links.forEach(function (a) {
+            a.classList.toggle('is-current', a.getAttribute('data-toc') === id);
+        });
+    }
+
+    // 1) Click handler — smooth scroll + flash the target and sync the hash
+    links.forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            const id = a.getAttribute('data-toc');
+            const target = document.getElementById(id);
+            if (!target) return; // let the browser fall back
+            e.preventDefault();
+            history.replaceState(null, '', '#' + id);
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            target.classList.remove('flash');
+            // Re-trigger animation
+            void target.offsetWidth;
+            target.classList.add('flash');
+            setActive(id);
+        });
+    });
+
+    // 2) Scroll-spy — keep TOC highlight in sync as the user scrolls
+    const sections = links
+        .map(function (a) { return document.getElementById(a.getAttribute('data-toc')); })
+        .filter(Boolean);
+
+    if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(function (entries) {
+            // Pick the entry closest to the top that is intersecting
+            const visible = entries
+                .filter(function (en) { return en.isIntersecting; })
+                .sort(function (a, b) { return a.boundingClientRect.top - b.boundingClientRect.top; });
+            if (visible[0] && visible[0].target && visible[0].target.id) {
+                setActive(visible[0].target.id);
+            }
+        }, {
+            // Trigger when a section's top crosses ~25% from the viewport top
+            rootMargin: '-25% 0px -65% 0px',
+            threshold: 0
+        });
+        sections.forEach(function (s) { obs.observe(s); });
+    }
+
+    // 3) Honour initial hash on page load (e.g. /system_settings#section-11)
+    function applyInitialHash() {
+        const hash = (window.location.hash || '').replace('#', '');
+        if (!hash) {
+            setActive('section-1');
+            return;
+        }
+        const target = document.getElementById(hash);
+        if (target) {
+            setActive(hash);
+            // Defer to allow layout (header, fonts) to settle
+            setTimeout(function () {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 60);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyInitialHash);
+    } else {
+        applyInitialHash();
+    }
 })();
 </script>
 {% endblock %}

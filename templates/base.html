@@ -7,20 +7,34 @@
     {% set cs = company_settings if company_settings is defined and company_settings else {} %}
     {% set theme_primary = cs.get('primary_brand_color') or '#1E1A4E' %}
     {% set theme_accent = cs.get('secondary_color') or '#6C5CE7' %}
+    {% set theme_tertiary = cs.get('tertiary_color') or '#A29BFE' %}
+    {% set allowed_fonts = ['Inter','Roboto','Open Sans','Lato','Poppins','Source Sans 3','Nunito','Plus Jakarta Sans','DM Sans','Manrope','IBM Plex Sans','Work Sans','Merriweather','Lora','Source Serif 4'] %}
+    {% set saved_font = cs.get('font_family') %}
+    {% set theme_font = saved_font if saved_font in allowed_fonts else 'Inter' %}
+    {% set font_param = theme_font.replace(' ', '+') %}
+    {# Global text size scale. Tailwind's text-* utilities use rem, so changing
+       the html base font-size scales the WHOLE system consistently. #}
+    {% set allowed_font_sizes = {'compact': '14px', 'comfortable': '16px', 'large': '17px', 'xl': '18px'} %}
+    {% set saved_font_size = cs.get('font_size') %}
+    {% set app_base_font_size = allowed_font_sizes.get(saved_font_size, '16px') %}
     {# PWA: manifest, icons, theme-color, service worker registration. #}
     {% include "_pwa_head.html" %}
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family={{ font_param }}:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --app-font-family: '{{ theme_font }}', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: var(--app-font-family);
         }
         :root {
             --brand-primary: {{ theme_primary }};
             --brand-accent: {{ theme_accent }};
+            --brand-tertiary: {{ theme_tertiary }};
             --app-footer-height: 74px;
             --brand-primary-soft: #f5f6fb;
             --brand-primary-border: #d6d9e6;
@@ -29,7 +43,59 @@
             --brand-accent-soft: #f3f2ff;
             --brand-accent-border: #cfc9ff;
             --brand-accent-glow: rgba(108, 92, 231, 0.28);
+            --brand-tertiary-soft: color-mix(in srgb, {{ theme_tertiary }} 18%, white);
+            --brand-tertiary-border: color-mix(in srgb, {{ theme_tertiary }} 45%, white);
+            /* Global typographic scale (drives every page consistently) */
+            --app-base-font-size: {{ app_base_font_size }};
+            --text-2xs: 0.6875rem;   /* ~11px @ 16 */
+            --text-xs:  0.75rem;     /* ~12px */
+            --text-sm:  0.875rem;    /* ~14px */
+            --text-base:1rem;        /* ~16px */
+            --text-lg:  1.125rem;    /* ~18px */
+            --text-xl:  1.25rem;     /* ~20px */
+            --text-2xl: 1.5rem;      /* ~24px */
+            --text-3xl: 1.875rem;    /* ~30px */
+            --text-4xl: 2.25rem;     /* ~36px */
+            --leading-tight:  1.25;
+            --leading-snug:   1.375;
+            --leading-normal: 1.55;
+            --leading-relaxed:1.7;
         }
+        /* ----- Global typography normalisation (applies to ALL pages) -----
+           Drives the rem-based Tailwind scale from one variable so every page
+           lines up visually. Restores h1-h6 default sizes that Tailwind's
+           preflight strips out, and standardises form-control text size. */
+        html {
+            font-size: var(--app-base-font-size);
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+        body {
+            font-size: var(--text-base);
+            line-height: var(--leading-normal);
+            color: #1f2937;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Restore consistent heading hierarchy regardless of page markup */
+        h1 { font-size: var(--text-3xl); line-height: var(--leading-tight); font-weight: 700; }
+        h2 { font-size: var(--text-2xl); line-height: var(--leading-tight); font-weight: 700; }
+        h3 { font-size: var(--text-xl);  line-height: var(--leading-snug);  font-weight: 600; }
+        h4 { font-size: var(--text-lg);  line-height: var(--leading-snug);  font-weight: 600; }
+        h5 { font-size: var(--text-base);line-height: var(--leading-snug);  font-weight: 600; }
+        h6 { font-size: var(--text-sm);  line-height: var(--leading-snug);  font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: #6b7280; }
+        p, li, dd, dt, blockquote { line-height: var(--leading-normal); }
+        small, .text-fine { font-size: var(--text-xs); }
+        /* Standardise form controls + buttons across every page */
+        input, select, textarea, button {
+            font-size: var(--text-sm);
+            line-height: var(--leading-snug);
+        }
+        input[type="file"]::file-selector-button { font-size: var(--text-sm); }
+        label { font-size: var(--text-sm); }
+        table { font-size: var(--text-sm); }
+        th { font-size: var(--text-xs); letter-spacing: 0.04em; text-transform: uppercase; color: #6b7280; }
+        code, kbd, samp, pre { font-size: var(--text-sm); }
         html, body {
             height: 100%;
             overflow-x: hidden;
@@ -889,40 +955,245 @@
         </div>
     </header>
 
+    <!-- Google Drive reconnect banner: appears for IT/Admin/Managing Partner
+         when the saved Drive credentials were revoked or expired (e.g. the
+         typical 7-day refresh-token expiry while the OAuth consent screen
+         is in Testing mode). Dismissible for the rest of the session. -->
+    {% if drive_reconnect_notice %}
+    <div id="drive-reconnect-banner" class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-10">
+        <div class="rounded-2xl border border-amber-300/70 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 shadow-md p-4 sm:p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div class="flex items-start gap-3">
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 border border-amber-200 text-amber-700 flex-shrink-0">
+                        <i class="fab fa-google-drive text-lg"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm sm:text-base font-bold text-amber-900 flex items-center gap-2">
+                            <i class="fas fa-triangle-exclamation"></i>
+                            Reconnect Google Drive
+                        </p>
+                        <p class="text-xs sm:text-sm text-amber-800 mt-0.5 leading-relaxed">
+                            {% if drive_reconnect_notice.email %}
+                            The link to <span class="font-semibold">{{ drive_reconnect_notice.email }}</span> was revoked or expired.
+                            {% else %}
+                            Your Google Drive credentials were revoked or expired.
+                            {% endif %}
+                            Document uploads and folder creation will fail until you reconnect.
+                        </p>
+                        {% if drive_reconnect_notice.reason %}
+                        <p class="text-[11px] text-amber-700/80 mt-1 italic">{{ drive_reconnect_notice.reason }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="{{ drive_reconnect_settings_url or '/documents_settings' }}"
+                       class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold shadow-sm transition-colors inline-flex items-center gap-2">
+                        <i class="fas fa-plug"></i> Reconnect now
+                    </a>
+                    <button type="button"
+                            onclick="dismissDriveReconnectBanner()"
+                            class="px-3 py-2 rounded-lg bg-white border border-amber-200 hover:bg-amber-100 text-amber-900 text-sm font-medium transition-colors"
+                            aria-label="Dismiss for this session">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        function dismissDriveReconnectBanner() {
+            var el = document.getElementById('drive-reconnect-banner');
+            if (el) {
+                el.style.transition = 'opacity 0.25s ease';
+                el.style.opacity = '0';
+                setTimeout(function () { el.remove(); }, 250);
+            }
+            fetch('/api/auth/google-drive/dismiss-notice', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' }
+            }).catch(function () { /* best-effort */ });
+        }
+    </script>
+    {% endif %}
+
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% set flash_ns = namespace(approval_popups=[]) %}
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8 mt-4 relative z-10">
+        <div id="toast-container" class="fixed top-4 right-4 z-[300] flex flex-col gap-2 w-[calc(100%-2rem)] sm:w-auto sm:max-w-sm pointer-events-none" aria-live="polite" aria-atomic="true">
             {% for category, message in messages %}
             {% if not (category == 'error' and 'permission' in message|lower) %}
             {% set is_approval_popup = 'undergoing approval' in message|lower or 'pending approval' in message|lower %}
             {% if is_approval_popup %}
             {% set flash_ns.approval_popups = flash_ns.approval_popups + [[category, message]] %}
             {% else %}
-            <div class="mb-3 p-4 rounded-xl border-l-4 shadow-lg glass-effect animate-slide-in {% if category == 'error' %}border-red-500 text-red-800{% elif category == 'success' %}border-green-500 text-green-800{% elif category == 'warning' %}border-yellow-500 text-yellow-800{% else %}border-blue-500 text-blue-800{% endif %}">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        {% if category == 'error' %}
-                        <i class="fas fa-exclamation-circle mr-3 text-red-600 text-lg icon-bounce"></i>
-                        {% elif category == 'success' %}
-                        <i class="fas fa-check-circle mr-3 text-green-600 text-lg icon-bounce"></i>
-                        {% elif category == 'warning' %}
-                        <i class="fas fa-exclamation-triangle mr-3 text-yellow-600 text-lg icon-bounce"></i>
-                        {% else %}
-                        <i class="fas fa-info-circle mr-3 text-blue-600 text-lg icon-bounce"></i>
-                        {% endif %}
-                        <span class="text-sm font-medium">{{ message }}</span>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.style.transition='opacity 0.3s'; this.parentElement.parentElement.style.opacity='0'; setTimeout(() => this.parentElement.parentElement.remove(), 300)" class="ml-4 text-gray-400 hover:text-gray-600 transition-colors hover:scale-110">
-                        <i class="fas fa-times text-sm"></i>
-                    </button>
+            <div class="toast toast-{{ category }} pointer-events-auto" role="alert" data-duration="4500">
+                <div class="toast-icon">
+                    {% if category == 'error' %}
+                    <i class="fas fa-exclamation-circle"></i>
+                    {% elif category == 'success' %}
+                    <i class="fas fa-check"></i>
+                    {% elif category == 'warning' %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                    {% else %}
+                    <i class="fas fa-info-circle"></i>
+                    {% endif %}
                 </div>
+                <div class="toast-body">
+                    <p class="toast-title">
+                        {% if category == 'error' %}Error{% elif category == 'success' %}Success{% elif category == 'warning' %}Warning{% else %}Notice{% endif %}
+                    </p>
+                    <p class="toast-message">{{ message }}</p>
+                </div>
+                <button type="button" class="toast-close" aria-label="Dismiss notification">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="toast-progress"></div>
             </div>
             {% endif %}
             {% endif %}
             {% endfor %}
         </div>
+        <style>
+            #toast-container {
+                font-family: var(--app-font-family);
+            }
+            .toast {
+                position: relative;
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                padding: 12px 36px 12px 14px;
+                background: #ffffff;
+                border: 1px solid #e5e7eb;
+                border-left: 4px solid #9ca3af;
+                border-radius: 12px;
+                box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.18), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+                overflow: hidden;
+                transform: translateX(120%);
+                opacity: 0;
+                animation: toast-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+                min-width: 0;
+            }
+            .toast.toast-hiding {
+                animation: toast-out 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
+            }
+            @keyframes toast-in {
+                0% { transform: translateX(120%); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes toast-out {
+                0% { transform: translateX(0); opacity: 1; max-height: 200px; margin-bottom: 8px; padding-top: 12px; padding-bottom: 12px; }
+                100% { transform: translateX(120%); opacity: 0; max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+            }
+            .toast-icon {
+                flex-shrink: 0;
+                width: 28px; height: 28px;
+                border-radius: 50%;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                font-size: 13px;
+                margin-top: 1px;
+            }
+            .toast-body { flex: 1; min-width: 0; }
+            .toast-title {
+                font-size: 12px;
+                font-weight: 700;
+                line-height: 1;
+                margin: 0 0 3px 0;
+                color: #111827;
+                letter-spacing: 0.01em;
+            }
+            .toast-message {
+                font-size: 13px;
+                line-height: 1.35;
+                margin: 0;
+                color: #4b5563;
+                word-wrap: break-word;
+            }
+            .toast-close {
+                position: absolute;
+                top: 8px; right: 8px;
+                width: 22px; height: 22px;
+                border-radius: 6px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                color: #9ca3af;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                font-size: 11px;
+                transition: background 0.15s, color 0.15s;
+            }
+            .toast-close:hover { background: #f3f4f6; color: #374151; }
+            .toast-progress {
+                position: absolute;
+                left: 0; bottom: 0;
+                height: 3px;
+                width: 100%;
+                background: currentColor;
+                opacity: 0.85;
+                transform-origin: left center;
+                animation: toast-progress linear forwards;
+            }
+            @keyframes toast-progress {
+                from { transform: scaleX(1); }
+                to   { transform: scaleX(0); }
+            }
+            .toast-success { border-left-color: #10b981; color: #10b981; }
+            .toast-success .toast-icon { background: #10b981; }
+            .toast-error   { border-left-color: #ef4444; color: #ef4444; }
+            .toast-error   .toast-icon { background: #ef4444; }
+            .toast-warning { border-left-color: #f59e0b; color: #f59e0b; }
+            .toast-warning .toast-icon { background: #f59e0b; }
+            .toast-message { color: #4b5563; }
+            .toast-info, .toast-message-info { border-left-color: #3b82f6; color: #3b82f6; }
+            .toast-info .toast-icon { background: #3b82f6; }
+            @media (max-width: 640px) {
+                #toast-container { top: 0.5rem; right: 0.5rem; left: 0.5rem; }
+                .toast { padding: 10px 32px 10px 12px; border-radius: 10px; }
+                .toast-message { font-size: 12.5px; }
+            }
+        </style>
+        <script>
+            (function() {
+                const container = document.getElementById('toast-container');
+                if (!container) return;
+                const toasts = container.querySelectorAll('.toast');
+                toasts.forEach((toast) => {
+                    const duration = parseInt(toast.dataset.duration || '4500', 10);
+                    const progress = toast.querySelector('.toast-progress');
+                    if (progress) progress.style.animationDuration = duration + 'ms';
+
+                    const close = () => {
+                        if (toast.classList.contains('toast-hiding')) return;
+                        toast.classList.add('toast-hiding');
+                        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+                    };
+
+                    let timer = setTimeout(close, duration);
+
+                    toast.addEventListener('mouseenter', () => {
+                        clearTimeout(timer);
+                        if (progress) progress.style.animationPlayState = 'paused';
+                    });
+                    toast.addEventListener('mouseleave', () => {
+                        if (progress) progress.style.animationPlayState = 'running';
+                        timer = setTimeout(close, 1500);
+                    });
+
+                    const closeBtn = toast.querySelector('.toast-close');
+                    if (closeBtn) closeBtn.addEventListener('click', () => {
+                        clearTimeout(timer);
+                        close();
+                    });
+                });
+            })();
+        </script>
         {% if flash_ns.approval_popups|length > 0 %}
         <div id="approval-status-modal" class="fixed inset-0 z-[210] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="approval-status-title">
             <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-lg" id="approval-status-backdrop"></div>
@@ -1165,8 +1436,8 @@
                     </div>
                     {% endif %}
                     
-                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management and case_management / matter pages) -->
-                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
+                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management, case_management / matter pages, and system_settings) -->
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint != 'system_settings' %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administration</p>
                     </div>
@@ -1254,21 +1525,13 @@
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Actions</p>
                     </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-back-to-cases">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back to Cases</span>
-                    </a>
-                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-case-actions">
-                        <i class="fas fa-route"></i>
-                        <span>Case tracking</span>
-                    </a>
-                    <a href="{{ url_for('case_details', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_details' %}active{% endif %}" id="nav-case-details">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Case Details</span>
+                    <a href="{{ url_for('case_task_management', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_task_management' %}active{% endif %}" id="nav-case-create-task">
+                        <i class="fas fa-tasks"></i>
+                        <span>Create task for this case</span>
                     </a>
                     <a href="{{ url_for('case_proceedings', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_proceedings' %}active{% endif %}" id="nav-case-proceedings">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Update Proceedings</span>
+                        <i class="fas fa-gavel"></i>
+                        <span>Update court attendance</span>
                     </a>
                     <a href="{{ url_for('case_documents', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_documents' %}active{% endif %}" id="nav-case-documents">
                         <i class="fas fa-upload"></i>
@@ -1290,6 +1553,7 @@
                         <i class="fas fa-history"></i>
                         <span>Case Audit Progress</span>
                     </a>
+                    {% if request.endpoint != 'case_documents' %}
                     <a href="{{ url_for('case_calendar', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_calendar' %}active{% endif %}" id="nav-case-calendar">
                         <i class="fas fa-calendar-alt"></i>
                         <span>Case Calendar</span>
@@ -1298,6 +1562,7 @@
                         <i class="fas fa-bell"></i>
                         <span>Reminders</span>
                     </a>
+                    {% endif %}
                     {% endif %}
 
                     {# Managing Partner's "Matter Management" panel (Litigation Matters, Case
@@ -1505,34 +1770,39 @@
                         <i class="fas fa-cog"></i>
                         <span>System Settings</span>
                     </a>
-                    <a href="{{ url_for('documents_settings') }}" class="sidebar-link" id="nav-documents-settings">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Documents Settings</span>
-                    </a>
-                    <a href="{{ url_for('communication_settings') }}" class="sidebar-link" id="nav-communication-settings">
-                        <i class="fas fa-comments"></i>
-                        <span>Communication Settings</span>
-                    </a>
-                    <a href="{{ url_for('compliance_audit') }}" class="sidebar-link" id="nav-compliance-audit">
-                        <i class="fas fa-clipboard-list"></i>
-                        <span>Compliance & Audit</span>
-                    </a>
-                    <a href="{{ url_for('system_reports_analytics') }}" class="sidebar-link" id="nav-system-reports">
-                        <i class="fas fa-chart-bar"></i>
-                        <span>System Reports & Analytics</span>
-                    </a>
-                    <a href="{{ url_for('data_backup_recovery') }}" class="sidebar-link" id="nav-data-backup">
-                        <i class="fas fa-database"></i>
-                        <span>Data Backup & Recovery</span>
-                    </a>
-                    <a href="{{ url_for('access_control_security') }}" class="sidebar-link" id="nav-access-control">
-                        <i class="fas fa-lock"></i>
-                        <span>Access Control & Security</span>
-                    </a>
-                    <a href="{{ url_for('system_health_module') }}" class="sidebar-link" id="nav-system-health">
-                        <i class="fas fa-heartbeat"></i>
-                        <span>System Health Module</span>
-                    </a>
+                    {# In-page table-of-contents — clicking auto-scrolls to that section #}
+                    <div id="system-settings-toc" class="ml-2 my-1 border-l border-gray-200 pl-2 space-y-0.5">
+                        <a href="#section-1"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-1">
+                            <i class="fas fa-building text-[11px]"></i><span>1. Basic Company Information</span>
+                        </a>
+                        <a href="#section-2"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-2">
+                            <i class="fas fa-address-book text-[11px]"></i><span>2. Contact Information</span>
+                        </a>
+                        <a href="#section-3"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-3">
+                            <i class="fas fa-map-marker-alt text-[11px]"></i><span>3. Physical Address</span>
+                        </a>
+                        <a href="#section-4"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-4">
+                            <i class="fas fa-clock text-[11px]"></i><span>4. Business Hours</span>
+                        </a>
+                        <a href="#section-5"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-5">
+                            <i class="fas fa-share-alt text-[11px]"></i><span>5. Social Media Links</span>
+                        </a>
+                        <a href="#section-6"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-6">
+                            <i class="fas fa-balance-scale text-[11px]"></i><span>6. Legal & Professional</span>
+                        </a>
+                        <a href="#section-7"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-7">
+                            <i class="fas fa-file-alt text-[11px]"></i><span>7. Document Settings</span>
+                        </a>
+                        <a href="#section-8"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-8">
+                            <i class="fas fa-dollar-sign text-[11px]"></i><span>8. Billing & Finance</span>
+                        </a>
+                        <a href="#section-9"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-9">
+                            <i class="fas fa-bell text-[11px]"></i><span>9. Notification Settings</span>
+                        </a>
+                        <a href="#section-11" class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-11">
+                            <i class="fas fa-palette text-[11px]"></i><span>11. Branding & Theme</span>
+                        </a>
+                    </div>
                     {% endif %}
 
                     <!-- Finance & Billing Page Links -->
@@ -1778,6 +2048,21 @@
                     <a href="{{ url_for('system_health_module') }}" class="sidebar-link active" id="nav-system-health">
                         <i class="fas fa-heartbeat"></i>
                         <span>System Health Module</span>
+                    </a>
+                    {% endif %}
+
+                    <!-- My Tools / My Templates contextual sidebar -->
+                    {% if request.endpoint in ['my_tools', 'my_templates'] %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">My Tools</p>
+                    </div>
+                    <a href="{{ url_for('my_tools') }}" class="sidebar-link {% if request.endpoint == 'my_tools' %}active{% endif %}" id="nav-my-tools-page">
+                        <i class="fas fa-tools"></i>
+                        <span>My Tools</span>
+                    </a>
+                    <a href="{{ url_for('my_templates') }}" class="sidebar-link {% if request.endpoint == 'my_templates' %}active{% endif %}" id="nav-my-templates">
+                        <i class="fas fa-file-alt"></i>
+                        <span>My Templates</span>
                     </a>
                     {% endif %}
                     

@@ -10,6 +10,149 @@
         border-radius: 1rem; box-shadow: 0 10px 40px rgba(79, 70, 229, 0.25);
         border-left: 4px solid rgba(255,255,255,0.3);
     }
+    .case-hero-card {
+        position: relative;
+        border-radius: 0.875rem;
+        box-shadow: 0 8px 24px rgba(79, 70, 229, 0.22);
+        overflow: hidden;
+        background: linear-gradient(135deg, #4338ca 0%, #6366f1 45%, #8b5cf6 100%);
+        color: #ffffff;
+    }
+    .case-hero-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+            radial-gradient(circle at 85% 15%, rgba(255,255,255,0.16) 0, transparent 30%),
+            radial-gradient(circle at 10% 90%, rgba(255,255,255,0.08) 0, transparent 35%);
+        pointer-events: none;
+    }
+    .case-hero-card > * { position: relative; z-index: 1; }
+    .case-hero-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.875rem;
+        align-items: center;
+    }
+    @media (min-width: 900px) {
+        .case-hero-grid { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.25rem; }
+    }
+    .hero-eyebrow {
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.75);
+    }
+    .hero-eyebrow-dark {
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #6366f1;
+    }
+    .hero-back-btn {
+        flex-shrink: 0;
+        width: 1.875rem; height: 1.875rem;
+        border-radius: 0.5rem;
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(8px);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff;
+        transition: background 0.18s ease, transform 0.18s ease;
+        border: 1px solid rgba(255,255,255,0.18);
+    }
+    .hero-back-btn:hover { background: rgba(255,255,255,0.28); transform: translateX(-2px); }
+    .hero-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.01em;
+        display: flex; align-items: center; gap: 0.5rem;
+    }
+    @media (min-width: 640px) { .hero-title { font-size: 1.5rem; } }
+    .hero-meta-list {
+        display: flex; flex-wrap: wrap; align-items: center;
+        gap: 0.375rem 0.75rem;
+        margin-top: 0.5rem;
+    }
+    .hero-meta-row {
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        font-size: 0.75rem;
+    }
+    .hero-meta-label {
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.65);
+    }
+    .hero-meta-value {
+        font-weight: 600;
+        color: #ffffff;
+        font-size: 0.8125rem;
+    }
+    .hero-meta-sep {
+        width: 3px; height: 3px; border-radius: 9999px;
+        background: rgba(255,255,255,0.35);
+    }
+    .hero-client-panel {
+        background: #ffffff;
+        color: #1e293b;
+        border-radius: 0.75rem;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+        border: 1px solid rgba(255,255,255,0.6);
+    }
+    .hero-avatar-ring {
+        padding: 2px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+        display: inline-flex;
+        flex-shrink: 0;
+        box-shadow: 0 3px 8px rgba(99, 102, 241, 0.22);
+    }
+    .hero-avatar {
+        width: 2.75rem; height: 2.75rem;
+        border-radius: 9999px;
+        object-fit: cover;
+        border: 2px solid #ffffff;
+        background: #ffffff;
+    }
+    .hero-avatar-fallback {
+        width: 2.75rem; height: 2.75rem;
+        border-radius: 9999px;
+        display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%);
+        color: #fff; font-size: 0.9375rem; font-weight: 700;
+        border: 2px solid #fff;
+    }
+    .hero-contact-chip {
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        padding: 0.25rem 0.5rem;
+        background: #f8fafc;
+        border: 1px solid #eef2f7;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        color: #334155;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        max-width: 100%;
+    }
+    .hero-contact-chip:hover { background: #f1f5ff; border-color: #c7d2fe; }
+    .hero-contact-chip i { color: #6366f1; font-size: 0.6875rem; }
+    .hero-status-pill {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.6875rem; font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #ffffff;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+    .hero-status-dot {
+        width: 0.375rem; height: 0.375rem; border-radius: 9999px;
+        background: #ffffff; opacity: 0.95;
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+    }
     .detail-card {
         background: #ffffff;
         border-radius: 1rem;
@@ -32,99 +175,166 @@
     .detail-table td { padding: 0.875rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
     .detail-table tbody tr:hover { background: #f8fafc; }
     .doc-row:hover { background: #fffbeb !important; }
+    .cd-party-chevron { transition: transform 0.18s ease; }
+    .cd-party-group.open > .cd-party-group-header .cd-party-chevron { transform: rotate(90deg); color: #d97706; }
+    .cd-party-group.open > .cd-party-group-header { background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%); }
+
+    /* Profile-style party group header (case details) */
+    .cd-party-avatar {
+        width: 3rem; height: 3rem; border-radius: 9999px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 700; font-size: 1rem;
+        flex-shrink: 0;
+        border: 2px solid rgba(255,255,255,0.9);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+        background-image: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        letter-spacing: 0.02em;
+    }
+    .cd-party-avatar.party-color-indigo  { background-image: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
+    .cd-party-avatar.party-color-rose    { background-image: linear-gradient(135deg, #fb7185 0%, #e11d48 100%); }
+    .cd-party-avatar.party-color-emerald { background-image: linear-gradient(135deg, #10b981 0%, #047857 100%); }
+    .cd-party-avatar.party-color-purple  { background-image: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); }
+    .cd-party-avatar.party-color-amber   { background-image: linear-gradient(135deg, #f59e0b 0%, #b45309 100%); }
+    .cd-party-avatar.party-color-slate   { background-image: linear-gradient(135deg, #94a3b8 0%, #475569 100%); }
+    .cd-party-avatar-ring {
+        padding: 2px; border-radius: 9999px; display: inline-flex; flex-shrink: 0;
+        background: linear-gradient(135deg, #fde68a 0%, #fbcfe8 50%, #c7d2fe 100%);
+    }
+    .cd-party-type-chip {
+        display: inline-flex; align-items: center; gap: 0.25rem;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em;
+        border-radius: 9999px; text-transform: uppercase;
+        border: 1px solid currentColor;
+    }
+    .cd-party-type-chip.party-color-indigo  { color: #4338ca; background: #eef2ff; }
+    .cd-party-type-chip.party-color-rose    { color: #be123c; background: #ffe4e6; }
+    .cd-party-type-chip.party-color-emerald { color: #047857; background: #d1fae5; }
+    .cd-party-type-chip.party-color-purple  { color: #7e22ce; background: #f3e8ff; }
+    .cd-party-type-chip.party-color-amber   { color: #b45309; background: #fef3c7; }
+    .cd-party-type-chip.party-color-slate   { color: #475569; background: #f1f5f9; }
+    .cd-party-meta {
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        font-size: 0.75rem; color: #475569; font-weight: 500;
+    }
+    .cd-party-meta i { color: #94a3b8; font-size: 0.7rem; }
+
     @media (max-width: 767px) {
         .detail-table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     }
 </style>
 
 <div class="detail-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-    <!-- Page Header -->
-    <div class="detail-header-card p-5 sm:p-6 mb-6 text-white">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div class="flex items-center gap-4">
-                <a href="{{ url_for('case_management') }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to cases">
-                    <i class="fas fa-arrow-left"></i>
-                </a>
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold mb-1 flex items-center gap-2">
-                        <i class="fas fa-briefcase opacity-90"></i>
+    {% set status_colors = {
+        'Active': 'bg-emerald-500',
+        'Closed': 'bg-slate-500',
+        'Archived': 'bg-blue-500',
+        'Mediations': 'bg-amber-500',
+        'Pending': 'bg-orange-500',
+        'Consolidated': 'bg-purple-500',
+        'Pending Approval': 'bg-red-500'
+    } %}
+
+    <!-- Combined Case Details + Client Profile -->
+    <div class="case-hero-card px-4 py-3 sm:px-5 sm:py-4 mb-5">
+        <div class="case-hero-grid">
+            <!-- Left: Case header -->
+            <div class="flex flex-col min-w-0">
+                <div class="flex items-center gap-2.5">
+                    <a href="{{ url_for('case_management') }}" class="hero-back-btn" title="Back to cases" aria-label="Back to cases">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    <h1 class="hero-title">
+                        <i class="fas fa-briefcase opacity-90 text-base"></i>
                         Case Details
                     </h1>
-                    <p class="text-white/90 text-sm sm:text-base">Tracking: <span class="font-semibold">{{ case_data.tracking_number }}</span>{% if case_data.court_case_number %} · {{ case_data.court_case_number }}{% endif %}</p>
+                </div>
+
+                <div class="hero-meta-list">
+                    <span class="hero-meta-row">
+                        <span class="hero-meta-label">Tracking</span>
+                        <span class="hero-meta-value">{{ case_data.tracking_number or '—' }}</span>
+                    </span>
+                    {% if case_data.court_case_number %}
+                    <span class="hero-meta-sep"></span>
+                    <span class="hero-meta-row">
+                        <span class="hero-meta-label">Court</span>
+                        <span class="hero-meta-value">{{ case_data.court_case_number }}</span>
+                    </span>
+                    {% endif %}
+                    <span class="hero-meta-sep"></span>
+                    <span class="hero-status-pill {{ status_colors.get(case_data.status, 'bg-slate-500') }}">
+                        <span class="hero-status-dot"></span>
+                        {{ case_data.status or 'N/A' }}
+                    </span>
                 </div>
             </div>
-            {% set status_colors = {
-                'Active': 'bg-emerald-500/90',
-                'Closed': 'bg-slate-500/90',
-                'Archived': 'bg-blue-500/90',
-                'Mediations': 'bg-amber-500/90',
-                'Pending': 'bg-orange-500/90',
-                'Consolidated': 'bg-purple-500/90',
-                'Pending Approval': 'bg-red-500/90'
-            } %}
-            <span class="px-4 py-2 rounded-lg text-white text-sm font-semibold {{ status_colors.get(case_data.status, 'bg-slate-500/90') }} sm:self-center">
-                {{ case_data.status or 'N/A' }}
-            </span>
+
+            <!-- Right: Client profile panel -->
+            {% if case_data.client_table_id %}
+            <div class="hero-client-panel px-3.5 py-3 sm:px-4 sm:py-3.5">
+                <div class="flex items-center gap-3">
+                    <div class="hero-avatar-ring">
+                        {% if case_data.client_profile_picture %}
+                            {% if case_data.client_profile_picture.startswith('http') %}
+                            <img src="{{ case_data.client_profile_picture }}" alt="{{ case_data.client_full_name or case_data.client_name }}" class="hero-avatar">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + case_data.client_profile_picture) }}" alt="{{ case_data.client_full_name or case_data.client_name }}" class="hero-avatar">
+                            {% endif %}
+                        {% else %}
+                        <div class="hero-avatar-fallback">
+                            {{ (case_data.client_full_name or case_data.client_name or 'C')[0]|upper }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                            <span class="hero-eyebrow-dark">Client</span>
+                            {% if case_data.client_status %}
+                            <span class="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider
+                                {% if case_data.client_status == 'Active' %}text-emerald-600{% else %}text-slate-500{% endif %}">
+                                <i class="fas fa-circle text-[5px]"></i>{{ case_data.client_status }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <h2 class="text-sm sm:text-base font-bold text-gray-900 truncate leading-tight">{{ case_data.client_full_name or case_data.client_name or 'N/A' }}</h2>
+                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9.5px] font-bold uppercase tracking-wider">{{ case_data.client_type or 'N/A' }}</span>
+                            {% if case_data.client_phone %}
+                            <a href="tel:{{ case_data.client_phone }}" class="hero-contact-chip hover:no-underline">
+                                <i class="fas fa-phone"></i><span class="truncate">{{ case_data.client_phone }}</span>
+                            </a>
+                            {% endif %}
+                            {% if case_data.client_email %}
+                            <a href="mailto:{{ case_data.client_email }}" class="hero-contact-chip hover:no-underline">
+                                <i class="fas fa-envelope"></i><span class="truncate">{{ case_data.client_email }}</span>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="hero-client-panel px-3.5 py-3 sm:px-4 sm:py-3.5">
+                <div class="flex items-center gap-2.5 text-slate-500">
+                    <i class="fas fa-user-slash text-slate-300 text-lg"></i>
+                    <div class="min-w-0">
+                        <p class="hero-eyebrow-dark">Client</p>
+                        <p class="text-xs text-gray-600">Not linked to this case.</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Client Profile Card -->
-    {% if case_data.client_table_id %}
-    <div class="detail-card client-card p-5 sm:p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-            <div class="flex-shrink-0">
-                {% if case_data.client_profile_picture %}
-                    {% if case_data.client_profile_picture.startswith('http') %}
-                    <img src="{{ case_data.client_profile_picture }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + case_data.client_profile_picture) }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
-                    {% endif %}
-                {% else %}
-                <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-indigo-100 shadow-md">
-                    {{ (case_data.client_full_name or case_data.client_name or 'C')[0] }}
-                </div>
-                {% endif %}
-            </div>
-            <div class="flex-1 min-w-0">
-                <h2 class="text-xl font-bold text-gray-900 mb-1">{{ case_data.client_full_name or case_data.client_name or 'N/A' }}</h2>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-                    {% if case_data.client_phone %}
-                    <span class="flex items-center gap-1.5"><i class="fas fa-phone text-indigo-500 text-xs"></i>{{ case_data.client_phone }}</span>
-                    {% endif %}
-                    {% if case_data.client_email %}
-                    <span class="flex items-center gap-1.5 truncate"><i class="fas fa-envelope text-indigo-500 text-xs"></i>{{ case_data.client_email }}</span>
-                    {% endif %}
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-semibold">{{ case_data.client_type or 'N/A' }} Client</span>
-                    {% if case_data.client_status %}
-                    <span class="px-3 py-1 rounded-lg text-xs font-medium {{ 'bg-emerald-100 text-emerald-800' if case_data.client_status == 'Active' else 'bg-slate-100 text-slate-700' }}">{{ case_data.client_status }}</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="detail-card p-5 sm:p-6 mb-6">
-        <div class="text-center py-8">
-            <i class="fas fa-user-slash text-slate-300 text-4xl mb-3 block"></i>
-            <p class="text-gray-600 font-semibold">Client information not available</p>
-            <p class="text-gray-500 text-sm mt-1">Client details could not be found for this case.</p>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Case Information -->
+    <!-- Case Information (with Parties) -->
     <div class="detail-card info-card p-5 sm:p-6 mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div class="flex items-center gap-3 mb-5">
             <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <i class="fas fa-info-circle text-blue-500"></i>
                 Case Information
             </h2>
-            <a href="{{ url_for('case_task_management', case_id=case_id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-sm transition-colors">
-                <i class="fas fa-tasks"></i>
-                Create task for this case
-            </a>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             <div><p class="detail-label">Tracking Number</p><p class="detail-value">{{ case_data.tracking_number or '—' }}</p></div>
@@ -152,42 +362,38 @@
             </div>
         </div>
         {% endif %}
-    </div>
 
-    <!-- Parties -->
-    {% if parties and parties|length > 0 %}
-    <div class="detail-card parties-card p-5 sm:p-6 mb-6">
-        <h2 class="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
-            <i class="fas fa-users text-pink-500"></i>
-            Parties ({{ parties|length }})
-        </h2>
-        <div class="space-y-3">
-            {% for party in parties %}
-            <div class="bg-gradient-to-r from-slate-50 to-pink-50/50 rounded-lg p-4 border border-slate-100">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                    <div><p class="detail-label">Party</p><p class="font-semibold text-gray-900">{{ party.party_name or '—' }}</p></div>
-                    <div><p class="detail-label">Type</p><p class="text-gray-700">{{ party.party_type or '—' }}</p></div>
-                    <div><p class="detail-label">Category</p><p class="text-gray-700">{{ party.party_category or '—' }}</p></div>
-                    <div><p class="detail-label">Firm/Agent</p><p class="text-gray-700">{{ party.firm_agent or '—' }}</p></div>
-                    <div><p class="detail-label">Phone</p><p class="text-gray-700">{{ party.party_phone or '—' }}</p></div>
-                    <div><p class="detail-label">Email</p><p class="text-gray-700 break-all">{{ party.party_email or '—' }}</p></div>
+        {% if parties and parties|length > 0 %}
+        <div class="mt-6 pt-5 border-t border-gray-200">
+            <h3 class="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <i class="fas fa-users text-pink-500"></i>
+                Parties ({{ parties|length }})
+            </h3>
+            <div class="space-y-3">
+                {% for party in parties %}
+                <div class="bg-gradient-to-r from-slate-50 to-pink-50/50 rounded-lg p-4 border border-slate-100">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                        <div><p class="detail-label">Party</p><p class="font-semibold text-gray-900">{{ party.party_name or '—' }}</p></div>
+                        <div><p class="detail-label">Type</p><p class="text-gray-700">{{ party.party_type or '—' }}</p></div>
+                        <div><p class="detail-label">Category</p><p class="text-gray-700">{{ party.party_category or '—' }}</p></div>
+                        <div><p class="detail-label">Firm/Agent</p><p class="text-gray-700">{{ party.firm_agent or '—' }}</p></div>
+                        <div><p class="detail-label">Phone</p><p class="text-gray-700">{{ party.party_phone or '—' }}</p></div>
+                        <div><p class="detail-label">Email</p><p class="text-gray-700 break-all">{{ party.party_email or '—' }}</p></div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
+        {% endif %}
     </div>
-    {% endif %}
 
     <!-- Court Attendance -->
     <div class="detail-card proceedings-card p-5 sm:p-6 mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+        <div class="flex items-center gap-4 mb-5">
             <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <i class="fas fa-gavel text-emerald-600"></i>
                 COURT ATTENDANCE <span class="text-gray-500 font-normal text-base">({{ proceedings|length }})</span>
             </h2>
-            <a href="{{ url_for('case_proceedings', case_id=case_id) }}" class="inline-flex items-center gap-2 text-emerald-700 hover:text-emerald-800 font-semibold text-sm">
-                Update court attendance <i class="fas fa-arrow-right text-xs"></i>
-            </a>
         </div>
         {% if proceedings and proceedings|length > 0 %}
         <div class="detail-table-responsive overflow-x-auto rounded-lg border border-slate-200">
@@ -228,113 +434,219 @@
         {% endif %}
     </div>
 
-    <!-- Case Documents (uploaded documents for this case) -->
+    <!-- Case Documents (read-only listing grouped by linked party) -->
     <div class="detail-card documents-card p-5 sm:p-6 mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
             <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <i class="fas fa-folder-open text-amber-600"></i>
-                Case Documents <span class="text-gray-500 font-normal text-base">({{ documents|length if documents else 0 }})</span>
+                Case Documents
+                <span class="text-gray-500 font-normal text-base">(<span id="cd-visible-count">{{ documents|length if documents else 0 }}</span>{% if documents %} / {{ documents|length }}{% endif %})</span>
             </h2>
-            <a href="{{ url_for('case_documents', case_id=case_id, task_id=access_task_id) if access_task_id else url_for('case_documents', case_id=case_id) }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-semibold text-sm transition-colors">
-                <i class="fas fa-upload"></i> Upload / View all
-            </a>
-        </div>
-        {% if google_drive_connected %}
-        <!-- Create with Google – open case folder to create Doc, Sheet, Slides or Notebook -->
-        <div class="mb-6 p-4 rounded-xl bg-gradient-to-r from-slate-50 to-amber-50/50 border border-amber-100">
-            <p class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                <i class="fab fa-google-drive text-amber-600"></i>
-                Create with Google
-            </p>
-            <p class="text-xs text-gray-600 mb-2">Creates the file directly in your company Google Drive case folder, then opens it in a new tab.</p>
-            {% if suggested_doc_title %}
-            <p class="text-xs text-gray-700 mb-3">
-                <span class="font-medium">When you save, use this title:</span>
-                <code id="suggested-doc-title" class="ml-1 px-1.5 py-0.5 bg-white rounded border border-amber-200 text-amber-800">{{ suggested_doc_title }}</code>
-                <button type="button" id="copy-suggested-title-btn" class="ml-2 text-xs font-semibold text-amber-700 hover:text-amber-900">Copy</button>
-            </p>
-            {% endif %}
-            <div class="flex flex-wrap gap-3">
-                <button type="button" data-google-app="doc" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow">
-                    <i class="fab fa-google-drive"></i> Google Doc
-                </button>
-                <button type="button" data-google-app="sheet" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow">
-                    <i class="fas fa-table"></i> Google Sheet
-                </button>
-                <button type="button" data-google-app="slides" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-sm hover:shadow">
-                    <i class="fas fa-file-powerpoint"></i> Google Slides
-                </button>
-                <button type="button" data-google-app="notebook" class="open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm hover:shadow">
-                    <i class="fas fa-book"></i> Google Notebook
-                </button>
+            {% if document_groups and document_groups|length > 0 %}
+            <div class="flex items-center gap-2">
+                <label for="cd-party-select" class="text-sm font-semibold text-slate-700">Select Party</label>
+                <select id="cd-party-select" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300" style="min-width: 14rem;">
+                    <option value="__all__">All parties ({{ documents|length }})</option>
+                    {% for group in document_groups %}
+                    <option value="{{ group.key }}">
+                        {% if group.is_unlinked %}— Not party-specific —{% else %}{{ group.party_type|upper }}{% if group.party_name %} — {{ group.party_name }}{% endif %}{% endif %}
+                        ({{ group.documents|length }})
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
         {% if not google_drive_connected %}
         <div class="py-6 text-center rounded-xl bg-amber-50 border border-amber-200">
             <i class="fab fa-google-drive text-amber-500 text-3xl mb-2"></i>
             <p class="text-amber-800 font-semibold">Google Drive not connected</p>
-            <p class="text-amber-700 text-sm mt-1">Connect Drive in Documents Settings to view and upload case documents.</p>
+            <p class="text-amber-700 text-sm mt-1">Connect Drive in Documents Settings to view case documents.</p>
             <a href="{{ url_for('documents_settings') }}" class="inline-block mt-3 text-sm font-semibold text-amber-700 hover:text-amber-900">Documents Settings →</a>
         </div>
-        {% elif documents and documents|length > 0 %}
-        <div class="space-y-2">
-            {% for doc in documents %}
-            {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
-            <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-100 bg-white hover:border-amber-200 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                    {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
-                    <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
-                    {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
-                    <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
-                    {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
-                    <i class="fas fa-file-image text-emerald-600 text-xl flex-shrink-0"></i>
-                    {% else %}
-                    <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
-                    {% endif %}
-                    <div class="min-w-0">
-                        <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
-                        <p class="text-xs text-gray-500">Size: {{ doc.size or '—' }}</p>
-                        <p class="text-xs text-gray-500 truncate" title="{{ doc.description or '—' }}">Description: {{ doc.description or '—' }}</p>
-                        <p class="text-xs text-gray-500">Uploaded: {{ doc.created_time or '—' }} · By: {{ doc.uploaded_by or 'Unknown' }}</p>
-                        <p class="text-xs text-gray-500">Modified: {{ doc.modified_time or '—' }} · By: {{ doc.modified_by or 'Unknown' }}</p>
+        {% elif document_groups and document_groups|length > 0 %}
+        <div class="space-y-3">
+            {% for group in document_groups %}
+            <div class="cd-party-group rounded-xl border border-slate-200 bg-white overflow-hidden"
+                 data-party-key="{{ group.key }}"
+                 data-doc-count="{{ group.documents|length }}">
+                <button type="button" class="cd-party-group-header w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 hover:bg-amber-50 transition-colors text-left" aria-expanded="false">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <i class="fas fa-chevron-right text-slate-400 cd-party-chevron flex-shrink-0"></i>
+                        {% if group.is_unlinked %}
+                        <div class="cd-party-avatar party-color-slate" aria-hidden="true">
+                            <i class="fas fa-question"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="font-bold text-gray-800 truncate text-[15px] leading-tight">— Not party-specific —</p>
+                            <p class="text-xs text-slate-500 mt-1">Documents not linked to any party</p>
+                        </div>
+                        {% else %}
+                        <div class="cd-party-avatar-ring">
+                            <div class="cd-party-avatar party-color-{{ group.party_color }}" aria-hidden="true">
+                                {{ group.party_initials }}
+                            </div>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <p class="font-bold text-gray-900 truncate text-[15px] leading-tight">{{ group.party_name or '—' }}</p>
+                                {% if group.is_orphan %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wide" title="Party no longer registered on this case">unlisted</span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-1 flex flex-wrap items-center gap-2">
+                                {% if group.party_type %}
+                                <span class="cd-party-type-chip party-color-{{ group.party_color }}">{{ group.party_type|upper }}</span>
+                                {% endif %}
+                                {% if group.party_category %}
+                                <span class="text-[11px] text-slate-500 font-medium">{{ group.party_category }}</span>
+                                {% endif %}
+                                {% if group.firm_agent %}
+                                <span class="cd-party-meta"><i class="fas fa-briefcase"></i> {{ group.firm_agent }}</span>
+                                {% endif %}
+                            </div>
+                            {% if group.party_phone or group.party_email %}
+                            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                {% if group.party_phone %}
+                                <span class="cd-party-meta"><i class="fas fa-phone"></i> {{ group.party_phone }}</span>
+                                {% endif %}
+                                {% if group.party_email %}
+                                <span class="cd-party-meta truncate max-w-[12rem]" title="{{ group.party_email }}"><i class="fas fa-envelope"></i> {{ group.party_email }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                     </div>
-                </div>
-                <div class="flex flex-shrink-0 items-center gap-2 flex-wrap justify-end">
-                    {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
-                    <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100 transition-colors" title="Edit in Google Docs"><i class="fas fa-edit text-xs"></i> Edit</a>
-                    {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
-                    <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100 transition-colors" title="Edit in Google Sheets"><i class="fas fa-edit text-xs"></i> Edit</a>
-                    {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
-                    <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100 transition-colors" title="Edit in Google Slides"><i class="fas fa-edit text-xs"></i> Edit</a>
-                    {% elif doc.url %}
-                    <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
-                    {% endif %}
-                    <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100 transition-colors"><i class="fas fa-download text-xs"></i> Download</a>
-                    <button type="button" class="case-doc-delete inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100 transition-colors" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                    <span class="flex-shrink-0 inline-flex flex-col items-end gap-0.5 text-right">
+                        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                            <i class="fas fa-folder text-slate-400 text-xs"></i>
+                            {{ group.documents|length }}
+                        </span>
+                        <span class="text-[10.5px] uppercase tracking-wider text-slate-400 font-semibold">{{ 'document' if group.documents|length == 1 else 'documents' }}</span>
+                    </span>
+                </button>
+                <div class="cd-party-group-body hidden border-t border-slate-200 p-3">
+                    <div class="space-y-2">
+                        {% for doc in group.documents %}
+                        {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
+                        <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-100 bg-white hover:border-amber-200 transition-colors">
+                            <div class="flex items-center gap-3 min-w-0">
+                                {% if 'pdf' in doc.mime_type or file_ext == 'pdf' %}
+                                <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
+                                {% elif 'word' in doc.mime_type or 'document' in doc.mime_type or file_ext in ['doc', 'docx'] %}
+                                <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
+                                {% elif 'image' in doc.mime_type or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
+                                <i class="fas fa-file-image text-emerald-600 text-xl flex-shrink-0"></i>
+                                {% else %}
+                                <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
+                                {% endif %}
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
+                                    <p class="text-xs text-gray-500">Size: {{ doc.size or '—' }}</p>
+                                    <p class="text-xs text-gray-500 truncate" title="{{ doc.description or '—' }}">Description: {{ doc.description or '—' }}</p>
+                                    <p class="text-xs text-gray-500">Uploaded: {{ doc.created_time or '—' }} · By: {{ doc.uploaded_by or 'Unknown' }}</p>
+                                    <p class="text-xs text-gray-500">Modified: {{ doc.modified_time or '—' }} · By: {{ doc.modified_by or 'Unknown' }}</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-shrink-0 items-center gap-2 flex-wrap justify-end">
+                                {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
+                                <a href="https://docs.google.com/document/d/{{ doc.id }}/view" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="Open in Google Docs"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                                {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
+                                <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/view" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="Open in Google Sheets"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                                {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
+                                <a href="https://docs.google.com/presentation/d/{{ doc.id }}/view" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="Open in Google Slides"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                                {% elif doc.url %}
+                                <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                                {% endif %}
+                                <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100 transition-colors"><i class="fas fa-download text-xs"></i> Download</a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-        <p class="mt-4 text-sm text-gray-500">
-            <a href="{{ url_for('case_documents', case_id=case_id, task_id=access_task_id) if access_task_id else url_for('case_documents', case_id=case_id) }}" class="text-amber-600 hover:text-amber-700 font-semibold">View all documents and upload more →</a>
-        </p>
         {% else %}
         <div class="py-8 text-center rounded-xl bg-slate-50 border-2 border-dashed border-slate-200">
             <i class="fas fa-folder-open text-slate-300 text-4xl mb-3 block"></i>
-            <p class="font-semibold text-gray-700 mb-1">No documents uploaded</p>
-            <p class="text-gray-500 text-sm mb-4">Documents for this case are stored in Google Drive.</p>
-            <a href="{{ url_for('case_documents', case_id=case_id, task_id=access_task_id) if access_task_id else url_for('case_documents', case_id=case_id) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 font-semibold text-sm transition-colors">
-                <i class="fas fa-upload"></i> Upload document
-            </a>
+            <p class="font-semibold text-gray-700 mb-1">No documents linked to this case</p>
+            <p class="text-gray-500 text-sm">There are currently no documents linked or uploaded to this case.</p>
         </div>
         {% endif %}
     </div>
 </div>
 
 <script>
-const caseId = {{ case_id }};
-const accessTaskId = {{ access_task_id|tojson if access_task_id else 'null' }};
+(function setupCaseDocumentPartyGroups() {
+    const groups = document.querySelectorAll('.cd-party-group');
+    if (!groups.length) return;
+    const visibleCountEl = document.getElementById('cd-visible-count');
+    const partySelectEl = document.getElementById('cd-party-select');
+
+    function setGroupOpen(group, open) {
+        const body = group.querySelector('.cd-party-group-body');
+        const headerBtn = group.querySelector('.cd-party-group-header');
+        if (!body || !headerBtn) return;
+        if (open) {
+            group.classList.add('open');
+            body.classList.remove('hidden');
+            headerBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            group.classList.remove('open');
+            body.classList.add('hidden');
+            headerBtn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    groups.forEach(function(group) {
+        const headerBtn = group.querySelector('.cd-party-group-header');
+        if (!headerBtn) return;
+        headerBtn.addEventListener('click', function(e) {
+            if (e.target.closest('.cd-party-group-body')) return;
+            const isOpen = group.classList.contains('open');
+            setGroupOpen(group, !isOpen);
+        });
+    });
+
+    function updateVisibleCount() {
+        let total = 0;
+        groups.forEach(function(g) {
+            if (g.style.display !== 'none') {
+                total += parseInt(g.getAttribute('data-doc-count') || '0', 10) || 0;
+            }
+        });
+        if (visibleCountEl) visibleCountEl.textContent = total;
+    }
+
+    function applyPartySelection() {
+        if (!partySelectEl) return;
+        const selected = partySelectEl.value || '__all__';
+        groups.forEach(function(g) {
+            const key = g.getAttribute('data-party-key');
+            if (selected === '__all__') {
+                g.style.display = '';
+                setGroupOpen(g, false);
+            } else if (key === selected) {
+                g.style.display = '';
+                setGroupOpen(g, true);
+                if (g.scrollIntoView) {
+                    g.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                g.style.display = 'none';
+                setGroupOpen(g, false);
+            }
+        });
+        updateVisibleCount();
+    }
+
+    if (partySelectEl) {
+        partySelectEl.addEventListener('change', applyPartySelection);
+    }
+    updateVisibleCount();
+})();
 
 function toggleDescription() {
     const content = document.getElementById('description-content');
@@ -356,87 +668,5 @@ function toggleDescription() {
     }
 }
 
-var copyBtn = document.getElementById('copy-suggested-title-btn');
-if (copyBtn) {
-    copyBtn.addEventListener('click', function() {
-        var el = document.getElementById('suggested-doc-title');
-        if (el && navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(el.textContent);
-            var btn = this;
-            btn.textContent = 'Copied!';
-            setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
-        }
-    });
-}
-document.querySelectorAll('.open-google-app').forEach(function(btn) {
-    btn.addEventListener('click', async function() {
-        var app = this.getAttribute('data-google-app');
-        if (!app) return;
-
-        var originalHtml = this.innerHTML;
-        this.disabled = true;
-        this.classList.add('opacity-70', 'cursor-not-allowed');
-        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
-
-        try {
-            var payload = { type: app };
-            if (accessTaskId) {
-                payload.task_id = accessTaskId;
-            }
-            var suggestedTitleEl = document.getElementById('suggested-doc-title');
-            if (suggestedTitleEl && suggestedTitleEl.textContent) {
-                payload.name = suggestedTitleEl.textContent.trim();
-            }
-            var res = await fetch('/api/case/' + caseId + '/create-google-file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            var data = await res.json();
-            if (!res.ok || !data.success) {
-                throw new Error(data.error || 'Failed to create Google file.');
-            }
-            var openUrl = data.editLink || data.webViewLink;
-            if (openUrl) {
-                window.open(openUrl, '_blank', 'noopener,noreferrer');
-            }
-            setTimeout(function() { window.location.reload(); }, 500);
-        } catch (err) {
-            console.error(err);
-            alert(err.message || 'Failed to create file in company Google Drive.');
-        } finally {
-            this.disabled = false;
-            this.classList.remove('opacity-70', 'cursor-not-allowed');
-            this.innerHTML = originalHtml;
-        }
-    });
-});
-
-document.querySelectorAll('.case-doc-delete').forEach(function(btn) {
-    btn.addEventListener('click', async function() {
-        var fileId = this.getAttribute('data-file-id');
-        var docName = this.getAttribute('data-doc-name') || 'this document';
-        if (!fileId || !confirm('Delete "' + docName + '" from Google Drive? This cannot be undone.')) return;
-        this.disabled = true;
-        try {
-            var deleteUrl = '/api/case/' + caseId + '/document/' + encodeURIComponent(fileId) + '/delete';
-            if (accessTaskId) {
-                deleteUrl += '?task_id=' + encodeURIComponent(accessTaskId);
-            }
-            var res = await fetch(deleteUrl, { method: 'POST' });
-            var data = await res.json();
-            if (data.success) {
-                window.location.reload();
-            } else {
-                alert(data.error || 'Delete failed.');
-                this.disabled = false;
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Request failed.');
-            this.disabled = false;
-        }
-    });
-});
 </script>
 {% endblock %}

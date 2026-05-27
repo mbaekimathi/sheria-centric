@@ -12,6 +12,8 @@ from io import BytesIO
 from google.oauth2 import id_token
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport import requests as google_requests
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -240,7 +242,7 @@ def test_db_connection():
         return False
 
 # Schema version for migrations
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 def get_db_connection(use_database=True):
     """Create and return database connection"""
@@ -714,6 +716,10 @@ def create_company_settings_table():
                     ('court_date_reminders', 'TINYINT(1) DEFAULT 1'),
                     ('primary_brand_color', 'VARCHAR(20)'),
                     ('secondary_color', 'VARCHAR(20)'),
+                    ('tertiary_color', 'VARCHAR(20)'),
+                    ('theme_preset', 'VARCHAR(50)'),
+                    ('font_family', 'VARCHAR(50)'),
+                    ('font_size', 'VARCHAR(20)'),
                     ('favicon', 'VARCHAR(500)'),
                     ('login_page_background', 'VARCHAR(500)'),
                     ('location_name', 'VARCHAR(255)'),
@@ -727,6 +733,10 @@ def create_company_settings_table():
                     ('google_drive_account_name', 'VARCHAR(255)'),
                     ('google_drive_account_picture', 'VARCHAR(500)'),
                     ('google_drive_main_folder_id', 'VARCHAR(255)'),
+                    ('google_drive_token_expiry', 'DATETIME NULL'),
+                    ('google_drive_last_verified_at', 'DATETIME NULL'),
+                    ('google_drive_needs_reconnect', 'TINYINT(1) NOT NULL DEFAULT 0'),
+                    ('google_drive_reconnect_reason', 'VARCHAR(255) NULL'),
                     ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
                     ('updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP')
                 ]
@@ -1920,6 +1930,32 @@ def apply_migrations(current_version):
                     print("[OK] case_proceeding_advocates table already exists")
                 migrations_applied = True
             
+            # Migration 16: Add next_activity_type and next_judicial_officer columns to case_proceedings
+            if current_version < 16:
+                print("Applying migration 16: Adding next_activity_type and next_judicial_officer columns to case_proceedings table...")
+
+                if not column_exists('case_proceedings', 'next_activity_type'):
+                    cursor.execute("""
+                        ALTER TABLE case_proceedings 
+                        ADD COLUMN next_activity_type VARCHAR(255) NULL AFTER next_attendance
+                    """)
+                    connection.commit()
+                    print("[OK] Added next_activity_type column to case_proceedings table")
+                else:
+                    print("[OK] next_activity_type column already exists")
+
+                if not column_exists('case_proceedings', 'next_judicial_officer'):
+                    cursor.execute("""
+                        ALTER TABLE case_proceedings 
+                        ADD COLUMN next_judicial_officer VARCHAR(255) NULL AFTER next_activity_type
+                    """)
+                    connection.commit()
+                    print("[OK] Added next_judicial_officer column to case_proceedings table")
+                else:
+                    print("[OK] next_judicial_officer column already exists")
+
+                migrations_applied = True
+
             # Migration 1: Ensure all required columns exist (for older versions)
             if current_version < 1:
                 print("Applying migration 1: Schema updates...")
@@ -2810,11 +2846,21 @@ def login():
                             session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
                         else:
                             session['company_name'] = 'BAUNI LAW GROUP'
-                        
+
+                        # Run a one-shot Google Drive health check so a clear
+                        # "Reconnect Google Drive" notice can appear on the
+                        # dashboard if Google revoked our refresh token (the
+                        # typical ~7-day expiry while the OAuth consent
+                        # screen is in Testing mode).
+                        try:
+                            refresh_drive_login_notice()
+                        except Exception as e:
+                            print(f"[Drive] login health-check error: {e}")
+
                         # Check if onboarding is completed
                         if not employee.get('onboarding_completed'):
                             return redirect(url_for('onboarding'))
-                        
+
                         # Redirect straight to the role-prefixed dashboard so
                         # the URL reflects the active role from the first hop.
                         return redirect(url_for('dashboard', role_slug=role_to_slug(employee['role'])))
@@ -6024,6 +6070,18 @@ def my_tools():
     
     return render_template('my_tools.html', company_settings=company_settings)
 
+@app.route('/my_templates')
+def my_templates():
+    """My Templates page — personal document templates for the logged-in employee."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    return render_template('my_templates.html', company_settings=company_settings)
+
 @app.route('/my_tasks')
 def my_tasks():
     """My Tasks page - all case/matter tasks allocated to the logged-in user."""
@@ -6748,15 +6806,10 @@ def client_document_type(document_type):
                         scopes=scopes
                     )
                     
-                    if credentials.expired and credentials.refresh_token:
-                        from google.auth.transport.requests import Request
-                        credentials.refresh(Request())
-                        cursor.execute("""
-                            UPDATE company_settings SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
-                        """, (credentials.token,))
-                        connection.commit()
-                    
+                    ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                    if not ok:
+                        raise RefreshError('invalid_grant: Google Drive needs reconnect')
+
                     service = build('drive', 'v3', credentials=credentials)
                     main_folder_id = drive_settings.get('google_drive_main_folder_id')
                     
@@ -6894,18 +6947,11 @@ def client_upload_document(document_type):
                     scopes=scopes
                 )
                 
-                # Refresh token if expired
-                if credentials.expired and credentials.refresh_token:
-                    from google.auth.transport.requests import Request
-                    credentials.refresh(Request())
-                    # Save refreshed token back to DB
-                    cursor.execute("""
-                        UPDATE company_settings SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
-                    """, (credentials.token,))
-                    connection.commit()
-                    print("[OK] Refreshed Google Drive token for client upload")
-                
+                # Refresh token if expired (also marks needs_reconnect on invalid_grant)
+                ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                if not ok:
+                    raise RefreshError('invalid_grant: Google Drive needs reconnect')
+
                 service = build('drive', 'v3', credentials=credentials)
                 
                 # Get main folder ID
@@ -7021,15 +7067,10 @@ def client_delete_document(file_id):
                     scopes=scopes
                 )
                 
-                if credentials.expired and credentials.refresh_token:
-                    from google.auth.transport.requests import Request
-                    credentials.refresh(Request())
-                    cursor.execute("""
-                        UPDATE company_settings SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
-                    """, (credentials.token,))
-                    connection.commit()
-                
+                ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                if not ok:
+                    raise RefreshError('invalid_grant: Google Drive needs reconnect')
+
                 service = build('drive', 'v3', credentials=credentials)
                 service.files().update(fileId=file_id, body={'trashed': True}).execute()
                 print(f"[OK] Client deleted document: {file_id}")
@@ -10645,6 +10686,114 @@ def matter_tracking():
         matter_count=len(matters),
     )
 
+def _party_initials(name):
+    """Return up to 2 uppercase initials derived from a person/organisation name."""
+    parts = (name or '').strip().split()
+    chars = [p[0] for p in parts if p]
+    return (''.join(chars[:2]) or 'P').upper()
+
+
+def _party_color_token(party_type):
+    """Return a short color token used by templates to pick a Tailwind palette."""
+    pt = (party_type or '').upper()
+    if pt in ('PLAINTIFF', 'PETITIONER', 'APPLICANT', 'COMPLAINANT'):
+        return 'indigo'
+    if pt in ('DEFENDANT', 'RESPONDENT', 'ACCUSED'):
+        return 'rose'
+    if pt == 'WITNESS':
+        return 'emerald'
+    if pt in ('JUDGE', 'MAGISTRATE'):
+        return 'purple'
+    if pt in ('ADVOCATE', 'LAWYER', 'COUNSEL', 'AGENT'):
+        return 'amber'
+    return 'slate'
+
+
+def _build_case_document_groups(documents, parties):
+    """Group case documents by their linked party for the per-party accordion UI.
+
+    Returns an ordered list of group dicts. Each group carries enough metadata
+    to render a "profile card" style header in the templates:
+        {key, party_id, party_type, party_name,
+         party_initials, party_color, party_phone, party_email, firm_agent, party_category,
+         is_unlinked, is_orphan, documents}
+
+    Registered parties (in their query order) come first, then orphans (docs
+    pointing to a party no longer registered on this case), then docs without
+    any party link.
+    """
+    party_lookup = {str(p['id']): p for p in (parties or [])}
+    groups_map = {}
+
+    for doc in (documents or []):
+        pid = (doc.get('party_id') or '').strip()
+        ptype = (doc.get('party_type') or '').strip()
+        pname = (doc.get('party_name') or '').strip()
+
+        if pid and pid in party_lookup:
+            p = party_lookup[pid]
+            key = f'party_{pid}'
+            label_type = (p.get('party_type') or '').strip()
+            label_name = (p.get('party_name') or '').strip()
+            extra = {
+                'party_phone': (p.get('party_phone') or '').strip(),
+                'party_email': (p.get('party_email') or '').strip(),
+                'firm_agent': (p.get('firm_agent') or '').strip(),
+                'party_category': (p.get('party_category') or '').strip(),
+            }
+        elif pid or ptype or pname:
+            key = f'orphan_{pid or ptype}_{pname}'.strip('_') or 'orphan'
+            label_type = ptype
+            label_name = pname
+            extra = {
+                'party_phone': '',
+                'party_email': '',
+                'firm_agent': '',
+                'party_category': '',
+            }
+        else:
+            key = '__none__'
+            label_type = ''
+            label_name = ''
+            extra = {
+                'party_phone': '',
+                'party_email': '',
+                'firm_agent': '',
+                'party_category': '',
+            }
+
+        if key not in groups_map:
+            groups_map[key] = {
+                'key': key,
+                'party_id': pid if (pid and pid in party_lookup) else '',
+                'party_type': label_type,
+                'party_name': label_name,
+                'party_initials': _party_initials(label_name) if (label_name or label_type) else '?',
+                'party_color': _party_color_token(label_type),
+                'is_unlinked': key == '__none__',
+                'is_orphan': key.startswith('orphan_'),
+                'documents': [],
+                **extra,
+            }
+        groups_map[key]['documents'].append(doc)
+
+    ordered = []
+    seen = set()
+    for p in (parties or []):
+        k = f'party_{p["id"]}'
+        if k in groups_map:
+            ordered.append(groups_map[k])
+            seen.add(k)
+    for k, g in groups_map.items():
+        if k in seen or k == '__none__':
+            continue
+        ordered.append(g)
+        seen.add(k)
+    if '__none__' in groups_map:
+        ordered.append(groups_map['__none__'])
+    return ordered
+
+
 @app.route('/case_management/<int:case_id>')
 def case_details(case_id):
     """Case Details page"""
@@ -10910,6 +11059,10 @@ def case_details(case_id):
                                     if not modified_by:
                                         modified_by = uploaded_by
 
+                                    party_type_value = (file_properties.get('party_type') or '').strip()
+                                    party_name_value = (file_properties.get('party_name') or '').strip()
+                                    party_id_value = (file_properties.get('party_id') or '').strip()
+
                                     documents.append({
                                         'id': file.get('id'),
                                         'name': file.get('name', 'Unknown'),
@@ -10920,7 +11073,10 @@ def case_details(case_id):
                                         'size': size_str,
                                         'mime_type': file.get('mimeType', ''),
                                         'uploaded_by': uploaded_by or 'Unknown',
-                                        'modified_by': modified_by or 'Unknown'
+                                        'modified_by': modified_by or 'Unknown',
+                                        'party_id': party_id_value,
+                                        'party_type': party_type_value,
+                                        'party_name': party_name_value
                                     })
                 except Exception as e:
                     print(f"Error fetching documents for case details: {e}")
@@ -10936,6 +11092,9 @@ def case_details(case_id):
                 emp_name = (emp_row.get('full_name') or '').strip() if emp_row else ''
             tracking = (case_data.get('tracking_number') or '').strip() or f'Case-{case_id}'
             suggested_doc_title = f"{emp_name or 'Document'} - {tracking}"
+
+            document_groups = _build_case_document_groups(documents, parties)
+
             return render_template('case_details.html', 
                                  case_data=case_data, 
                                  case_id=case_id,
@@ -10943,6 +11102,7 @@ def case_details(case_id):
                                  parties=parties,
                                  proceedings=proceedings,
                                  documents=documents,
+                                 document_groups=document_groups,
                                  google_drive_connected=google_drive_connected,
                                  company_settings=company_settings,
                                  suggested_doc_title=suggested_doc_title)
@@ -11118,7 +11278,17 @@ def case_documents(case_id):
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view_documents'):
                     flash('You can only access case documents while your allocated task is active.', 'error')
                     return redirect(url_for('my_tasks'))
-            
+
+            # Fetch parties registered for this case so user can link documents to a specific party
+            cursor.execute("""
+                SELECT id, party_type, party_name
+                FROM case_parties
+                WHERE case_id = %s
+                  AND party_type IS NOT NULL AND party_type <> ''
+                ORDER BY party_type ASC, party_name ASC
+            """, (case_id,))
+            parties = cursor.fetchall() or []
+
             # Check if Google Drive is connected and load credentials
             google_drive_connected = False
             if 'google_drive_credentials' in session:
@@ -11258,7 +11428,11 @@ def case_documents(case_id):
                                     )
                                     if not modified_by:
                                         modified_by = uploaded_by
-                                    
+
+                                    party_type_value = (file_properties.get('party_type') or '').strip()
+                                    party_name_value = (file_properties.get('party_name') or '').strip()
+                                    party_id_value = (file_properties.get('party_id') or '').strip()
+
                                     documents.append({
                                         'id': file.get('id'),
                                         'name': file.get('name', 'Unknown'),
@@ -11269,7 +11443,10 @@ def case_documents(case_id):
                                         'size': size_str,
                                         'mime_type': file.get('mimeType', ''),
                                         'uploaded_by': uploaded_by or 'Unknown',
-                                        'modified_by': modified_by or 'Unknown'
+                                        'modified_by': modified_by or 'Unknown',
+                                        'party_id': party_id_value,
+                                        'party_type': party_type_value,
+                                        'party_name': party_name_value
                                     })
                 except Exception as e:
                     print(f"Error fetching documents from Google Drive: {e}")
@@ -11279,13 +11456,27 @@ def case_documents(case_id):
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
-            
+
+            document_groups = _build_case_document_groups(documents, parties)
+
+            # Suggested doc title used by "Create with Google" UI (employee name + tracking)
+            emp_name = (session.get('employee_name') or '').strip()
+            if not emp_name and session.get('employee_id'):
+                cursor.execute("SELECT full_name FROM employees WHERE id = %s", (session['employee_id'],))
+                emp_row = cursor.fetchone()
+                emp_name = (emp_row.get('full_name') or '').strip() if emp_row else ''
+            tracking = (case_data.get('tracking_number') or '').strip() or f'Case-{case_id}'
+            suggested_doc_title = f"{emp_name or 'Document'} - {tracking}"
+
             return render_template('case_documents.html', 
                                  case_data=case_data, 
                                  case_id=case_id,
                                  access_task_id=task_id,
                                  google_drive_connected=google_drive_connected,
                                  documents=documents,
+                                 document_groups=document_groups,
+                                 parties=parties,
+                                 suggested_doc_title=suggested_doc_title,
                                  company_settings=company_settings)
     except Exception as e:
         print(f"Error fetching case documents page: {e}")
@@ -11338,6 +11529,8 @@ def case_proceedings(case_id):
                     next_court_date,
                     attendance,
                     next_attendance,
+                    next_activity_type,
+                    next_judicial_officer,
                     virtual_link,
                     reason,
                     created_at,
@@ -11604,6 +11797,8 @@ def case_calendar(case_id):
                     next_court_date,
                     attendance,
                     next_attendance,
+                    next_activity_type,
+                    next_judicial_officer,
                     virtual_link,
                     outcome_orders,
                     created_at
@@ -11624,6 +11819,8 @@ def case_calendar(case_id):
                     next_court_date,
                     attendance,
                     next_attendance,
+                    next_activity_type,
+                    next_judicial_officer,
                     virtual_link,
                     outcome_orders,
                     created_at
@@ -12136,8 +12333,9 @@ def api_add_proceeding():
             cursor.execute("""
                 INSERT INTO case_proceedings (
                     case_id, previous_proceeding_id, court_activity_type, court_room, judicial_officer,
-                    date_of_court_appeared, outcome_orders, outcome_details, next_court_date, attendance, next_attendance, virtual_link, reason
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    date_of_court_appeared, outcome_orders, outcome_details, next_court_date, attendance, next_attendance,
+                    next_activity_type, next_judicial_officer, virtual_link, reason
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 data['case_id'],
                 prev_id,
@@ -12150,6 +12348,8 @@ def api_add_proceeding():
                 data.get('next_court_date') if data.get('next_court_date') else None,
                 data.get('attendance') if data.get('attendance') else None,
                 data.get('next_attendance') if data.get('next_attendance') else None,
+                data.get('next_activity_type') if data.get('next_activity_type') else None,
+                data.get('next_judicial_officer') if data.get('next_judicial_officer') else None,
                 data.get('virtual_link') if data.get('virtual_link') else None,
                 data.get('reason') if data.get('reason') else None
             ))
@@ -12253,6 +12453,8 @@ def api_update_proceeding(proceeding_id):
                     next_court_date = %s,
                     attendance = %s,
                     next_attendance = %s,
+                    next_activity_type = %s,
+                    next_judicial_officer = %s,
                     virtual_link = %s,
                     reason = %s,
                     updated_at = NOW()
@@ -12267,6 +12469,8 @@ def api_update_proceeding(proceeding_id):
                 data.get('next_court_date') if data.get('next_court_date') else None,
                 data.get('attendance') if data.get('attendance') else None,
                 data.get('next_attendance') if data.get('next_attendance') else None,
+                data.get('next_activity_type') if data.get('next_activity_type') else None,
+                data.get('next_judicial_officer') if data.get('next_judicial_officer') else None,
                 data.get('virtual_link') if data.get('virtual_link') else None,
                 data.get('reason') if data.get('reason') else None,
                 proceeding_id
@@ -13572,6 +13776,329 @@ def _pop_google_drive_oauth_employee(state):
         connection.close()
 
 
+# ------------------------------------------------------------------
+# Google Drive credentials lifecycle: refresh, persistence, reconnect
+# ------------------------------------------------------------------
+#
+# Google's OAuth refresh tokens (especially while the OAuth consent
+# screen is in "Testing" mode) can become invalid after ~7 days. When
+# that happens the next refresh raises google.auth.exceptions.RefreshError
+# with "invalid_grant". The helpers below centralize the handling so:
+#   * refreshed access tokens are persisted back to company_settings,
+#   * a failed refresh marks the row as `needs_reconnect = 1` and
+#     stores a human-readable reason, while preserving the account
+#     email / name / picture / main folder id so the UI can ask the
+#     user to reconnect THAT specific account,
+#   * `google_drive_last_verified_at` records when we last confirmed
+#     the connection is healthy so the user can see it in settings.
+
+DRIVE_NOTICE_SESSION_KEY = 'drive_reconnect_notice'
+
+
+def _credentials_expiry_dt(credentials):
+    """Return a naive UTC datetime for credentials.expiry, or None."""
+    expiry = getattr(credentials, 'expiry', None)
+    if not expiry:
+        return None
+    try:
+        if hasattr(expiry, 'tzinfo') and expiry.tzinfo is not None:
+            return expiry.astimezone(tz=None).replace(tzinfo=None)
+        return expiry
+    except Exception:
+        return None
+
+
+def _persist_refreshed_drive_token(cursor, connection, credentials):
+    """Save the refreshed access token + expiry back to company_settings.
+    Also clears any prior `needs_reconnect` flag and records last_verified_at.
+    """
+    try:
+        cursor.execute(
+            """
+            UPDATE company_settings
+            SET google_drive_token = %s,
+                google_drive_token_expiry = %s,
+                google_drive_needs_reconnect = 0,
+                google_drive_reconnect_reason = NULL,
+                google_drive_last_verified_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+            """,
+            (credentials.token, _credentials_expiry_dt(credentials)),
+        )
+        connection.commit()
+    except Exception as e:
+        print(f"[WARNING] _persist_refreshed_drive_token: {e}")
+
+
+def _mark_drive_needs_reconnect(reason):
+    """Mark the saved Drive account as needing a fresh OAuth reconnect.
+
+    We intentionally KEEP `google_drive_account_email/name/picture` and
+    `google_drive_main_folder_id` so the UI can show a precise prompt
+    like "Reconnect <email>" and re-use the existing SHERIA CENTRIC
+    folder when the user reconnects.
+    """
+    reason = (reason or 'Google Drive needs to be reconnected.')[:250]
+    connection = get_db_connection()
+    if not connection:
+        return False
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE company_settings
+                SET google_drive_needs_reconnect = 1,
+                    google_drive_reconnect_reason = %s,
+                    google_drive_token = NULL,
+                    google_drive_token_expiry = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                """,
+                (reason,),
+            )
+            connection.commit()
+        try:
+            session.pop('google_drive_credentials', None)
+        except Exception:
+            pass
+        print(f"[Drive] Marked needs_reconnect: {reason}")
+        return True
+    except Exception as e:
+        print(f"[WARNING] _mark_drive_needs_reconnect: {e}")
+        return False
+    finally:
+        connection.close()
+
+
+def _is_invalid_grant_error(exc):
+    """Heuristic: tell whether an exception means the refresh token is dead."""
+    if isinstance(exc, RefreshError):
+        return True
+    text = str(exc).lower()
+    return (
+        'invalid_grant' in text
+        or 'token has been expired or revoked' in text
+        or 'token has been revoked' in text
+        or 'bad request' in text and 'invalid_grant' in text
+    )
+
+
+def refresh_drive_credentials_safely(credentials, cursor=None, connection=None):
+    """Refresh `credentials` in-place if expired. Persist + return (True, credentials)
+    on success. On invalid_grant, mark needs_reconnect and return (False, reason).
+    """
+    try:
+        if not credentials.expired:
+            return True, credentials
+        if not credentials.refresh_token:
+            _mark_drive_needs_reconnect('No refresh token on file. Please reconnect Google Drive.')
+            return False, 'no_refresh_token'
+        credentials.refresh(GoogleAuthRequest())
+        if cursor is not None and connection is not None:
+            _persist_refreshed_drive_token(cursor, connection, credentials)
+        else:
+            tmp_connection = get_db_connection()
+            if tmp_connection:
+                try:
+                    with tmp_connection.cursor() as c2:
+                        _persist_refreshed_drive_token(c2, tmp_connection, credentials)
+                finally:
+                    tmp_connection.close()
+        return True, credentials
+    except Exception as e:
+        if _is_invalid_grant_error(e):
+            _mark_drive_needs_reconnect(
+                'Google revoked or expired the saved credentials. Please reconnect Google Drive.'
+            )
+            return False, 'invalid_grant'
+        print(f"[Drive] Unexpected refresh error: {e}")
+        return False, f'refresh_error: {e}'
+
+
+def _load_drive_settings_row(cursor):
+    cursor.execute(
+        """
+        SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+               google_drive_scopes, google_drive_account_email, google_drive_account_name,
+               google_drive_account_picture, google_drive_main_folder_id,
+               google_drive_token_expiry, google_drive_last_verified_at,
+               google_drive_needs_reconnect, google_drive_reconnect_reason,
+               updated_at
+        FROM company_settings
+        ORDER BY id DESC LIMIT 1
+        """
+    )
+    return cursor.fetchone()
+
+
+def _build_drive_account_payload(row):
+    """Build the public account info payload from a company_settings row."""
+    if not row:
+        return None
+    return {
+        'email': row.get('google_drive_account_email'),
+        'name': row.get('google_drive_account_name'),
+        'picture': row.get('google_drive_account_picture'),
+    }
+
+
+def evaluate_drive_connection_state():
+    """Single source of truth for Drive connection health.
+
+    Returns a dict:
+        {
+          'state': 'never_connected' | 'connected' | 'needs_reconnect',
+          'account': {email,name,picture} | None,
+          'reason': str | None,
+          'last_verified_at': iso str | None,
+        }
+    Also refreshes + persists the access token if it is just expired and
+    the refresh token is still valid.
+    """
+    result = {'state': 'never_connected', 'account': None, 'reason': None, 'last_verified_at': None}
+    connection = get_db_connection()
+    if not connection:
+        return result
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            row = _load_drive_settings_row(cursor)
+            if not row:
+                return result
+            account = _build_drive_account_payload(row)
+            last_verified = row.get('google_drive_last_verified_at')
+            if last_verified:
+                try:
+                    result['last_verified_at'] = last_verified.isoformat()
+                except Exception:
+                    result['last_verified_at'] = str(last_verified)
+            if int(row.get('google_drive_needs_reconnect') or 0) == 1:
+                result['state'] = 'needs_reconnect'
+                result['account'] = account
+                result['reason'] = row.get('google_drive_reconnect_reason') or (
+                    'Google Drive needs to be reconnected.'
+                )
+                return result
+            if not row.get('google_drive_token') or not row.get('google_drive_refresh_token'):
+                result['account'] = account if account and account.get('email') else None
+                if result['account']:
+                    result['state'] = 'needs_reconnect'
+                    result['reason'] = 'Saved credentials are incomplete. Please reconnect Google Drive.'
+                return result
+            scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
+            creds = Credentials(
+                token=row['google_drive_token'],
+                refresh_token=row['google_drive_refresh_token'],
+                token_uri=row.get('google_drive_token_uri'),
+                client_id=GOOGLE_CLIENT_ID,
+                client_secret=GOOGLE_CLIENT_SECRET,
+                scopes=scopes,
+            )
+            if creds.expired:
+                ok, info = refresh_drive_credentials_safely(creds, cursor, connection)
+                if not ok:
+                    result['state'] = 'needs_reconnect'
+                    result['account'] = account
+                    result['reason'] = (
+                        'Google revoked or expired the saved credentials. Please reconnect Google Drive.'
+                        if info == 'invalid_grant'
+                        else 'Could not refresh Google Drive credentials. Please reconnect.'
+                    )
+                    return result
+            else:
+                try:
+                    cursor.execute(
+                        """
+                        UPDATE company_settings
+                        SET google_drive_last_verified_at = CURRENT_TIMESTAMP
+                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+                        """
+                    )
+                    connection.commit()
+                except Exception:
+                    pass
+            result['state'] = 'connected'
+            result['account'] = account
+            return result
+    except Exception as e:
+        print(f"[Drive] evaluate_drive_connection_state error: {e}")
+        return result
+    finally:
+        connection.close()
+
+
+def refresh_drive_login_notice():
+    """Sync session['drive_reconnect_notice'] with the current DB state.
+
+    Called on login and on the documents_settings page so the banner is
+    always in sync. Returns the notice dict that was stored (or removed).
+    """
+    state = evaluate_drive_connection_state()
+    if state['state'] == 'needs_reconnect':
+        notice = {
+            'needs_reconnect': True,
+            'email': (state.get('account') or {}).get('email'),
+            'name': (state.get('account') or {}).get('name'),
+            'picture': (state.get('account') or {}).get('picture'),
+            'reason': state.get('reason'),
+        }
+        session[DRIVE_NOTICE_SESSION_KEY] = notice
+        session.pop('drive_reconnect_notice_dismissed', None)
+        return notice
+    session.pop(DRIVE_NOTICE_SESSION_KEY, None)
+    return None
+
+
+@app.context_processor
+def _inject_drive_reconnect_notice():
+    """Expose the Drive reconnect notice to all employee templates.
+
+    The banner is suppressed in two cases:
+        * the user has dismissed it for this session,
+        * the user is currently ON the documents_settings page (where
+          the page itself already shows the reconnect UI).
+    """
+    try:
+        if not session.get('employee_id'):
+            return {}
+        notice = session.get(DRIVE_NOTICE_SESSION_KEY)
+        if not notice or not notice.get('needs_reconnect'):
+            return {}
+        if session.get('drive_reconnect_notice_dismissed'):
+            return {}
+        try:
+            if request.endpoint == 'documents_settings':
+                return {}
+        except Exception:
+            pass
+        try:
+            allowed_roles = ('IT Support', 'Firm Administrator', 'Managing Partner')
+            role = session.get('employee_role') or ''
+            original_role = session.get('original_role') or ''
+            if role not in allowed_roles and original_role != 'IT Support':
+                return {}
+            settings_url = url_for('documents_settings')
+        except Exception:
+            settings_url = '/documents_settings'
+        return {
+            'drive_reconnect_notice': notice,
+            'drive_reconnect_settings_url': settings_url,
+        }
+    except Exception:
+        return {}
+
+
+@app.route('/api/auth/google-drive/dismiss-notice', methods=['POST'])
+def google_drive_dismiss_notice():
+    """Hide the Drive reconnect banner for the remainder of this session.
+    The DB still says needs_reconnect, so the prompt comes back next login.
+    """
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    session['drive_reconnect_notice_dismissed'] = True
+    return jsonify({'success': True})
+
+
 @app.route('/api/auth/google-drive/authorize')
 def google_drive_authorize():
     """Initiate Google Drive OAuth flow with account selection"""
@@ -13753,7 +14280,9 @@ def google_drive_callback():
         if connection:
             try:
                 with connection.cursor() as cursor:
-                    # Update company_settings with Google Drive credentials
+                    # Update company_settings with Google Drive credentials.
+                    # Reset needs_reconnect flag and stamp last_verified_at because
+                    # we have a fresh, working set of credentials right now.
                     cursor.execute("""
                         UPDATE company_settings 
                         SET google_drive_token = %s,
@@ -13763,6 +14292,10 @@ def google_drive_callback():
                             google_drive_account_email = %s,
                             google_drive_account_name = %s,
                             google_drive_account_picture = %s,
+                            google_drive_token_expiry = %s,
+                            google_drive_needs_reconnect = 0,
+                            google_drive_reconnect_reason = NULL,
+                            google_drive_last_verified_at = CURRENT_TIMESTAMP,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
                     """, (
@@ -13772,7 +14305,8 @@ def google_drive_callback():
                         json.dumps(credentials.scopes) if credentials.scopes else None,
                         id_info.get('email'),
                         id_info.get('name'),
-                        id_info.get('picture')
+                        id_info.get('picture'),
+                        _credentials_expiry_dt(credentials),
                     ))
                     connection.commit()
                     print("[OK] Google Drive credentials saved to database")
@@ -13795,7 +14329,11 @@ def google_drive_callback():
             'name': id_info.get('name'),
             'picture': id_info.get('picture')
         }
-        
+
+        # A successful reconnect clears any pending reconnect banner.
+        session.pop(DRIVE_NOTICE_SESSION_KEY, None)
+        session.pop('drive_reconnect_notice_dismissed', None)
+
         # Clear state
         session.pop('google_drive_oauth_state', None)
         
@@ -13828,67 +14366,74 @@ def google_drive_callback():
 
 @app.route('/api/auth/google-drive/status', methods=['GET'])
 def google_drive_status():
-    """Check Google Drive connection status"""
+    """Check Google Drive connection status.
+
+    This endpoint now ACTIVELY verifies credentials by refreshing the
+    access token if it's expired. Three states are returned:
+
+        connected: true                       - healthy, account info attached.
+        connected: false, needs_reconnect: true
+                                              - had a previous link, refresh
+                                                token is dead; account info
+                                                still attached so the UI can
+                                                say "Reconnect <email>".
+        connected: false, needs_reconnect: false
+                                              - never connected.
+    """
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    # First check database for persistent credentials
-    connection = get_db_connection()
-    if connection:
-        try:
-            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                cursor.execute("""
-                    SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
-                           google_drive_scopes, google_drive_account_email, google_drive_account_name,
-                           google_drive_account_picture, google_drive_main_folder_id
-                    FROM company_settings 
-                    ORDER BY id DESC LIMIT 1
-                """)
-                settings = cursor.fetchone()
-                
-                if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
-                    # Load credentials into session for use
-                    scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
-                    session['google_drive_credentials'] = {
-                        'token': settings['google_drive_token'],
-                        'refresh_token': settings['google_drive_refresh_token'],
-                        'token_uri': settings.get('google_drive_token_uri'),
-                        'client_id': GOOGLE_CLIENT_ID,
-                        'client_secret': GOOGLE_CLIENT_SECRET,
-                        'scopes': scopes
-                    }
-                    session['google_drive_account'] = {
-                        'email': settings.get('google_drive_account_email'),
-                        'name': settings.get('google_drive_account_name'),
-                        'picture': settings.get('google_drive_account_picture')
-                    }
-                    if settings.get('google_drive_main_folder_id'):
-                        session['google_drive_main_folder_id'] = settings['google_drive_main_folder_id']
-                    
-                    return jsonify({
-                        'connected': True,
-                        'account': {
-                            'email': settings.get('google_drive_account_email'),
-                            'name': settings.get('google_drive_account_name'),
-                            'picture': settings.get('google_drive_account_picture')
+
+    state = evaluate_drive_connection_state()
+    if state['state'] == 'connected':
+        # Mirror to session for fast-path code that still reads it.
+        connection = get_db_connection()
+        if connection:
+            try:
+                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                    row = _load_drive_settings_row(cursor)
+                    if row:
+                        scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
+                        session['google_drive_credentials'] = {
+                            'token': row.get('google_drive_token'),
+                            'refresh_token': row.get('google_drive_refresh_token'),
+                            'token_uri': row.get('google_drive_token_uri'),
+                            'client_id': GOOGLE_CLIENT_ID,
+                            'client_secret': GOOGLE_CLIENT_SECRET,
+                            'scopes': scopes,
                         }
-                    })
-        except Exception as e:
-            print(f"Error checking Google Drive status from database: {e}")
-        finally:
-            connection.close()
-    
-    # Fallback to session check
-    if 'google_drive_credentials' in session and 'google_drive_account' in session:
+                        session['google_drive_account'] = state['account']
+                        if row.get('google_drive_main_folder_id'):
+                            session['google_drive_main_folder_id'] = row['google_drive_main_folder_id']
+            except Exception as e:
+                print(f"[Drive] status session-mirror error: {e}")
+            finally:
+                connection.close()
+        session.pop(DRIVE_NOTICE_SESSION_KEY, None)
         return jsonify({
             'connected': True,
-            'account': session['google_drive_account']
+            'needs_reconnect': False,
+            'account': state['account'],
+            'last_verified_at': state.get('last_verified_at'),
         })
-    else:
+    if state['state'] == 'needs_reconnect':
+        session[DRIVE_NOTICE_SESSION_KEY] = {
+            'needs_reconnect': True,
+            'email': (state.get('account') or {}).get('email'),
+            'name': (state.get('account') or {}).get('name'),
+            'picture': (state.get('account') or {}).get('picture'),
+            'reason': state.get('reason'),
+        }
+        session.pop('google_drive_credentials', None)
         return jsonify({
             'connected': False,
-            'account': None
+            'needs_reconnect': True,
+            'account': state['account'],
+            'reason': state['reason'],
+            'last_verified_at': state.get('last_verified_at'),
         })
+    # never_connected
+    session.pop(DRIVE_NOTICE_SESSION_KEY, None)
+    return jsonify({'connected': False, 'needs_reconnect': False, 'account': None})
 
 @app.route('/api/auth/google-drive/disconnect', methods=['POST'])
 def google_drive_disconnect():
@@ -13911,6 +14456,10 @@ def google_drive_disconnect():
                         google_drive_account_name = NULL,
                         google_drive_account_picture = NULL,
                         google_drive_main_folder_id = NULL,
+                        google_drive_token_expiry = NULL,
+                        google_drive_last_verified_at = NULL,
+                        google_drive_needs_reconnect = 0,
+                        google_drive_reconnect_reason = NULL,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
                 """)
@@ -13921,11 +14470,14 @@ def google_drive_disconnect():
         finally:
             connection.close()
     
-    # Clear from session
+    # Clear from session — including any pending reconnect banner because
+    # the user deliberately ended the connection.
     session.pop('google_drive_credentials', None)
     session.pop('google_drive_account', None)
     session.pop('google_drive_main_folder_id', None)
-    
+    session.pop(DRIVE_NOTICE_SESSION_KEY, None)
+    session.pop('drive_reconnect_notice_dismissed', None)
+
     return jsonify({
         'success': True,
         'message': 'Google Drive disconnected successfully'
@@ -14004,8 +14556,18 @@ def get_google_drive_service():
             client_secret=creds_dict.get('client_secret'),
             scopes=creds_dict.get('scopes')
         )
-        
-        # Build and return the Drive service
+
+        # If the access token is expired, refresh through the safe helper so a
+        # revoked refresh token automatically flips the global needs_reconnect
+        # state instead of falling through as an opaque service error.
+        if credentials.expired:
+            ok, _info = refresh_drive_credentials_safely(credentials)
+            if not ok:
+                session.pop('google_drive_credentials', None)
+                return None
+            creds_dict['token'] = credentials.token
+            session['google_drive_credentials'] = creds_dict
+
         service = build('drive', 'v3', credentials=credentials)
         return service
     except Exception as e:
@@ -14371,7 +14933,37 @@ def upload_case_document(case_id):
                 desc_words = description.split()
                 if len(desc_words) > 5:
                     return jsonify({'success': False, 'error': 'Description must be 5 words or fewer.'}), 400
-                
+
+                # Optional: party this document is linked to (used for filtering by party type)
+                party_id = (request.form.get('party_id') or '').strip()[:50]
+                party_type = (request.form.get('party_type') or '').strip()
+                party_name = (request.form.get('party_name') or '').strip()
+                if party_type:
+                    party_type = party_type.upper()[:100]
+                party_name = party_name[:120]
+                # If a party_id was supplied, verify it belongs to this case and resolve type/name
+                # from the database to prevent client-side tampering of the link.
+                if party_id:
+                    try:
+                        cursor.execute(
+                            """
+                            SELECT id, party_type, party_name
+                            FROM case_parties
+                            WHERE id = %s AND case_id = %s
+                            LIMIT 1
+                            """,
+                            (party_id, case_id),
+                        )
+                        party_row = cursor.fetchone()
+                        if party_row:
+                            party_type = (party_row.get('party_type') or '').strip().upper()[:100]
+                            party_name = (party_row.get('party_name') or '').strip()[:120]
+                        else:
+                            party_id = ''  # invalid for this case
+                    except Exception as _party_lookup_err:
+                        print(f"WARN: party lookup failed: {_party_lookup_err}")
+                        party_id = ''
+
                 # Determine MIME type
                 file_ext = file_name.rsplit('.', 1)[1].lower() if '.' in file_name else ''
                 mime_types = {
@@ -14385,13 +14977,21 @@ def upload_case_document(case_id):
                 mime_type = mime_types.get(file_ext, 'application/octet-stream')
                 
                 # Create file metadata
+                file_properties = {
+                    'uploaded_by_id': str(session.get('employee_id') or ''),
+                    'uploaded_by_name': session.get('employee_name') or ''
+                }
+                if party_type:
+                    file_properties['party_type'] = party_type
+                if party_name:
+                    file_properties['party_name'] = party_name
+                if party_id:
+                    file_properties['party_id'] = str(party_id)
+
                 file_metadata = {
                     'name': file_name,
                     'parents': [case_doc_folder_id],
-                    'properties': {
-                        'uploaded_by_id': str(session.get('employee_id') or ''),
-                        'uploaded_by_name': session.get('employee_name') or ''
-                    }
+                    'properties': file_properties
                 }
                 file_metadata['description'] = description
                 
@@ -14540,8 +15140,16 @@ def create_case_google_file(case_id):
         file_type = (data.get('type') or '').strip().lower()
         file_name = (data.get('name') or '').strip()
         task_id = str(data.get('task_id') or '').strip()
+        party_id_in = str(data.get('party_id') or '').strip()[:50]
+        party_type_in = (data.get('party_type') or '').strip()
+        party_name_in = (data.get('party_name') or '').strip()
+        description_in = (data.get('description') or '').strip()
         if file_type not in ('doc', 'sheet', 'slides', 'notebook'):
             return jsonify({'success': False, 'error': 'Invalid type. Use doc, sheet, slides, or notebook.'}), 400
+        if description_in:
+            desc_words = description_in.split()
+            if len(desc_words) > 5:
+                return jsonify({'success': False, 'error': 'Description must be 5 words or fewer.'}), 400
         connection = get_db_connection()
         if not connection:
             return jsonify({'success': False, 'error': 'Database connection error'}), 500
@@ -14574,16 +15182,10 @@ def create_case_google_file(case_id):
                     client_secret=company_creds_dict.get('client_secret'),
                     scopes=company_creds_dict.get('scopes')
                 )
-                if credentials.expired and credentials.refresh_token:
-                    from google.auth.transport.requests import Request
-                    credentials.refresh(Request())
-                    cursor.execute("""
-                        UPDATE company_settings
-                        SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
-                    """, (credentials.token,))
-                    connection.commit()
-                    company_creds_dict['token'] = credentials.token
+                ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                if not ok:
+                    raise RefreshError('invalid_grant: Google Drive needs reconnect')
+                company_creds_dict['token'] = credentials.token
 
                 service = build('drive', 'v3', credentials=credentials)
 
@@ -14641,17 +15243,59 @@ def create_case_google_file(case_id):
                 }
                 mime_type, default_name = mime_and_default[file_type]
                 name = file_name if file_name else default_name
+
+                # Resolve / validate the optional linked party so it can't be tampered with
+                resolved_party_id = ''
+                resolved_party_type = (party_type_in or '').upper()[:100]
+                resolved_party_name = (party_name_in or '')[:120]
+                if party_id_in:
+                    try:
+                        cursor.execute(
+                            """
+                            SELECT id, party_type, party_name
+                            FROM case_parties
+                            WHERE id = %s AND case_id = %s
+                            LIMIT 1
+                            """,
+                            (party_id_in, case_id),
+                        )
+                        party_row = cursor.fetchone()
+                        if party_row:
+                            resolved_party_id = str(party_row['id'])
+                            resolved_party_type = (party_row.get('party_type') or '').strip().upper()[:100]
+                            resolved_party_name = (party_row.get('party_name') or '').strip()[:120]
+                        else:
+                            # Invalid id for this case — drop the link rather than store something wrong
+                            resolved_party_type = ''
+                            resolved_party_name = ''
+                    except Exception as _party_lookup_err:
+                        print(f"WARN: party lookup failed (create google file): {_party_lookup_err}")
+                        resolved_party_type = ''
+                        resolved_party_name = ''
+
+                file_properties = {
+                    'created_by_id': str(session.get('employee_id') or ''),
+                    'created_by_name': session.get('employee_name') or '',
+                    'uploaded_by_id': str(session.get('employee_id') or ''),
+                    'uploaded_by_name': session.get('employee_name') or '',
+                    'task_id': task_id,
+                    'task_type': 'case'
+                }
+                if resolved_party_id:
+                    file_properties['party_id'] = resolved_party_id
+                if resolved_party_type:
+                    file_properties['party_type'] = resolved_party_type
+                if resolved_party_name:
+                    file_properties['party_name'] = resolved_party_name
+
                 file_metadata = {
                     'name': name,
                     'mimeType': mime_type,
                     'parents': [case_doc_folder_id],
-                    'properties': {
-                        'created_by_id': str(session.get('employee_id') or ''),
-                        'created_by_name': session.get('employee_name') or '',
-                        'task_id': task_id,
-                        'task_type': 'case'
-                    }
+                    'properties': file_properties
                 }
+                if description_in:
+                    file_metadata['description'] = description_in
                 created = service.files().create(
                     body=file_metadata,
                     fields='id, name, webViewLink'
@@ -14836,15 +15480,9 @@ def create_matter_google_file(matter_id):
                     client_secret=GOOGLE_CLIENT_SECRET,
                     scopes=drive_scopes
                 )
-                if credentials.expired and credentials.refresh_token:
-                    from google.auth.transport.requests import Request
-                    credentials.refresh(Request())
-                    cursor.execute("""
-                        UPDATE company_settings
-                        SET google_drive_token = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
-                    """, (credentials.token,))
-                    connection.commit()
+                ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                if not ok:
+                    raise RefreshError('invalid_grant: Google Drive needs reconnect')
 
                 cursor.execute("""
                     SELECT
@@ -15386,8 +16024,18 @@ def documents_settings():
         connection.close()
         if deny:
             return deny
-    
-    return render_template('documents_settings.html', company_settings=company_settings)
+
+    # Compute fresh Drive connection state so the template can render the
+    # right card (connected / needs reconnect / never connected) without
+    # an extra round-trip and so the global banner stays in sync.
+    drive_state = evaluate_drive_connection_state()
+    refresh_drive_login_notice()
+
+    return render_template(
+        'documents_settings.html',
+        company_settings=company_settings,
+        drive_state=drive_state,
+    )
 
 @app.route('/view_client_documents/<int:client_id>')
 def view_client_documents(client_id):
@@ -17900,7 +18548,7 @@ def update_company_settings():
                 'website_url', 'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link',
                 'law_society_reg_number', 'practicing_certificate_number', 'lead_advocate_name', 'bar_association_membership',
                 'document_footer_text', 'currency', 'invoice_prefix', 'payment_terms', 'bank_account_details', 'mobile_payment_mpesa',
-                'primary_brand_color', 'secondary_color'
+                'primary_brand_color', 'secondary_color', 'tertiary_color', 'theme_preset', 'font_family', 'font_size'
             ]
             for key in text_fields:
                 val = request.form.get(key)
@@ -17915,6 +18563,34 @@ def update_company_settings():
                 updates.get('secondary_color'),
                 '#6C5CE7'
             )
+            updates['tertiary_color'] = _normalize_hex_color(
+                updates.get('tertiary_color'),
+                '#A29BFE'
+            )
+            # Allowlist of supported theme presets (must match the UI list)
+            allowed_theme_presets = {
+                'midnight_indigo', 'forest_calm', 'slate_ocean', 'royal_plum',
+                'charcoal_amber', 'olive_mist', 'burgundy_rose', 'mocha_sand',
+                'steel_teal', 'graphite_sky', 'soft_lavender', 'rose_quartz',
+                'custom'
+            }
+            theme_preset_val = updates.get('theme_preset')
+            if theme_preset_val not in allowed_theme_presets:
+                updates['theme_preset'] = 'custom'
+            # Allowlist of supported font families (must match the UI list)
+            allowed_fonts = {
+                'Inter', 'Roboto', 'Open Sans', 'Lato', 'Poppins', 'Source Sans 3',
+                'Nunito', 'Plus Jakarta Sans', 'DM Sans', 'Manrope', 'IBM Plex Sans',
+                'Work Sans', 'Merriweather', 'Lora', 'Source Serif 4'
+            }
+            font_val = updates.get('font_family')
+            if font_val not in allowed_fonts:
+                updates['font_family'] = 'Inter'
+            # Allowlist of supported text-size presets (must match UI + base.html)
+            allowed_font_sizes = {'compact', 'comfortable', 'large', 'xl'}
+            font_size_val = updates.get('font_size')
+            if font_size_val not in allowed_font_sizes:
+                updates['font_size'] = 'comfortable'
             # Working days: multiple checkboxes stored as comma-separated
             wd = request.form.getlist('working_days')
             if wd is not None:

@@ -3,382 +3,912 @@
 {% block title %}Case Calendar - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <!-- Page Header -->
-    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-            <div class="flex items-center space-x-4 mb-4 md:mb-0">
-                <a href="{{ url_for('case_details', case_id=case_id) }}" class="text-white hover:text-indigo-200 transition-colors">
-                    <i class="fas fa-arrow-left text-xl"></i>
+{# Pre-compute date helpers for the template #}
+{% set today_str = (none) %}
+<div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6 relative z-10">
+
+    {# ============================================================= #}
+    {# HERO HEADER                                                    #}
+    {# ============================================================= #}
+    <div class="relative overflow-hidden rounded-3xl shadow-2xl text-white"
+         style="background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-accent) 100%);">
+        <!-- decorative blobs -->
+        <div class="absolute -top-20 -right-20 w-72 h-72 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-24 -left-16 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute inset-0 opacity-20 pointer-events-none"
+             style="background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.25) 1px, transparent 0); background-size: 24px 24px;"></div>
+
+        <div class="relative p-5 sm:p-7 lg:p-8">
+            <!-- breadcrumb -->
+            <nav class="flex items-center text-xs sm:text-sm text-white/80 mb-4 flex-wrap gap-y-1">
+                <a href="{{ url_for('dashboard') }}" class="hover:text-white transition-colors flex items-center gap-1">
+                    <i class="fas fa-home"></i> Dashboard
                 </a>
-                <div>
-                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
-                        <i class="fas fa-calendar-alt mr-3"></i>
-                        Case Calendar
-                    </h1>
-                    <p class="text-indigo-100">Tracking Number: <span class="font-semibold text-white">{{ case_data.tracking_number }}</span></p>
+                <i class="fas fa-chevron-right text-[10px] mx-2 opacity-60"></i>
+                <a href="{{ url_for('case_management') }}" class="hover:text-white transition-colors">Case Management</a>
+                <i class="fas fa-chevron-right text-[10px] mx-2 opacity-60"></i>
+                <a href="{{ url_for('case_details', case_id=case_id) }}" class="hover:text-white transition-colors truncate max-w-[140px] sm:max-w-none">
+                    Case {{ case_data.tracking_number }}
+                </a>
+                <i class="fas fa-chevron-right text-[10px] mx-2 opacity-60"></i>
+                <span class="text-white font-semibold">Calendar</span>
+            </nav>
+
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+                <div class="flex items-start gap-4">
+                    <a href="{{ url_for('case_details', case_id=case_id) }}"
+                       class="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-sm transition-all duration-200 ring-1 ring-white/20"
+                       title="Back to case details">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-3 mb-1">
+                            <span class="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-sm ring-1 ring-white/25">
+                                <i class="fas fa-calendar-alt text-lg"></i>
+                            </span>
+                            <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Case Calendar</h1>
+                        </div>
+                        <p class="text-white/85 text-sm sm:text-base">
+                            <span class="opacity-80">Tracking:</span>
+                            <span class="font-semibold text-white">{{ case_data.tracking_number }}</span>
+                            {% if case_data.client_name %}
+                            <span class="opacity-60 mx-2">•</span>
+                            <span class="opacity-80">Client:</span>
+                            <span class="font-semibold text-white">{{ case_data.client_name }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- quick actions -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="{{ url_for('case_proceedings', case_id=case_id) }}"
+                       class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-sm font-semibold backdrop-blur-sm ring-1 ring-white/20 transition-all">
+                        <i class="fas fa-gavel"></i> Proceedings
+                    </a>
+                    <a href="{{ url_for('case_details', case_id=case_id) }}"
+                       class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-50 text-sm font-semibold shadow-lg transition-all">
+                        <i class="fas fa-folder-open"></i> Case Details
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Left Column: Calendar -->
-        <div class="lg:col-span-2 space-y-6">
-            <!-- Modern Calendar View -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 overflow-hidden">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-xl md:text-2xl font-bold text-gray-900 flex items-center">
-                        <i class="fas fa-calendar-week text-indigo-600 mr-3"></i>
-                        Calendar Overview
-                    </h2>
-                    <div class="flex items-center space-x-2">
-                        <button onclick="changeMonth(-1)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            <i class="fas fa-chevron-left text-gray-600"></i>
+    {# ============================================================= #}
+    {# STATS ROW                                                      #}
+    {# ============================================================= #}
+    {% set upcoming_count = upcoming_proceedings|length if upcoming_proceedings else 0 %}
+    {% set history_count = all_proceedings|length if all_proceedings else 0 %}
+    {% set next_event = upcoming_proceedings[0] if upcoming_proceedings and upcoming_proceedings|length > 0 else None %}
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- Upcoming -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 hover:shadow-md transition-all group">
+            <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-calendar-day"></i>
+                </span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Upcoming</span>
+            </div>
+            <p class="text-2xl sm:text-3xl font-bold text-gray-900">{{ upcoming_count }}</p>
+            <p class="text-xs text-gray-500 mt-1">Future court date{{ 's' if upcoming_count != 1 else '' }}</p>
+        </div>
+
+        <!-- Total appearances -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 hover:shadow-md transition-all group">
+            <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-gavel"></i>
+                </span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">History</span>
+            </div>
+            <p class="text-2xl sm:text-3xl font-bold text-gray-900">{{ history_count }}</p>
+            <p class="text-xs text-gray-500 mt-1">Total proceeding{{ 's' if history_count != 1 else '' }}</p>
+        </div>
+
+        <!-- This month -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 hover:shadow-md transition-all group">
+            <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-50 text-purple-600 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-calendar-week"></i>
+                </span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">This Month</span>
+            </div>
+            <p id="stat-this-month" class="text-2xl sm:text-3xl font-bold text-gray-900">0</p>
+            <p class="text-xs text-gray-500 mt-1">Event{{ 's' }} this month</p>
+        </div>
+
+        <!-- Next event countdown -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 hover:shadow-md transition-all group">
+            <div class="flex items-center justify-between mb-3">
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-hourglass-half"></i>
+                </span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Next In</span>
+            </div>
+            <p id="stat-next-in" class="text-2xl sm:text-3xl font-bold text-gray-900">—</p>
+            <p id="stat-next-label" class="text-xs text-gray-500 mt-1">No upcoming date</p>
+        </div>
+    </div>
+
+    {# ============================================================= #}
+    {# MAIN GRID: Calendar + Sidebar                                  #}
+    {# ============================================================= #}
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6">
+
+        <!-- LEFT (CALENDAR + UPCOMING) -->
+        <div class="xl:col-span-2 space-y-5 sm:space-y-6">
+
+            <!-- Calendar Card -->
+            <section class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl text-white shadow-sm"
+                              style="background: linear-gradient(135deg, var(--brand-accent), var(--brand-primary));">
+                            <i class="fas fa-calendar"></i>
+                        </span>
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-bold text-gray-900 leading-tight">Calendar Overview</h2>
+                            <p class="text-xs text-gray-500">Tap a highlighted day to view events</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 sm:gap-2">
+                        <button onclick="changeMonth(-1)"
+                                class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 transition"
+                                title="Previous month" aria-label="Previous month">
+                            <i class="fas fa-chevron-left text-sm"></i>
                         </button>
-                        <button onclick="changeMonth(1)" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            <i class="fas fa-chevron-right text-gray-600"></i>
+                        <button onclick="goToToday()"
+                                class="px-3 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-semibold transition"
+                                title="Jump to current month">
+                            <i class="fas fa-crosshairs mr-1.5"></i>Today
+                        </button>
+                        <button onclick="changeMonth(1)"
+                                class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 transition"
+                                title="Next month" aria-label="Next month">
+                            <i class="fas fa-chevron-right text-sm"></i>
                         </button>
                     </div>
                 </div>
-                
-                <div id="calendar-container" class="w-full">
-                    <!-- Calendar will be generated by JavaScript -->
+
+                <div class="p-3 sm:p-5">
+                    <div id="calendar-container" class="w-full"></div>
+
+                    <!-- Legend -->
+                    <div class="mt-4 sm:mt-5 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs sm:text-sm">
+                        <span class="flex items-center gap-2 text-gray-600">
+                            <span class="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 ring-2 ring-emerald-100"></span>
+                            Upcoming court date
+                        </span>
+                        <span class="flex items-center gap-2 text-gray-600">
+                            <span class="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 ring-2 ring-blue-100"></span>
+                            Past appearance
+                        </span>
+                        <span class="flex items-center gap-2 text-gray-600">
+                            <span class="w-3 h-3 rounded-full ring-2 ring-offset-1"
+                                  style="background: var(--brand-accent); --tw-ring-color: var(--brand-accent-border);"></span>
+                            Today
+                        </span>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- Selected day details (revealed when clicking a day) -->
+            <section id="selected-day-panel" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 shrink-0">
+                            <i class="fas fa-bullseye"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <h3 class="text-base sm:text-lg font-bold text-gray-900 truncate" id="selected-day-title">Selected day</h3>
+                            <p class="text-xs text-gray-500" id="selected-day-subtitle"></p>
+                        </div>
+                    </div>
+                    <button onclick="clearSelectedDay()" class="text-gray-400 hover:text-gray-600 p-2" aria-label="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="selected-day-events" class="p-4 sm:p-6 space-y-3"></div>
+            </section>
 
             <!-- Upcoming Court Dates -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6">
-                <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <i class="fas fa-calendar-check text-green-600 mr-3"></i>
-                    Upcoming Court Dates
-                </h2>
-                
-                {% if upcoming_proceedings and upcoming_proceedings|length > 0 %}
-                <div class="space-y-4">
-                    {% for proceeding in upcoming_proceedings %}
-                    <div class="bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 rounded-xl p-4 sm:p-6 border border-green-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4">
-                            <div class="flex items-center space-x-3 mb-3 sm:mb-0">
-                                <div class="bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-xl px-4 py-3 font-bold text-lg sm:text-xl shadow-lg">
-                                    {{ proceeding.next_court_date.split('-')[2] if proceeding.next_court_date else 'N/A' }}
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-600 font-medium">
-                                        {{ proceeding.next_court_date.split('-')[1] if proceeding.next_court_date else 'N/A' }}/{{ proceeding.next_court_date.split('-')[0] if proceeding.next_court_date else 'N/A' }}
-                                    </p>
-                                    <p class="text-sm font-semibold text-gray-800" id="upcoming-day-{{ loop.index }}"></p>
-                                </div>
-                            </div>
-                            <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">Upcoming</span>
+            <section class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600">
+                            <i class="fas fa-calendar-check"></i>
+                        </span>
+                        <div>
+                            <h2 class="text-lg sm:text-xl font-bold text-gray-900 leading-tight">Upcoming Court Dates</h2>
+                            <p class="text-xs text-gray-500">Future scheduled appearances for this case</p>
                         </div>
-                        <h3 class="text-lg sm:text-xl font-bold text-gray-900 mb-2">{{ proceeding.court_activity_type or 'N/A' }}</h3>
-                        <p class="text-sm text-gray-600 mb-4">From proceeding dated: <span class="font-semibold">{{ proceeding.date_of_court_appeared or 'N/A' }}</span></p>
-                        
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                            {% if proceeding.court_room %}
-                            <div class="bg-white rounded-lg p-3 border border-gray-200">
-                                <p class="text-xs text-gray-500 font-medium mb-1">Court Room</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ proceeding.court_room }}</p>
-                            </div>
-                            {% endif %}
-                            {% if proceeding.judicial_officer %}
-                            <div class="bg-white rounded-lg p-3 border border-gray-200">
-                                <p class="text-xs text-gray-500 font-medium mb-1">Judicial Officer</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ proceeding.judicial_officer }}</p>
-                            </div>
-                            {% endif %}
-                            {% if proceeding.attendance %}
-                            <div class="bg-white rounded-lg p-3 border border-gray-200">
-                                <p class="text-xs text-gray-500 font-medium mb-1">Previous Attendance</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ proceeding.attendance }}</p>
-                            </div>
-                            {% endif %}
-                            {% if proceeding.next_attendance %}
-                            <div class="bg-white rounded-lg p-3 border border-gray-200">
-                                <p class="text-xs text-gray-500 font-medium mb-1">Next Client Attendance</p>
-                                <p class="text-sm font-semibold text-gray-900">{{ proceeding.next_attendance }}</p>
-                                {% if proceeding.virtual_link %}
-                                <p class="text-xs text-blue-600 mt-1">
-                                    <i class="fas fa-video mr-1"></i>
-                                    <a href="{{ proceeding.virtual_link }}" target="_blank" class="hover:underline break-all">{{ proceeding.virtual_link[:50] }}{% if proceeding.virtual_link|length > 50 %}...{% endif %}</a>
-                                </p>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        
-                        {% if proceeding.outcome_orders %}
-                        <div class="mt-4 pt-4 border-t border-green-200">
-                            <p class="text-xs text-gray-500 font-medium mb-1">Current Case Outcome</p>
-                            <p class="text-sm text-gray-900 font-semibold">{{ proceeding.outcome_orders }}</p>
-                        </div>
-                        {% endif %}
                     </div>
-                    {% endfor %}
+                    <span class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
+                        <i class="fas fa-circle text-[6px]"></i> {{ upcoming_count }}
+                    </span>
                 </div>
-                {% else %}
-                <div class="text-center py-12">
-                    <i class="fas fa-calendar-times text-gray-300 text-5xl sm:text-6xl mb-4"></i>
-                    <p class="text-gray-600 text-lg font-semibold">No upcoming court dates scheduled</p>
-                    <p class="text-gray-500 mt-2 text-sm">Next court dates will appear here once proceedings are added with future dates.</p>
+
+                <div class="p-0">
+                    {% if upcoming_proceedings and upcoming_proceedings|length > 0 %}
+                    <ul class="divide-y divide-gray-100">
+                        {% for proceeding in upcoming_proceedings %}
+                        {% set parts = (proceeding.next_court_date or '').split('-') %}
+                        {% set yr = parts[0] if parts|length == 3 else '' %}
+                        {% set mo = parts[1] if parts|length == 3 else '' %}
+                        {% set dy = parts[2] if parts|length == 3 else '' %}
+                        <li class="upcoming-row group relative px-4 sm:px-6 py-4 hover:bg-emerald-50/40 transition-colors">
+                            <!-- left accent bar -->
+                            <span class="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-gradient-to-b from-emerald-400 to-emerald-600 opacity-70 group-hover:opacity-100 transition-opacity"></span>
+
+                            <div class="flex items-start gap-3 sm:gap-4">
+                                <!-- date block -->
+                                <div class="shrink-0 text-center w-16 sm:w-20 select-none">
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-600" id="upcoming-month-{{ loop.index }}"></p>
+                                    <p class="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-none my-0.5">{{ dy or '—' }}</p>
+                                    <p class="text-[10px] font-semibold text-gray-500 uppercase tracking-wider" id="upcoming-day-{{ loop.index }}">{{ yr }}</p>
+                                </div>
+
+                                <!-- separator -->
+                                <div class="hidden sm:block w-px self-stretch bg-gray-200"></div>
+
+                                <!-- body -->
+                                <div class="flex-1 min-w-0">
+                                    {% set next_attendance_norm = (proceeding.next_attendance or '')|lower %}
+                                    {% set show_next_link = proceeding.virtual_link and (
+                                        'virtual' in next_attendance_norm or next_attendance_norm == 'represented'
+                                    ) %}
+                                    <div class="flex items-start justify-between gap-2 mb-1.5 flex-wrap">
+                                        <h3 class="text-sm sm:text-base font-bold text-gray-900 leading-snug flex items-center gap-2 min-w-0">
+                                            <span class="truncate">{{ proceeding.next_activity_type or proceeding.court_activity_type or 'Court Appearance' }}</span>
+                                        </h3>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <span id="upcoming-countdown-{{ loop.index }}"
+                                                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white whitespace-nowrap">
+                                                <i class="fas fa-hourglass-half text-[9px]"></i><span></span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Primary "next" details -->
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-700 mb-1.5">
+                                        {% if proceeding.next_activity_type %}
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold">
+                                            <i class="fas fa-list-check text-[10px]"></i>{{ proceeding.next_activity_type }}
+                                        </span>
+                                        {% endif %}
+                                        {% if proceeding.next_judicial_officer %}
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-semibold">
+                                            <i class="fas fa-gavel text-[10px]"></i>{{ proceeding.next_judicial_officer }}
+                                        </span>
+                                        {% endif %}
+                                        {% if proceeding.next_attendance %}
+                                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[11px] font-semibold">
+                                            <i class="fas fa-users text-[10px]"></i>{{ proceeding.next_attendance }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- inline detail pills (context from previous proceeding) -->
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-gray-600">
+                                        {% if proceeding.court_room %}
+                                        <span class="inline-flex items-center gap-1.5"><i class="fas fa-door-open text-indigo-500 w-3.5"></i><span class="font-medium text-gray-800">{{ proceeding.court_room }}</span></span>
+                                        {% endif %}
+                                        {% if proceeding.attendance %}
+                                        <span class="inline-flex items-center gap-1.5"><i class="fas fa-user-check text-blue-500 w-3.5"></i><span class="font-medium text-gray-800">{{ proceeding.attendance }}</span></span>
+                                        {% endif %}
+                                        <span class="inline-flex items-center gap-1.5 text-gray-400">
+                                            <i class="fas fa-clock-rotate-left w-3.5"></i>
+                                            <span>From <span class="font-semibold text-gray-600">{{ proceeding.date_of_court_appeared or 'N/A' }}</span></span>
+                                        </span>
+                                    </div>
+
+                                    {% if proceeding.outcome_orders %}
+                                    <div class="mt-2.5 flex items-start gap-2 text-xs sm:text-sm bg-emerald-50/60 border-l-2 border-emerald-400 rounded-r-lg px-3 py-2">
+                                        <i class="fas fa-quote-left text-emerald-400 mt-0.5"></i>
+                                        <p class="text-gray-700 leading-relaxed"><span class="font-bold text-emerald-700 mr-1">Outcome:</span>{{ proceeding.outcome_orders }}</p>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if show_next_link %}
+                                    <div class="mt-2.5">
+                                        <a href="{{ proceeding.virtual_link }}" target="_blank"
+                                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold shadow-sm hover:shadow-md transition-all"
+                                           style="background: linear-gradient(135deg, var(--brand-accent), var(--brand-primary));">
+                                            <i class="fas fa-video text-[11px]"></i> Join Next Court Link
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-10 sm:py-14 px-4">
+                        <div class="mx-auto w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+                            <i class="fas fa-calendar-times text-gray-300 text-3xl"></i>
+                        </div>
+                        <p class="text-gray-700 text-base font-semibold">No upcoming court dates scheduled</p>
+                        <p class="text-gray-500 mt-1 text-sm max-w-md mx-auto">Future court dates will appear here once proceedings are recorded with a next-hearing date.</p>
+                        <a href="{{ url_for('case_proceedings', case_id=case_id) }}"
+                           class="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold shadow-sm hover:shadow-md transition-all"
+                           style="background: linear-gradient(135deg, var(--brand-accent), var(--brand-primary));">
+                            <i class="fas fa-plus"></i> Add Proceeding
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
-            </div>
+            </section>
         </div>
 
-        <!-- Right Column: Court Appearance History -->
-        <div class="space-y-6">
-            <!-- Court Appearance History -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6">
-                <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                    <i class="fas fa-history text-blue-600 mr-3"></i>
-                    Court Appearance History
-                </h2>
-                
-                {% if all_proceedings and all_proceedings|length > 0 %}
-                <div class="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
-                    {% for proceeding in all_proceedings %}
-                    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200 hover:shadow-md transition-all duration-200">
-                        <div class="flex items-start justify-between mb-2">
-                            <div class="flex items-center space-x-2">
-                                <div class="bg-blue-600 text-white rounded-lg px-3 py-1.5 font-bold text-sm">
-                                    {{ proceeding.date_of_court_appeared.split('-')[2] if proceeding.date_of_court_appeared else 'N/A' }}
+        <!-- RIGHT: TIMELINE -->
+        <aside class="xl:col-span-1">
+            <section class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden xl:sticky xl:top-4">
+                <div class="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                            <i class="fas fa-history"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-bold text-gray-900 leading-tight">Appearance History</h2>
+                            <p class="text-xs text-gray-500">Chronological proceedings</p>
+                        </div>
+                    </div>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold whitespace-nowrap">
+                        {{ history_count }}
+                    </span>
+                </div>
+
+                <div class="p-0">
+                    {% if all_proceedings and all_proceedings|length > 0 %}
+                    <ul class="divide-y divide-gray-100 max-h-[720px] overflow-y-auto custom-scrollbar">
+                        {% for proceeding in all_proceedings %}
+                        {% set hparts = (proceeding.date_of_court_appeared or '').split('-') %}
+                        {% set hyr = hparts[0] if hparts|length == 3 else '' %}
+                        {% set hmo = hparts[1] if hparts|length == 3 else '' %}
+                        {% set hdy = hparts[2] if hparts|length == 3 else '' %}
+                        <li class="history-row group relative px-4 sm:px-5 py-3.5 hover:bg-blue-50/40 transition-colors">
+                            <span class="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-gradient-to-b from-blue-400 to-indigo-600 opacity-60 group-hover:opacity-100 transition-opacity"></span>
+
+                            <div class="flex items-start gap-3">
+                                <!-- date stack -->
+                                <div class="shrink-0 text-center w-12 select-none">
+                                    <p class="text-[9px] uppercase tracking-widest text-blue-600 font-bold" id="history-monthname-{{ loop.index }}"></p>
+                                    <p class="text-xl font-extrabold text-gray-900 leading-none my-0.5">{{ hdy or '—' }}</p>
+                                    <p class="text-[9px] uppercase tracking-wider text-gray-400 font-semibold">{{ hyr }}</p>
                                 </div>
-                                <div>
-                                    <p class="text-xs text-gray-600 font-medium">
-                                        {{ proceeding.date_of_court_appeared.split('-')[1] if proceeding.date_of_court_appeared else 'N/A' }}/{{ proceeding.date_of_court_appeared.split('-')[0] if proceeding.date_of_court_appeared else 'N/A' }}
-                                    </p>
-                                    <p class="text-xs font-semibold text-gray-700" id="history-day-{{ loop.index }}"></p>
+
+                                <div class="hidden sm:block w-px self-stretch bg-gray-200"></div>
+
+                                <!-- body -->
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-start justify-between gap-2 mb-1">
+                                        <h4 class="text-sm font-bold text-gray-900 leading-tight truncate">
+                                            {{ proceeding.court_activity_type or 'Court Appearance' }}
+                                        </h4>
+                                        <span class="hidden md:inline text-[10px] uppercase tracking-wider text-blue-700 font-bold whitespace-nowrap" id="history-day-{{ loop.index }}"></span>
+                                    </div>
+
+                                    <!-- detail pills inline -->
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                                        {% if proceeding.court_room %}
+                                        <span class="inline-flex items-center gap-1 truncate max-w-[140px]"><i class="fas fa-door-open text-gray-400 w-3"></i>{{ proceeding.court_room }}</span>
+                                        {% endif %}
+                                        {% if proceeding.judicial_officer %}
+                                        <span class="inline-flex items-center gap-1 truncate max-w-[160px]"><i class="fas fa-user-tie text-gray-400 w-3"></i>{{ proceeding.judicial_officer }}</span>
+                                        {% endif %}
+                                        {% if proceeding.attendance %}
+                                        <span class="inline-flex items-center gap-1 truncate max-w-[140px]"><i class="fas fa-user-check text-gray-400 w-3"></i>{{ proceeding.attendance }}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    {% if proceeding.outcome_orders %}
+                                    <div class="mt-2 flex items-start gap-1.5 bg-gray-50 border-l-2 border-blue-300 rounded-r-md px-2 py-1.5">
+                                        <i class="fas fa-quote-left text-blue-300 text-[10px] mt-0.5"></i>
+                                        <p class="text-[11px] text-gray-700 leading-snug line-clamp-3">{{ proceeding.outcome_orders }}</p>
+                                    </div>
+                                    {% endif %}
+
+                                    {% set h_next_norm = (proceeding.next_attendance or '')|lower %}
+                                    {% set h_show_link = proceeding.virtual_link and (
+                                        'virtual' in h_next_norm or h_next_norm == 'represented'
+                                    ) %}
+                                    {% if proceeding.next_court_date or proceeding.next_activity_type or proceeding.next_judicial_officer or h_show_link %}
+                                    <div class="mt-2 flex flex-col gap-1">
+                                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                                            {% if proceeding.next_court_date %}
+                                            <p class="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                                                <i class="fas fa-arrow-right-long"></i> Next: <span class="font-bold">{{ proceeding.next_court_date }}</span>
+                                            </p>
+                                            {% else %}
+                                            <span></span>
+                                            {% endif %}
+                                            {% if h_show_link %}
+                                            <a href="{{ proceeding.virtual_link }}" target="_blank"
+                                               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[10px] font-semibold transition">
+                                                <i class="fas fa-video"></i> Join
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                        {% if proceeding.next_activity_type or proceeding.next_judicial_officer %}
+                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-gray-600">
+                                            {% if proceeding.next_activity_type %}
+                                            <span class="inline-flex items-center gap-1"><i class="fas fa-list-check text-emerald-500"></i>{{ proceeding.next_activity_type }}</span>
+                                            {% endif %}
+                                            {% if proceeding.next_judicial_officer %}
+                                            <span class="inline-flex items-center gap-1"><i class="fas fa-gavel text-amber-500"></i>{{ proceeding.next_judicial_officer }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-10 px-4">
+                        <div class="mx-auto w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+                            <i class="fas fa-inbox text-gray-300 text-2xl"></i>
                         </div>
-                        <h4 class="text-sm font-bold text-gray-900 mb-1">{{ proceeding.court_activity_type or 'N/A' }}</h4>
-                        {% if proceeding.court_room %}
-                        <p class="text-xs text-gray-600 mb-1"><i class="fas fa-door-open mr-1"></i>{{ proceeding.court_room }}</p>
-                        {% endif %}
-                        {% if proceeding.judicial_officer %}
-                        <p class="text-xs text-gray-600 mb-1"><i class="fas fa-gavel mr-1"></i>{{ proceeding.judicial_officer }}</p>
-                        {% endif %}
-                        {% if proceeding.outcome_orders %}
-                        <p class="text-xs text-gray-700 mt-2 font-semibold">{{ proceeding.outcome_orders }}</p>
-                        {% endif %}
-                        {% if proceeding.next_court_date %}
-                        <div class="mt-2 pt-2 border-t border-blue-200">
-                            <p class="text-xs text-green-700 font-semibold">
-                                <i class="fas fa-arrow-right mr-1"></i>Next: {{ proceeding.next_court_date }}
-                            </p>
-                        </div>
-                        {% endif %}
-                        {% if proceeding.next_attendance %}
-                        <div class="mt-2 pt-2 border-t border-blue-200">
-                            <p class="text-xs text-purple-700 font-semibold">
-                                <i class="fas fa-user-check mr-1"></i>Next Attendance: {{ proceeding.next_attendance }}
-                            </p>
-                            {% if proceeding.virtual_link %}
-                            <p class="text-xs text-blue-600 mt-1">
-                                <i class="fas fa-video mr-1"></i>
-                                <a href="{{ proceeding.virtual_link }}" target="_blank" class="hover:underline break-all">{{ proceeding.virtual_link[:40] }}{% if proceeding.virtual_link|length > 40 %}...{% endif %}</a>
-                            </p>
-                            {% endif %}
-                        </div>
-                        {% endif %}
+                        <p class="text-gray-700 text-sm font-semibold">No proceedings recorded</p>
+                        <p class="text-gray-500 mt-1 text-xs">Court appearances will appear here.</p>
                     </div>
-                    {% endfor %}
+                    {% endif %}
                 </div>
-                {% else %}
-                <div class="text-center py-8">
-                    <i class="fas fa-inbox text-gray-300 text-4xl mb-3"></i>
-                    <p class="text-gray-500 text-sm">No court appearances recorded yet</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+            </section>
+        </aside>
     </div>
 </div>
 
 <style>
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* Calendar cell base */
+.cal-cell {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    border: 1px solid #f1f1f4;
+    background: #fafafa;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    transition: all 0.18s ease;
 }
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
+@media (min-width: 640px) {
+    .cal-cell { padding: 6px; border-radius: 14px; }
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 10px;
+.cal-cell--empty {
+    background: transparent;
+    border: 1px dashed #f1f1f4;
+    opacity: 0.5;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #555;
+.cal-cell--has-event {
+    cursor: pointer;
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    border-color: #e5e7eb;
 }
+.cal-cell--has-event:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px -10px rgba(108, 92, 231, 0.25);
+    border-color: var(--brand-accent-border);
+}
+.cal-cell--upcoming {
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+    border-color: #a7f3d0;
+}
+.cal-cell--past {
+    background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 100%);
+    border-color: #bfdbfe;
+}
+.cal-cell--today {
+    box-shadow: 0 0 0 2px var(--brand-accent), 0 6px 16px -8px var(--brand-accent-glow);
+}
+.cal-cell--selected {
+    box-shadow: 0 0 0 3px var(--brand-accent), 0 10px 24px -8px var(--brand-accent-glow);
+    transform: translateY(-2px);
+}
+.cal-day-num {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #374151;
+    line-height: 1;
+}
+@media (min-width: 640px) {
+    .cal-day-num { font-size: 0.9rem; }
+}
+.cal-today-bubble {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    color: #ffffff;
+    background: var(--brand-accent);
+    font-weight: 800;
+    font-size: 0.72rem;
+}
+.cal-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+@media (min-width: 640px) {
+    .cal-dot { width: 7px; height: 7px; }
+}
+.cal-day-header {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    padding: 6px 0 10px;
+}
+@media (min-width: 640px) {
+    .cal-day-header { font-size: 11px; }
+}
+.cal-weekend { color: #94a3b8; }
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+@keyframes calFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#calendar-container > * { animation: calFadeIn 0.25s ease; }
 </style>
 
 <script>
-// Get current month and year
 const now = new Date();
 let currentMonth = now.getMonth();
 let currentYear = now.getFullYear();
+let selectedDateStr = null;
 
-// Calendar events from server
 const calendarEvents = {{ calendar_events|tojson }};
 const appearanceEvents = {{ appearance_events|tojson }};
 
-// Month names
-const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                   'July', 'August', 'September', 'October', 'November', 'December'];
+const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const dayNamesShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDateStr(y, m, d) { return `${y}-${pad(m + 1)}-${pad(d)}`; }
+function daysBetween(a, b) {
+    const ms = b.setHours(0,0,0,0) - a.setHours(0,0,0,0);
+    return Math.round(ms / 86400000);
+}
 
-// Set day names for proceedings
 document.addEventListener('DOMContentLoaded', function() {
+    // Upcoming proceeding labels (month name, weekday, countdown)
     {% for proceeding in upcoming_proceedings %}
     {% if proceeding.next_court_date %}
-    const upcomingDate{{ loop.index }} = new Date('{{ proceeding.next_court_date }}');
-    const upcomingDayName{{ loop.index }} = dayNames[upcomingDate{{ loop.index }}.getDay()];
-    const upcomingEl{{ loop.index }} = document.getElementById('upcoming-day-{{ loop.index }}');
-    if (upcomingEl{{ loop.index }}) {
-        upcomingEl{{ loop.index }}.textContent = upcomingDayName{{ loop.index }};
-    }
+    (function() {
+        const d = new Date('{{ proceeding.next_court_date }}T00:00:00');
+        const today = new Date();
+        const dayEl = document.getElementById('upcoming-day-{{ loop.index }}');
+        const moEl = document.getElementById('upcoming-month-{{ loop.index }}');
+        if (moEl) moEl.textContent = monthShort[d.getMonth()];
+        if (dayEl) dayEl.textContent = dayNamesShort[d.getDay()];
+
+        const diff = daysBetween(new Date(today), new Date(d));
+        const labels = [
+            document.getElementById('upcoming-countdown-{{ loop.index }}'),
+            document.getElementById('upcoming-countdown-mobile-{{ loop.index }}')
+        ];
+        labels.forEach(el => {
+            if (!el) return;
+            const span = el.querySelector('span');
+            if (!span) return;
+            if (diff === 0) span.textContent = 'Today';
+            else if (diff === 1) span.textContent = 'Tomorrow';
+            else if (diff > 1) span.textContent = `In ${diff} days`;
+            else span.textContent = `${Math.abs(diff)} days ago`;
+        });
+    })();
     {% endif %}
     {% endfor %}
-    
+
+    // History labels
     {% for proceeding in all_proceedings %}
     {% if proceeding.date_of_court_appeared %}
-    const historyDate{{ loop.index }} = new Date('{{ proceeding.date_of_court_appeared }}');
-    const historyDayName{{ loop.index }} = dayNamesShort[historyDate{{ loop.index }}.getDay()];
-    const historyEl{{ loop.index }} = document.getElementById('history-day-{{ loop.index }}');
-    if (historyEl{{ loop.index }}) {
-        historyEl{{ loop.index }}.textContent = historyDayName{{ loop.index }};
-    }
+    (function() {
+        const d = new Date('{{ proceeding.date_of_court_appeared }}T00:00:00');
+        const dEl = document.getElementById('history-day-{{ loop.index }}');
+        const mEl = document.getElementById('history-monthname-{{ loop.index }}');
+        if (dEl) dEl.textContent = dayNamesShort[d.getDay()];
+        if (mEl) mEl.textContent = monthShort[d.getMonth()];
+    })();
     {% endif %}
     {% endfor %}
-    
-    // Generate calendar
+
+    // Next-event stat card
+    (function() {
+        const keys = Object.keys(calendarEvents).filter(k => {
+            return (calendarEvents[k] || []).some(ev => ev.type === 'next');
+        }).sort();
+        const today = new Date(); today.setHours(0,0,0,0);
+        let nextDate = null;
+        for (const k of keys) {
+            const d = new Date(k + 'T00:00:00');
+            if (d >= today) { nextDate = d; break; }
+        }
+        const valEl = document.getElementById('stat-next-in');
+        const labelEl = document.getElementById('stat-next-label');
+        if (!valEl || !labelEl) return;
+        if (!nextDate) { valEl.textContent = '—'; labelEl.textContent = 'No upcoming date'; return; }
+        const diff = daysBetween(new Date(today), new Date(nextDate));
+        if (diff === 0) { valEl.textContent = 'Today'; }
+        else if (diff === 1) { valEl.textContent = '1 day'; }
+        else { valEl.textContent = diff + ' days'; }
+        labelEl.textContent = nextDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    })();
+
     generateCalendar();
 });
 
 function generateCalendar() {
     const container = document.getElementById('calendar-container');
     if (!container) return;
-    
-    // Clear container
     container.innerHTML = '';
-    
-    // Month/Year Header with Navigation
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'flex items-center justify-between mb-6 pb-4 border-b border-gray-200';
-    
+
+    // header (month/year + dot count summary)
+    const header = document.createElement('div');
+    header.className = 'flex items-center justify-between mb-3 sm:mb-4 px-1';
+
     const monthYear = document.createElement('div');
-    monthYear.className = 'text-2xl md:text-3xl font-bold text-gray-900';
-    monthYear.textContent = `${monthNames[currentMonth]} ${currentYear}`;
-    headerDiv.appendChild(monthYear);
-    
-    container.appendChild(headerDiv);
-    
-    // Calendar Grid Container
-    const gridContainer = document.createElement('div');
-    gridContainer.className = 'grid grid-cols-7 gap-1 sm:gap-2';
-    
-    // Day Headers
-    dayNamesShort.forEach(day => {
-        const dayHeader = document.createElement('div');
-        dayHeader.className = 'text-center font-bold text-gray-700 py-2 text-xs sm:text-sm';
-        dayHeader.textContent = day;
-        gridContainer.appendChild(dayHeader);
+    monthYear.className = 'text-xl sm:text-2xl font-bold text-gray-900 flex items-baseline gap-2';
+    monthYear.innerHTML = `<span>${monthNames[currentMonth]}</span><span class="text-gray-400 font-semibold">${currentYear}</span>`;
+    header.appendChild(monthYear);
+
+    // event count for this month
+    let monthCount = 0;
+    const monthPrefix = `${currentYear}-${pad(currentMonth + 1)}`;
+    Object.keys(calendarEvents).forEach(k => {
+        if (k.startsWith(monthPrefix)) monthCount += (calendarEvents[k] || []).length;
     });
-    
-    // Get first day of month and number of days
+    const monthStatEl = document.getElementById('stat-this-month');
+    if (monthStatEl) monthStatEl.textContent = monthCount;
+
+    const summary = document.createElement('div');
+    summary.className = 'text-xs sm:text-sm text-gray-500 font-medium';
+    summary.innerHTML = monthCount > 0
+        ? `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-semibold"><i class="fas fa-circle text-[6px]"></i>${monthCount} event${monthCount === 1 ? '' : 's'}</span>`
+        : `<span class="text-gray-400">No events</span>`;
+    header.appendChild(summary);
+
+    container.appendChild(header);
+
+    // grid
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-7 gap-1.5 sm:gap-2';
+
+    dayNamesShort.forEach((d, idx) => {
+        const dh = document.createElement('div');
+        dh.className = 'cal-day-header' + ((idx === 0 || idx === 6) ? ' cal-weekend' : '');
+        dh.textContent = d;
+        grid.appendChild(dh);
+    });
+
     const firstDay = new Date(currentYear, currentMonth, 1).getDay();
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const today = new Date();
-    const isCurrentMonth = currentYear === today.getFullYear() && currentMonth === today.getMonth();
-    
-    // Add empty cells for days before month starts
+    const isCurrentMonth = (currentYear === today.getFullYear() && currentMonth === today.getMonth());
+
     for (let i = 0; i < firstDay; i++) {
-        const emptyCell = document.createElement('div');
-        emptyCell.className = 'aspect-square';
-        gridContainer.appendChild(emptyCell);
+        const empty = document.createElement('div');
+        empty.className = 'cal-cell cal-cell--empty';
+        grid.appendChild(empty);
     }
-    
-    // Add cells for each day of the month
+
     for (let day = 1; day <= daysInMonth; day++) {
-        const cell = document.createElement('div');
-        cell.className = 'aspect-square border border-gray-200 rounded-lg p-1 sm:p-2 relative transition-all duration-200 hover:shadow-md';
-        
-        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dateStr = toDateStr(currentYear, currentMonth, day);
+        const events = calendarEvents[dateStr] || [];
+        const hasNext = events.some(e => e.type === 'next');
+        const hasAppeared = events.some(e => e.type === 'appeared');
         const isToday = isCurrentMonth && day === today.getDate();
-        
-        // Check if this date has events
-        if (calendarEvents[dateStr]) {
-            const events = calendarEvents[dateStr];
-            const hasNext = events.some(e => e.type === 'next');
-            const hasAppeared = events.some(e => e.type === 'appeared');
-            
+
+        const cell = document.createElement('div');
+        let cls = 'cal-cell';
+        if (events.length > 0) {
+            cls += ' cal-cell--has-event';
+            if (hasNext) cls += ' cal-cell--upcoming';
+            else if (hasAppeared) cls += ' cal-cell--past';
+        }
+        if (isToday) cls += ' cal-cell--today';
+        if (selectedDateStr === dateStr) cls += ' cal-cell--selected';
+        cell.className = cls;
+        cell.dataset.date = dateStr;
+
+        // day number row
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-start justify-between';
+
+        const dayNum = document.createElement('div');
+        if (isToday) {
+            dayNum.innerHTML = `<span class="cal-today-bubble">${day}</span>`;
+        } else {
+            dayNum.className = 'cal-day-num';
+            dayNum.textContent = day;
+        }
+        topRow.appendChild(dayNum);
+
+        if (events.length > 1) {
+            const countBadge = document.createElement('span');
+            countBadge.className = 'text-[9px] font-bold text-gray-500 bg-white/80 px-1.5 rounded-full ring-1 ring-gray-200';
+            countBadge.textContent = events.length;
+            topRow.appendChild(countBadge);
+        }
+        cell.appendChild(topRow);
+
+        // dots
+        if (events.length > 0) {
+            const dots = document.createElement('div');
+            dots.className = 'mt-auto flex items-center justify-center gap-1 pb-0.5';
             if (hasNext) {
-                cell.className += ' bg-gradient-to-br from-green-100 to-emerald-100 border-green-300';
-            } else if (hasAppeared) {
-                cell.className += ' bg-gradient-to-br from-blue-100 to-indigo-100 border-blue-300';
-            }
-            
-            const dayNumber = document.createElement('div');
-            dayNumber.className = `text-xs sm:text-sm font-bold mb-1 ${isToday ? 'text-white bg-indigo-600 rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-900'}`;
-            dayNumber.textContent = day;
-            cell.appendChild(dayNumber);
-            
-            // Event indicators
-            const eventIndicators = document.createElement('div');
-            eventIndicators.className = 'flex flex-wrap gap-0.5 justify-center';
-            
-            if (hasNext) {
-                const nextIndicator = document.createElement('div');
-                nextIndicator.className = 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-600 rounded-full';
-                nextIndicator.title = 'Upcoming court date';
-                eventIndicators.appendChild(nextIndicator);
+                const dot = document.createElement('span');
+                dot.className = 'cal-dot bg-emerald-500';
+                dot.title = 'Upcoming court date';
+                dots.appendChild(dot);
             }
             if (hasAppeared) {
-                const appearedIndicator = document.createElement('div');
-                appearedIndicator.className = 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-600 rounded-full';
-                appearedIndicator.title = 'Court appearance';
-                eventIndicators.appendChild(appearedIndicator);
+                const dot = document.createElement('span');
+                dot.className = 'cal-dot bg-blue-500';
+                dot.title = 'Past appearance';
+                dots.appendChild(dot);
             }
-            
-            cell.appendChild(eventIndicators);
-            
-            // Event count tooltip
-            const eventCount = events.length;
-            cell.title = `${eventCount} event(s) on this day`;
-            cell.style.cursor = 'pointer';
-        } else {
-            const dayNumber = document.createElement('div');
-            dayNumber.className = `text-xs sm:text-sm ${isToday ? 'text-white bg-indigo-600 rounded-full w-6 h-6 flex items-center justify-center font-bold' : 'text-gray-600'}`;
-            dayNumber.textContent = day;
-            cell.appendChild(dayNumber);
+            cell.appendChild(dots);
+
+            cell.title = `${events.length} event${events.length === 1 ? '' : 's'} on ${dateStr}`;
+            cell.addEventListener('click', () => showSelectedDay(dateStr));
         }
-        
-        // Highlight today
-        if (isToday) {
-            cell.className += ' ring-2 ring-indigo-500';
-        }
-        
-        gridContainer.appendChild(cell);
+
+        grid.appendChild(cell);
     }
-    
-    container.appendChild(gridContainer);
+
+    container.appendChild(grid);
 }
 
-// Navigation buttons
 function changeMonth(direction) {
     currentMonth += direction;
-    if (currentMonth < 0) {
-        currentMonth = 11;
-        currentYear--;
-    } else if (currentMonth > 11) {
-        currentMonth = 0;
-        currentYear++;
-    }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
     generateCalendar();
+}
+
+function goToToday() {
+    const t = new Date();
+    currentMonth = t.getMonth();
+    currentYear = t.getFullYear();
+    generateCalendar();
+    const todayStr = toDateStr(currentYear, currentMonth, t.getDate());
+    if (calendarEvents[todayStr]) showSelectedDay(todayStr);
+}
+
+function clearSelectedDay() {
+    selectedDateStr = null;
+    const panel = document.getElementById('selected-day-panel');
+    if (panel) panel.classList.add('hidden');
+    generateCalendar();
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function showSelectedDay(dateStr) {
+    selectedDateStr = dateStr;
+    const panel = document.getElementById('selected-day-panel');
+    const titleEl = document.getElementById('selected-day-title');
+    const subEl = document.getElementById('selected-day-subtitle');
+    const wrap = document.getElementById('selected-day-events');
+    if (!panel || !wrap) return;
+
+    const d = new Date(dateStr + 'T00:00:00');
+    titleEl.textContent = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    const events = calendarEvents[dateStr] || [];
+    subEl.textContent = `${events.length} event${events.length === 1 ? '' : 's'} on this day`;
+
+    // Static class maps so Tailwind CDN can pre-generate them (no dynamic construction)
+    const theme = {
+        next: {
+            container: 'relative rounded-xl border bg-gradient-to-br from-emerald-50/60 via-white to-emerald-50/30 border-emerald-200 p-4',
+            iconWrap: 'inline-flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 shrink-0',
+            badge: 'shrink-0 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase tracking-wider',
+            outcomeBorder: 'mt-3 pt-3 border-t border-emerald-200/70',
+            outcomeLabel: 'text-[10px] uppercase tracking-wider text-emerald-700 font-bold mb-1',
+            icon: 'fa-calendar-check',
+            label: 'Upcoming'
+        },
+        appeared: {
+            container: 'relative rounded-xl border bg-gradient-to-br from-blue-50/60 via-white to-blue-50/30 border-blue-200 p-4',
+            iconWrap: 'inline-flex items-center justify-center w-9 h-9 rounded-lg bg-blue-100 text-blue-700 shrink-0',
+            badge: 'shrink-0 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold uppercase tracking-wider',
+            outcomeBorder: 'mt-3 pt-3 border-t border-blue-200/70',
+            outcomeLabel: 'text-[10px] uppercase tracking-wider text-blue-700 font-bold mb-1',
+            icon: 'fa-gavel',
+            label: 'Past Appearance'
+        }
+    };
+
+    const isNextLinkAttendance = (val) => {
+        const v = String(val || '').trim().toLowerCase();
+        return v.includes('virtual') || v === 'represented';
+    };
+
+    wrap.innerHTML = '';
+    events.forEach(ev => {
+        const p = ev.proceeding || {};
+        const t = ev.type === 'next' ? theme.next : theme.appeared;
+        const isNext = ev.type === 'next';
+
+        const titleText = isNext
+            ? (p.next_activity_type || p.court_activity_type || 'Court Appearance')
+            : (p.court_activity_type || 'Court Appearance');
+
+        // Build details list - "next" events use next_* fields; "appeared" uses current fields
+        let detailsHtml = '';
+        if (isNext) {
+            detailsHtml = `
+                ${p.next_activity_type ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-list-check text-emerald-500 w-4"></i><span class="font-semibold">Activity:</span> ${escapeHtml(p.next_activity_type)}</div>` : ''}
+                ${p.next_judicial_officer ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-gavel text-amber-500 w-4"></i><span class="font-semibold">Officer:</span> ${escapeHtml(p.next_judicial_officer)}</div>` : ''}
+                ${p.next_attendance ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-users text-purple-500 w-4"></i><span class="font-semibold">Attendance:</span> ${escapeHtml(p.next_attendance)}</div>` : ''}
+                ${p.court_room ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-door-open text-gray-400 w-4"></i>${escapeHtml(p.court_room)}</div>` : ''}
+            `;
+        } else {
+            detailsHtml = `
+                ${p.court_room ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-door-open text-gray-400 w-4"></i>${escapeHtml(p.court_room)}</div>` : ''}
+                ${p.judicial_officer ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-user-tie text-gray-400 w-4"></i>${escapeHtml(p.judicial_officer)}</div>` : ''}
+                ${p.attendance ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-user-check text-gray-400 w-4"></i>${escapeHtml(p.attendance)}</div>` : ''}
+                ${p.next_attendance ? `<div class="flex items-center gap-2 text-gray-700"><i class="fas fa-users text-gray-400 w-4"></i>${escapeHtml(p.next_attendance)}</div>` : ''}
+            `;
+        }
+
+        const showLink = p.virtual_link && isNextLinkAttendance(p.next_attendance);
+
+        const card = document.createElement('div');
+        card.className = t.container;
+        card.innerHTML = `
+            <div class="flex items-start justify-between gap-3 mb-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="${t.iconWrap}">
+                        <i class="fas ${t.icon}"></i>
+                    </span>
+                    <h4 class="text-sm sm:text-base font-bold text-gray-900 truncate">${escapeHtml(titleText)}</h4>
+                </div>
+                <span class="${t.badge}">${t.label}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+                ${detailsHtml}
+            </div>
+            ${p.outcome_orders ? `<div class="${t.outcomeBorder}"><p class="${t.outcomeLabel}">Outcome / Orders</p><p class="text-sm text-gray-800 leading-relaxed">${escapeHtml(p.outcome_orders)}</p></div>` : ''}
+            ${showLink ? `<div class="mt-3"><a href="${escapeHtml(p.virtual_link)}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition"><i class="fas fa-video"></i> Join Next Court Link</a></div>` : ''}
+        `;
+        wrap.appendChild(card);
+    });
+
+    panel.classList.remove('hidden');
+    generateCalendar();
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 </script>
 {% endblock %}

@@ -5,175 +5,270 @@
 {% block content %}
 <style>
 .proceedings-page {
-    max-width: 72rem; margin-left: auto; margin-right: auto; padding: 1rem;
+    width: 100%;
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0.5rem;
     min-height: 100vh;
     background: linear-gradient(160deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%);
+    box-sizing: border-box;
 }
-@media (min-width: 640px) { .proceedings-page { padding: 1.5rem; } }
-@media (min-width: 1024px) { .proceedings-page { padding: 2rem; } }
+@media (min-width: 640px) { .proceedings-page { padding: 0.875rem; } }
+@media (min-width: 1024px) { .proceedings-page { padding: 1.125rem; } }
+@media (min-width: 1280px) { .proceedings-page { padding: 1.25rem; max-width: 84rem; } }
+@media (min-width: 1536px) { .proceedings-page { max-width: 90rem; } }
+
 .proc-card {
     background: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 4px -1px rgba(0,0,0,.05), 0 1px 2px -1px rgba(0,0,0,.04);
     border: 1px solid rgba(226, 232, 240, 0.8);
 }
 .proc-form-card {
     background: linear-gradient(to bottom, #ffffff 0%, #fafbfc 100%);
-    border-radius: 1.25rem;
-    box-shadow: 0 14px 30px -6px rgba(30, 41, 59, .12), 0 8px 14px -8px rgba(15, 23, 42, .12);
-    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 0.75rem;
+    box-shadow: 0 6px 14px -4px rgba(30, 41, 59, .08), 0 3px 6px -4px rgba(15, 23, 42, .06);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+@media (min-width: 640px) {
+    .proc-form-card { border-radius: 0.875rem; }
 }
 .proc-primary-grid {
     background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 65%);
     border: 1px solid #cbd5e1;
-    border-radius: 1rem;
-    padding: 1rem;
+    border-radius: 0.625rem;
+    padding: 0.625rem;
 }
-@media (min-width: 640px) {
-    .proc-primary-grid { padding: 1.25rem; }
-}
+@media (min-width: 640px) { .proc-primary-grid { padding: 0.75rem; border-radius: 0.75rem; } }
+@media (min-width: 1024px) { .proc-primary-grid { padding: 0.875rem; } }
+
 .proc-section-card {
     background: #f8fafc;
     border: 1px solid #cbd5e1;
-    border-radius: 1rem;
-    padding: 1rem;
+    border-radius: 0.625rem;
+    padding: 0.625rem;
 }
-@media (min-width: 640px) {
-    .proc-section-card { padding: 1.25rem; }
+@media (min-width: 640px) { .proc-section-card { padding: 0.75rem; border-radius: 0.75rem; } }
+@media (min-width: 1024px) { .proc-section-card { padding: 0.875rem; } }
+
+/* Fluid auto-fit grids — fields auto-wrap based on container width */
+.proc-auto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 0.5rem;
 }
+@media (min-width: 640px) { .proc-auto-grid { gap: 0.625rem; } }
+@media (min-width: 1024px) { .proc-auto-grid { gap: 0.75rem; } }
+
+.proc-auto-grid--sm {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 0.5rem;
+}
+@media (min-width: 640px) { .proc-auto-grid--sm { gap: 0.625rem; } }
+
+/* Allow a child to span the full width of an auto-grid row */
+.proc-grid-full { grid-column: 1 / -1; }
+
 .proc-input,
 input.proc-input,
 select.proc-input,
 textarea.proc-input {
     width: 100%;
-    padding: 0.75rem 1rem;
+    max-width: 100%;
+    padding: 0.4375rem 0.625rem;
     border: 1px solid #64748b;
-    border-radius: 0.75rem;
-    font-size: 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
     background: #fefefe !important;
     color: #1e293b !important;
-    box-shadow: inset 0 1px 1px rgba(148, 163, 184, 0.2);
+    box-shadow: inset 0 1px 1px rgba(148, 163, 184, 0.18);
     transition: box-shadow .2s, border-color .2s, background-color .2s;
     -webkit-appearance: none;
     appearance: none;
+    box-sizing: border-box;
 }
+@media (min-width: 640px) {
+    .proc-input,
+    input.proc-input,
+    select.proc-input,
+    textarea.proc-input {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        border-radius: 0.5rem;
+    }
+}
+textarea.proc-input { resize: vertical; min-height: 3.75rem; }
 select.proc-input {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.75rem center;
+    background-position: right 0.5rem center;
     background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
-    padding-right: 2.5rem;
+    background-size: 1.25em 1.25em;
+    padding-right: 1.875rem;
 }
 .proc-input::placeholder { color: #94a3b8; }
-.proc-input:hover {
-    border-color: #475569;
-    background: #ffffff !important;
-}
+.proc-input:hover { border-color: #475569; background: #ffffff !important; }
 .proc-input:focus {
     outline: none;
     border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22), inset 0 1px 1px rgba(148, 163, 184, 0.12);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), inset 0 1px 1px rgba(148, 163, 184, 0.1);
     background: #ffffff !important;
     color: #1e293b !important;
 }
 .proc-label {
     display: block;
-    font-size: 0.875rem;
+    font-size: 0.6875rem;
     font-weight: 600;
-    color: #1e293b;
-    margin-bottom: 0.5rem;
-    letter-spacing: 0.01em;
+    color: #334155;
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
+@media (min-width: 640px) {
+    .proc-label { font-size: 0.75rem; margin-bottom: 0.3125rem; }
+}
+
 .proc-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .proc-header-card {
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border-left: 4px solid #6366f1;
+    border-left: 3px solid #6366f1;
 }
+
+/* Mobile-card layout for the previous-attendances list */
 @media (max-width: 767px) {
-.proc-table-wrap table { display: none !important; }
-.proc-mobile-cards .proc-mobile-card {
-    background: #fff;
-    border-radius: 0.75rem;
-    border: 1px solid #e2e8f0;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
-}
-.proc-mobile-cards .proc-mobile-card .proc-mobile-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #f3f4f6; }
-.proc-mobile-cards .proc-mobile-card .proc-mobile-row:last-child { border-bottom: none; }
+    .proc-table-wrap table { display: none !important; }
+    .proc-mobile-cards .proc-mobile-card {
+        background: #fff;
+        border-radius: 0.625rem;
+        border: 1px solid #e2e8f0;
+        padding: 0.625rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .proc-mobile-cards .proc-mobile-card .proc-mobile-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.375rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .proc-mobile-cards .proc-mobile-card .proc-mobile-row:last-child { border-bottom: none; }
 }
 @media (min-width: 768px) { .proc-mobile-cards { display: none !important; } }
+
+/* Stack form action buttons full-width on small screens for easier tapping */
+.proc-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.proc-actions > button { flex: 1 1 100%; }
+@media (min-width: 480px) {
+    .proc-actions > button { flex: 0 1 auto; min-width: 8rem; }
+}
+
+/* Make autocomplete dropdowns never push the layout */
+.proc-dropdown { max-height: 12rem; }
+
+/* Advocate / material card rows: stack their inner grids cleanly on phones */
+.proc-row-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+@media (min-width: 640px) { .proc-row-grid { grid-template-columns: 1fr 1fr; gap: 0.625rem; } }
+@media (min-width: 1024px) { .proc-row-grid { grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; } }
+
+/* Prevent any accidental horizontal scroll caused by long content */
+.proc-no-overflow { min-width: 0; }
+
+/* Headings scale smoothly (smaller, tighter) */
+.proc-h1 { font-size: clamp(1rem, 1.8vw, 1.375rem); line-height: 1.2; }
+.proc-h2 { font-size: clamp(0.9375rem, 1.4vw, 1.125rem); line-height: 1.25; }
+.proc-h3 { font-size: clamp(0.875rem, 1.2vw, 1rem); line-height: 1.3; }
+
+/* Compact pill buttons used inside cards */
+.proc-btn-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.4375rem;
+    transition: background-color .15s, color .15s, box-shadow .15s;
+    line-height: 1;
+}
+@media (min-width: 640px) {
+    .proc-btn-sm { padding: 0.4375rem 0.75rem; font-size: 0.8125rem; }
+}
 </style>
 <div class="proceedings-page">
-    <!-- Page Header -->
-    <div class="proc-card proc-header-card p-4 sm:p-6 mb-4 sm:mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div class="flex items-start sm:items-center gap-3 sm:gap-4">
-                <a href="{{ url_for('case_details', case_id=case_id) }}" class="flex-shrink-0 p-2 -m-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors" aria-label="Back">
-                    <i class="fas fa-arrow-left text-lg sm:text-xl"></i>
-                </a>
-                <div class="min-w-0">
-                    <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
-                        <i class="fas fa-file-alt text-indigo-600"></i>
-                        <span>UPDATE CASE ATTENDANCE</span>
-                    </h1>
-                    <p class="text-sm sm:text-base text-gray-600 mt-1">Tracking: <span class="font-semibold">{{ case_data.tracking_number }}</span></p>
-                </div>
+    <!-- Combined header + form card (single compact container) -->
+    <div class="proc-card proc-form-card proc-header-card p-2.5 sm:p-4 md:p-5 mb-2.5 sm:mb-4">
+        <!-- Header row: back button, title, tracking -->
+        <div class="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-gray-100">
+            <a href="{{ url_for('case_details', case_id=case_id) }}"
+               class="flex-shrink-0 inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+               aria-label="Back">
+                <i class="fas fa-arrow-left text-sm"></i>
+            </a>
+            <div class="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3">
+                <h1 class="proc-h1 font-bold text-gray-900 flex items-center gap-1.5 min-w-0">
+                    <i class="fas fa-file-alt text-indigo-600 text-sm flex-shrink-0"></i>
+                    <span class="truncate">UPDATE CURRENT CASE ATTENDANCE</span>
+                </h1>
+                <p class="text-[11px] sm:text-xs text-gray-600 truncate sm:text-right flex-shrink-0">
+                    Tracking: <span class="font-semibold text-gray-800">{{ case_data.tracking_number }}</span>
+                </p>
             </div>
         </div>
-    </div>
 
-    <!-- New court attendance (always inserts; never overwrites past rows) -->
-    <div class="proc-card proc-form-card p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
-        <h2 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center gap-2">
-            <i class="fas fa-edit text-indigo-600"></i>
-            UPDATE CASE ATTENDANCE
-        </h2>
-        <p class="text-sm text-gray-600 mb-4 sm:mb-6">
-            <i class="fas fa-info-circle mr-2"></i>
+        <p class="text-[11px] sm:text-xs text-gray-500 mb-2.5 sm:mb-3 flex items-start gap-1.5">
+            <i class="fas fa-info-circle text-indigo-400 mt-0.5"></i>
+            <span>
             {% if proceedings and proceedings|length > 0 %}
             Form may be pre-filled from the latest attendance. Saving always adds a new record — past rows stay for reference.
             {% else %}
             Add your first court attendance for this case.
             {% endif %}
+            </span>
         </p>
-        
-        <form id="proceedingForm" class="space-y-4 sm:space-y-6">
-            <div class="proc-primary-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <!-- Activity Type -->
-                <div>
-                    <label for="court_activity_type" class="proc-label">Activity Type</label>
-                    <input type="text" id="court_activity_type" name="court_activity_type" class="proc-input" placeholder="e.g. Mention, Hearing" autocomplete="off" />
-                </div>
-                <!-- Judicial Officer -->
-                <div>
-                    <label for="judicial_officer" class="proc-label">Judicial Officer</label>
-                    <div class="relative">
-                        <input type="text" id="judicial_officer" name="judicial_officer" class="proc-input uppercase"
-                            placeholder="Enter judicial officer name..."
-                            autocomplete="off"
-                        />
-                        <div id="judicial_officer_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+
+        <form id="proceedingForm" class="space-y-2.5 sm:space-y-3.5">
+            <!-- Current Attendance: primary fields + advocates + directions + description + next action (single combined card) -->
+            <div class="proc-primary-grid space-y-2.5 sm:space-y-3">
+                <!-- Primary fields grid -->
+                <div class="proc-auto-grid">
+                    <!-- Activity Type -->
+                    <div class="proc-no-overflow">
+                        <label for="court_activity_type" class="proc-label">Activity Type</label>
+                        <input type="text" id="court_activity_type" name="court_activity_type" class="proc-input" placeholder="e.g. Mention, Hearing" autocomplete="off" />
                     </div>
-                </div>
-                <!-- Court Room -->
-                <div>
-                    <label for="court_room" class="proc-label">Court Room</label>
-                    <input type="text" id="court_room" name="court_room" class="proc-input" placeholder="e.g. Court 3" autocomplete="off" />
-                </div>
-                <!-- Court Link -->
-                <div>
-                    <label for="virtual_link" class="proc-label">Court Link</label>
-                    <input type="url" id="virtual_link" name="virtual_link" class="proc-input" placeholder="https://meet.google.com/... or https://zoom.us/..." />
-                </div>
-                <!-- Right column: Date first then Attendance -->
-                <div class="space-y-4">
-                    <div>
-                        <label for="date_of_court_appeared" class="proc-label">DATE OF COURT ATTENDANCE</label>
+                    <!-- Judicial Officer -->
+                    <div class="proc-no-overflow">
+                        <label for="judicial_officer" class="proc-label">Judicial Officer</label>
+                        <div class="relative">
+                            <input type="text" id="judicial_officer" name="judicial_officer" class="proc-input uppercase"
+                                placeholder="Enter judicial officer name..."
+                                autocomplete="off"
+                            />
+                            <div id="judicial_officer_dropdown" class="proc-dropdown hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto"></div>
+                        </div>
+                    </div>
+                    <!-- Court Room -->
+                    <div class="proc-no-overflow">
+                        <label for="court_room" class="proc-label">Court Room</label>
+                        <input type="text" id="court_room" name="court_room" class="proc-input" placeholder="e.g. Court 3" autocomplete="off" />
+                    </div>
+                    <!-- Date of Court Attendance -->
+                    <div class="proc-no-overflow">
+                        <label for="date_of_court_appeared" class="proc-label">Date of Court Attendance</label>
                         <input type="date" id="date_of_court_appeared" name="date_of_court_appeared" class="proc-input" required />
                     </div>
-                    <div>
-                        <label for="current_attendance" class="proc-label">COURT ATTENDANCE</label>
+                    <!-- Court Attendance -->
+                    <div class="proc-no-overflow">
+                        <label for="current_attendance" class="proc-label">Court Attendance</label>
                         <select id="current_attendance" name="current_attendance" class="proc-input">
                             <option value="Represented" selected>REPRESENTED</option>
                             <option value="Present">PRESENT</option>
@@ -183,25 +278,25 @@ select.proc-input {
                     </div>
                 </div>
 
-            </div>
-            <div class="proc-section-card grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                <!-- Advocates present (before Court Directions) -->
-                <div class="sm:col-span-2 border border-indigo-100 rounded-xl p-4 sm:p-5 bg-gradient-to-br from-indigo-50/80 to-white">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-                        <h3 class="text-base font-bold text-gray-900 flex items-center gap-2">
-                            <i class="fas fa-user-tie text-indigo-600"></i>
-                            Advocates present
-                        </h3>
-                        <button type="button" onclick="addAdvocateRow()" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-semibold shadow-sm">
-                            <i class="fas fa-plus"></i> Add advocate
+                <!-- Divider -->
+                <div class="border-t border-indigo-200/70"></div>
+
+                <!-- Advocates present (inline header + add button) -->
+                <div class="proc-no-overflow">
+                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                        <span class="proc-label !mb-0 flex items-center gap-1.5">
+                            <i class="fas fa-user-tie text-indigo-600 text-[10px]"></i>
+                            Advocates Present
+                        </span>
+                        <button type="button" onclick="addAdvocateRow()" class="proc-btn-sm bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm flex-shrink-0">
+                            <i class="fas fa-plus"></i> Add
                         </button>
                     </div>
-                    <p class="text-xs text-gray-600 mb-4">Record each advocate and a short description of what they said. You can add multiple rows.</p>
-                    <div id="advocatesContainer" class="space-y-3"></div>
+                    <div id="advocatesContainer" class="space-y-2"></div>
                 </div>
 
                 <!-- Court Directions -->
-                <div class="sm:col-span-2">
+                <div class="proc-no-overflow">
                     <label for="outcome_orders" class="proc-label">Court Directions</label>
                     <div class="relative">
                         <input type="text" id="outcome_orders" name="outcome_orders" class="proc-input uppercase"
@@ -209,151 +304,193 @@ select.proc-input {
                             maxlength="255"
                             autocomplete="off"
                         />
-                        <div id="outcome_orders_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                        <div id="outcome_orders_dropdown" class="proc-dropdown hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto"></div>
                     </div>
                 </div>
 
-                <!-- Description -->
-                <div class="sm:col-span-2">
-                    <label for="outcome_details" class="proc-label">Description</label>
-                    <textarea id="outcome_details" name="outcome_details" rows="4" class="proc-input" placeholder="Enter detailed outcome information..."></textarea>
+                <!-- Description + Next Action (side by side on wide screens) -->
+                <div class="proc-auto-grid">
+                    <div class="proc-no-overflow">
+                        <label for="outcome_details" class="proc-label">Description</label>
+                        <textarea id="outcome_details" name="outcome_details" rows="3" class="proc-input" placeholder="Enter detailed outcome information..."></textarea>
+                    </div>
+                    <div class="proc-no-overflow">
+                        <label for="reason" class="proc-label">Next Action</label>
+                        <textarea id="reason" name="reason" rows="3" class="proc-input" placeholder="Enter next action..."></textarea>
+                    </div>
                 </div>
-                <!-- Next Action -->
-                <div class="sm:col-span-2">
-                    <label for="reason" class="proc-label">Next Action</label>
-                    <textarea id="reason" name="reason" rows="3" class="proc-input" placeholder="Enter next action..."></textarea>
-                </div>
-                <!-- Next Court Date -->
-                <div>
-                    <label for="next_court_date" class="proc-label">Next Court Date (if any)</label>
-                    <input type="date" id="next_court_date" name="next_court_date" class="proc-input" />
-                </div>
-                <!-- Next Client Attendance -->
-                <div>
-                    <label for="next_attendance" class="proc-label">Next Client Attendance</label>
-                    <select id="next_attendance" name="next_attendance" class="proc-input">
-                        <option value="">Select attendance...</option>
-                        <option value="Present">Present</option>
-                        <option value="Absent">Absent</option>
-                        <option value="Represented">Represented</option>
-                        <option value="Not Required">Not Required</option>
-                        <option value="Virtual (Represented)">Virtual (Represented)</option>
-                        <option value="Virtual (Client to Attend)">Virtual (Client to Attend)</option>
-                    </select>
-                </div>
+            </div>
 
+            <!-- Next Court Appearance Section -->
+            <div class="proc-section-card" style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 60%, #f8fafc 100%); border-color: #6ee7b7;">
+                <div class="flex items-baseline gap-2 mb-2 sm:mb-2.5 flex-wrap">
+                    <h3 class="proc-h3 font-bold text-gray-900 flex items-center gap-1.5">
+                        <i class="fas fa-calendar-plus text-emerald-600 text-xs"></i>
+                        Next Court Appearance
+                    </h3>
+                    <span class="text-[10px] sm:text-[11px] text-gray-500">— shown on the case calendar</span>
+                </div>
+                <div class="proc-auto-grid">
+                    <!-- Next Activity Type -->
+                    <div class="proc-no-overflow">
+                        <label for="next_activity_type" class="proc-label">Next Activity Type</label>
+                        <div class="relative">
+                            <input type="text" id="next_activity_type" name="next_activity_type" class="proc-input uppercase"
+                                placeholder="e.g. Mention, Hearing"
+                                autocomplete="off" />
+                            <div id="next_activity_type_dropdown" class="proc-dropdown hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto"></div>
+                        </div>
+                    </div>
+                    <!-- Next Court Date -->
+                    <div class="proc-no-overflow">
+                        <label for="next_court_date" class="proc-label">Next Court Date</label>
+                        <input type="date" id="next_court_date" name="next_court_date" class="proc-input" />
+                    </div>
+                    <!-- Next Judicial Officer -->
+                    <div class="proc-no-overflow">
+                        <label for="next_judicial_officer" class="proc-label">Next Judicial Officer</label>
+                        <div class="relative">
+                            <input type="text" id="next_judicial_officer" name="next_judicial_officer" class="proc-input uppercase"
+                                placeholder="Enter judicial officer name..."
+                                autocomplete="off" />
+                            <div id="next_judicial_officer_dropdown" class="proc-dropdown hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto"></div>
+                        </div>
+                    </div>
+                    <!-- Next Client Attendance -->
+                    <div class="proc-no-overflow">
+                        <label for="next_attendance" class="proc-label">Next Client Attendance</label>
+                        <select id="next_attendance" name="next_attendance" class="proc-input">
+                            <option value="">Select attendance...</option>
+                            <option value="Present">Present</option>
+                            <option value="Absent">Absent</option>
+                            <option value="Represented">Represented</option>
+                            <option value="Not Required">Not Required</option>
+                            <option value="Virtual (Represented)">Virtual (Represented)</option>
+                            <option value="Virtual (Client to Attend)">Virtual (Client to Attend)</option>
+                        </select>
+                    </div>
+                    <!-- Next Court Link (conditional) -->
+                    <div id="next_court_link_wrap" class="proc-grid-full proc-no-overflow hidden">
+                        <label for="virtual_link" class="proc-label">
+                            Next Court Link
+                            <span id="next_court_link_hint" class="ml-1 text-[10px] font-normal normal-case text-emerald-700"></span>
+                        </label>
+                        <input type="url" id="virtual_link" name="virtual_link" class="proc-input" placeholder="https://meet.google.com/... or https://zoom.us/..." />
+                    </div>
+                </div>
             </div>
 
             <!-- Bring up date Section -->
-            <div class="border-t border-gray-100 pt-6 mt-6 bg-gray-50/50 rounded-xl p-4 sm:p-5 -mx-1 sm:-mx-2">
-                <div class="flex items-center mb-4">
+            <div class="bg-gray-50/60 rounded-lg p-2.5 sm:p-3 border border-gray-200">
+                <label class="flex items-center cursor-pointer">
                     <input 
                         type="checkbox" 
                         id="materials_required"
-                        class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 flex-shrink-0"
                         onchange="toggleMaterialsSection()"
                     />
-                    <label for="materials_required" class="ml-3 text-base sm:text-lg font-semibold text-gray-900">
+                    <span class="ml-2 text-xs sm:text-sm font-semibold text-gray-900">
                         Bring up date
-                    </label>
-                </div>
+                    </span>
+                </label>
 
-                <div id="materialsSection" class="hidden space-y-4">
+                <div id="materialsSection" class="hidden mt-2.5 space-y-2">
                     <div id="materialsContainer">
                         <!-- Items will be added here dynamically -->
                     </div>
                     <button 
                         type="button"
                         onclick="addMaterialRow()"
-                        class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors duration-200 font-semibold shadow-sm"
+                        class="proc-btn-sm bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
                     >
-                        <i class="fas fa-plus mr-2"></i>Add Item
+                        <i class="fas fa-plus"></i>Add Item
                     </button>
                 </div>
             </div>
 
             <!-- Submit Button -->
-            <div class="flex flex-wrap justify-end gap-3 sm:gap-4 pt-6 mt-6 border-t border-gray-100">
+            <div class="proc-actions pt-2.5 sm:pt-3 border-t border-gray-100">
                 <button 
                     type="button" 
                     onclick="resetForm()"
-                    class="px-5 py-2.5 sm:px-6 sm:py-3 bg-white text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 font-semibold shadow-sm"
+                    class="px-3.5 py-2 sm:px-4 sm:py-2 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs sm:text-sm font-semibold shadow-sm"
                 >
-                    <i class="fas fa-redo mr-2"></i>Reset
+                    <i class="fas fa-redo mr-1.5"></i>Reset
                 </button>
                 <button 
                     type="submit"
-                    class="px-5 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl"
+                    class="px-3.5 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-md hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 text-xs sm:text-sm font-semibold shadow-sm hover:shadow"
                 >
-                    <i class="fas fa-save mr-2"></i>Save new court attendance
+                    <i class="fas fa-save mr-1.5"></i>Save
                 </button>
             </div>
         </form>
     </div>
 
     <!-- Previous court attendances (all rows, newest / current first) — anchor for deep links from Case tracking -->
-    <div id="previous-court-attendances" class="proc-card p-4 sm:p-6 mb-4 sm:mb-6 scroll-mt-24 md:scroll-mt-28" tabindex="-1">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 sm:mb-6">
-            <h2 class="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2 flex-wrap">
-                <i class="fas fa-list text-indigo-600"></i>
-                PREVIOUS COURT ATTENDANCES <span class="text-green-600">({{ proceedings|length }})</span>
+    <div id="previous-court-attendances" class="proc-card p-2.5 sm:p-4 mb-2.5 sm:mb-4 scroll-mt-24 md:scroll-mt-28" tabindex="-1">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 mb-2.5 sm:mb-3.5">
+            <h2 class="proc-h2 font-bold text-gray-900 flex items-center gap-1.5 flex-wrap min-w-0">
+                <i class="fas fa-list text-indigo-600 text-xs flex-shrink-0"></i>
+                <span class="truncate">PREVIOUS COURT ATTENDANCES</span>
+                <span class="text-green-600 text-xs">({{ proceedings|length }})</span>
             </h2>
-            <p class="text-xs sm:text-sm text-gray-500 font-medium">Latest shown at the top · All records listed</p>
+            <p class="text-[10px] sm:text-xs text-gray-500">Latest at the top · All records listed</p>
         </div>
         
         {% if proceedings and proceedings|length > 0 %}
         <!-- Desktop/Tablet: table -->
         <div class="proc-table-wrap">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-[13px]">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Activity</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Court Room</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Next Date</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Outcome</th>
-                        <th class="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Activity</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Court Room</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Judicial Officer</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Next Date</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Outcome</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody class="bg-white divide-y divide-gray-100">
                     {% for proceeding in proceedings %}
                     <tr class="hover:bg-gray-50 transition-colors {% if proceeding.is_latest == 0 %}opacity-60{% endif %}">
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
                             {% if proceeding.is_latest == 1 %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Current</span>
+                            <span class="px-1.5 py-0.5 inline-flex text-[10px] font-semibold rounded-full bg-green-100 text-green-800">Current</span>
                             {% else %}
-                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-600">Previous</span>
+                            <span class="px-1.5 py-0.5 inline-flex text-[10px] font-semibold rounded-full bg-gray-100 text-gray-600">Previous</span>
                             {% endif %}
                         </td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 text-sm text-gray-900">{{ proceeding.court_activity_type or '-' }}</td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 text-sm text-gray-900">{{ proceeding.court_room or '-' }}</td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
-                            <div class="text-sm font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</div>
-                            <div class="text-xs text-gray-500">{{ proceeding.created_at.split(' ')[0] if proceeding.created_at else '' }}</div>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 text-gray-900">{{ proceeding.court_activity_type or '-' }}</td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 text-gray-900">{{ proceeding.court_room or '-' }}</td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
+                            <div class="font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</div>
+                            <div class="text-[10px] text-gray-500">{{ proceeding.created_at.split(' ')[0] if proceeding.created_at else '' }}</div>
                         </td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 text-sm text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 text-gray-900">{{ proceeding.judicial_officer or '-' }}</td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
                             {% if proceeding.next_court_date %}
-                            <div class="text-sm font-semibold text-green-600">{{ proceeding.next_court_date }}</div>
+                            <div class="font-semibold text-green-600">{{ proceeding.next_court_date }}</div>
                             {% else %}
-                            <span class="text-sm text-gray-400">-</span>
+                            <span class="text-gray-400">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3">
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2">
                             {% if proceeding.outcome_orders %}
-                            <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ proceeding.outcome_orders }}">{{ proceeding.outcome_orders }}</div>
+                            <div class="text-gray-900 max-w-[14rem] truncate" title="{{ proceeding.outcome_orders }}">{{ proceeding.outcome_orders }}</div>
                             {% else %}
-                            <span class="text-sm text-gray-400">-</span>
+                            <span class="text-gray-400">-</span>
                             {% endif %}
                         </td>
-                        <td class="px-3 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <button onclick="viewProceedingDetails({{ proceeding.id }})" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors inline-flex items-center" title="View"><i class="fas fa-eye mr-1"></i>View</button>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
+                            <div class="flex flex-wrap items-center gap-1">
+                                <button onclick="viewProceedingDetails({{ proceeding.id }})" class="proc-btn-sm bg-blue-600 hover:bg-blue-700 text-white" title="View"><i class="fas fa-eye"></i>View</button>
                                 {% if proceeding.is_latest == 1 %}
-                                <button onclick="editProceeding({{ proceeding.id }})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors inline-flex items-center" title="Edit this current proceeding in place"><i class="fas fa-pen mr-1"></i>Edit current</button>
-                                <button onclick="updateProceeding({{ proceeding.id }})" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors inline-flex items-center" title="Load into form; save adds a new row (history kept)"><i class="fas fa-copy mr-1"></i>New from latest</button>
+                                <button onclick="editProceeding({{ proceeding.id }})" class="proc-btn-sm bg-amber-600 hover:bg-amber-700 text-white" title="Edit this current proceeding in place"><i class="fas fa-pen"></i>Edit</button>
+                                <button onclick="updateProceeding({{ proceeding.id }})" class="proc-btn-sm bg-indigo-600 hover:bg-indigo-700 text-white" title="Load into form; save adds a new row (history kept)"><i class="fas fa-copy"></i>New</button>
                                 {% endif %}
                             </div>
                         </td>
@@ -363,36 +500,36 @@ select.proc-input {
             </table>
         </div>
         <!-- Mobile: cards -->
-        <div class="proc-mobile-cards mt-4 md:mt-0">
+        <div class="proc-mobile-cards mt-2 md:mt-0">
             {% for proceeding in proceedings %}
             <div class="proc-mobile-card {% if proceeding.is_latest == 0 %}opacity-75{% endif %}">
                 <div class="proc-mobile-row">
-                    <span class="text-xs text-gray-500">Status</span>
+                    <span class="text-[10px] text-gray-500">Status</span>
                     {% if proceeding.is_latest == 1 %}
-                    <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Current</span>
+                    <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-800">Current</span>
                     {% else %}
-                    <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Previous</span>
+                    <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-gray-100 text-gray-600">Previous</span>
                     {% endif %}
                 </div>
                 <div class="proc-mobile-row">
-                    <span class="text-xs text-gray-500">Activity / Room</span>
-                    <span class="text-sm font-medium text-gray-900">{{ proceeding.court_activity_type or '-' }} / {{ proceeding.court_room or '-' }}</span>
+                    <span class="text-[10px] text-gray-500">Activity / Room</span>
+                    <span class="text-xs font-medium text-gray-900 text-right">{{ proceeding.court_activity_type or '-' }} / {{ proceeding.court_room or '-' }}</span>
                 </div>
                 <div class="proc-mobile-row">
-                    <span class="text-xs text-gray-500">Date</span>
-                    <span class="text-sm font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</span>
+                    <span class="text-[10px] text-gray-500">Date</span>
+                    <span class="text-xs font-semibold text-gray-900">{{ proceeding.date_of_court_appeared or 'N/A' }}</span>
                 </div>
                 <div class="proc-mobile-row">
-                    <span class="text-xs text-gray-500">Next Date</span>
-                    <span class="text-sm font-medium text-green-600">{{ proceeding.next_court_date or '-' }}</span>
+                    <span class="text-[10px] text-gray-500">Next Date</span>
+                    <span class="text-xs font-medium text-green-600">{{ proceeding.next_court_date or '-' }}</span>
                 </div>
                 <div class="proc-mobile-row flex-wrap">
-                    <span class="text-xs text-gray-500 w-full mb-1">Actions</span>
-                    <div class="flex gap-2">
-                        <button onclick="viewProceedingDetails({{ proceeding.id }})" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg"><i class="fas fa-eye mr-1"></i>View</button>
+                    <span class="text-[10px] text-gray-500 w-full mb-1">Actions</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button onclick="viewProceedingDetails({{ proceeding.id }})" class="proc-btn-sm bg-blue-600 hover:bg-blue-700 text-white"><i class="fas fa-eye"></i>View</button>
                         {% if proceeding.is_latest == 1 %}
-                        <button onclick="editProceeding({{ proceeding.id }})" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg" title="Edit this current proceeding in place"><i class="fas fa-pen mr-1"></i>Edit current</button>
-                        <button onclick="updateProceeding({{ proceeding.id }})" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg" title="Load into form; save adds a new row (history kept)"><i class="fas fa-copy mr-1"></i>New from latest</button>
+                        <button onclick="editProceeding({{ proceeding.id }})" class="proc-btn-sm bg-amber-600 hover:bg-amber-700 text-white" title="Edit this current proceeding in place"><i class="fas fa-pen"></i>Edit</button>
+                        <button onclick="updateProceeding({{ proceeding.id }})" class="proc-btn-sm bg-indigo-600 hover:bg-indigo-700 text-white" title="Load into form; save adds a new row (history kept)"><i class="fas fa-copy"></i>New</button>
                         {% endif %}
                     </div>
                 </div>
@@ -400,48 +537,48 @@ select.proc-input {
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center py-8 sm:py-12">
-            <i class="fas fa-inbox text-gray-300 text-4xl sm:text-5xl mb-4"></i>
-            <p class="text-gray-600 text-sm sm:text-base">No proceedings yet. Add your first proceeding above.</p>
+        <div class="text-center py-5 sm:py-8">
+            <i class="fas fa-inbox text-gray-300 text-3xl sm:text-4xl mb-2"></i>
+            <p class="text-gray-600 text-xs sm:text-sm">No proceedings yet. Add your first proceeding above.</p>
         </div>
         {% endif %}
     </div>
 
     <!-- Success/Error Messages -->
-    <div id="messageContainer" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+    <div id="messageContainer" class="hidden fixed top-16 sm:top-20 right-2 left-2 sm:left-auto sm:right-4 z-50 sm:max-w-md"></div>
 
     <!-- Proceeding Details Modal (full width on large screens, scrollable body) -->
-    <div id="proceedingModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 overflow-y-auto p-4 sm:p-6">
-        <div class="relative mx-auto my-6 sm:my-10 w-full max-w-4xl border border-gray-200 shadow-xl rounded-xl bg-white max-h-[calc(100vh-3rem)] flex flex-col">
-            <div class="p-5 sm:p-6 flex-shrink-0 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-indigo-50/40 rounded-t-xl">
+    <div id="proceedingModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 overflow-y-auto p-2 sm:p-4 md:p-6">
+        <div class="relative mx-auto my-2 sm:my-6 md:my-10 w-full max-w-4xl border border-gray-200 shadow-xl rounded-xl bg-white max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-3rem)] flex flex-col">
+            <div class="p-3 sm:p-5 md:p-6 flex-shrink-0 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-indigo-50/40 rounded-t-xl">
                 <!-- Modal Header -->
-                <div class="flex items-start justify-between gap-3">
-                    <h3 class="text-xl sm:text-2xl font-bold text-gray-900 flex items-center flex-wrap gap-2">
+                <div class="flex items-start justify-between gap-2 sm:gap-3">
+                    <h3 class="proc-h2 font-bold text-gray-900 flex items-center flex-wrap gap-2">
                         <i class="fas fa-file-alt text-indigo-600"></i>
                         <span>Proceeding details</span>
                     </h3>
                     <button type="button" onclick="closeProceedingModal()" class="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 p-1 rounded-lg hover:bg-white/80" aria-label="Close">
-                        <i class="fas fa-times text-2xl"></i>
+                        <i class="fas fa-times text-xl sm:text-2xl"></i>
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-2">Complete record for this court attendance entry.</p>
+                <p class="text-xs text-gray-500 mt-1.5 sm:mt-2">Complete record for this court attendance entry.</p>
             </div>
-                
-                <!-- Modal Body (scrollable) -->
-                <div id="proceedingModalContent" class="px-5 sm:px-6 py-4 overflow-y-auto flex-1 min-h-0 space-y-4 text-gray-800">
-                    <!-- Content will be populated by JavaScript -->
-                </div>
-                
-                <!-- Modal Footer -->
-                <div class="px-5 sm:px-6 py-4 border-t border-gray-200 flex justify-end flex-shrink-0 rounded-b-xl bg-gray-50/80">
-                    <button 
-                        type="button"
-                        onclick="closeProceedingModal()"
-                        class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold shadow-sm"
-                    >
-                        Close
-                    </button>
-                </div>
+
+            <!-- Modal Body (scrollable) -->
+            <div id="proceedingModalContent" class="px-3 sm:px-5 md:px-6 py-3 sm:py-4 overflow-y-auto flex-1 min-h-0 space-y-3 sm:space-y-4 text-gray-800">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-3 sm:px-5 md:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-end flex-shrink-0 rounded-b-xl bg-gray-50/80">
+                <button 
+                    type="button"
+                    onclick="closeProceedingModal()"
+                    class="w-full sm:w-auto px-5 sm:px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base font-semibold shadow-sm"
+                >
+                    Close
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -498,21 +635,21 @@ function addAdvocateRow() {
     const rowId = `advocate_row_${advocateRowCount}`;
     const n = advocateRowCount;
     const row = document.createElement('div');
-    row.className = 'advocate-row bg-white rounded-lg p-4 border border-indigo-100 shadow-sm';
+    row.className = 'advocate-row bg-white rounded-md p-2 sm:p-2.5 border border-indigo-100 shadow-sm';
     row.id = rowId;
     row.innerHTML = `
-        <div class="flex items-start justify-between gap-2 mb-3">
-            <span class="text-sm font-semibold text-indigo-800">Advocate ${n}</span>
-            <button type="button" onclick="removeAdvocateRow('${rowId}')" class="text-red-600 hover:text-red-800 p-1" title="Remove"><i class="fas fa-times"></i></button>
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+            <span class="text-[11px] sm:text-xs font-semibold text-indigo-800">Advocate ${n}</span>
+            <button type="button" onclick="removeAdvocateRow('${rowId}')" class="text-red-600 hover:text-red-800 text-xs p-0.5 flex-shrink-0" title="Remove"><i class="fas fa-times"></i></button>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+        <div class="space-y-1.5 sm:space-y-2">
+            <div class="proc-no-overflow">
                 <label class="proc-label">Advocate name <span class="text-red-500">*</span></label>
                 <input type="text" class="proc-input advocate-name-input" placeholder="NAME OF ADVOCATE" autocomplete="off" />
             </div>
-            <div class="md:col-span-2">
+            <div class="proc-no-overflow">
                 <label class="proc-label">What they said</label>
-                <textarea rows="3" class="proc-input advocate-remarks-input" placeholder="SUMMARY OF SUBMISSIONS OR REMARKS"></textarea>
+                <textarea rows="2" class="proc-input advocate-remarks-input" placeholder="SUMMARY OF SUBMISSIONS OR REMARKS"></textarea>
             </div>
         </div>
     `;
@@ -572,40 +709,40 @@ function addMaterialRow() {
     const rowId = `material_${materialRowCount}`;
     
     const row = document.createElement('div');
-    row.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
+    row.className = 'bg-white rounded-md p-2 sm:p-2.5 border border-gray-200';
     row.id = rowId;
     row.innerHTML = `
-        <div class="flex items-start justify-between mb-4">
-            <h4 class="font-semibold text-gray-900">Item ${materialRowCount}</h4>
+        <div class="flex items-center justify-between mb-1.5 gap-2">
+            <h4 class="text-[11px] sm:text-xs font-semibold text-gray-900">Item ${materialRowCount}</h4>
             <button 
                 type="button"
                 onclick="removeMaterialRow('${rowId}')"
-                class="text-red-600 hover:text-red-800 transition-colors"
+                class="text-red-600 hover:text-red-800 transition-colors text-xs p-0.5 flex-shrink-0"
                 title="Remove Item"
             >
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">
+        <div class="proc-row-grid">
+            <div class="proc-no-overflow">
+                <label class="proc-label">
                     Description <span class="text-red-500">*</span>
                 </label>
                 <textarea 
                     name="material_description_${materialRowCount}"
-                    rows="3"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    rows="2"
+                    class="proc-input"
                     placeholder="Enter item description..."
                     required
                 ></textarea>
             </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">
+            <div class="proc-no-overflow">
+                <label class="proc-label">
                     Frequency to be Reminded
                 </label>
                 <select 
                     name="material_frequency_${materialRowCount}"
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    class="proc-input"
                 >
                     <option value="">Select frequency...</option>
                     <option value="Daily">Daily</option>
@@ -616,8 +753,8 @@ function addMaterialRow() {
                     <option value="Custom">Custom</option>
                 </select>
             </div>
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">
+            <div class="proc-no-overflow">
+                <label class="proc-label">
                     Allocated To
                 </label>
                 <div class="relative">
@@ -625,7 +762,7 @@ function addMaterialRow() {
                         type="text"
                         id="material_allocated_${materialRowCount}"
                         name="material_allocated_input_${materialRowCount}"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        class="proc-input"
                         placeholder="Search employee..."
                         autocomplete="off"
                         oninput="searchEmployees(${materialRowCount}, this.value)"
@@ -635,7 +772,7 @@ function addMaterialRow() {
                         name="material_allocated_id_${materialRowCount}"
                         id="material_allocated_id_${materialRowCount}"
                     />
-                    <div id="employee_dropdown_${materialRowCount}" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                    <div id="employee_dropdown_${materialRowCount}" class="proc-dropdown hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-y-auto"></div>
                 </div>
             </div>
         </div>
@@ -884,11 +1021,148 @@ outcomeOrdersInput.addEventListener('blur', function(e) {
     }, 200);
 });
 
+// Helpers for "Next Court Link" conditional visibility
+function shouldShowNextCourtLink(nextAttendanceValue) {
+    if (!nextAttendanceValue) return false;
+    const v = String(nextAttendanceValue).trim().toLowerCase();
+    return v === 'represented'
+        || v === 'virtual (represented)'
+        || v === 'virtual (client to attend)'
+        || v.startsWith('virtual');
+}
+
+function updateNextCourtLinkVisibility() {
+    const wrap = document.getElementById('next_court_link_wrap');
+    const hint = document.getElementById('next_court_link_hint');
+    const linkInput = document.getElementById('virtual_link');
+    const select = document.getElementById('next_attendance');
+    if (!wrap || !select || !linkInput) return;
+    const val = select.value || '';
+    if (shouldShowNextCourtLink(val)) {
+        wrap.classList.remove('hidden');
+        if (hint) hint.textContent = '(' + val + ')';
+    } else {
+        wrap.classList.add('hidden');
+        if (hint) hint.textContent = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const nextAttendance = document.getElementById('next_attendance');
+    if (nextAttendance) {
+        nextAttendance.addEventListener('change', updateNextCourtLinkVisibility);
+        updateNextCourtLinkVisibility();
+    }
+});
+
+// Live search for Next Judicial Officer (reuses judicial-officers endpoint)
+let nextJudicialOfficerSearchTimeout;
+const nextJudicialOfficerInput = document.getElementById('next_judicial_officer');
+if (nextJudicialOfficerInput) {
+    nextJudicialOfficerInput.addEventListener('input', function() {
+        const cursorPos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(cursorPos, cursorPos);
+
+        clearTimeout(nextJudicialOfficerSearchTimeout);
+        const query = this.value.trim();
+        const dropdown = document.getElementById('next_judicial_officer_dropdown');
+        if (!dropdown) return;
+        if (query.length < 1) {
+            dropdown.classList.add('hidden');
+            return;
+        }
+        nextJudicialOfficerSearchTimeout = setTimeout(() => {
+            fetch(`/api/proceedings/judicial-officers/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) { dropdown.classList.add('hidden'); return; }
+                    dropdown.innerHTML = '';
+                    if (data.officers && data.officers.length > 0) {
+                        data.officers.forEach(officer => {
+                            const item = document.createElement('div');
+                            item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                            item.textContent = officer;
+                            item.addEventListener('click', () => {
+                                document.getElementById('next_judicial_officer').value = officer;
+                                dropdown.classList.add('hidden');
+                            });
+                            dropdown.appendChild(item);
+                        });
+                        dropdown.classList.remove('hidden');
+                    } else {
+                        dropdown.classList.add('hidden');
+                    }
+                })
+                .catch(() => dropdown.classList.add('hidden'));
+        }, 300);
+    });
+    nextJudicialOfficerInput.addEventListener('blur', function() {
+        setTimeout(() => {
+            const dropdown = document.getElementById('next_judicial_officer_dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+        }, 200);
+    });
+}
+
+// Live search for Next Activity Type (reuses court-activity-types endpoint)
+let nextActivityTypeSearchTimeout;
+const nextActivityTypeInput = document.getElementById('next_activity_type');
+if (nextActivityTypeInput) {
+    nextActivityTypeInput.addEventListener('input', function() {
+        const cursorPos = this.selectionStart;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(cursorPos, cursorPos);
+
+        clearTimeout(nextActivityTypeSearchTimeout);
+        const query = this.value.trim();
+        const dropdown = document.getElementById('next_activity_type_dropdown');
+        if (!dropdown) return;
+        if (query.length < 1) {
+            dropdown.classList.add('hidden');
+            return;
+        }
+        nextActivityTypeSearchTimeout = setTimeout(() => {
+            fetch(`/api/proceedings/court-activity-types/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) { dropdown.classList.add('hidden'); return; }
+                    dropdown.innerHTML = '';
+                    const items = data.types || data.activity_types || data.activities || [];
+                    if (items && items.length > 0) {
+                        items.forEach(item => {
+                            const el = document.createElement('div');
+                            el.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+                            el.textContent = item;
+                            el.addEventListener('click', () => {
+                                document.getElementById('next_activity_type').value = item;
+                                dropdown.classList.add('hidden');
+                            });
+                            dropdown.appendChild(el);
+                        });
+                        dropdown.classList.remove('hidden');
+                    } else {
+                        dropdown.classList.add('hidden');
+                    }
+                })
+                .catch(() => dropdown.classList.add('hidden'));
+        }, 300);
+    });
+    nextActivityTypeInput.addEventListener('blur', function() {
+        setTimeout(() => {
+            const dropdown = document.getElementById('next_activity_type_dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+        }, 200);
+    });
+}
+
 // Form submission
 // Update form submission to handle both add and edit
 document.getElementById('proceedingForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
+    const nextAttendanceValue = document.getElementById('next_attendance').value || null;
+    const virtualLinkRaw = document.getElementById('virtual_link').value.trim();
     const formData = {
         case_id: {{ case_id }},
         previous_proceeding_id: (typeof chainFromProceedingId === 'number' && chainFromProceedingId > 0)
@@ -902,8 +1176,10 @@ document.getElementById('proceedingForm').addEventListener('submit', function(e)
         outcome_details: document.getElementById('outcome_details').value.trim() || null,
         next_court_date: document.getElementById('next_court_date').value || null,
         attendance: document.getElementById('current_attendance').value || null,
-        next_attendance: document.getElementById('next_attendance').value || null,
-        virtual_link: document.getElementById('virtual_link').value.trim() || null,
+        next_attendance: nextAttendanceValue,
+        next_activity_type: document.getElementById('next_activity_type').value.trim().toUpperCase() || null,
+        next_judicial_officer: document.getElementById('next_judicial_officer').value.trim().toUpperCase() || null,
+        virtual_link: shouldShowNextCourtLink(nextAttendanceValue) ? (virtualLinkRaw || null) : null,
         reason: document.getElementById('reason').value.trim() || null,
         materials: [],
         advocates: collectAdvocatesFromForm()
@@ -1014,12 +1290,15 @@ function populateForm(proceeding) {
     document.getElementById('reason').value = proceeding.reason || '';
     document.getElementById('judicial_officer').value = proceeding.judicial_officer || '';
     document.getElementById('next_court_date').value = proceeding.next_court_date || '';
+    document.getElementById('next_activity_type').value = proceeding.next_activity_type || '';
+    document.getElementById('next_judicial_officer').value = proceeding.next_judicial_officer || '';
     setSelectValueCaseInsensitive(
         document.getElementById('next_attendance'),
         proceeding.next_attendance || '',
         ''
     );
     document.getElementById('virtual_link').value = proceeding.virtual_link || '';
+    updateNextCourtLinkVisibility();
     
     clearAdvocateRows();
     if (proceeding.advocates && proceeding.advocates.length > 0) {
@@ -1136,24 +1415,33 @@ function prefillFormForNewUpdate(proceeding) {
     // Reset form first to clear any previous values
     document.getElementById('proceedingForm').reset();
     
-    // Only pre-fill these two fields from previous proceeding:
-    // - Date of Court Appeared: Use previous "Next Court Date"
-    // - Current Session Attendance: Use previous "Next Client Attendance"
-    // All other fields remain empty for new updates
+    // Smart pre-fill from previous proceeding's "next" fields → become current details:
+    // - Date of Court Appeared: previous "Next Court Date"
+    // - Current Session Attendance: previous "Next Client Attendance"
+    // - Activity Type: previous "Next Activity Type"
+    // - Judicial Officer: previous "Next Judicial Officer"
     
     const nextCourtDate = proceeding.next_court_date ? (typeof proceeding.next_court_date === 'string' ? proceeding.next_court_date.trim() : proceeding.next_court_date) : '';
     const nextAttendance = proceeding.next_attendance ? (typeof proceeding.next_attendance === 'string' ? proceeding.next_attendance.trim() : proceeding.next_attendance) : '';
+    const nextActivityType = proceeding.next_activity_type ? String(proceeding.next_activity_type).trim() : '';
+    const nextJudicialOfficer = proceeding.next_judicial_officer ? String(proceeding.next_judicial_officer).trim() : '';
     
-    // Only populate these two fields
     const dateInput = document.getElementById('date_of_court_appeared');
     const attendanceSelect = document.getElementById('current_attendance');
+    const activityInput = document.getElementById('court_activity_type');
+    const officerInput = document.getElementById('judicial_officer');
     
     if (dateInput && nextCourtDate) {
         dateInput.value = nextCourtDate;
     }
-    
     if (attendanceSelect) {
         setSelectValueCaseInsensitive(attendanceSelect, nextAttendance || '', 'Represented');
+    }
+    if (activityInput && nextActivityType) {
+        activityInput.value = nextActivityType;
+    }
+    if (officerInput && nextJudicialOfficer) {
+        officerInput.value = nextJudicialOfficer;
     }
     
     // Ensure materials section is hidden and unchecked
@@ -1163,6 +1451,7 @@ function prefillFormForNewUpdate(proceeding) {
     materialRowCount = 0;
     
     clearAdvocateRows();
+    updateNextCourtLinkVisibility();
     
     setProceedingFormMode('create');
 }
@@ -1236,16 +1525,16 @@ function showMessage(message, type) {
     const container = document.getElementById('messageContainer');
     const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
     const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
-    
-    container.className = `fixed top-20 right-4 z-50 max-w-md ${bgColor} text-white px-6 py-4 rounded-lg shadow-lg`;
+
+    container.className = `fixed top-16 sm:top-20 right-2 left-2 sm:left-auto sm:right-4 z-50 sm:max-w-md ${bgColor} text-white px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-lg`;
     container.innerHTML = `
         <div class="flex items-center">
-            <i class="fas ${icon} mr-3 text-xl"></i>
-            <span>${message}</span>
+            <i class="fas ${icon} mr-3 text-base sm:text-xl"></i>
+            <span class="text-sm sm:text-base">${message}</span>
         </div>
     `;
     container.classList.remove('hidden');
-    
+
     setTimeout(() => {
         container.classList.add('hidden');
     }, 5000);
@@ -1340,90 +1629,98 @@ function viewProceedingDetails(proceedingId) {
     
     const html = `
         <!-- Record metadata -->
-        <div class="rounded-xl p-4 border-2 ${proceeding.is_latest == 1 ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-gray-50'}">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Status</p>
-                    <p class="text-lg font-bold ${proceeding.is_latest == 1 ? 'text-green-700' : 'text-gray-600'} mt-0.5">
+        <div class="rounded-xl p-3 sm:p-4 border-2 ${proceeding.is_latest == 1 ? 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50' : 'border-slate-200 bg-gradient-to-r from-slate-50 to-gray-50'}">
+            <div class="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
+                <div class="min-w-0">
+                    <p class="text-[10px] sm:text-xs text-gray-500 font-medium uppercase tracking-wide">Status</p>
+                    <p class="text-base sm:text-lg font-bold ${proceeding.is_latest == 1 ? 'text-green-700' : 'text-gray-600'} mt-0.5">
                         ${proceeding.is_latest == 1 ? '<i class="fas fa-check-circle mr-2"></i>Current' : '<i class="fas fa-history mr-2"></i>Previous'}
                     </p>
                 </div>
-                <div class="text-right space-y-1 text-sm">
+                <div class="text-right space-y-0.5 sm:space-y-1 text-xs sm:text-sm">
                     <div><span class="text-gray-500">Record ID:</span> <span class="font-mono font-semibold text-gray-900">${escapeHtml(String(proceeding.id))}</span></div>
                     ${proceeding.previous_proceeding_id ? '<div><span class="text-gray-500">Previous version ID:</span> <span class="font-mono font-semibold text-gray-900">' + escapeHtml(String(proceeding.previous_proceeding_id)) + '</span></div>' : '<div><span class="text-gray-500">Previous version ID:</span> <span class="text-gray-400">—</span></div>'}
                 </div>
             </div>
-            <div class="mt-4 pt-3 border-t border-gray-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div><span class="text-gray-500">Created:</span> <span class="font-medium text-gray-900">${formatDateTime(proceeding.created_at)}</span></div>
-                <div><span class="text-gray-500">Last updated:</span> <span class="font-medium text-gray-900">${formatDateTime(proceeding.updated_at)}</span></div>
+            <div class="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-gray-200/80 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
+                <div class="break-words"><span class="text-gray-500">Created:</span> <span class="font-medium text-gray-900">${formatDateTime(proceeding.created_at)}</span></div>
+                <div class="break-words"><span class="text-gray-500">Last updated:</span> <span class="font-medium text-gray-900">${formatDateTime(proceeding.updated_at)}</span></div>
             </div>
         </div>
-        
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-2">Session</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Activity type</p>
-                <p class="text-sm font-semibold text-gray-900">${escapeHtml(proceeding.court_activity_type) || '<span class="text-gray-400">—</span>'}</p>
+
+        <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1 sm:pt-2">Session</p>
+        <div class="proc-auto-grid--sm">
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Activity type</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.court_activity_type) || '<span class="text-gray-400">—</span>'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Judicial officer</p>
-                <p class="text-sm font-semibold text-gray-900">${escapeHtml(proceeding.judicial_officer) || '<span class="text-gray-400">—</span>'}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Judicial officer</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.judicial_officer) || '<span class="text-gray-400">—</span>'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Court room</p>
-                <p class="text-sm font-semibold text-gray-900">${escapeHtml(proceeding.court_room) || '<span class="text-gray-400">—</span>'}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Court room</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.court_room) || '<span class="text-gray-400">—</span>'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Date of court attendance</p>
-                <p class="text-sm font-semibold text-gray-900">${formatDate(proceeding.date_of_court_appeared)}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Date of court attendance</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${formatDate(proceeding.date_of_court_appeared)}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm sm:col-span-2">
-                <p class="text-xs text-gray-500 font-medium mb-1">Court attendance</p>
-                <p class="text-sm font-semibold text-gray-900">${escapeHtml(proceeding.attendance) || '<span class="text-gray-400">—</span>'}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow proc-grid-full">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Court attendance</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.attendance) || '<span class="text-gray-400">—</span>'}</p>
             </div>
         </div>
-        
-        <div class="rounded-xl p-4 border border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-white">
-            <h4 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+
+        <div class="rounded-xl p-3 sm:p-4 border border-indigo-200 bg-gradient-to-br from-indigo-50/90 to-white">
+            <h4 class="text-sm font-bold text-gray-900 mb-2.5 sm:mb-3 flex items-center gap-2">
                 <i class="fas fa-user-tie text-indigo-600"></i> Advocates present (${advocates.length})
             </h4>
             ${advocatesHtml}
         </div>
-        
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1">Orders &amp; notes</p>
-        <div class="grid grid-cols-1 gap-3">
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Court directions</p>
-                <p class="text-sm text-gray-900 whitespace-pre-wrap">${escapeHtml(proceeding.outcome_orders) || '<span class="text-gray-400">—</span>'}</p>
+
+        <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1">Orders &amp; notes</p>
+        <div class="grid grid-cols-1 gap-2.5 sm:gap-3">
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Court directions</p>
+                <p class="text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(proceeding.outcome_orders) || '<span class="text-gray-400">—</span>'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Description</p>
-                <p class="text-sm text-gray-900 whitespace-pre-wrap">${escapeHtml(proceeding.outcome_details) || '<span class="text-gray-400">—</span>'}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Description</p>
+                <p class="text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(proceeding.outcome_details) || '<span class="text-gray-400">—</span>'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Next action</p>
-                <p class="text-sm text-gray-900 whitespace-pre-wrap">${escapeHtml(proceeding.reason) || '<span class="text-gray-400">—</span>'}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Next action</p>
+                <p class="text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(proceeding.reason) || '<span class="text-gray-400">—</span>'}</p>
             </div>
         </div>
-        
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1">Next steps</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Next court date</p>
-                <p class="text-sm font-semibold ${proceeding.next_court_date ? 'text-green-600' : 'text-gray-400'}">${proceeding.next_court_date ? formatDate(proceeding.next_court_date) : '—'}</p>
+
+        <p class="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1">Next steps</p>
+        <div class="proc-auto-grid--sm">
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Next activity type</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.next_activity_type) || '<span class="text-gray-400">—</span>'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                <p class="text-xs text-gray-500 font-medium mb-1">Next client attendance</p>
-                <p class="text-sm font-semibold text-gray-900">${escapeHtml(proceeding.next_attendance) || '<span class="text-gray-400">—</span>'}</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Next court date</p>
+                <p class="text-sm font-semibold ${proceeding.next_court_date ? 'text-green-600' : 'text-gray-400'} break-words">${proceeding.next_court_date ? formatDate(proceeding.next_court_date) : '—'}</p>
             </div>
-            <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm sm:col-span-2">
-                <p class="text-xs text-gray-500 font-medium mb-1">Virtual link</p>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Next judicial officer</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.next_judicial_officer) || '<span class="text-gray-400">—</span>'}</p>
+            </div>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Next client attendance</p>
+                <p class="text-sm font-semibold text-gray-900 break-words">${escapeHtml(proceeding.next_attendance) || '<span class="text-gray-400">—</span>'}</p>
+            </div>
+            <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm proc-no-overflow proc-grid-full">
+                <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-1">Next court link</p>
                 ${vlink ? '<a href=' + JSON.stringify(vlink) + ' target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-blue-600 hover:text-blue-800 break-all"><i class="fas fa-link mr-2"></i>' + escapeHtml(vlink) + '</a>' : '<p class="text-sm text-gray-400">—</p>'}
             </div>
         </div>
-        
-        <div class="rounded-xl p-4 border-2 border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50/80">
-            <h4 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+
+        <div class="rounded-xl p-3 sm:p-4 border-2 border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50/80">
+            <h4 class="text-sm font-bold text-gray-900 mb-2.5 sm:mb-3 flex items-center gap-2">
                 <i class="fas fa-clipboard-list text-indigo-600"></i> Bring up date (${materials.length})
             </h4>
             ${materialsHtml}

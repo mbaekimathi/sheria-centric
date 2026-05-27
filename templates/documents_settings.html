@@ -55,8 +55,48 @@
                     You will be able to select which Google account to connect.
                 </p>
                 
+                {% set ds = drive_state if drive_state is defined and drive_state else {'state': 'never_connected', 'account': None} %}
+                {% set ds_account = ds.account or {} %}
+                {% set initial_state = ds.state %}
+
+                <!-- Needs-Reconnect State (Google revoked/expired our refresh token) -->
+                <div id="needsReconnectState" class="{% if initial_state != 'needs_reconnect' %}hidden{% endif %}">
+                    <div class="bg-amber-50 border border-amber-300 rounded-lg p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-start space-x-3">
+                                <div class="w-10 h-10 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-triangle-exclamation text-amber-700"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-sm font-bold text-amber-900">Reconnect Google Drive</p>
+                                    <p class="text-xs text-amber-800 mt-0.5">
+                                        Previously linked to
+                                        <span class="font-semibold" id="reconnectAccountEmail">{{ ds_account.email or 'your Google account' }}</span>.
+                                        Google revoked or expired the saved credentials, so uploads will fail until you reconnect.
+                                    </p>
+                                    <p class="text-[11px] text-amber-700 mt-1 italic" id="reconnectReason">
+                                        {{ ds.reason or 'Tokens issued while the OAuth consent screen is in Testing mode expire after about 7 days.' }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-amber-200 flex flex-wrap items-center gap-2">
+                            <button type="button"
+                                    onclick="connectGoogleDrive()"
+                                    class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-semibold text-sm inline-flex items-center">
+                                <i class="fab fa-google mr-2"></i>Reconnect now
+                            </button>
+                            <button type="button"
+                                    onclick="disconnectGoogleDrive()"
+                                    class="px-4 py-2 bg-white border border-amber-300 text-amber-900 rounded-lg hover:bg-amber-100 transition-colors font-semibold text-sm inline-flex items-center">
+                                <i class="fas fa-unlink mr-2"></i>Forget this account
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Not Connected State -->
-                <div id="notConnectedState">
+                <div id="notConnectedState" class="{% if initial_state != 'never_connected' %}hidden{% endif %}">
                     <button 
                         type="button"
                         onclick="connectGoogleDrive()"
@@ -72,7 +112,7 @@
                 </div>
 
                 <!-- Connected State -->
-                <div id="connectedState" class="hidden">
+                <div id="connectedState" class="{% if initial_state != 'connected' %}hidden{% endif %}">
                     <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-3">
@@ -81,7 +121,10 @@
                                 </div>
                                 <div>
                                     <p class="text-sm font-semibold text-gray-900">Connected to Google Drive</p>
-                                    <p class="text-xs text-gray-600" id="connectedAccountEmail">No account selected</p>
+                                    <p class="text-xs text-gray-600" id="connectedAccountEmail">{{ ds_account.email or 'No account selected' }}</p>
+                                    <p class="text-[11px] text-gray-500 mt-0.5" id="connectedLastVerified">
+                                        {% if ds.last_verified_at %}Last verified: {{ ds.last_verified_at }}{% endif %}
+                                    </p>
                                 </div>
                             </div>
                             <button 
@@ -321,21 +364,56 @@ function connectGoogleDrive() {
         });
 }
 
+// Toggle which of the three states (connected / needs_reconnect / never_connected) is visible.
+function setDriveState(state, account, opts) {
+    opts = opts || {};
+    const notConnected = document.getElementById('notConnectedState');
+    const connected = document.getElementById('connectedState');
+    const needsReconnect = document.getElementById('needsReconnectState');
+    if (!notConnected || !connected || !needsReconnect) return;
+
+    notConnected.classList.add('hidden');
+    connected.classList.add('hidden');
+    needsReconnect.classList.add('hidden');
+
+    if (state === 'connected') {
+        connected.classList.remove('hidden');
+        const emailEl = document.getElementById('connectedAccountEmail');
+        if (emailEl) emailEl.textContent = (account && (account.email || account.name)) || 'Connected';
+        const lastVerifiedEl = document.getElementById('connectedLastVerified');
+        if (lastVerifiedEl) {
+            lastVerifiedEl.textContent = opts.lastVerifiedAt ? `Last verified: ${opts.lastVerifiedAt}` : '';
+        }
+        const banner = document.getElementById('drive-reconnect-banner');
+        if (banner) banner.remove();
+    } else if (state === 'needs_reconnect') {
+        needsReconnect.classList.remove('hidden');
+        const emailEl = document.getElementById('reconnectAccountEmail');
+        if (emailEl) emailEl.textContent = (account && account.email) || 'your Google account';
+        const reasonEl = document.getElementById('reconnectReason');
+        if (reasonEl && opts.reason) reasonEl.textContent = opts.reason;
+    } else {
+        notConnected.classList.remove('hidden');
+    }
+}
+
 // Handle successful Google Drive connection
 function handleGoogleDriveConnected(accountData) {
-    document.getElementById('notConnectedState').classList.add('hidden');
-    document.getElementById('connectedState').classList.remove('hidden');
-    document.getElementById('connectedAccountEmail').textContent = accountData.email || accountData.name || 'Connected';
+    setDriveState('connected', accountData || {}, { lastVerifiedAt: new Date().toLocaleString() });
     showMessage('Google Drive connected successfully!', 'success');
 }
 
-// Check connection status
+// Check connection status — handles the three states the API can return.
 function checkConnectionStatus() {
     fetch('/api/auth/google-drive/status', { credentials: 'same-origin' })
         .then(response => response.json())
         .then(data => {
             if (data.connected) {
-                handleGoogleDriveConnected(data.account);
+                setDriveState('connected', data.account || {}, { lastVerifiedAt: data.last_verified_at });
+            } else if (data.needs_reconnect) {
+                setDriveState('needs_reconnect', data.account || {}, { reason: data.reason });
+            } else {
+                setDriveState('never_connected');
             }
         })
         .catch(error => {
@@ -357,9 +435,11 @@ function disconnectGoogleDrive() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            document.getElementById('notConnectedState').classList.remove('hidden');
-            document.getElementById('connectedState').classList.add('hidden');
-            document.getElementById('currentSettings').classList.add('hidden');
+            setDriveState('never_connected');
+            const cur = document.getElementById('currentSettings');
+            if (cur) cur.classList.add('hidden');
+            const banner = document.getElementById('drive-reconnect-banner');
+            if (banner) banner.remove();
             showMessage('Google Drive disconnected successfully', 'success');
         } else {
             showMessage(data.error || 'Error disconnecting', 'error');
@@ -381,8 +461,10 @@ function switchGoogleAccount() {
 // Create main folder function
 function createMainFolder() {
     const connectedState = document.getElementById('connectedState');
-    if (connectedState.classList.contains('hidden')) {
-        showMessage('Please connect Google Drive first', 'error');
+    const needsReconnect = document.getElementById('needsReconnectState');
+    if (!connectedState || connectedState.classList.contains('hidden')) {
+        const isNeedingReconnect = needsReconnect && !needsReconnect.classList.contains('hidden');
+        showMessage(isNeedingReconnect ? 'Please reconnect Google Drive first' : 'Please connect Google Drive first', 'error');
         return;
     }
     
@@ -418,10 +500,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // Form submission (for saving settings)
 document.getElementById('googleDriveSettingsForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const connectedState = document.getElementById('connectedState');
-    if (connectedState.classList.contains('hidden')) {
-        showMessage('Please connect Google Drive first', 'error');
+    const needsReconnect = document.getElementById('needsReconnectState');
+    const isConnected = connectedState && !connectedState.classList.contains('hidden');
+    const isNeedingReconnect = needsReconnect && !needsReconnect.classList.contains('hidden');
+    if (!isConnected) {
+        showMessage(isNeedingReconnect ? 'Please reconnect Google Drive first' : 'Please connect Google Drive first', 'error');
         return;
     }
     

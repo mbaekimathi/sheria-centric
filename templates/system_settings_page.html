@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% set page_group = page_group|default('system_settings') %}
+{% block title %}{{ section_meta.label }} - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+{% set cs = company_settings or {} %}
+<div class="max-w-5xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-building text-indigo-600 mr-3"></i>
+            {{ section_meta.label }}
+        </h1>
+        <p class="text-gray-600">
+            {% if page_group == 'company' and settings_section_key == 'company' %}
+            Main identity details of the law firm. Use the sidebar to open other company settings.
+            {% else %}
+            Company setting — configure this area, then save. Use the sidebar to open other company pages.
+            {% endif %}
+        </p>
+    </div>
+
+    <form action="{{ url_for('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6">
+        <input type="hidden" name="settings_section" value="{{ settings_section_key }}">
+        {% include 'system_settings/sections/' + settings_section_key + '.html' %}
+        <div class="flex justify-end pb-8">
+            <button type="submit" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
+                <i class="fas fa-save mr-2"></i>Save Settings
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'system_settings/_styles.html' %}
+{% if settings_section_key == 'branding' %}
+{% include 'system_settings/_branding_assets.html' %}
+{% endif %}
+{% if settings_section_key == 'documents' %}
+{% include 'system_settings/_document_assets.html' %}
+{% endif %}
+{% endblock %}

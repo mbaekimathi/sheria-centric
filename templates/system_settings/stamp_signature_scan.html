@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+
+{% set cs = company_settings or {} %}
+
+{% block title %}{{ asset_meta.scan_title }} - SHERIA CENTRIC{% endblock %}
+
+{% block extra_css %}
+{% if asset_kind == 'signature' %}
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Parisienne&family=Sacramento&display=swap" rel="stylesheet">
+<style>
+    .typed-signature-live {
+        font-size: 2.25rem;
+        line-height: 1.2;
+        color: #000;
+        min-height: 3.5rem;
+    }
+</style>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+                <a href="{{ url_for('system_settings_section', section='documents') }}"
+                   class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold inline-flex items-center gap-1 mb-2">
+                    <i class="fas fa-arrow-left"></i> Back to Document Settings
+                </a>
+                <h1 class="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <i class="fas {{ asset_meta.icon }} text-indigo-600"></i>
+                    {{ asset_meta.scan_title }}
+                </h1>
+                <p class="text-gray-600 mt-1">{{ asset_meta.label }}</p>
+                <p class="text-gray-600 mt-2">{{ asset_meta.hint }}</p>
+                <p class="text-sm text-indigo-800 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-3">
+                    <i class="fas fa-magic mr-1"></i>
+                    We detect the <strong>ink only</strong> (your signature or stamp impression), not the whole photo — place writing on white paper in the frame.
+                </p>
+            </div>
+            {% if current_static %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                <i class="fas fa-check-circle"></i> Configured
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <form action="{{ url_for('system_settings_asset_scan', asset_kind=asset_kind) }}"
+          method="post" enctype="multipart/form-data" id="scan-form" class="space-y-6">
+
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="flex border-b border-gray-200">
+                <button type="button" id="tab-camera"
+                    class="scan-tab flex-1 px-4 py-3 text-sm font-semibold text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/50">
+                    <i class="fas fa-expand mr-2"></i>Scan with camera
+                </button>
+                <button type="button" id="tab-upload"
+                    class="scan-tab flex-1 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                    <i class="fas fa-upload mr-2"></i>Upload scan
+                </button>
+                {% if asset_kind == 'signature' %}
+                <button type="button" id="tab-draw"
+                    class="scan-tab flex-1 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                    <i class="fas fa-pen-nib mr-2"></i>Sign on screen
+                </button>
+                <button type="button" id="tab-type"
+                    class="scan-tab flex-1 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                    <i class="fas fa-keyboard mr-2"></i>Type signature
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div id="panel-camera" class="scan-panel space-y-4">
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-lightbulb text-amber-500 mr-1"></i>
+                        Use good lighting, plain white paper, and hold the device steady over the signature or stamp.
+                    </p>
+                    <div class="relative rounded-xl overflow-hidden bg-gray-900 aspect-[4/3] max-h-[360px]">
+                        <video id="camera-video" class="w-full h-full object-cover" playsinline autoplay muted></video>
+                        <canvas id="camera-snapshot" class="hidden w-full h-full object-cover"></canvas>
+                        <div id="camera-placeholder"
+                            class="absolute inset-0 flex flex-col items-center justify-center text-gray-400 text-sm p-4 text-center">
+                            <i class="fas fa-expand text-4xl mb-2 opacity-50"></i>
+                            <span>Scanner preview will appear here</span>
+                        </div>
+                        <div class="pointer-events-none absolute inset-6 border-2 border-dashed border-white/40 rounded-lg"></div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" id="btn-start-camera"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700">
+                            <i class="fas fa-video mr-2"></i>Start scanner
+                        </button>
+                        <button type="button" id="btn-scan" disabled
+                            class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-expand mr-2"></i>Scan now
+                        </button>
+                        <button type="button" id="btn-retake" disabled
+                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg text-sm font-semibold hover:bg-gray-300 disabled:opacity-50 hidden">
+                            <i class="fas fa-redo mr-2"></i>Scan again
+                        </button>
+                        <button type="button" id="btn-switch-camera" disabled
+                            class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+                            <i class="fas fa-sync-alt mr-2"></i>Switch camera
+                        </button>
+                    </div>
+                    <p id="camera-error" class="hidden text-sm text-red-600"></p>
+                </div>
+
+                <div id="panel-upload" class="scan-panel hidden space-y-4">
+                    <label for="asset-file"
+                        class="cursor-pointer flex flex-col items-center justify-center px-4 py-10 border-2 border-dashed border-gray-300 rounded-xl hover:border-indigo-500 hover:bg-indigo-50/40 transition-all">
+                        <i class="fas fa-cloud-upload-alt text-3xl text-indigo-500 mb-2"></i>
+                        <span class="text-sm font-medium text-gray-700">Choose a scanned photo from device</span>
+                        <span class="text-xs text-gray-500 mt-1">PNG, JPG, GIF — max 5 MB</span>
+                    </label>
+                    <input type="file" id="asset-file" name="asset_file" accept="image/*" capture="environment" class="hidden">
+                </div>
+
+                {% if asset_kind == 'signature' %}
+                <div id="panel-draw" class="scan-panel hidden space-y-4">
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-hand-pointer text-amber-500 mr-1"></i>
+                        Use your finger, stylus, or mouse to sign in the box. We’ll save it as a clean transparent PNG.
+                    </p>
+                    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                        <div class="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center justify-between gap-2">
+                            <div class="text-xs text-gray-600 font-semibold">
+                                Tip: write a little larger for best results
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="btn-draw-clear"
+                                    class="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                                    <i class="fas fa-eraser mr-1"></i>Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-3">
+                            <canvas id="draw-canvas"
+                                class="w-full bg-white rounded-lg border-2 border-dashed border-gray-200"
+                                style="touch-action: none; height: 200px;"></canvas>
+                            <p class="mt-2 text-xs text-gray-500">Sign in the box above, then click “Save Default signature”.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-type" class="scan-panel hidden space-y-4">
+                    <p class="text-sm text-gray-600">
+                        <i class="fas fa-font text-amber-500 mr-1"></i>
+                        Type your name — we convert it to a black script signature on a transparent background.
+                    </p>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="typed-name" class="block text-sm font-semibold text-gray-700 mb-1">Your name</label>
+                            <input type="text" id="typed-name" maxlength="80" autocomplete="name"
+                                placeholder="e.g. Jane M. Smith"
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="typed-font" class="block text-sm font-semibold text-gray-700 mb-1">Style</label>
+                                <select id="typed-font"
+                                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500">
+                                    <option value="dancing">Classic script</option>
+                                    <option value="great-vibes">Elegant</option>
+                                    <option value="parisienne">Formal</option>
+                                    <option value="sacramento">Casual</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="typed-size" class="block text-sm font-semibold text-gray-700 mb-1">Size</label>
+                                <select id="typed-size"
+                                    class="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500">
+                                    <option value="small">Small</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="large">Large</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-gray-200 bg-[url('data:image/svg+xml,%3Csvg width=%2220%22 height=%2220%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cpath d=%22M0 0h10v10H0zM10 10h10v10H10z%22 fill=%22%23f3f4f6%22/%3E%3C/svg%3E')] bg-repeat px-6 py-8 flex items-center justify-center min-h-[100px]">
+                            <p id="typed-live-preview" class="typed-signature-live text-center" style="font-family: 'Dancing Script', cursive;">Your signature appears here</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div id="processing-row" class="hidden text-sm text-indigo-600 flex items-center gap-2">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Scanning ink strokes and removing background…</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <i class="fas fa-eye text-indigo-600"></i>
+                Preview
+            </h2>
+            <div class="rounded-xl border-2 border-dashed border-gray-200 bg-[url('data:image/svg+xml,%3Csvg width=%2220%22 height=%2220%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cpath d=%22M0 0h10v10H0zM10 10h10v10H10z%22 fill=%22%23f3f4f6%22/%3E%3C/svg%3E')] bg-repeat p-6 min-h-[160px] flex items-center justify-center">
+                <div id="preview-empty" class="text-center text-gray-400 text-sm {% if current_static %}hidden{% endif %}">
+                    <i class="fas {{ asset_meta.icon }} text-3xl mb-2 opacity-40"></i>
+                    <p>No preview yet — scan, draw, type, or upload</p>
+                </div>
+                {% if current_static %}
+                <img id="preview-img" src="{{ url_for('static', filename=current_static) }}" alt="Preview"
+                    class="max-h-40 max-w-full object-contain">
+                {% else %}
+                <img id="preview-img" src="" alt="Preview" class="hidden max-h-40 max-w-full object-contain">
+                {% endif %}
+                <canvas id="preview-canvas" class="hidden max-h-40 max-w-full object-contain"></canvas>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">
+                Dark ink on a transparent background — ready for Google Docs and firm documents.
+            </p>
+        </div>
+
+        <input type="hidden" name="processed_data" id="processed-data" value="">
+
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-8">
+            <div class="flex flex-wrap gap-3">
+                {% if current_static %}
+                <label class="inline-flex items-center gap-2 text-sm text-red-600 cursor-pointer">
+                    <input type="checkbox" name="remove_asset" value="1" class="rounded border-gray-300 text-red-600">
+                    Remove current {{ asset_meta.label|lower }}
+                </label>
+                {% endif %}
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ url_for('system_settings_section', section='documents') }}"
+                   class="px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50">
+                    Cancel
+                </a>
+                <button type="submit" id="btn-save" disabled
+                    class="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-save mr-2"></i>Save {{ asset_meta.label }}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'system_settings/_styles.html' %}
+<script src="{{ url_for('static', filename='js/ink-extract.js') }}"></script>
+{% if asset_kind == 'signature' %}
+<script src="{{ url_for('static', filename='js/signature-type.js') }}"></script>
+{% endif %}
+<script>
+(function () {
+    const ASSET_KIND = {{ asset_kind|tojson }};
+    const MAX_BYTES = 5 * 1024 * 1024;
+    const processedInput = document.getElementById('processed-data');
+    const previewImg = document.getElementById('preview-img');
+    const previewCanvas = document.getElementById('preview-canvas');
+    const previewEmpty = document.getElementById('preview-empty');
+    const processingRow = document.getElementById('processing-row');
+    const btnSave = document.getElementById('btn-save');
+    const form = document.getElementById('scan-form');
+
+    const video = document.getElementById('camera-video');
+    const snapshotCanvas = document.getElementById('camera-snapshot');
+    const cameraPlaceholder = document.getElementById('camera-placeholder');
+    const cameraError = document.getElementById('camera-error');
+    const btnStart = document.getElementById('btn-start-camera');
+    const btnScan = document.getElementById('btn-scan');
+    const btnRetake = document.getElementById('btn-retake');
+    const btnSwitch = document.getElementById('btn-switch-camera');
+    const fileInput = document.getElementById('asset-file');
+    const tabDraw = document.getElementById('tab-draw');
+    const panelDraw = document.getElementById('panel-draw');
+    const drawCanvas = document.getElementById('draw-canvas');
+    const btnDrawClear = document.getElementById('btn-draw-clear');
+    const tabType = document.getElementById('tab-type');
+    const panelType = document.getElementById('panel-type');
+    const typedName = document.getElementById('typed-name');
+    const typedFont = document.getElementById('typed-font');
+    const typedSize = document.getElementById('typed-size');
+    const typedLivePreview = document.getElementById('typed-live-preview');
+
+    let mediaStream = null;
+    let facingMode = 'environment';
+    let hasProcessed = {% if current_static %}true{% else %}false{% endif %};
+    let drawDirty = false;
+    let typeRenderTimer = null;
+
+    if (hasProcessed) btnSave.disabled = false;
+
+    function activateTab(tabEl, panelEl) {
+        document.querySelectorAll('.scan-tab').forEach(function (t) {
+            t.classList.remove('text-indigo-700', 'border-b-2', 'border-indigo-600', 'bg-indigo-50/50');
+            t.classList.add('text-gray-600');
+        });
+        document.querySelectorAll('.scan-panel').forEach(function (p) { p.classList.add('hidden'); });
+        if (tabEl) {
+            tabEl.classList.add('text-indigo-700', 'border-b-2', 'border-indigo-600', 'bg-indigo-50/50');
+            tabEl.classList.remove('text-gray-600');
+        }
+        if (panelEl) panelEl.classList.remove('hidden');
+    }
+
+    function showTab(name) {
+        stopCamera();
+        if (tabDraw) stopDraw();
+        if (name === 'camera') {
+            activateTab(document.getElementById('tab-camera'), document.getElementById('panel-camera'));
+        } else if (name === 'upload') {
+            activateTab(document.getElementById('tab-upload'), document.getElementById('panel-upload'));
+        } else if (name === 'draw' && tabDraw && panelDraw) {
+            activateTab(tabDraw, panelDraw);
+            startDraw();
+        } else if (name === 'type' && tabType && panelType) {
+            activateTab(tabType, panelType);
+            updateTypedLivePreview();
+            scheduleTypedRender();
+        }
+    }
+
+    document.getElementById('tab-camera').addEventListener('click', function () { showTab('camera'); });
+    document.getElementById('tab-upload').addEventListener('click', function () { showTab('upload'); });
+    if (tabDraw) tabDraw.addEventListener('click', function () { showTab('draw'); });
+    if (tabType) tabType.addEventListener('click', function () { showTab('type'); });
+
+    function stopCamera() {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(function (t) { t.stop(); });
+            mediaStream = null;
+        }
+        video.srcObject = null;
+        video.classList.remove('hidden');
+        snapshotCanvas.classList.add('hidden');
+        cameraPlaceholder.classList.remove('hidden');
+        btnScan.disabled = true;
+        btnSwitch.disabled = true;
+    }
+
+    async function startCamera() {
+        cameraError.classList.add('hidden');
+        stopCamera();
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            cameraError.textContent = 'Camera not supported in this browser. Use Upload scan instead.';
+            cameraError.classList.remove('hidden');
+            return;
+        }
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                audio: false,
+            });
+            video.srcObject = mediaStream;
+            await video.play();
+            cameraPlaceholder.classList.add('hidden');
+            btnScan.disabled = false;
+            btnSwitch.disabled = false;
+        } catch (err) {
+            console.error(err);
+            cameraError.textContent = 'Could not open scanner: ' + (err.message || 'permission denied') + '. Try Upload scan.';
+            cameraError.classList.remove('hidden');
+        }
+    }
+
+    btnStart.addEventListener('click', startCamera);
+    btnSwitch.addEventListener('click', function () {
+        facingMode = facingMode === 'environment' ? 'user' : 'environment';
+        startCamera();
+    });
+
+    btnScan.addEventListener('click', function () {
+        if (!video.videoWidth) return;
+        snapshotCanvas.width = video.videoWidth;
+        snapshotCanvas.height = video.videoHeight;
+        snapshotCanvas.getContext('2d').drawImage(video, 0, 0);
+        const dataUrl = snapshotCanvas.toDataURL('image/jpeg', 0.92);
+        video.classList.add('hidden');
+        snapshotCanvas.classList.remove('hidden');
+        btnRetake.classList.remove('hidden');
+        processImageDataUrl(dataUrl);
+    });
+
+    btnRetake.addEventListener('click', function () {
+        snapshotCanvas.classList.add('hidden');
+        video.classList.remove('hidden');
+        btnRetake.classList.add('hidden');
+        startCamera();
+    });
+
+    function processImageDataUrl(dataUrl) {
+        processingRow.classList.remove('hidden');
+        const img = new Image();
+        img.onload = function () {
+            let png;
+            if (typeof extractInkFromScan === 'function') {
+                png = extractInkFromScan(img, ASSET_KIND);
+            } else {
+                alert('Ink extraction failed to load. Refresh the page.');
+                processingRow.classList.add('hidden');
+                return;
+            }
+            applyPreview(png);
+            processingRow.classList.add('hidden');
+        };
+        img.onerror = function () {
+            processingRow.classList.add('hidden');
+            alert('Could not read image.');
+        };
+        img.src = dataUrl;
+    }
+
+    function applyPreview(dataUrl) {
+        if (!dataUrl) return;
+        processedInput.value = dataUrl;
+        previewEmpty.classList.add('hidden');
+        previewImg.src = dataUrl;
+        previewImg.classList.remove('hidden');
+        previewCanvas.classList.add('hidden');
+        hasProcessed = true;
+        btnSave.disabled = false;
+    }
+
+    function startDraw() {
+        if (!drawCanvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = drawCanvas.getBoundingClientRect();
+        const w = Math.max(420, Math.round(rect.width));
+        const h = Math.max(200, Math.round(rect.height || 200));
+        drawCanvas.width = Math.round(w * dpr);
+        drawCanvas.height = Math.round(h * dpr);
+
+        const ctx = drawCanvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#0b0f19';
+        ctx.lineWidth = 3.2;
+
+        const state = {
+            drawing: false,
+            lastX: 0,
+            lastY: 0,
+        };
+
+        function getPos(e) {
+            const r = drawCanvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - r.left),
+                y: (e.clientY - r.top),
+            };
+        }
+
+        function onDown(e) {
+            e.preventDefault();
+            drawCanvas.setPointerCapture(e.pointerId);
+            const p = getPos(e);
+            state.drawing = true;
+            state.lastX = p.x;
+            state.lastY = p.y;
+        }
+
+        function onMove(e) {
+            if (!state.drawing) return;
+            const p = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(state.lastX, state.lastY);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            state.lastX = p.x;
+            state.lastY = p.y;
+            drawDirty = true;
+            applyPreview(exportDrawPng());
+        }
+
+        function onUp(e) {
+            if (!state.drawing) return;
+            state.drawing = false;
+            try { drawCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+
+        drawCanvas._drawHandlers = { onDown, onMove, onUp };
+        drawCanvas.addEventListener('pointerdown', onDown);
+        drawCanvas.addEventListener('pointermove', onMove);
+        drawCanvas.addEventListener('pointerup', onUp);
+        drawCanvas.addEventListener('pointercancel', onUp);
+
+        if (!drawDirty && !processedInput.value) {
+            // Initialize with a blank (no-op) so Save remains disabled until drawing.
+            btnSave.disabled = true;
+        }
+    }
+
+    function stopDraw() {
+        if (!drawCanvas || !drawCanvas._drawHandlers) return;
+        const h = drawCanvas._drawHandlers;
+        drawCanvas.removeEventListener('pointerdown', h.onDown);
+        drawCanvas.removeEventListener('pointermove', h.onMove);
+        drawCanvas.removeEventListener('pointerup', h.onUp);
+        drawCanvas.removeEventListener('pointercancel', h.onUp);
+        delete drawCanvas._drawHandlers;
+    }
+
+    function exportDrawPng() {
+        const src = drawCanvas;
+        const w = src.width;
+        const h = src.height;
+        const ctx = src.getContext('2d');
+        const img = ctx.getImageData(0, 0, w, h);
+        const d = img.data;
+
+        // Find bounds of non-transparent drawn pixels (we draw on opaque white, so use darkness test).
+        let minX = w, minY = h, maxX = 0, maxY = 0, found = 0;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const i = (y * w + x) * 4;
+                const r = d[i], g = d[i + 1], b = d[i + 2];
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                if (lum < 245) {
+                    found++;
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (!found) return '';
+
+        const pad = Math.round(Math.min(w, h) * 0.03);
+        minX = Math.max(0, minX - pad);
+        minY = Math.max(0, minY - pad);
+        maxX = Math.min(w - 1, maxX + pad);
+        maxY = Math.min(h - 1, maxY + pad);
+        const cropW = maxX - minX + 1;
+        const cropH = maxY - minY + 1;
+
+        const out = document.createElement('canvas');
+        out.width = cropW;
+        out.height = cropH;
+        const octx = out.getContext('2d');
+        const outImg = octx.createImageData(cropW, cropH);
+        const od = outImg.data;
+
+        for (let y = 0; y < cropH; y++) {
+            for (let x = 0; x < cropW; x++) {
+                const si = ((y + minY) * w + (x + minX)) * 4;
+                const di = (y * cropW + x) * 4;
+                const r = d[si], g = d[si + 1], b = d[si + 2];
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                const alpha = Math.max(0, Math.min(255, Math.round((255 - lum) * 1.15)));
+                if (alpha > 0) {
+                    od[di] = 0;
+                    od[di + 1] = 0;
+                    od[di + 2] = 0;
+                    od[di + 3] = alpha;
+                }
+            }
+        }
+        octx.putImageData(outImg, 0, 0);
+        return out.toDataURL('image/png', 1.0);
+    }
+
+    function typedFontFamily(fontId) {
+        const fonts = window.SIGNATURE_FONTS;
+        if (!fonts) return 'cursive';
+        const f = fonts.find(function (x) { return x.id === fontId; });
+        return f ? '"' + f.family + '", cursive' : 'cursive';
+    }
+
+    function updateTypedLivePreview() {
+        if (!typedLivePreview || !typedName) return;
+        const name = typedName.value.trim();
+        const fontId = typedFont ? typedFont.value : 'dancing';
+        const sizeKey = typedSize ? typedSize.value : 'medium';
+        const sizeRem = sizeKey === 'large' ? '2.75rem' : (sizeKey === 'small' ? '1.85rem' : '2.25rem');
+        typedLivePreview.style.fontFamily = typedFontFamily(fontId);
+        typedLivePreview.style.fontSize = sizeRem;
+        typedLivePreview.textContent = name || 'Your signature appears here';
+        typedLivePreview.classList.toggle('text-gray-400', !name);
+        typedLivePreview.classList.toggle('text-black', !!name);
+    }
+
+    function scheduleTypedRender() {
+        if (!typedName || typeof renderTypedSignature !== 'function') return;
+        clearTimeout(typeRenderTimer);
+        typeRenderTimer = setTimeout(function () {
+            const name = typedName.value.trim();
+            if (!name) {
+                if (!hasProcessed || panelType && !panelType.classList.contains('hidden')) {
+                    processedInput.value = '';
+                    previewImg.classList.add('hidden');
+                    previewEmpty.classList.remove('hidden');
+                    btnSave.disabled = true;
+                }
+                return;
+            }
+            renderTypedSignature(name, typedFont.value, typedSize.value).then(function (png) {
+                if (png) applyPreview(png);
+            });
+        }, 280);
+    }
+
+    if (typedName) {
+        typedName.addEventListener('input', function () {
+            updateTypedLivePreview();
+            scheduleTypedRender();
+        });
+    }
+    if (typedFont) {
+        typedFont.addEventListener('change', function () {
+            updateTypedLivePreview();
+            scheduleTypedRender();
+        });
+    }
+    if (typedSize) {
+        typedSize.addEventListener('change', function () {
+            updateTypedLivePreview();
+            scheduleTypedRender();
+        });
+    }
+
+    if (btnDrawClear) {
+        btnDrawClear.addEventListener('click', function () {
+            if (!drawCanvas) return;
+            const ctx = drawCanvas.getContext('2d');
+            ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            drawDirty = false;
+            processedInput.value = '';
+            previewImg.classList.add('hidden');
+            previewEmpty.classList.remove('hidden');
+            btnSave.disabled = true;
+        });
+    }
+
+    fileInput.addEventListener('change', function () {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        const file = fileInput.files[0];
+        if (file.size > MAX_BYTES) {
+            alert('Image must be smaller than 5 MB.');
+            fileInput.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function (e) { processImageDataUrl(e.target.result); };
+        reader.readAsDataURL(file);
+    });
+
+    form.addEventListener('submit', function (e) {
+        const removing = form.querySelector('input[name="remove_asset"]:checked');
+        if (!removing && !processedInput.value) {
+            e.preventDefault();
+            alert('Add a signature (scan, draw, type, or upload) before saving.');
+        }
+    });
+
+    window.addEventListener('beforeunload', stopCamera);
+    window.addEventListener('beforeunload', stopDraw);
+
+    if (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        startCamera();
+    } else {
+        cameraError.textContent = 'Scanner requires HTTPS or localhost. Use Upload scan on this site.';
+        cameraError.classList.remove('hidden');
+    }
+})();
+</script>
+{% endblock %}

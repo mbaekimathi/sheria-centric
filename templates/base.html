@@ -1436,8 +1436,8 @@
                     </div>
                     {% endif %}
                     
-                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management, case_management / matter pages, and system_settings) -->
-                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint != 'system_settings' %}
+                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management, case pages, and company settings) -->
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint not in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administration</p>
                     </div>
@@ -1449,6 +1449,12 @@
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
+                    {% if user_role == 'Managing Partner' %}
+                    <a href="{{ url_for('document_management') }}" class="sidebar-link {% if request.endpoint == 'document_management' %}active{% endif %}" id="nav-document-management">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Document Management</span>
+                    </a>
+                    {% endif %}
                     {# Register Case - kept for Associate Advocate and IT Support only #}
                     {% if user_role in ['Associate Advocate', 'IT Support'] %}
                     <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
@@ -1721,7 +1727,7 @@
 
 
 
-                    <!-- IT Support Dashboard Links (only on dashboard, not on system_settings) -->
+                    <!-- IT Support Dashboard Links (only on dashboard, not on system settings pages) -->
                     {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'dashboard' %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">IT Support</p>
@@ -1746,6 +1752,10 @@
                         <span>Matter Management</span>
                     </a>
                     {% endif %}
+                    <a href="{{ url_for('document_management') }}" class="sidebar-link {% if request.endpoint == 'document_management' %}active{% endif %}" id="nav-document-management-dashboard">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Document Management</span>
+                    </a>
                     <a href="{{ url_for('finance_billing') }}" class="sidebar-link" id="nav-finance-billing">
                         <i class="fas fa-dollar-sign"></i>
                         <span>Finance & Billing</span>
@@ -1761,48 +1771,51 @@
                     {% endif %}
                     {% endif %}
 
-                    <!-- System Settings Page: sidebar shows only system setting links -->
-                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint == 'system_settings' %}
+                    <!-- Company settings (all firm / company configuration pages) -->
+                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section', 'system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] %}
+                    {% if settings_section_key == 'documents' or request.endpoint in ['system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">System Settings</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Document Settings</p>
                     </div>
-                    <a href="{{ url_for('system_settings') }}" class="sidebar-link active" id="nav-system-settings-current">
-                        <i class="fas fa-cog"></i>
-                        <span>System Settings</span>
+                    <a href="{{ url_for('system_settings_section', section='documents') }}" class="sidebar-link {% if request.endpoint == 'system_settings_section' and settings_section_key == 'documents' %}active{% endif %}" id="nav-company-documents">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Document Settings</span>
                     </a>
-                    {# In-page table-of-contents — clicking auto-scrolls to that section #}
-                    <div id="system-settings-toc" class="ml-2 my-1 border-l border-gray-200 pl-2 space-y-0.5">
-                        <a href="#section-1"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-1">
-                            <i class="fas fa-building text-[11px]"></i><span>1. Basic Company Information</span>
-                        </a>
-                        <a href="#section-2"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-2">
-                            <i class="fas fa-address-book text-[11px]"></i><span>2. Contact Information</span>
-                        </a>
-                        <a href="#section-3"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-3">
-                            <i class="fas fa-map-marker-alt text-[11px]"></i><span>3. Physical Address</span>
-                        </a>
-                        <a href="#section-4"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-4">
-                            <i class="fas fa-clock text-[11px]"></i><span>4. Business Hours</span>
-                        </a>
-                        <a href="#section-5"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-5">
-                            <i class="fas fa-share-alt text-[11px]"></i><span>5. Social Media Links</span>
-                        </a>
-                        <a href="#section-6"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-6">
-                            <i class="fas fa-balance-scale text-[11px]"></i><span>6. Legal & Professional</span>
-                        </a>
-                        <a href="#section-7"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-7">
-                            <i class="fas fa-file-alt text-[11px]"></i><span>7. Document Settings</span>
-                        </a>
-                        <a href="#section-8"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-8">
-                            <i class="fas fa-dollar-sign text-[11px]"></i><span>8. Billing & Finance</span>
-                        </a>
-                        <a href="#section-9"  class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-9">
-                            <i class="fas fa-bell text-[11px]"></i><span>9. Notification Settings</span>
-                        </a>
-                        <a href="#section-11" class="sidebar-link sidebar-link-sub ml-6 text-sm" data-toc="section-11">
-                            <i class="fas fa-palette text-[11px]"></i><span>11. Branding & Theme</span>
-                        </a>
+                    <a href="{{ url_for('system_settings_letterhead') }}" class="sidebar-link {% if request.endpoint == 'system_settings_letterhead' %}active{% endif %}">
+                        <i class="fas fa-file-signature"></i>
+                        <span>Letterhead</span>
+                    </a>
+                    <a href="{{ url_for('system_settings_asset_scan', asset_kind='stamp') }}" class="sidebar-link {% if request.endpoint in ['system_settings_asset_scan', 'system_settings_asset_capture'] and request.view_args.get('asset_kind') == 'stamp' %}active{% endif %}">
+                        <i class="fas fa-stamp"></i>
+                        <span>Digital stamp</span>
+                    </a>
+                    <a href="{{ url_for('system_settings_asset_scan', asset_kind='signature') }}" class="sidebar-link {% if request.endpoint in ['system_settings_asset_scan', 'system_settings_asset_capture'] and request.view_args.get('asset_kind') == 'signature' %}active{% endif %}">
+                        <i class="fas fa-signature"></i>
+                        <span>Default signature</span>
+                    </a>
+                    <a href="{{ url_for('documents_settings') }}" class="sidebar-link {% if request.endpoint == 'documents_settings' %}active{% endif %}" id="nav-google-drive-settings">
+                        <i class="fab fa-google-drive"></i>
+                        <span>Google Drive Settings</span>
+                    </a>
+                    {% else %}
+                    <div class="px-4 py-2 mt-4 mb-2">
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Company Settings</p>
                     </div>
+                    <a href="{{ url_for('company_templates_settings') }}" class="sidebar-link {% if request.endpoint == 'company_templates_settings' %}active{% endif %}" id="nav-company-templates-settings">
+                        <i class="fas {{ COMPANY_TEMPLATES_SECTION.icon }}"></i>
+                        <span>{{ COMPANY_TEMPLATES_SECTION.label }}</span>
+                    </a>
+                    <a href="{{ url_for('company_information') }}" class="sidebar-link {% if request.endpoint == 'company_information' %}active{% endif %}" id="nav-company-information">
+                        <i class="fas {{ COMPANY_INFORMATION_SECTION.icon }}"></i>
+                        <span>{{ COMPANY_INFORMATION_SECTION.label }}</span>
+                    </a>
+                    {% for nav_key, nav_meta in SYSTEM_SETTINGS_NAV.items() %}
+                    <a href="{{ url_for('system_settings_section', section=nav_key) }}" class="sidebar-link {% if settings_section_key == nav_key %}active{% endif %}" id="nav-company-{{ nav_key }}">
+                        <i class="fas {{ nav_meta.icon }}"></i>
+                        <span>{{ nav_meta.label }}</span>
+                    </a>
+                    {% endfor %}
+                    {% endif %}
                     {% endif %}
 
                     <!-- Finance & Billing Page Links -->
@@ -2051,15 +2064,11 @@
                     </a>
                     {% endif %}
 
-                    <!-- My Tools / My Templates contextual sidebar -->
+                    <!-- My Templates (main nav on My Tools pages) -->
                     {% if request.endpoint in ['my_tools', 'my_templates'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">My Tools</p>
                     </div>
-                    <a href="{{ url_for('my_tools') }}" class="sidebar-link {% if request.endpoint == 'my_tools' %}active{% endif %}" id="nav-my-tools-page">
-                        <i class="fas fa-tools"></i>
-                        <span>My Tools</span>
-                    </a>
                     <a href="{{ url_for('my_templates') }}" class="sidebar-link {% if request.endpoint == 'my_templates' %}active{% endif %}" id="nav-my-templates">
                         <i class="fas fa-file-alt"></i>
                         <span>My Templates</span>
@@ -2113,9 +2122,9 @@
                     <span>My Tools</span>
                 </a>
                 {% if user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or (session.get('original_role') == 'IT Support') %}
-                <a href="{{ url_for('system_settings') }}" class="sidebar-link {% if request.endpoint == 'system_settings' %}active{% endif %}" id="nav-system-settings-footer">
-                    <i class="fas fa-cog"></i>
-                    <span>System Settings</span>
+                <a href="{{ url_for('company_information') }}" class="sidebar-link {% if request.endpoint in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section'] %}active{% endif %}" id="nav-company-footer">
+                    <i class="fas fa-building"></i>
+                    <span>Company Settings</span>
                 </a>
                 {% endif %}
                 <a href="{{ url_for('logout') }}" class="sidebar-link text-red-600 hover:bg-red-50 hover:text-red-700">

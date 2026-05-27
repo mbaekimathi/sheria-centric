@@ -1,0 +1,78 @@
+<div id="section-4" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-clock settings-section-icon"></i>
+                    4. Business Hours
+                </h2>
+                <p class="settings-section-subtitle">Used for appointment scheduling.</p>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Regular hours: clock/time pickers -->
+                <div>
+                    <p class="text-sm font-medium text-gray-700 mb-2">Regular opening hours</p>
+                    <p class="text-xs text-gray-500 mb-2">Select from what time to what time you are open.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Opening Time</label>
+                            <input type="time" name="opening_time" value="{{ cs.get('opening_time') or '08:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Closing Time</label>
+                            <input type="time" name="closing_time" value="{{ cs.get('closing_time') or '17:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+                <!-- Working days: calendar-style checkboxes -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Working Days</label>
+                    <p class="text-xs text-gray-500 mb-2">Select the days you are open (e.g. Mon–Fri, Sat optional).</p>
+                    {% set wd_list = (cs.get('working_days') or '').split(',') %}
+                    <div class="flex flex-wrap gap-4">
+                        {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="working_days" value="{{ day }}" {% if day in wd_list %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">{{ day }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <!-- Public Holiday Status: select + when open times -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Public Holiday Status</label>
+                    <p class="text-xs text-gray-500 mb-2">Choose whether you are closed, open, or on reduced hours on public holidays.</p>
+                    <select name="public_holiday_status" id="public_holiday_status" class="w-full md:max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+                        <option value="">— Select —</option>
+                        <option value="Closed" {% if cs.get('public_holiday_status') == 'Closed' %}selected{% endif %}>Closed</option>
+                        <option value="Open" {% if cs.get('public_holiday_status') == 'Open' %}selected{% endif %}>Open</option>
+                        <option value="Reduced hours" {% if cs.get('public_holiday_status') == 'Reduced hours' %}selected{% endif %}>Reduced hours</option>
+                    </select>
+                    <div id="when_open_times" class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 {% if cs.get('public_holiday_status') not in ['Open', 'Reduced hours'] %}hidden{% endif %}">
+                        <p class="text-sm font-medium text-gray-700 mb-2">When open on public holidays</p>
+                        <p class="text-xs text-gray-500 mb-2">From what time to what time.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">From (time)</label>
+                                <input type="time" name="public_holiday_open_time" value="{{ cs.get('public_holiday_open_time') or '09:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">To (time)</label>
+                                <input type="time" name="public_holiday_close_time" value="{{ cs.get('public_holiday_close_time') or '13:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function() {
+            var sel = document.getElementById('public_holiday_status');
+            var block = document.getElementById('when_open_times');
+            if (!sel || !block) return;
+            function toggle() {
+                var v = sel.value;
+                block.classList.toggle('hidden', v !== 'Open' && v !== 'Reduced hours');
+            }
+            sel.addEventListener('change', toggle);
+            toggle();
+        })();
+        </script>

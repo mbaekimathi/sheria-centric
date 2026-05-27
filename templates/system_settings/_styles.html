@@ -1,0 +1,61 @@
+<style>
+/* Reserve room beneath any sticky header so anchor jumps don't hide titles */
+    html { scroll-behavior: smooth; }
+    .settings-section { scroll-margin-top: 96px; }
+
+    /* Themed section header — stays readable on ANY selected system theme.
+       Uses brand-primary as the background and the light brand-tertiary for
+       the icon, with white text for the title and translucent white for the
+       subtitle so contrast is preserved across every preset palette. */
+    .settings-section-header {
+        padding: 1rem 1.5rem;
+        background: linear-gradient(
+            135deg,
+            var(--brand-primary) 0%,
+            var(--brand-primary) 65%,
+            color-mix(in srgb, var(--brand-primary) 78%, var(--brand-accent)) 100%
+        );
+        border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+        color: #ffffff;
+    }
+    .settings-section-header .settings-section-title {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        font-size: 1.125rem;
+        line-height: 1.5;
+        font-weight: 700;
+        color: #ffffff !important;
+    }
+    .settings-section-header .settings-section-icon {
+        margin-right: 0.5rem;
+        color: var(--brand-tertiary, #A29BFE) !important;
+    }
+    .settings-section-header .settings-section-subtitle {
+        margin-top: 0.25rem;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        color: rgba(255, 255, 255, 0.78) !important;
+    }
+
+    /* Indented sub-link styling for the in-page TOC */
+    .sidebar-link-sub {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        opacity: 0.85;
+        border-left: 2px solid transparent;
+        border-radius: 0 8px 8px 0;
+    }
+    .sidebar-link-sub:hover {
+        opacity: 1;
+        background: var(--brand-accent-soft, #f3f2ff) !important;
+    }
+    .sidebar-link-sub.is-current {
+        opacity: 1;
+        font-weight: 600;
+        color: var(--brand-accent, #6C5CE7) !important;
+        background: var(--brand-accent-soft, #f3f2ff) !important;
+        border-left-color: var(--brand-accent, #6C5CE7);
+    }
+    .sidebar-link-sub.is-current i { color: var(--brand-accent, #6C5CE7) !important; }
+</style>

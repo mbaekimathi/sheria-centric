@@ -1,0 +1,413 @@
+<!-- Google fonts (full set used in font preview) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;700&family=Inter:wght@400;500;700&family=Lato:wght@400;700&family=Lora:wght@400;500;700&family=Manrope:wght@400;500;700&family=Merriweather:wght@400;700&family=Nunito:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:wght@400;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script>
+(function () {
+    // Eye-comfortable 3-color theme presets (primary + accent + tertiary highlight)
+    // All palettes are low-glare and tuned for long reading sessions.
+    const THEME_PRESETS = [
+        { id: 'midnight_indigo',  name: 'Midnight Indigo',  primary: '#1E1A4E', accent: '#6C5CE7', tertiary: '#A29BFE', desc: 'Indigo + violet + lilac' },
+        { id: 'forest_calm',      name: 'Forest Calm',      primary: '#1F3A2E', accent: '#4FAE7D', tertiary: '#C8E6C9', desc: 'Forest + sage + mint' },
+        { id: 'slate_ocean',      name: 'Slate Ocean',      primary: '#0F3D56', accent: '#3B97D3', tertiary: '#A8DADC', desc: 'Slate + ocean + cyan' },
+        { id: 'royal_plum',       name: 'Royal Plum',       primary: '#3B1F4C', accent: '#9B6FB5', tertiary: '#E1BEE7', desc: 'Plum + violet + lavender' },
+        { id: 'charcoal_amber',   name: 'Charcoal Amber',   primary: '#2B2A33', accent: '#E2A24F', tertiary: '#FFE0B2', desc: 'Charcoal + amber + cream' },
+        { id: 'olive_mist',       name: 'Olive Mist',       primary: '#2C3A2A', accent: '#9CB071', tertiary: '#DCEDC8', desc: 'Olive + sage + moss mist' },
+        { id: 'burgundy_rose',    name: 'Burgundy Rose',    primary: '#4B1F2D', accent: '#C97A8E', tertiary: '#F8BBD0', desc: 'Burgundy + rose + blush' },
+        { id: 'mocha_sand',       name: 'Mocha Sand',       primary: '#3A2F2A', accent: '#C9A87C', tertiary: '#F5E6D3', desc: 'Mocha + sand + cream' },
+        { id: 'steel_teal',       name: 'Steel Teal',       primary: '#1F3B47', accent: '#3FB6A8', tertiary: '#B2DFDB', desc: 'Steel + teal + mint' },
+        { id: 'graphite_sky',     name: 'Graphite Sky',     primary: '#23262E', accent: '#7AA7D9', tertiary: '#BBDEFB', desc: 'Graphite + sky + powder' },
+        { id: 'soft_lavender',    name: 'Soft Lavender',    primary: '#3D365C', accent: '#B8A1E3', tertiary: '#E1D5F5', desc: 'Lavender depth + mist' },
+        { id: 'rose_quartz',      name: 'Rose Quartz',      primary: '#3F2E3E', accent: '#E6A4B4', tertiary: '#FCE4EC', desc: 'Mauve + rose + blush' }
+    ];
+
+    function normalizeHex(value, fallback) {
+        if (!value) return fallback;
+        const hex = String(value).trim();
+        const fullHex = /^#([A-Fa-f0-9]{6})$/;
+        const shortHex = /^#([A-Fa-f0-9]{3})$/;
+        if (fullHex.test(hex)) return hex;
+        if (shortHex.test(hex)) {
+            return '#' + hex.slice(1).split('').map(function (c) { return c + c; }).join('');
+        }
+        return fallback;
+    }
+
+    function hexToRgba(hex, alpha) {
+        const h = normalizeHex(hex, '#000000').slice(1);
+        const r = parseInt(h.slice(0, 2), 16);
+        const g = parseInt(h.slice(2, 4), 16);
+        const b = parseInt(h.slice(4, 6), 16);
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    const primaryText = document.getElementById('primary_brand_color');
+    const primaryPicker = document.getElementById('primary_brand_color_picker');
+    const secondaryText = document.getElementById('secondary_color');
+    const secondaryPicker = document.getElementById('secondary_color_picker');
+    const tertiaryText = document.getElementById('tertiary_color');
+    const tertiaryPicker = document.getElementById('tertiary_color_picker');
+    const previewPrimary = document.getElementById('preview-primary');
+    const previewSecondary = document.getElementById('preview-secondary');
+    const previewTertiary = document.getElementById('preview-tertiary');
+    const themePresetInput = document.getElementById('theme_preset');
+    const themeGrid = document.getElementById('theme-preset-grid');
+
+    const previewHeader = document.getElementById('theme-preview-header');
+    const previewSidebar = document.getElementById('theme-preview-sidebar');
+    const previewBtnPrimary = document.getElementById('theme-preview-btn-primary');
+    const previewBtnOutline = document.getElementById('theme-preview-btn-outline');
+    const previewBtnSoft = document.getElementById('theme-preview-btn-soft');
+    const previewLink = document.getElementById('theme-preview-link');
+    const previewLogo = document.getElementById('theme-preview-logo');
+    const previewAccentText = document.getElementById('theme-preview-accent-text');
+    const previewActive = document.getElementById('theme-preview-active');
+    const previewText = document.getElementById('theme-preview-text');
+    const previewBadge = document.getElementById('theme-preview-badge');
+    const previewChip = document.getElementById('theme-preview-chip');
+
+    const fontSelect = document.getElementById('font_family');
+    const fontPreview = document.getElementById('font-preview');
+    const themePreviewShell = document.getElementById('theme-preview-shell');
+
+    if (!primaryText || !primaryPicker || !secondaryText || !secondaryPicker || !tertiaryText || !tertiaryPicker) return;
+
+    // Pick black or white for legible text on a given hex background
+    function contrastColor(hex) {
+        const h = normalizeHex(hex, '#000000').slice(1);
+        const r = parseInt(h.slice(0, 2), 16);
+        const g = parseInt(h.slice(2, 4), 16);
+        const b = parseInt(h.slice(4, 6), 16);
+        // Relative luminance (sRGB)
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return lum > 0.6 ? '#1f2937' : '#ffffff';
+    }
+
+    // Build theme preset cards — each card shows all 3 palette colors as stripes
+    function renderThemeCards() {
+        if (!themeGrid) return;
+        const html = THEME_PRESETS.map(function (t) {
+            const swatch = ''
+                + '<div class="h-14 w-full flex overflow-hidden">'
+                +     '<div class="flex-1 flex items-center justify-center" style="background:' + t.primary + ';">'
+                +         '<span class="text-[10px] font-semibold tracking-wider text-white/90">Aa</span>'
+                +     '</div>'
+                +     '<div class="flex-1" style="background:' + t.accent + ';"></div>'
+                +     '<div class="flex-1" style="background:' + t.tertiary + ';"></div>'
+                + '</div>';
+            return ''
+                + '<button type="button" data-preset="' + t.id + '" data-primary="' + t.primary + '" data-accent="' + t.accent + '" data-tertiary="' + t.tertiary + '" '
+                + 'class="theme-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+                + swatch
+                + '<div class="p-2.5">'
+                +     '<div class="flex items-center justify-between">'
+                +         '<p class="text-xs font-semibold text-gray-900 truncate">' + t.name + '</p>'
+                +         '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px]"><i class="fas fa-check"></i></span>'
+                +     '</div>'
+                +     '<p class="text-[10px] text-gray-500 truncate">' + t.desc + '</p>'
+                + '</div>'
+                + '</button>';
+        }).join('');
+        themeGrid.innerHTML = html
+            + '<button type="button" data-preset="custom" class="theme-card group relative text-left rounded-xl border border-dashed border-gray-300 bg-gray-50 hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+            +     '<div class="h-14 w-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-white text-gray-400">'
+            +         '<i class="fas fa-paint-brush"></i>'
+            +     '</div>'
+            +     '<div class="p-2.5">'
+            +         '<p class="text-xs font-semibold text-gray-900">Custom</p>'
+            +         '<p class="text-[10px] text-gray-500 truncate">Pick your own 3 colors</p>'
+            +     '</div>'
+            + '</button>';
+
+        themeGrid.querySelectorAll('.theme-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                const preset = card.getAttribute('data-preset');
+                const p = card.getAttribute('data-primary');
+                const a = card.getAttribute('data-accent');
+                const ter = card.getAttribute('data-tertiary');
+                themePresetInput.value = preset;
+                if (preset !== 'custom' && p && a && ter) {
+                    primaryText.value = p;
+                    secondaryText.value = a;
+                    tertiaryText.value = ter;
+                    primaryPicker.value = p;
+                    secondaryPicker.value = a;
+                    tertiaryPicker.value = ter;
+                }
+                updateActiveCard();
+                syncAndPreview();
+            });
+        });
+    }
+
+    function updateActiveCard() {
+        if (!themeGrid) return;
+        const current = themePresetInput.value || 'custom';
+        themeGrid.querySelectorAll('.theme-card').forEach(function (card) {
+            const isActive = card.getAttribute('data-preset') === current;
+            card.classList.toggle('is-active', isActive);
+            card.classList.toggle('ring-2', isActive);
+            card.classList.toggle('ring-indigo-500', isActive);
+            card.classList.toggle('border-indigo-500', isActive);
+        });
+    }
+
+    function detectPresetFromColors(p, a, ter) {
+        const pl = p.toLowerCase();
+        const al = a.toLowerCase();
+        const tl = (ter || '').toLowerCase();
+        const match = THEME_PRESETS.find(function (t) {
+            return t.primary.toLowerCase() === pl
+                && t.accent.toLowerCase() === al
+                && t.tertiary.toLowerCase() === tl;
+        });
+        return match ? match.id : 'custom';
+    }
+
+    function syncAndPreview() {
+        const p = normalizeHex(primaryText.value, '#1E1A4E');
+        const s = normalizeHex(secondaryText.value, '#6C5CE7');
+        const ter = normalizeHex(tertiaryText.value, '#A29BFE');
+        primaryPicker.value = p;
+        secondaryPicker.value = s;
+        tertiaryPicker.value = ter;
+        if (previewPrimary) previewPrimary.style.backgroundColor = p;
+        if (previewSecondary) previewSecondary.style.backgroundColor = s;
+        if (previewTertiary) previewTertiary.style.backgroundColor = ter;
+
+        const terText = contrastColor(ter);
+
+        // Live theme preview pieces — header now subtly blends all 3 colors
+        if (previewHeader) previewHeader.style.background = 'linear-gradient(135deg, ' + p + ' 0%, ' + p + ' 55%, ' + s + ' 95%, ' + ter + ' 140%)';
+        if (previewSidebar) previewSidebar.style.background = p;
+        if (previewLogo) previewLogo.style.background = s;
+        if (previewAccentText) previewAccentText.style.color = s;
+        if (previewActive) {
+            previewActive.style.background = hexToRgba(ter, 0.85);
+            previewActive.style.color = terText;
+        }
+        if (previewBtnPrimary) previewBtnPrimary.style.background = s;
+        if (previewBtnOutline) { previewBtnOutline.style.borderColor = s; previewBtnOutline.style.color = s; }
+        if (previewBtnSoft) {
+            previewBtnSoft.style.background = ter;
+            previewBtnSoft.style.color = terText;
+            previewBtnSoft.style.borderColor = 'transparent';
+        }
+        if (previewLink) previewLink.style.color = s;
+        if (previewBadge) {
+            previewBadge.style.background = ter;
+            previewBadge.style.color = terText;
+        }
+        if (previewChip) {
+            previewChip.style.background = hexToRgba(s, 0.14);
+            previewChip.style.color = s;
+            previewChip.style.border = '1px solid ' + hexToRgba(s, 0.35);
+        }
+
+        // If user manually changes colors, reflect a matching preset (or "custom")
+        if (themePresetInput && themeGrid) {
+            const detected = detectPresetFromColors(p, s, ter);
+            if (themePresetInput.value !== detected) {
+                themePresetInput.value = detected;
+                updateActiveCard();
+            }
+        }
+    }
+
+    function applyFontPreview() {
+        if (!fontSelect) return;
+        const f = fontSelect.value || 'Inter';
+        const isSerif = SERIF_FONTS.has(f);
+        const stack = "'" + f + "', " + (isSerif
+            ? "Georgia, 'Times New Roman', serif"
+            : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+        if (fontPreview) fontPreview.style.fontFamily = stack;
+        if (themePreviewShell) themePreviewShell.style.fontFamily = stack;
+    }
+
+    // ----- Modern, professionally curated font presets -----
+    const SERIF_FONTS = new Set(['Merriweather', 'Lora', 'Source Serif 4']);
+    const FONT_PRESETS = [
+        // Modern Sans-Serif — clean, neutral workhorses
+        { id: 'Inter',             name: 'Inter',             desc: 'Neutral, highly legible (default)', category: 'Modern Sans-Serif' },
+        { id: 'Roboto',            name: 'Roboto',            desc: 'Friendly Google classic',           category: 'Modern Sans-Serif' },
+        { id: 'Open Sans',         name: 'Open Sans',         desc: 'Approachable everywhere',           category: 'Modern Sans-Serif' },
+        { id: 'Lato',              name: 'Lato',              desc: 'Warm and humanist',                 category: 'Modern Sans-Serif' },
+        { id: 'Source Sans 3',     name: 'Source Sans 3',     desc: "Adobe's UI staple",                 category: 'Modern Sans-Serif' },
+        { id: 'Nunito',            name: 'Nunito',            desc: 'Soft, rounded edges',               category: 'Modern Sans-Serif' },
+        // Geometric & Editorial — modern, distinctive sans-serif
+        { id: 'Poppins',           name: 'Poppins',           desc: 'Geometric & cheerful',              category: 'Geometric & Editorial' },
+        { id: 'Plus Jakarta Sans', name: 'Plus Jakarta Sans', desc: 'Modern & confident',                category: 'Geometric & Editorial' },
+        { id: 'DM Sans',           name: 'DM Sans',           desc: 'Crisp low-contrast',                category: 'Geometric & Editorial' },
+        { id: 'Manrope',           name: 'Manrope',           desc: 'Balanced & open',                   category: 'Geometric & Editorial' },
+        { id: 'IBM Plex Sans',     name: 'IBM Plex Sans',     desc: 'Engineered character',              category: 'Geometric & Editorial' },
+        { id: 'Work Sans',         name: 'Work Sans',         desc: 'Friendly & versatile',              category: 'Geometric & Editorial' },
+        // Professional Serif — editorial feel, ideal for legal documents
+        { id: 'Merriweather',      name: 'Merriweather',      desc: 'Reading-optimised serif',           category: 'Professional Serif' },
+        { id: 'Lora',              name: 'Lora',              desc: 'Elegant editorial serif',           category: 'Professional Serif' },
+        { id: 'Source Serif 4',    name: 'Source Serif 4',    desc: 'Refined & timeless',                category: 'Professional Serif' }
+    ];
+
+    const fontGrid = document.getElementById('font-preset-grid');
+
+    function renderFontCards() {
+        if (!fontGrid) return;
+        // Group by category, preserving order from FONT_PRESETS
+        const groups = [];
+        const groupMap = new Map();
+        FONT_PRESETS.forEach(function (f) {
+            if (!groupMap.has(f.category)) {
+                const g = { name: f.category, items: [] };
+                groupMap.set(f.category, g);
+                groups.push(g);
+            }
+            groupMap.get(f.category).items.push(f);
+        });
+
+        const html = groups.map(function (g) {
+            const cards = g.items.map(function (f) {
+                const stack = "'" + f.id + "', " + (SERIF_FONTS.has(f.id)
+                    ? "Georgia, 'Times New Roman', serif"
+                    : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+                return ''
+                    + '<button type="button" data-font="' + f.id + '" '
+                    + 'class="font-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+                    +     '<div class="h-16 w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-white border-b border-gray-100" style="font-family:' + stack + ';">'
+                    +         '<span class="text-3xl font-semibold text-gray-900 leading-none">Aa</span>'
+                    +     '</div>'
+                    +     '<div class="p-2.5">'
+                    +         '<div class="flex items-center justify-between gap-2">'
+                    +             '<p class="text-xs font-semibold text-gray-900 truncate" style="font-family:' + stack + ';">' + f.name + '</p>'
+                    +             '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
+                    +         '</div>'
+                    +         '<p class="text-[10px] text-gray-500 truncate">' + f.desc + '</p>'
+                    +     '</div>'
+                    + '</button>';
+            }).join('');
+            return ''
+                + '<div>'
+                +     '<div class="flex items-center gap-2 mb-2">'
+                +         '<span class="text-[11px] uppercase tracking-wider font-semibold text-gray-500">' + g.name + '</span>'
+                +         '<span class="flex-1 h-px bg-gray-200"></span>'
+                +     '</div>'
+                +     '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">' + cards + '</div>'
+                + '</div>';
+        }).join('');
+
+        fontGrid.innerHTML = html;
+
+        fontGrid.querySelectorAll('.font-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                const f = card.getAttribute('data-font');
+                if (!f) return;
+                fontSelect.value = f;
+                updateActiveFontCard();
+                applyFontPreview();
+            });
+        });
+    }
+
+    function updateActiveFontCard() {
+        if (!fontGrid) return;
+        const current = (fontSelect && fontSelect.value) || 'Inter';
+        fontGrid.querySelectorAll('.font-card').forEach(function (card) {
+            const isActive = card.getAttribute('data-font') === current;
+            card.classList.toggle('is-active', isActive);
+            card.classList.toggle('ring-2', isActive);
+            card.classList.toggle('ring-indigo-500', isActive);
+            card.classList.toggle('border-indigo-500', isActive);
+        });
+    }
+
+    // ----- Text Size presets (consistent global scale) -----
+    // Numbers here MUST match the server-side allowlist in app.py and the
+    // {% raw %}{{ allowed_font_sizes }}{% endraw %} map in base.html.
+    const FONT_SIZE_PRESETS = [
+        { id: 'compact',     name: 'Compact',     px: '14px', desc: 'Dense — fits more on screen', sample: 14 },
+        { id: 'comfortable', name: 'Comfortable', px: '16px', desc: 'Balanced default',            sample: 16 },
+        { id: 'large',       name: 'Large',       px: '17px', desc: 'Easier for long reading',     sample: 17 },
+        { id: 'xl',          name: 'X-Large',     px: '18px', desc: 'Maximum readability',         sample: 18 }
+    ];
+
+    const fontSizeInput = document.getElementById('font_size');
+    const fontSizeGrid  = document.getElementById('font-size-grid');
+    const fontSizePreview = document.getElementById('font-size-preview');
+
+    function renderFontSizeCards() {
+        if (!fontSizeGrid) return;
+        const html = FONT_SIZE_PRESETS.map(function (s) {
+            return ''
+                + '<button type="button" data-size="' + s.id + '" '
+                + 'class="size-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
+                +     '<div class="h-16 w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">'
+                +         '<span class="font-semibold text-gray-900 leading-none" style="font-size:' + (s.sample + 6) + 'px;">Aa</span>'
+                +         '<span class="ml-2 text-[10px] text-gray-500">' + s.px + '</span>'
+                +     '</div>'
+                +     '<div class="p-2.5">'
+                +         '<div class="flex items-center justify-between gap-2">'
+                +             '<p class="text-xs font-semibold text-gray-900 truncate">' + s.name + '</p>'
+                +             '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
+                +         '</div>'
+                +         '<p class="text-[10px] text-gray-500 truncate">' + s.desc + '</p>'
+                +     '</div>'
+                + '</button>';
+        }).join('');
+        fontSizeGrid.innerHTML = html;
+        fontSizeGrid.querySelectorAll('.size-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                const id = card.getAttribute('data-size');
+                if (!id) return;
+                fontSizeInput.value = id;
+                updateActiveFontSizeCard();
+                applyFontSizePreview();
+            });
+        });
+    }
+
+    function updateActiveFontSizeCard() {
+        if (!fontSizeGrid) return;
+        const current = (fontSizeInput && fontSizeInput.value) || 'comfortable';
+        fontSizeGrid.querySelectorAll('.size-card').forEach(function (card) {
+            const isActive = card.getAttribute('data-size') === current;
+            card.classList.toggle('is-active', isActive);
+            card.classList.toggle('ring-2', isActive);
+            card.classList.toggle('ring-indigo-500', isActive);
+            card.classList.toggle('border-indigo-500', isActive);
+        });
+    }
+
+    function applyFontSizePreview() {
+        if (!fontSizePreview || !fontSizeInput) return;
+        const id = fontSizeInput.value || 'comfortable';
+        const map = { compact: 14, comfortable: 16, large: 17, xl: 18 };
+        const base = map[id] || 16;
+        // Scale the live preview block as if html font-size were `base`px.
+        // Tailwind's text-3xl/base/xs are 1.875rem/1rem/0.75rem respectively.
+        const set = function (role, rem) {
+            const el = fontSizePreview.querySelector('[data-fs-role="' + role + '"]');
+            if (el) el.style.fontSize = (base * rem) + 'px';
+        };
+        set('display', 1.875);
+        set('body',    1.0);
+        set('meta',    0.75);
+    }
+
+    primaryPicker.addEventListener('input', function () { primaryText.value = primaryPicker.value; syncAndPreview(); });
+    secondaryPicker.addEventListener('input', function () { secondaryText.value = secondaryPicker.value; syncAndPreview(); });
+    tertiaryPicker.addEventListener('input', function () { tertiaryText.value = tertiaryPicker.value; syncAndPreview(); });
+    primaryText.addEventListener('input', syncAndPreview);
+    secondaryText.addEventListener('input', syncAndPreview);
+    tertiaryText.addEventListener('input', syncAndPreview);
+
+    renderThemeCards();
+    updateActiveCard();
+    syncAndPreview();
+    renderFontCards();
+    updateActiveFontCard();
+    applyFontPreview();
+    renderFontSizeCards();
+    updateActiveFontSizeCard();
+    applyFontSizePreview();
+})();
+</script>

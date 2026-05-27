@@ -30,6 +30,8 @@ from email.header import decode_header
 from datetime import datetime
 import re
 import sys
+import time
+import mimetypes
 
 app = Flask(__name__)
 
@@ -165,8 +167,24 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_DISCOVERY_URL = os.environ.get('GOOGLE_DISCOVERY_URL', "https://accounts.google.com/.well-known/openid-configuration")
 
-# OAuth 2.0 scopes
+# OAuth 2.0 scopes (employee login)
 SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
+
+# Google Drive + Docs + Slides — required for uploads and letterhead/branding previews.
+# Use full `drive` (not drive.file only) so created Docs/Slides can be edited via the APIs.
+GOOGLE_DRIVE_REQUIRED_SCOPE_FRAGMENTS = (
+    'auth/drive',
+    'auth/documents',
+    'auth/presentations',
+)
+GOOGLE_DRIVE_OAUTH_SCOPES = [
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/presentations',
+]
 
 # Database configuration - Auto-detect environment
 import socket
@@ -2186,7 +2204,7 @@ def allowed_id_file(filename):
     """Check if ID/passport file extension is allowed (images or PDF)"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_ID_EXTENSIONS
 
-def process_signature_image(image_file):
+def process_signature_image(image_file, max_width=400, max_height=200):
     """Process and clean signature/stamp image with optimized algorithms"""
     try:
         # Try to use numpy/scipy for advanced processing
@@ -2207,8 +2225,7 @@ def process_signature_image(image_file):
             else:
                 img = img.convert('RGB')
         
-        # Resize if too large (max 400x200) - use high-quality resampling
-        max_width, max_height = 400, 200
+        # Resize if too large - use high-quality resampling
         if img.width > max_width or img.height > max_height:
             # Maintain aspect ratio with high-quality resampling
             img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
@@ -2224,26 +2241,56 @@ def process_signature_image(image_file):
             blurred = ndimage.gaussian_filter(gray_array, sigma=1.0)
             threshold = blurred + 15  # Adaptive threshold
             mask = gray_array < threshold
+
+            # Keep main ink cluster only (signature/strokes), drop table edges and noise.
+            labeled, num_features = ndimage.label(mask)
+            if num_features > 0:
+                sizes = ndimage.sum(mask, labeled, range(1, num_features + 1))
+                sizes = np.asarray(sizes).reshape(-1)
+                min_area = max(12, int(mask.size * 0.00015))
+                order = np.argsort(sizes)[::-1]
+                keep = np.zeros(num_features + 1, dtype=bool)
+                if len(order):
+                    main_id = int(order[0]) + 1
+                    if sizes[order[0]] >= min_area:
+                        keep[main_id] = True
+                        main_slices = np.where(labeled == main_id)
+                        main_y0, main_y1 = int(main_slices[0].min()), int(main_slices[0].max())
+                        main_x0, main_x1 = int(main_slices[1].min()), int(main_slices[1].max())
+                        merge_gap = 40
+                        area_floor = sizes[order[0]] * 0.03
+                        for rank in order[1:]:
+                            lid = int(rank) + 1
+                            if sizes[rank] < area_floor or sizes[rank] < min_area:
+                                continue
+                            ys, xs = np.where(labeled == lid)
+                            if ys.size == 0:
+                                continue
+                            if (
+                                int(xs.min()) <= main_x1 + merge_gap
+                                and int(xs.max()) >= main_x0 - merge_gap
+                                and int(ys.min()) <= main_y1 + merge_gap
+                                and int(ys.max()) >= main_y0 - merge_gap
+                            ):
+                                keep[lid] = True
+                mask = keep[labeled]
             
             # Find bounding box of actual content (signature/stamp)
-            # Get coordinates of all non-background pixels
             rows = np.any(mask, axis=1)
             cols = np.any(mask, axis=0)
             
             if np.any(rows) and np.any(cols):
-                # Calculate bounding box with padding
-                padding = 5  # Add small padding around content
+                padding = 8
                 top = max(0, np.argmax(rows) - padding)
                 bottom = min(gray_array.shape[0], len(rows) - np.argmax(rows[::-1]) + padding)
                 left = max(0, np.argmax(cols) - padding)
                 right = min(gray_array.shape[1], len(cols) - np.argmax(cols[::-1]) + padding)
                 
-                # Crop to bounding box
                 gray_array = gray_array[top:bottom, left:right]
                 mask = mask[top:bottom, left:right]
             
-            # Create result array with transparency
-            result_array = np.ones((gray_array.shape[0], gray_array.shape[1], 4), dtype=np.uint8) * 255
+            # Transparent background (RGBA alpha=0); ink pixels set below.
+            result_array = np.zeros((gray_array.shape[0], gray_array.shape[1], 4), dtype=np.uint8)
             
             # Process signature pixels
             signature_pixels = gray_array[mask]
@@ -2324,6 +2371,92 @@ def generate_signature_hash(signature_data):
     """Generate hash for signature for digital signing"""
     return hashlib.sha256(signature_data).hexdigest()
 
+
+def process_logo_image(image_file, max_size=512):
+    """Convert uploaded logo to a clean SVG vector file.
+
+    Pipeline:
+      1. Open + normalize with Pillow (strip EXIF, crop whitespace, resize).
+      2. Vectorize via vtracer with logo-optimised settings.
+      3. Return (BytesIO of SVG bytes, 'svg').
+      Fallback: if vtracer is not installed or vectorization fails, return
+      a compressed PNG (BytesIO, 'png') so the upload never silently breaks.
+    """
+    try:
+        img = Image.open(image_file)
+
+        # Strip EXIF / metadata by converting through a clean mode.
+        if img.mode == 'P' and 'transparency' in img.info:
+            img = img.convert('RGBA')
+        elif img.mode not in ('RGB', 'RGBA'):
+            img = img.convert('RGBA' if 'A' in img.getbands() else 'RGB')
+
+        # Auto-crop excess whitespace/transparent padding around the logo.
+        if img.mode == 'RGBA':
+            # Use alpha channel as the crop mask.
+            bbox = img.split()[3].getbbox()
+        else:
+            # Convert to grayscale and find non-white bounding box.
+            gray = img.convert('L')
+            bbox = gray.point(lambda p: 255 if p < 250 else 0).getbbox()
+        if bbox:
+            padding = 4
+            w, h = img.size
+            bbox = (
+                max(0, bbox[0] - padding),
+                max(0, bbox[1] - padding),
+                min(w, bbox[2] + padding),
+                min(h, bbox[3] + padding),
+            )
+            img = img.crop(bbox)
+
+        # Resize so the longest edge is at most max_size.
+        if img.width > max_size or img.height > max_size:
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+
+        # Flatten to RGB for vtracer (it doesn't need an alpha channel for vectorising).
+        if img.mode == 'RGBA':
+            bg = Image.new('RGB', img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[3])
+            img = bg
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Encode cleaned image to PNG bytes for vtracer.
+        png_buf = BytesIO()
+        img.save(png_buf, format='PNG', optimize=True, compress_level=6)
+        png_bytes = png_buf.getvalue()
+
+        try:
+            import vtracer
+            svg_str = vtracer.convert_raw_image_to_svg(
+                png_bytes,
+                img_format='png',
+                colormode='color',       # full-color vectorization
+                hierarchical='stacked',  # nested shapes (better for logos)
+                mode='spline',           # smooth bezier curves
+                filter_speckle=6,        # remove tiny noise/speckles
+                color_precision=6,       # colour quantisation depth
+                layer_difference=16,     # colour layer separation
+                corner_threshold=60,     # how sharp a corner needs to be
+                length_threshold=4.0,    # minimum path segment length
+                max_iterations=10,
+                splice_threshold=45,
+                path_precision=3,        # decimal places in path data (fewer = smaller file)
+            )
+            svg_buf = BytesIO(svg_str.encode('utf-8'))
+            svg_buf.seek(0)
+            return svg_buf, 'svg'
+        except Exception as vt_err:
+            print(f"[process_logo_image] vtracer failed, falling back to PNG: {vt_err}")
+            # Fallback: return the already-cleaned PNG.
+            png_buf.seek(0)
+            return png_buf, 'png'
+
+    except Exception as e:
+        print(f"[process_logo_image] Error processing logo: {e}")
+        return None, None
+
 def get_company_settings():
     """Get company settings from database"""
     try:
@@ -2342,13 +2475,772 @@ def get_company_settings():
             connection.close()
 
 
+COMPANY_ASSET_STATIC_PREFIX = 'uploads/profile_pictures'
+DOCUMENT_ASSET_COLUMNS = (
+    'default_letterhead',
+    'stamp_seal_upload',
+    'default_signature_documents',
+)
+
+
+def company_asset_basename(stored_value):
+    """Return safe local filename from a company_settings asset value, or None."""
+    if not stored_value:
+        return None
+    text = str(stored_value).strip()
+    if not text or text.startswith('http://') or text.startswith('https://'):
+        return None
+    base = os.path.basename(text.replace('\\', '/'))
+    if not base or base in ('.', '..'):
+        return None
+    return base
+
+
+def company_asset_public_url(stored_value):
+    """Absolute URL for external APIs (e.g. Google Docs). Pass-through if already http(s)."""
+    if not stored_value:
+        return None
+    text = str(stored_value).strip()
+    if text.startswith('http://') or text.startswith('https://'):
+        return text
+    filename = company_asset_basename(text)
+    if not filename:
+        return None
+    base = get_public_base_url()
+    if not base:
+        return None
+    return f"{base}/static/{COMPANY_ASSET_STATIC_PREFIX}/{filename}"
+
+
+def company_asset_static_path(stored_value):
+    """Relative static path segment for url_for('static', filename=...)."""
+    filename = company_asset_basename(stored_value)
+    if not filename:
+        return None
+    return f"{COMPANY_ASSET_STATIC_PREFIX}/{filename}"
+
+
+def process_letterhead_image(image_file):
+    """Resize letterhead for storage while preserving full color (no transparency extraction)."""
+    try:
+        img = Image.open(image_file)
+        if img.mode not in ('RGB', 'RGBA'):
+            if img.mode == 'P' and 'transparency' in img.info:
+                img = img.convert('RGBA')
+            else:
+                img = img.convert('RGB')
+        max_width, max_height = 1200, 320
+        if img.width > max_width or img.height > max_height:
+            img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+        output = BytesIO()
+        if img.mode == 'RGBA':
+            img.save(output, format='PNG', optimize=True)
+            ext = 'png'
+        else:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            img.save(output, format='JPEG', optimize=True, quality=90)
+            ext = 'jpg'
+        output.seek(0)
+        return output, ext
+    except Exception as e:
+        print(f"Error processing letterhead: {e}")
+        return None, None
+
+
+def _google_doc_body_end_index(doc):
+    """Last index in document body (for append operations)."""
+    return _google_doc_segment_end_index(doc, segment_id=None)
+
+
+def _google_doc_segment_end_index(doc, segment_id=None):
+    """Last index in document body, or in a header/footer segment."""
+    if segment_id:
+        headers = doc.get('headers') or {}
+        footers = doc.get('footers') or {}
+        segment = headers.get(segment_id) or footers.get(segment_id) or {}
+        default_start = 0
+    else:
+        segment = doc.get('body') or {}
+        default_start = 1
+    end_index = default_start
+    for el in segment.get('content', []):
+        if el.get('endIndex') is not None:
+            end_index = max(end_index, el['endIndex'])
+    return end_index
+
+
+# Google Docs inline image sizes (points) for stamp and signature.
+GOOGLE_DOC_STAMP_SIZE_PT = (88, 88)
+GOOGLE_DOC_SIGNATURE_SIZE_PT = (200, 72)
+
+
+def _google_doc_ensure_default_header_id(docs_service, file_id):
+    """Return the DEFAULT header segment id, creating it when missing."""
+    doc = docs_service.documents().get(documentId=file_id).execute()
+    header_id = (doc.get('documentStyle') or {}).get('defaultHeaderId')
+    if header_id:
+        return header_id
+    result = docs_service.documents().batchUpdate(
+        documentId=file_id,
+        body={'requests': [{'createHeader': {'type': 'DEFAULT'}}]},
+    ).execute()
+    for reply in result.get('replies', []):
+        created = reply.get('createHeader') or {}
+        if created.get('headerId'):
+            return created['headerId']
+    doc = docs_service.documents().get(documentId=file_id).execute()
+    return (doc.get('documentStyle') or {}).get('defaultHeaderId')
+
+
+def _google_doc_set_compact_page_margins(docs_service, file_id):
+    """Reduce top margin so the header letterhead sits nearer the page top."""
+    try:
+        docs_service.documents().batchUpdate(
+            documentId=file_id,
+            body={'requests': [{
+                'updateDocumentStyle': {
+                    'documentStyle': {
+                        'marginTop': {'magnitude': 36, 'unit': 'PT'},
+                        'marginHeader': {'magnitude': 12, 'unit': 'PT'},
+                    },
+                    'fields': 'marginTop,marginHeader',
+                },
+            }]},
+        ).execute()
+    except Exception as err:
+        print(f"[Docs] Could not update page margins: {err}")
+
+
+def _google_doc_insert_inline_image(
+    docs_service,
+    file_id,
+    image_url,
+    index,
+    *,
+    segment_id=None,
+    width_pt=None,
+    height_pt=None,
+):
+    """Best-effort inline image insert; returns True on success."""
+    if not image_url:
+        return False
+    try:
+        min_index = 0 if segment_id else 1
+        location = {'index': max(min_index, index)}
+        if segment_id:
+            location['segmentId'] = segment_id
+        image_req = {
+            'uri': image_url,
+            'location': location,
+        }
+        if width_pt and height_pt:
+            image_req['objectSize'] = {
+                'width': {'magnitude': width_pt, 'unit': 'PT'},
+                'height': {'magnitude': height_pt, 'unit': 'PT'},
+            }
+        docs_service.documents().batchUpdate(
+            documentId=file_id,
+            body={'requests': [{'insertInlineImage': image_req}]},
+        ).execute()
+        return True
+    except Exception as err:
+        print(f"Docs API image insert failed ({image_url}): {err}")
+        return False
+
+
+def _is_stamp_or_signature_asset(filename):
+    """True for personal/firm stamp or signature image files."""
+    if not filename:
+        return False
+    lower = filename.lower()
+    return (
+        lower.startswith('signature')
+        or lower.startswith('stamp')
+        or 'stamp_seal' in lower
+    )
+
+
+def _prepare_image_for_google_docs(local_path, *, stamp_or_signature=False):
+    """
+    Prepare image bytes for Google Docs/Slides insertInlineImage.
+    Stamp/signature: composite on white and crop to dark ink (fixes canvas PNG alpha bugs).
+    Other assets: pass through unchanged.
+    """
+    try:
+        img = Image.open(local_path)
+        if stamp_or_signature:
+            rgba = img.convert('RGBA')
+            flat = Image.new('RGB', rgba.size, (255, 255, 255))
+            flat.paste(rgba, mask=rgba.split()[3])
+            gray = flat.convert('L')
+            ink_mask = gray.point(lambda p: 255 if p < 248 else 0, mode='1')
+            bbox = ink_mask.getbbox()
+            if bbox:
+                pad = 6
+                left = max(0, bbox[0] - pad)
+                top = max(0, bbox[1] - pad)
+                right = min(flat.width, bbox[2] + pad)
+                bottom = min(flat.height, bbox[3] + pad)
+                flat = flat.crop((left, top, right, bottom))
+            out = BytesIO()
+            flat.save(out, format='PNG', optimize=True)
+            out.seek(0)
+            return out
+        out = BytesIO()
+        img.save(out, format='PNG', optimize=True)
+        out.seek(0)
+        return out
+    except Exception as err:
+        print(f"[branding] Image prepare failed ({local_path}): {err}")
+        return None
+
+
+def _google_doc_insert_stamp_signature_footer_block(
+    docs_service,
+    file_id,
+    stamp_url,
+    signature_url,
+):
+    """Sign-off at document end: closing line, then stamp and signature with fixed sizes."""
+    if not stamp_url and not signature_url:
+        return False
+
+    inserted = False
+    try:
+        doc = docs_service.documents().get(documentId=file_id).execute()
+        end_index = max(1, _google_doc_body_end_index(doc) - 1)
+        docs_service.documents().batchUpdate(
+            documentId=file_id,
+            body={'requests': [{
+                'insertText': {
+                    'location': {'index': end_index},
+                    'text': '\n\nYours faithfully,\n\n',
+                },
+            }]},
+        ).execute()
+
+        doc = docs_service.documents().get(documentId=file_id).execute()
+        end_index = max(1, _google_doc_body_end_index(doc) - 1)
+
+        if stamp_url:
+            ok = _google_doc_insert_inline_image(
+                docs_service,
+                file_id,
+                stamp_url,
+                end_index,
+                width_pt=GOOGLE_DOC_STAMP_SIZE_PT[0],
+                height_pt=GOOGLE_DOC_STAMP_SIZE_PT[1],
+            )
+            inserted = inserted or ok
+            doc = docs_service.documents().get(documentId=file_id).execute()
+            end_index = max(1, _google_doc_body_end_index(doc) - 1)
+            if signature_url:
+                docs_service.documents().batchUpdate(
+                    documentId=file_id,
+                    body={'requests': [{
+                        'insertText': {'location': {'index': end_index}, 'text': '  '},
+                    }]},
+                ).execute()
+                doc = docs_service.documents().get(documentId=file_id).execute()
+                end_index = max(1, _google_doc_body_end_index(doc) - 1)
+
+        if signature_url:
+            ok = _google_doc_insert_inline_image(
+                docs_service,
+                file_id,
+                signature_url,
+                end_index,
+                width_pt=GOOGLE_DOC_SIGNATURE_SIZE_PT[0],
+                height_pt=GOOGLE_DOC_SIGNATURE_SIZE_PT[1],
+            )
+            inserted = inserted or ok
+    except Exception as err:
+        print(f"[Docs] Footer stamp/signature insert failed: {err}")
+    return inserted
+
+
+def _public_base_url_usable_for_google():
+    """True when APP_BASE_URL (or request root) is reachable by Google's servers."""
+    base = get_public_base_url()
+    if not base:
+        return False
+    lowered = base.lower()
+    return not (
+        lowered.startswith('http://127.0.0.1')
+        or lowered.startswith('http://localhost')
+        or lowered.startswith('https://127.0.0.1')
+        or lowered.startswith('https://localhost')
+    )
+
+
+def _upload_local_asset_to_drive(drive_service, parent_folder_id, stored_value):
+    """Upload a company static asset to Drive; return a public HTTPS URI for Docs/Slides."""
+    static_rel = company_asset_static_path(stored_value)
+    if not static_rel or not drive_service or not parent_folder_id:
+        return None
+    filename = company_asset_basename(stored_value)
+    if not filename:
+        return None
+    local_path = os.path.join(app.root_path, 'static', static_rel.replace('/', os.sep))
+    if not os.path.isfile(local_path):
+        return None
+    mime_type = mimetypes.guess_type(local_path)[0] or 'image/png'
+    is_sign = _is_stamp_or_signature_asset(filename)
+    try:
+        mtime = int(os.path.getmtime(local_path))
+        drive_name = f'branding_{mtime}_{filename}'
+        prepared = None
+        if filename.lower().endswith('.png'):
+            prepared = _prepare_image_for_google_docs(
+                local_path, stamp_or_signature=is_sign,
+            )
+        if prepared:
+            media = MediaIoBaseUpload(prepared, mimetype='image/png', resumable=False)
+        else:
+            with open(local_path, 'rb') as fh:
+                media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
+        created = drive_service.files().create(
+            body={
+                'name': drive_name,
+                'parents': [parent_folder_id],
+            },
+            media_body=media,
+            fields='id',
+        ).execute()
+        drive_file_id = created.get('id')
+        if not drive_file_id:
+            return None
+        try:
+            drive_service.permissions().create(
+                fileId=drive_file_id,
+                body={'type': 'anyone', 'role': 'reader'},
+                fields='id',
+            ).execute()
+        except Exception as perm_err:
+            print(f"Branding asset permission warning: {perm_err}")
+        # Docs/Slides image fetch works best with direct download URL.
+        return f'https://drive.google.com/uc?export=download&id={drive_file_id}'
+    except Exception as err:
+        print(f"Branding asset Drive upload failed ({filename}): {err}")
+        return None
+
+
+def resolve_company_asset_url_for_google(
+    stored_value,
+    drive_service=None,
+    drive_assets_folder_id=None,
+    url_cache=None,
+):
+    """Resolve an asset to a URL Google's APIs can fetch (public site or Drive-hosted)."""
+    if not stored_value:
+        return None
+    text = str(stored_value).strip()
+    if text.startswith('http://') or text.startswith('https://'):
+        return text
+    cache_key = text
+    if url_cache is not None and cache_key in url_cache:
+        return url_cache[cache_key]
+
+    url = None
+    basename = company_asset_basename(stored_value)
+    is_sign = _is_stamp_or_signature_asset(basename)
+    if drive_service and drive_assets_folder_id:
+        url = _upload_local_asset_to_drive(drive_service, drive_assets_folder_id, stored_value)
+    if not url and is_sign and _public_base_url_usable_for_google():
+        base = get_public_base_url()
+        if base and basename:
+            url = f"{base.rstrip('/')}/api/branding-asset/google/{basename}"
+    if not url and _public_base_url_usable_for_google():
+        url = company_asset_public_url(stored_value)
+    if not url and drive_service and drive_assets_folder_id:
+        url = _upload_local_asset_to_drive(drive_service, drive_assets_folder_id, stored_value)
+
+    if url_cache is not None:
+        url_cache[cache_key] = url
+    return url
+
+
+def _wait_for_google_doc(docs_service, file_id, attempts=6):
+    """Retry until a newly created Doc is readable via the Docs API."""
+    last_err = None
+    for attempt in range(attempts):
+        try:
+            return docs_service.documents().get(documentId=file_id).execute()
+        except HttpError as err:
+            last_err = err
+            if err.resp.status in (404, 503, 500) and attempt < attempts - 1:
+                time.sleep(0.35 * (attempt + 1))
+                continue
+            raise
+    if last_err:
+        raise last_err
+    return None
+
+
+def _google_docs_api_error_message(err, *, app_label='document'):
+    """Human-readable message from a Docs/Slides HttpError."""
+    if isinstance(err, HttpError):
+        status = err.resp.status
+        if status == 403:
+            return (
+                'Google Drive needs permission to edit documents. Disconnect and reconnect '
+                'Google Drive in Documents Settings (grant all requested permissions).'
+            )
+        if status == 404:
+            return f'The Google {app_label} was not ready yet. Please try again in a few seconds.'
+        detail = getattr(err, 'error_details', None) or str(err)
+        return f'Google {app_label} error ({status}): {detail}'
+    return str(err)
+
+
+def apply_google_doc_company_branding(
+    docs_service,
+    file_id,
+    company_settings,
+    company_name,
+    employee_name,
+    employee_signature_file=None,
+    employee_stamp_file=None,
+    drive_service=None,
+    drive_assets_folder_id=None,
+):
+    """
+    Apply firm letterhead, logo, header/footer text, stamp, and signature to a new Google Doc.
+    Employee stamp/signature override firm defaults when provided.
+    Returns (content_added: bool, warning_message: str|None).
+    """
+    if not company_settings:
+        return False, None
+
+    warning = None
+    content_added = False
+    company_name = (company_name or company_settings.get('company_name') or 'Law Firm').strip()
+    employee_name = (employee_name or 'N/A').strip()
+    url_cache = {}
+
+    def asset_url(stored):
+        return resolve_company_asset_url_for_google(
+            stored,
+            drive_service=drive_service,
+            drive_assets_folder_id=drive_assets_folder_id,
+            url_cache=url_cache,
+        )
+
+    def resolve_stamp_or_signature(primary, company_field):
+        for stored in (primary, company_settings.get(company_field)):
+            if not stored:
+                continue
+            url = asset_url(stored)
+            if url:
+                return url
+        return None
+
+    letterhead_url = asset_url(company_settings.get('default_letterhead'))
+    logo_url = asset_url(company_settings.get('company_logo'))
+    stamp_url = resolve_stamp_or_signature(employee_stamp_file, 'stamp_seal_upload')
+    signature_url = resolve_stamp_or_signature(
+        employee_signature_file, 'default_signature_documents'
+    )
+
+    if not _public_base_url_usable_for_google() and not drive_service:
+        if any(
+            company_settings.get(k)
+            for k in DOCUMENT_ASSET_COLUMNS + ('company_logo',)
+        ):
+            warning = (
+                'Images may be missing: set APP_BASE_URL to your public site URL in production, '
+                'or use Google Drive preview (assets upload to Drive automatically).'
+            )
+    elif (company_settings.get('stamp_seal_upload') or company_settings.get('default_signature_documents')):
+        missing = []
+        if company_settings.get('stamp_seal_upload') and not stamp_url:
+            missing.append('stamp')
+        if company_settings.get('default_signature_documents') and not signature_url:
+            missing.append('signature')
+        if missing:
+            extra = (
+                ' Could not embed firm ' + ' and '.join(missing)
+                + ' — reconnect Google Drive or set APP_BASE_URL.'
+            )
+            warning = (warning or '') + extra
+
+    _wait_for_google_doc(docs_service, file_id)
+    _google_doc_set_compact_page_margins(docs_service, file_id)
+
+    # Letterhead strip → document HEADER (top of every page). Body stays empty for typing.
+    letterhead_width_pt = 468   # ~6.5 in page width
+    letterhead_height_pt = 84     # header strip aspect ratio
+
+    if letterhead_url:
+        header_id = _google_doc_ensure_default_header_id(docs_service, file_id)
+        if header_id:
+            content_added = _google_doc_insert_inline_image(
+                docs_service,
+                file_id,
+                letterhead_url,
+                0,
+                segment_id=header_id,
+                width_pt=letterhead_width_pt,
+                height_pt=letterhead_height_pt,
+            )
+        if not content_added:
+            content_added = _google_doc_insert_inline_image(
+                docs_service,
+                file_id,
+                letterhead_url,
+                1,
+                width_pt=letterhead_width_pt,
+                height_pt=letterhead_height_pt,
+            )
+    elif logo_url:
+        content_added = _google_doc_insert_inline_image(
+            docs_service, file_id, logo_url, 1, width_pt=120, height_pt=48,
+        )
+    else:
+        date_str = datetime.now().strftime('%Y-%m-%d')
+        header_text = "\n".join([
+            company_name,
+            f"Prepared by: {employee_name}",
+            f"Date: {date_str}",
+            "",
+            "",
+        ])
+        docs_service.documents().batchUpdate(
+            documentId=file_id,
+            body={'requests': [{'insertText': {'location': {'index': 1}, 'text': header_text}}]},
+        ).execute()
+        content_added = True
+
+    if content_added:
+        docs_service.documents().batchUpdate(
+            documentId=file_id,
+            body={'requests': [{'insertText': {'location': {'index': 1}, 'text': '\n'}}]},
+        ).execute()
+
+    footer_text = (company_settings.get('document_footer_text') or '').strip()
+    if footer_text:
+        doc = docs_service.documents().get(documentId=file_id).execute()
+        footer_index = max(1, _google_doc_body_end_index(doc) - 1)
+        docs_service.documents().batchUpdate(
+            documentId=file_id,
+            body={'requests': [{'insertText': {
+                'location': {'index': footer_index},
+                'text': '\n\n' + footer_text,
+            }}]},
+        ).execute()
+
+    # Sign-off block at document end (stamp then signature).
+    if stamp_url or signature_url:
+        if _google_doc_insert_stamp_signature_footer_block(
+            docs_service, file_id, stamp_url, signature_url
+        ):
+            content_added = True
+
+    return content_added, warning
+
+
+def _slides_pt(magnitude):
+    return {'magnitude': magnitude, 'unit': 'PT'}
+
+
+def _slides_transform(translate_x, translate_y, scale_x=1, scale_y=1):
+    return {
+        'scaleX': scale_x,
+        'scaleY': scale_y,
+        'translateX': translate_x,
+        'translateY': translate_y,
+        'unit': 'PT',
+    }
+
+
+def apply_google_slides_company_branding(
+    slides_service,
+    presentation_id,
+    company_settings,
+    company_name,
+    employee_name,
+    employee_signature_file=None,
+    employee_stamp_file=None,
+    drive_service=None,
+    drive_assets_folder_id=None,
+):
+    """Apply firm letterhead, logo, text, stamp, and signature on the first slide."""
+    if not company_settings:
+        return False, None
+
+    warning = None
+    company_name = (company_name or company_settings.get('company_name') or 'Law Firm').strip()
+    employee_name = (employee_name or 'N/A').strip()
+    url_cache = {}
+
+    def asset_url(stored):
+        return resolve_company_asset_url_for_google(
+            stored,
+            drive_service=drive_service,
+            drive_assets_folder_id=drive_assets_folder_id,
+            url_cache=url_cache,
+        )
+
+    def resolve_stamp_or_signature(primary, company_field):
+        for stored in (primary, company_settings.get(company_field)):
+            if not stored:
+                continue
+            url = asset_url(stored)
+            if url:
+                return url
+        return None
+
+    letterhead_url = asset_url(company_settings.get('default_letterhead'))
+    logo_url = asset_url(company_settings.get('company_logo'))
+    stamp_url = resolve_stamp_or_signature(employee_stamp_file, 'stamp_seal_upload')
+    signature_url = resolve_stamp_or_signature(
+        employee_signature_file, 'default_signature_documents'
+    )
+
+    if not _public_base_url_usable_for_google() and not drive_service:
+        if any(
+            company_settings.get(k)
+            for k in DOCUMENT_ASSET_COLUMNS + ('company_logo',)
+        ):
+            warning = (
+                'Images may be missing: set APP_BASE_URL to your public site URL in production, '
+                'or use Google Drive preview (uploads assets automatically).'
+            )
+
+    pres = slides_service.presentations().get(presentationId=presentation_id).execute()
+    slides = pres.get('slides', [])
+    if not slides:
+        return False, warning
+    slide_id = slides[0]['objectId']
+
+    uid = uuid.uuid4().hex[:10]
+    title_shape_id = f'brandingTitle_{uid}'
+    requests = []
+    y_pos = 24.0
+
+    if letterhead_url:
+        requests.append({
+            'createImage': {
+                'url': letterhead_url,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {'width': _slides_pt(648), 'height': _slides_pt(96)},
+                    'transform': _slides_transform(36, y_pos),
+                },
+            }
+        })
+        y_pos += 104.0
+    if logo_url:
+        requests.append({
+            'createImage': {
+                'url': logo_url,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {'width': _slides_pt(72), 'height': _slides_pt(72)},
+                    'transform': _slides_transform(36, y_pos),
+                },
+            }
+        })
+        y_pos += 80.0
+
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    body_text = f"{company_name}\nPrepared by: {employee_name}\nDate: {date_str}"
+    text_y = y_pos if letterhead_url or logo_url else 36.0
+    requests.extend([
+        {
+            'createShape': {
+                'objectId': title_shape_id,
+                'shapeType': 'TEXT_BOX',
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {'width': _slides_pt(520), 'height': _slides_pt(72)},
+                    'transform': _slides_transform(120 if logo_url else 36, text_y),
+                },
+            }
+        },
+        {'insertText': {'objectId': title_shape_id, 'insertionIndex': 0, 'text': body_text}},
+    ])
+
+    footer_text = (company_settings.get('document_footer_text') or '').strip()
+    if footer_text:
+        footer_shape_id = f'brandingFooter_{uid}'
+        requests.extend([
+            {
+                'createShape': {
+                    'objectId': footer_shape_id,
+                    'shapeType': 'TEXT_BOX',
+                    'elementProperties': {
+                        'pageObjectId': slide_id,
+                        'size': {'width': _slides_pt(648), 'height': _slides_pt(36)},
+                        'transform': _slides_transform(36, 468),
+                    },
+                }
+            },
+            {'insertText': {'objectId': footer_shape_id, 'insertionIndex': 0, 'text': footer_text}},
+        ])
+
+    sign_y = 340.0
+    if stamp_url:
+        requests.append({
+            'createImage': {
+                'url': stamp_url,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {'width': _slides_pt(96), 'height': _slides_pt(96)},
+                    'transform': _slides_transform(36, sign_y),
+                },
+            }
+        })
+        sign_y += 104.0
+    if signature_url:
+        requests.append({
+            'createImage': {
+                'url': signature_url,
+                'elementProperties': {
+                    'pageObjectId': slide_id,
+                    'size': {'width': _slides_pt(180), 'height': _slides_pt(64)},
+                    'transform': _slides_transform(36, sign_y),
+                },
+            }
+        })
+
+    if not requests:
+        return False, warning
+    try:
+        slides_service.presentations().batchUpdate(
+            presentationId=presentation_id,
+            body={'requests': requests},
+        ).execute()
+        return True, warning
+    except Exception as err:
+        print(f"Slides branding failed: {err}")
+        return False, warning
+
+
 @app.context_processor
 def inject_global_theme_settings():
     """Inject company settings into all templates for consistent theming."""
     settings = get_company_settings()
     if not settings:
         settings = {'company_name': 'BAUNI LAW GROUP'}
-    return {'company_settings': settings}
+    section_key = None
+    if request.endpoint == 'system_settings_section':
+        section_key = (request.view_args or {}).get('section')
+    elif request.endpoint == 'company_information':
+        section_key = 'company'
+    elif request.endpoint in ('system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'):
+        section_key = 'documents'
+    return {
+        'company_settings': settings,
+        'SYSTEM_SETTINGS_NAV': SYSTEM_SETTINGS_SECTIONS,
+        'COMPANY_INFORMATION_SECTION': COMPANY_INFORMATION_SECTION,
+        'COMPANY_TEMPLATES_SECTION': COMPANY_TEMPLATES_SECTION,
+        'settings_section_key': section_key,
+        'company_asset_static_path': company_asset_static_path,
+        'company_asset_basename': company_asset_basename,
+        'app_base_url': APP_BASE_URL,
+    }
 
 
 @app.context_processor
@@ -13884,6 +14776,19 @@ def _is_invalid_grant_error(exc):
     )
 
 
+def drive_oauth_has_required_scopes(scopes):
+    """True when stored OAuth scopes include Drive, Docs, and Slides API access."""
+    if not scopes:
+        return False
+    if isinstance(scopes, str):
+        try:
+            scopes = json.loads(scopes)
+        except (TypeError, ValueError):
+            scopes = scopes.split()
+    joined = ' '.join(str(s) for s in scopes)
+    return all(frag in joined for frag in GOOGLE_DRIVE_REQUIRED_SCOPE_FRAGMENTS)
+
+
 def refresh_drive_credentials_safely(credentials, cursor=None, connection=None):
     """Refresh `credentials` in-place if expired. Persist + return (True, credentials)
     on success. On invalid_grant, mark needs_reconnect and return (False, reason).
@@ -14006,6 +14911,15 @@ def evaluate_drive_connection_state():
                     )
                     return result
             else:
+                if not drive_oauth_has_required_scopes(scopes):
+                    result['state'] = 'needs_reconnect'
+                    result['account'] = account
+                    result['reason'] = (
+                        'Google Drive is missing permission to edit Docs and Slides. '
+                        'Disconnect, then reconnect and approve all requested permissions '
+                        '(Drive, Google Docs, Google Slides).'
+                    )
+                    return result
                 try:
                     cursor.execute(
                         """
@@ -14106,15 +15020,9 @@ def google_drive_authorize():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
-        # Google Drive API scopes + Docs API for inserting company header into new docs
-        drive_scopes = [
-            'openid',
-            'https://www.googleapis.com/auth/drive.file',
-            'https://www.googleapis.com/auth/documents',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/userinfo.profile'
-        ]
-        
+        force_consent = request.args.get('force_consent', '').lower() in ('1', 'true', 'yes')
+        drive_scopes = list(GOOGLE_DRIVE_OAUTH_SCOPES)
+
         # Use APP_BASE_URL when hosted so redirect_uri matches Google Console exactly
         redirect_uri = get_google_drive_redirect_uri()
         
@@ -14139,7 +15047,7 @@ def google_drive_authorize():
         authorization_url, state = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
-            prompt='select_account consent'  # Force account selection and consent
+            prompt='consent' if force_consent else 'select_account consent',
         )
         session['google_drive_oauth_state'] = state
         session.modified = True
@@ -14197,15 +15105,8 @@ def google_drive_callback():
 
         print(f"[OK] Google Drive OAuth callback validated for employee_id={resolved_employee_id}")
 
-        # Google Drive API scopes (must match authorize function, including openid)
-        drive_scopes = [
-            'openid',
-            'https://www.googleapis.com/auth/drive.file',
-            'https://www.googleapis.com/auth/documents',
-            'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/userinfo.profile'
-        ]
-        
+        drive_scopes = list(GOOGLE_DRIVE_OAUTH_SCOPES)
+
         # Must match authorize (use APP_BASE_URL when hosted)
         redirect_uri = get_google_drive_redirect_uri()
         
@@ -14271,6 +15172,22 @@ def google_drive_callback():
                 raise
         
         credentials = flow.credentials
+
+        if not drive_oauth_has_required_scopes(credentials.scopes):
+            missing = [
+                f for f in GOOGLE_DRIVE_REQUIRED_SCOPE_FRAGMENTS
+                if f not in ' '.join(credentials.scopes or [])
+            ]
+            return (
+                '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: '
+                + json.dumps(
+                    'Google did not grant all required permissions (Drive, Docs, Slides). '
+                    'Disconnect, then reconnect and check every permission box. '
+                    f'Missing: {", ".join(missing) or "unknown"}.'
+                )
+                + '}, "*"); window.close();</script>',
+                400,
+            )
         
         # Get user info (with small clock-skew tolerance)
         id_info = verify_google_id_token(credentials.id_token)
@@ -14759,6 +15676,85 @@ def get_or_create_folder(service, parent_folder_id, folder_name):
         print(f"Error getting/creating folder {folder_name}: {e}")
         raise
 
+
+def _grant_drive_file_editor(service, file_id, email):
+    """Grant a Google account edit access to a Drive file (best-effort)."""
+    if not email or '@' not in str(email):
+        return
+    try:
+        service.permissions().create(
+            fileId=file_id,
+            body={'type': 'user', 'role': 'writer', 'emailAddress': str(email).strip()},
+            sendNotificationEmail=False,
+            fields='id',
+        ).execute()
+    except Exception as err:
+        print(f"[Drive] Could not grant editor to {email}: {err}")
+
+
+def ensure_google_drive_main_folder_id(service, cursor, connection, existing_folder_id=None):
+    """Return the firm main Drive folder id, creating and persisting it when missing."""
+    folder_name = 'SHERIA CENTRIC'
+    folder_id = existing_folder_id or session.get('google_drive_main_folder_id')
+    if not folder_id:
+        cursor.execute(
+            "SELECT google_drive_main_folder_id FROM company_settings ORDER BY id DESC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        if row:
+            folder_id = row.get('google_drive_main_folder_id') if isinstance(row, dict) else row[0]
+
+    if folder_id:
+        try:
+            service.files().get(fileId=folder_id, fields='id').execute()
+            session['google_drive_main_folder_id'] = folder_id
+            return folder_id
+        except HttpError:
+            folder_id = None
+
+    folder = service.files().create(
+        body={'name': folder_name, 'mimeType': 'application/vnd.google-apps.folder'},
+        fields='id',
+    ).execute()
+    folder_id = folder.get('id')
+    cursor.execute(
+        """
+        UPDATE company_settings
+        SET google_drive_main_folder_id = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1) AS sub)
+        """,
+        (folder_id,),
+    )
+    connection.commit()
+    session['google_drive_main_folder_id'] = folder_id
+    return folder_id
+
+
+def _sync_google_drive_session_from_settings_row(row):
+    """Load Drive OAuth credentials from a company_settings row into the Flask session."""
+    if not row or not row.get('google_drive_token') or not row.get('google_drive_refresh_token'):
+        return False
+    scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
+    session['google_drive_credentials'] = {
+        'token': row['google_drive_token'],
+        'refresh_token': row['google_drive_refresh_token'],
+        'token_uri': row.get('google_drive_token_uri'),
+        'client_id': GOOGLE_CLIENT_ID,
+        'client_secret': GOOGLE_CLIENT_SECRET,
+        'scopes': scopes,
+    }
+    if row.get('google_drive_account_email'):
+        session['google_drive_account'] = {
+            'email': row.get('google_drive_account_email'),
+            'name': row.get('google_drive_account_name'),
+            'picture': row.get('google_drive_account_picture'),
+        }
+    if row.get('google_drive_main_folder_id'):
+        session['google_drive_main_folder_id'] = row['google_drive_main_folder_id']
+    return True
+
+
 @app.route('/api/case/<int:case_id>/upload-document', methods=['POST'])
 def upload_case_document(case_id):
     """Upload a document for a specific case to Google Drive"""
@@ -15216,6 +16212,9 @@ def create_case_google_file(case_id):
                 main_folder_id = drive_settings.get('google_drive_main_folder_id')
                 if not main_folder_id:
                     return jsonify({'success': False, 'error': 'Google Drive main folder not configured'}), 400
+                branding_assets_folder_id = get_or_create_folder(
+                    service, main_folder_id, '_Branding image cache'
+                )
                 client_folder_name = get_user_folder_name(
                     case_data.get('client_phone'),
                     case_data.get('client_full_name'),
@@ -15313,13 +16312,18 @@ def create_case_google_file(case_id):
                 docs_message = None
                 docs_content_added = False
                 DOCS_SCOPE = 'https://www.googleapis.com/auth/documents'
-                # For Google Docs: insert company header, footer, letterhead, and logo from company_settings
-                if file_type == 'doc' and company_settings:
+                # For Google Docs / Notes: insert company header, footer, letterhead, and logo
+                if file_type in ('doc', 'notebook') and company_settings:
                     creds_dict = company_creds_dict
                     stored_scopes = (creds_dict or {}).get('scopes') or []
-                    has_docs_scope = DOCS_SCOPE in stored_scopes
+                    has_docs_scope = any(
+                        'auth/documents' in (scope or '') for scope in stored_scopes
+                    )
                     if creds_dict and not has_docs_scope:
-                        docs_message = 'Reconnect Google Drive in Documents Settings to add letterhead, footer and logo to new documents.'
+                        docs_message = (
+                            'Reconnect Google Drive in Documents Settings to add letterhead, '
+                            'footer, stamp, and signature to new documents.'
+                        )
                     elif creds_dict:
                         try:
                             credentials = Credentials(
@@ -15331,82 +16335,39 @@ def create_case_google_file(case_id):
                                 scopes=creds_dict.get('scopes')
                             )
                             docs_service = build('docs', 'v1', credentials=credentials)
-                            doc = docs_service.documents().get(documentId=file_id).execute()
-                            body = doc.get('body', {})
-                            content = body.get('content', [])
-                            insert_index = 1
-                            if content:
-                                for el in content:
-                                    if el.get('startIndex') is not None:
-                                        insert_index = el['startIndex']
-                                        break
-                            # 1) Header text first (company name, prepared by, date) – always run
-                            date_str = datetime.now().strftime('%Y-%m-%d')
-                            header_lines = [
+                            emp_signature = None
+                            emp_stamp = None
+                            emp_id = session.get('employee_id')
+                            if emp_id:
+                                cursor.execute(
+                                    "SELECT signature, stamp FROM employees WHERE id = %s",
+                                    (emp_id,),
+                                )
+                                emp_row = cursor.fetchone() or {}
+                                emp_signature = emp_row.get('signature')
+                                emp_stamp = emp_row.get('stamp')
+                            docs_content_added, branding_warning = apply_google_doc_company_branding(
+                                docs_service,
+                                file_id,
+                                company_settings,
                                 company_name,
-                                f"Prepared by: {employee_name or 'N/A'}",
-                                f"Date: {date_str}",
-                                ""
-                            ]
-                            header_text = "\n".join(header_lines)
-                            docs_service.documents().batchUpdate(
-                                documentId=file_id,
-                                body={'requests': [{'insertText': {'location': {'index': insert_index}, 'text': header_text}}]}
-                            ).execute()
-                            docs_content_added = True
-                            # 2) Footer at end of document
-                            footer_text = (company_settings.get('document_footer_text') or '').strip()
-                            if footer_text:
-                                try:
-                                    doc = docs_service.documents().get(documentId=file_id).execute()
-                                    content = doc.get('body', {}).get('content', [])
-                                    end_index = 1
-                                    for el in content:
-                                        if el.get('endIndex') is not None:
-                                            end_index = max(end_index, el['endIndex'])
-                                    footer_index = max(1, end_index - 1)
-                                    docs_service.documents().batchUpdate(
-                                        documentId=file_id,
-                                        body={'requests': [{'insertText': {'location': {'index': footer_index}, 'text': '\n\n' + footer_text}}]}
-                                    ).execute()
-                                except Exception as footer_err:
-                                    print(f"Docs API footer insert failed: {footer_err}")
-                            # 3) Letterhead image at top (index 1) – best effort
-                            letterhead_url = (company_settings.get('default_letterhead') or '').strip()
-                            if letterhead_url and (letterhead_url.startswith('http://') or letterhead_url.startswith('https://')):
-                                try:
-                                    docs_service.documents().batchUpdate(
-                                        documentId=file_id,
-                                        body={'requests': [{
-                                            'insertInlineImage': {
-                                                'uri': letterhead_url,
-                                                'objectId': 'letterhead_' + str(uuid.uuid4()).replace('-', '')[:16],
-                                                'location': {'index': 1}
-                                            }
-                                        }]}
-                                    ).execute()
-                                except Exception as letter_err:
-                                    print(f"Docs API letterhead insert failed (use a public image URL): {letter_err}")
-                            # 4) Company logo after letterhead – best effort
-                            logo_url = (company_settings.get('company_logo') or '').strip()
-                            if logo_url and (logo_url.startswith('http://') or logo_url.startswith('https://')):
-                                try:
-                                    docs_service.documents().batchUpdate(
-                                        documentId=file_id,
-                                        body={'requests': [{
-                                            'insertInlineImage': {
-                                                'uri': logo_url,
-                                                'objectId': 'logo_' + str(uuid.uuid4()).replace('-', '')[:16],
-                                                'location': {'index': 1}
-                                            }
-                                        }]}
-                                    ).execute()
-                                except Exception as logo_err:
-                                    print(f"Docs API logo insert failed (use a public image URL): {logo_err}")
+                                employee_name,
+                                employee_signature_file=emp_signature,
+                                employee_stamp_file=emp_stamp,
+                                drive_service=service,
+                                drive_assets_folder_id=branding_assets_folder_id,
+                            )
+                            if branding_warning and not docs_message:
+                                docs_message = branding_warning
                         except HttpError as docs_err:
                             err_msg = str(docs_err).lower()
                             if '403' in err_msg or 'insufficient' in err_msg or 'scope' in err_msg or 'permission' in err_msg:
-                                docs_message = 'Reconnect Google Drive in Documents Settings to add letterhead, footer and logo to new documents.'
+                                docs_message = (
+                            'Reconnect Google Drive in Documents Settings to add letterhead, '
+                            'footer, stamp, and signature to new documents.'
+                        )
+                            else:
+                                docs_message = _google_docs_api_error_message(docs_err, app_label='document')
                             print(f"Docs API insert failed: {docs_err}")
                         except Exception as docs_err:
                             print(f"Docs API insert failed: {docs_err}")
@@ -15426,7 +16387,7 @@ def create_case_google_file(case_id):
                 if docs_message:
                     payload['docs_message'] = docs_message
                     payload['docs_settings_url'] = url_for('documents_settings')
-                if file_type == 'doc':
+                if file_type in ('doc', 'notebook'):
                     payload['docs_content_added'] = docs_content_added
                 return jsonify(payload)
         except Exception as e:
@@ -15508,6 +16469,9 @@ def create_matter_google_file(matter_id):
                     return jsonify({'success': False, 'error': 'Google Drive main folder not configured'}), 400
 
                 service = build('drive', 'v3', credentials=credentials)
+                branding_assets_folder_id = get_or_create_folder(
+                    service, main_folder_id, '_Branding image cache'
+                )
                 client_phone = matter_data.get('client_phone_number') or matter_data.get('client_phone')
                 client_name = matter_data.get('client_full_name') or matter_data.get('client_name') or ''
                 if client_name or client_phone:
@@ -15556,19 +16520,78 @@ def create_matter_google_file(matter_id):
                     ).execute()
                 except Exception as perm_err:
                     print(f"Warning setting matter file public permission: {perm_err}")
+                docs_message = None
+                docs_content_added = False
+                company_settings = get_company_settings()
+                DOCS_SCOPE = 'https://www.googleapis.com/auth/documents'
+                if file_type in ('doc', 'notebook') and company_settings:
+                    has_docs_scope = any(
+                        'auth/documents' in (scope or '') for scope in drive_scopes
+                    )
+                    if not has_docs_scope:
+                        docs_message = (
+                            'Reconnect Google Drive in Documents Settings to add letterhead, '
+                            'footer, stamp, and signature to new documents.'
+                        )
+                    else:
+                        try:
+                            docs_service = build('docs', 'v1', credentials=credentials)
+                            company_name = (company_settings.get('company_name') or '').strip() or 'Law Firm'
+                            emp_signature = None
+                            emp_stamp = None
+                            emp_id = session.get('employee_id')
+                            if emp_id:
+                                cursor.execute(
+                                    "SELECT signature, stamp FROM employees WHERE id = %s",
+                                    (emp_id,),
+                                )
+                                emp_row = cursor.fetchone() or {}
+                                emp_signature = emp_row.get('signature')
+                                emp_stamp = emp_row.get('stamp')
+                            docs_content_added, branding_warning = apply_google_doc_company_branding(
+                                docs_service,
+                                file_id,
+                                company_settings,
+                                company_name,
+                                employee_name,
+                                employee_signature_file=emp_signature,
+                                employee_stamp_file=emp_stamp,
+                                drive_service=service,
+                                drive_assets_folder_id=branding_assets_folder_id,
+                            )
+                            if branding_warning and not docs_message:
+                                docs_message = branding_warning
+                        except HttpError as docs_err:
+                            err_msg = str(docs_err).lower()
+                            if '403' in err_msg or 'insufficient' in err_msg or 'scope' in err_msg:
+                                docs_message = (
+                                    'Reconnect Google Drive in Documents Settings to add letterhead, '
+                                    'footer, stamp, and signature to new documents.'
+                                )
+                            else:
+                                docs_message = _google_docs_api_error_message(docs_err, app_label='document')
+                            print(f"Matter Docs API insert failed: {docs_err}")
+                        except Exception as docs_err:
+                            print(f"Matter Docs API insert failed: {docs_err}")
                 edit_urls = {
                     'doc': f'https://docs.google.com/document/d/{file_id}/edit',
                     'sheet': f'https://docs.google.com/spreadsheets/d/{file_id}/edit',
                     'slides': f'https://docs.google.com/presentation/d/{file_id}/edit',
                     'notebook': f'https://docs.google.com/document/d/{file_id}/edit',
                 }
-                return jsonify({
+                payload = {
                     'success': True,
                     'file_id': file_id,
                     'name': created.get('name', name),
                     'webViewLink': created.get('webViewLink') or f'https://drive.google.com/file/d/{file_id}/view',
-                    'editLink': edit_urls.get(file_type)
-                })
+                    'editLink': edit_urls.get(file_type),
+                }
+                if docs_message:
+                    payload['docs_message'] = docs_message
+                    payload['docs_settings_url'] = url_for('system_settings_section', section='documents')
+                if file_type in ('doc', 'notebook'):
+                    payload['docs_content_added'] = docs_content_added
+                return jsonify(payload)
         finally:
             connection.close()
     except Exception as e:
@@ -18457,34 +19480,578 @@ def system_health_module():
     
     return render_template('system_health_module.html', company_settings=company_settings)
 
-@app.route('/system_settings')
-def system_settings():
-    """System Settings page"""
+# Basic company profile (standalone — not listed under System Settings nav).
+COMPANY_INFORMATION_SECTION = {
+    'label': 'Basic Company Information',
+    'icon': 'fa-building',
+}
+
+COMPANY_TEMPLATES_SECTION = {
+    'label': 'Company Templates',
+    'icon': 'fa-copy',
+}
+
+# Firm stamp / signature scan pages (linked from Document Settings).
+SYSTEM_CAPTURE_ASSETS = {
+    'stamp': {
+        'label': 'Digital stamp / seal',
+        'icon': 'fa-stamp',
+        'field': 'stamp_seal_upload',
+        'file_key': 'stamp_seal_upload',
+        'prefix': 'stamp_seal',
+        'scan_title': 'Scan your stamp',
+        'hint': (
+            'Place the stamp on white paper, fill the frame, and scan. '
+            'We detect the stamp ink only (not the whole photo) and save a transparent PNG.'
+        ),
+    },
+    'signature': {
+        'label': 'Default signature',
+        'icon': 'fa-signature',
+        'field': 'default_signature_documents',
+        'file_key': 'default_signature_documents',
+        'prefix': 'signature',
+        'scan_title': 'Scan your signature',
+        'hint': (
+            'Scan on paper, sign on screen, or type your name in a script font — '
+            'saved as a black transparent PNG for Google Docs and PDFs.'
+        ),
+    },
+}
+
+# Additional company settings pages (sidebar under Company, with company_information & templates).
+SYSTEM_SETTINGS_SECTIONS = {
+    'contact': {'label': 'Contact Information', 'icon': 'fa-address-book'},
+    'address': {'label': 'Physical Address', 'icon': 'fa-map-marker-alt'},
+    'business-hours': {'label': 'Business Hours', 'icon': 'fa-clock'},
+    'social-media': {'label': 'Social Media Links', 'icon': 'fa-share-alt'},
+    'legal': {'label': 'Legal & Professional', 'icon': 'fa-balance-scale'},
+    'documents': {'label': 'Document Settings', 'icon': 'fa-file-alt'},
+    'billing': {'label': 'Billing & Finance', 'icon': 'fa-dollar-sign'},
+    'notifications': {'label': 'Notification Settings', 'icon': 'fa-bell'},
+    'branding': {'label': 'Branding & Theme', 'icon': 'fa-palette'},
+}
+
+# All valid settings_section form keys (company + system settings pages).
+ALL_SETTINGS_SECTION_KEYS = {'company'} | set(SYSTEM_SETTINGS_SECTIONS.keys())
+
+
+def _system_settings_access_check():
+    """Auth + permission for system settings pages. Returns redirect response or None."""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
-    
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
     allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
-    
     if not has_permission:
         flash('You do not have permission to access this page', 'error')
         return redirect(url_for('dashboard'))
-    
-    company_settings = get_company_settings()
-    if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
-
-    # Fine-grained permission: view system settings
     connection = get_db_connection()
     if connection:
         deny = enforce_permission(connection, 'system_manage_settings')
         connection.close()
         if deny:
             return deny
-    
-    return render_template('system_settings.html', company_settings=company_settings)
+    return None
+
+
+@app.route('/company_information')
+def company_information():
+    """Basic company / law firm profile (standalone page, not under System Settings)."""
+    deny = _system_settings_access_check()
+    if deny:
+        return deny
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    return render_template(
+        'system_settings_page.html',
+        company_settings=company_settings,
+        settings_section_key='company',
+        section_meta=COMPANY_INFORMATION_SECTION,
+        page_group='company',
+    )
+
+
+@app.route('/company_templates_settings')
+def company_templates_settings():
+    """Firm-wide document templates used across the system."""
+    deny = _system_settings_access_check()
+    if deny:
+        return deny
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    return render_template(
+        'company_templates_settings.html',
+        company_settings=company_settings,
+    )
+
+
+@app.route('/system_settings')
+@app.route('/system_settings/')
+def system_settings():
+    """Legacy URL — redirect to the first System Settings page (Contact)."""
+    deny = _system_settings_access_check()
+    if deny:
+        return deny
+    return redirect(url_for('system_settings_section', section='contact'))
+
+
+@app.route('/system_settings/<section>')
+def system_settings_section(section):
+    """Individual system settings page (one section per URL)."""
+    deny = _system_settings_access_check()
+    if deny:
+        return deny
+    if section == 'company':
+        return redirect(url_for('company_information'))
+    if section not in SYSTEM_SETTINGS_SECTIONS:
+        flash('Unknown settings page.', 'error')
+        return redirect(url_for('system_settings_section', section='contact'))
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    return render_template(
+        'system_settings_page.html',
+        company_settings=company_settings,
+        settings_section_key=section,
+        section_meta=SYSTEM_SETTINGS_SECTIONS[section],
+        page_group='company',
+    )
+
+
+@app.route('/system_settings/letterhead')
+def system_settings_letterhead():
+    """Letterhead designer page (separate from Documents Settings to reduce congestion)."""
+    deny = _system_settings_access_check()
+    if deny:
+        return deny
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    return render_template(
+        'system_settings/letterhead_settings.html',
+        company_settings=company_settings,
+    )
+
+
+@app.route('/system_settings/<asset_kind>/scan', methods=['GET', 'POST'])
+def system_settings_asset_scan(asset_kind):
+    """Scan or upload firm stamp / default signature on a dedicated page."""
+    deny = _system_settings_access_check()
+    if deny:
+        return deny
+
+    asset_meta = SYSTEM_CAPTURE_ASSETS.get(asset_kind)
+    if not asset_meta:
+        flash('Unknown document asset type.', 'error')
+        return redirect(url_for('system_settings_section', section='documents'))
+
+    company_settings = get_company_settings() or {'company_name': 'BAUNI LAW GROUP'}
+    field = asset_meta['field']
+    upload_folder = app.config['UPLOAD_FOLDER']
+
+    if request.method == 'POST':
+        connection = get_db_connection()
+        if not connection:
+            flash('Database error.', 'error')
+            return redirect(url_for('system_settings_asset_scan', asset_kind=asset_kind))
+        deny_perm = enforce_permission(connection, 'system_manage_settings')
+        if deny_perm:
+            return deny_perm
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute(
+                    f"SELECT id, `{field}` FROM company_settings ORDER BY id DESC LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if not row:
+                    flash('No company settings record found.', 'error')
+                    return redirect(url_for('system_settings_section', section='documents'))
+                pk = row['id']
+                stored_value = row.get(field)
+
+                if request.form.get('remove_asset') == '1':
+                    basename = company_asset_basename(stored_value)
+                    if basename:
+                        path = os.path.join(upload_folder, basename)
+                        if os.path.isfile(path):
+                            try:
+                                os.remove(path)
+                            except OSError as err:
+                                print(f"Could not remove asset {path}: {err}")
+                    cursor.execute(
+                        f"UPDATE company_settings SET `{field}` = '' WHERE id = %s",
+                        (pk,),
+                    )
+                    connection.commit()
+                    flash(f"{asset_meta['label']} removed.", 'success')
+                    return redirect(url_for('system_settings_section', section='documents'))
+
+                processed_data = (request.form.get('processed_data') or '').strip()
+                file_bytes = None
+                if processed_data:
+                    try:
+                        _header, encoded = processed_data.split(',', 1)
+                        file_bytes = base64.b64decode(encoded)
+                    except Exception as err:
+                        print(f"Invalid processed data for {field}: {err}")
+                if file_bytes is None:
+                    f = request.files.get('asset_file')
+                    if f and f.filename and allowed_file(f.filename):
+                        raw = f.read()
+                        stream = BytesIO(raw)
+                        processed = process_signature_image(stream)
+                        if processed:
+                            processed.seek(0)
+                            file_bytes = processed.read()
+                        else:
+                            stream.seek(0)
+                            file_bytes = stream.read()
+
+                if not file_bytes:
+                    flash('No image to save. Scan with the camera or choose a file.', 'error')
+                    return redirect(url_for('system_settings_asset_scan', asset_kind=asset_kind))
+
+                if asset_kind in ('signature', 'stamp'):
+                    try:
+                        tmp = os.path.join(upload_folder, f'_tmp_{secrets.token_hex(6)}.png')
+                        with open(tmp, 'wb') as tmp_out:
+                            tmp_out.write(file_bytes)
+                        prepared = _prepare_image_for_google_docs(
+                            tmp, stamp_or_signature=True,
+                        )
+                        if prepared:
+                            file_bytes = prepared.read()
+                        if os.path.isfile(tmp):
+                            os.remove(tmp)
+                    except Exception as prep_err:
+                        print(f"Could not normalize {asset_kind} for storage: {prep_err}")
+
+                unique = f"{asset_meta['prefix']}_{pk}_{secrets.token_hex(4)}.png"
+                path = os.path.join(upload_folder, unique)
+                with open(path, 'wb') as out:
+                    out.write(file_bytes)
+
+                old_basename = company_asset_basename(stored_value)
+                if old_basename and old_basename != unique:
+                    old_path = os.path.join(upload_folder, old_basename)
+                    if os.path.isfile(old_path):
+                        try:
+                            os.remove(old_path)
+                        except OSError as err:
+                            print(f"Could not remove old asset {old_path}: {err}")
+
+                cursor.execute(
+                    f"UPDATE company_settings SET `{field}` = %s WHERE id = %s",
+                    (unique, pk),
+                )
+                connection.commit()
+                flash(f"{asset_meta['label']} saved successfully.", 'success')
+                return redirect(url_for('system_settings_section', section='documents'))
+        except Exception as e:
+            print(f"Error saving {asset_kind} scan: {e}")
+            flash('An error occurred while saving.', 'error')
+            return redirect(url_for('system_settings_asset_scan', asset_kind=asset_kind))
+        finally:
+            connection.close()
+
+    current_static = company_asset_static_path(company_settings.get(field))
+    return render_template(
+        'system_settings/stamp_signature_scan.html',
+        company_settings=company_settings,
+        asset_kind=asset_kind,
+        asset_meta=asset_meta,
+        current_static=current_static,
+        section_meta=SYSTEM_SETTINGS_SECTIONS['documents'],
+    )
+
+
+@app.route('/system_settings/<asset_kind>/capture', methods=['GET', 'POST'])
+def system_settings_asset_capture(asset_kind):
+    """Legacy URL — redirect to scan page."""
+    return redirect(url_for('system_settings_asset_scan', asset_kind=asset_kind), code=307)
+
+
+@app.route('/api/branding-asset/google/<path:filename>')
+def branding_asset_for_google(filename):
+    """
+    Stamp/signature PNG optimized for Google Docs (white background, cropped).
+    Public endpoint — Google's servers fetch this when APP_BASE_URL is set.
+    """
+    safe = company_asset_basename(filename)
+    if not safe or not _is_stamp_or_signature_asset(safe):
+        return jsonify({'error': 'Not found'}), 404
+    local_path = os.path.join(app.config['UPLOAD_FOLDER'], safe)
+    if not os.path.isfile(local_path):
+        static_rel = company_asset_static_path(safe)
+        if static_rel:
+            local_path = os.path.join(app.root_path, 'static', static_rel.replace('/', os.sep))
+    if not os.path.isfile(local_path):
+        return jsonify({'error': 'Not found'}), 404
+    prepared = _prepare_image_for_google_docs(local_path, stamp_or_signature=True)
+    if not prepared:
+        return jsonify({'error': 'Could not prepare image'}), 500
+    prepared.seek(0)
+    return send_file(prepared, mimetype='image/png', max_age=300)
+
+
+@app.route('/api/system-settings/google-branding-preview', methods=['POST'])
+def system_settings_google_branding_preview():
+    """Create a Google Doc, Slides deck, or Notebook (Doc) with firm branding for preview."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        return jsonify({'success': False, 'error': 'You do not have permission to preview branding.'}), 403
+
+    data = request.get_json(silent=True) or {}
+    file_type = (data.get('type') or data.get('file_type') or '').strip().lower()
+    if file_type not in ('doc', 'slides', 'notebook'):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid type. Use doc, slides, or notebook.',
+        }), 400
+
+    drive_state = evaluate_drive_connection_state()
+    if drive_state['state'] == 'never_connected':
+        return jsonify({
+            'success': False,
+            'error': 'Google Drive not connected. Connect it in Documents Settings.',
+            'settings_url': url_for('documents_settings'),
+        }), 400
+    if drive_state['state'] == 'needs_reconnect':
+        return jsonify({
+            'success': False,
+            'error': drive_state.get('reason') or 'Google Drive needs to be reconnected.',
+            'settings_url': url_for('documents_settings'),
+        }), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if not current_user_has_permission(connection, 'system_manage_settings'):
+                return jsonify({'success': False, 'error': 'Permission denied.'}), 403
+
+            cursor.execute("""
+                SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                       google_drive_scopes, google_drive_main_folder_id,
+                       google_drive_account_email, google_drive_account_name,
+                       google_drive_account_picture
+                FROM company_settings ORDER BY id DESC LIMIT 1
+            """)
+            drive_settings = cursor.fetchone()
+            if not drive_settings or not drive_settings.get('google_drive_token') or not drive_settings.get('google_drive_refresh_token'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Google Drive not connected. Connect it in Documents Settings.',
+                    'settings_url': url_for('documents_settings'),
+                }), 400
+
+            _sync_google_drive_session_from_settings_row(drive_settings)
+
+            drive_scopes = (
+                json.loads(drive_settings['google_drive_scopes'])
+                if drive_settings.get('google_drive_scopes') else []
+            )
+            credentials = Credentials(
+                token=drive_settings['google_drive_token'],
+                refresh_token=drive_settings.get('google_drive_refresh_token'),
+                token_uri=drive_settings.get('google_drive_token_uri'),
+                client_id=GOOGLE_CLIENT_ID,
+                client_secret=GOOGLE_CLIENT_SECRET,
+                scopes=drive_scopes,
+            )
+            ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+            if not ok:
+                return jsonify({
+                    'success': False,
+                    'error': 'Google Drive session expired. Reconnect in Documents Settings.',
+                    'settings_url': url_for('documents_settings'),
+                }), 400
+
+            service = build('drive', 'v3', credentials=credentials)
+            try:
+                main_folder_id = ensure_google_drive_main_folder_id(
+                    service,
+                    cursor,
+                    connection,
+                    drive_settings.get('google_drive_main_folder_id'),
+                )
+            except Exception as folder_err:
+                print(f"[google-branding-preview] Main folder ensure failed: {folder_err}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Could not access Google Drive storage folder. Reconnect in Documents Settings.',
+                    'settings_url': url_for('documents_settings'),
+                }), 400
+            preview_folder_id = get_or_create_folder(
+                service, main_folder_id, 'System - Branding Previews'
+            )
+            branding_assets_folder_id = get_or_create_folder(
+                service, preview_folder_id, '_Branding image cache'
+            )
+
+            company_settings = get_company_settings()
+            company_name = (company_settings.get('company_name') or 'Company').strip() if company_settings else 'Company'
+            employee_name = (session.get('employee_name') or '').strip()
+            if not employee_name and session.get('employee_id'):
+                cursor.execute(
+                    "SELECT full_name FROM employees WHERE id = %s",
+                    (session['employee_id'],),
+                )
+                emp_row = cursor.fetchone() or {}
+                employee_name = (emp_row.get('full_name') or '').strip()
+
+            type_labels = {'doc': 'Google Doc', 'slides': 'Google Slides', 'notebook': 'Google Notes'}
+            stamp = datetime.now().strftime('%Y-%m-%d %H:%M')
+            safe_company = re.sub(r'[\\/:*?"<>|]', '_', company_name)[:40]
+            file_title = f"Branding preview ({type_labels[file_type]}) - {safe_company} - {stamp}"
+
+            mime_map = {
+                'doc': 'application/vnd.google-apps.document',
+                'slides': 'application/vnd.google-apps.presentation',
+                'notebook': 'application/vnd.google-apps.document',
+            }
+            if file_type == 'notebook':
+                file_title = f"{file_title} - NOTEBOOK"
+
+            created = service.files().create(
+                body={
+                    'name': file_title,
+                    'mimeType': mime_map[file_type],
+                    'parents': [preview_folder_id],
+                },
+                fields='id, name, webViewLink',
+            ).execute()
+            file_id = created.get('id')
+
+            try:
+                service.permissions().create(
+                    fileId=file_id,
+                    body={'type': 'anyone', 'role': 'writer'},
+                    fields='id',
+                ).execute()
+            except Exception as perm_err:
+                print(f"Warning setting branding preview public permission: {perm_err}")
+
+            drive_account_email = (drive_settings.get('google_drive_account_email') or '').strip()
+            if drive_account_email:
+                _grant_drive_file_editor(service, file_id, drive_account_email)
+
+            docs_message = None
+            branding_applied = False
+            DOCS_SCOPE = 'https://www.googleapis.com/auth/documents'
+            emp_signature = None
+            emp_stamp = None
+            emp_id = session.get('employee_id')
+            if emp_id:
+                cursor.execute(
+                    "SELECT signature, stamp FROM employees WHERE id = %s",
+                    (emp_id,),
+                )
+                emp_row = cursor.fetchone() or {}
+                emp_signature = emp_row.get('signature')
+                emp_stamp = emp_row.get('stamp')
+
+            has_docs_scope = any(
+                'auth/documents' in (scope or '') for scope in drive_scopes
+            )
+            if file_type in ('doc', 'notebook') and company_settings:
+                if not has_docs_scope:
+                    docs_message = (
+                        'Reconnect Google Drive in Documents Settings to embed letterhead, '
+                        'footer, stamp, and signature.'
+                    )
+                else:
+                    try:
+                        docs_service = build('docs', 'v1', credentials=credentials)
+                        branding_applied, branding_warning = apply_google_doc_company_branding(
+                            docs_service,
+                            file_id,
+                            company_settings,
+                            company_name,
+                            employee_name,
+                            employee_signature_file=emp_signature,
+                            employee_stamp_file=emp_stamp,
+                            drive_service=service,
+                            drive_assets_folder_id=branding_assets_folder_id,
+                        )
+                        if branding_warning and not docs_message:
+                            docs_message = branding_warning
+                    except HttpError as docs_err:
+                        print(f"Branding preview Docs API failed: {docs_err}")
+                        docs_message = _google_docs_api_error_message(docs_err, app_label='document')
+                    except Exception as docs_err:
+                        print(f"Branding preview Docs API failed: {docs_err}")
+                        docs_message = _google_docs_api_error_message(docs_err, app_label='document')
+
+            elif file_type == 'slides' and company_settings:
+                try:
+                    slides_service = build('slides', 'v1', credentials=credentials)
+                    branding_applied, branding_warning = apply_google_slides_company_branding(
+                        slides_service,
+                        file_id,
+                        company_settings,
+                        company_name,
+                        employee_name,
+                        employee_signature_file=emp_signature,
+                        employee_stamp_file=emp_stamp,
+                        drive_service=service,
+                        drive_assets_folder_id=branding_assets_folder_id,
+                    )
+                    if branding_warning and not docs_message:
+                        docs_message = branding_warning
+                except HttpError as slides_err:
+                    print(f"Branding preview Slides API failed: {slides_err}")
+                    docs_message = _google_docs_api_error_message(slides_err, app_label='presentation')
+                except Exception as slides_err:
+                    print(f"Branding preview Slides API failed: {slides_err}")
+                    docs_message = _google_docs_api_error_message(slides_err, app_label='presentation')
+
+            edit_urls = {
+                'doc': f'https://docs.google.com/document/d/{file_id}/edit',
+                'slides': f'https://docs.google.com/presentation/d/{file_id}/edit',
+                'notebook': f'https://docs.google.com/document/d/{file_id}/edit',
+            }
+            payload = {
+                'success': True,
+                'file_id': file_id,
+                'name': created.get('name', file_title),
+                'editLink': edit_urls.get(file_type),
+                'webViewLink': created.get('webViewLink') or f'https://drive.google.com/file/d/{file_id}/view',
+                'branding_applied': branding_applied,
+            }
+            if docs_message:
+                payload['message'] = docs_message
+                payload['settings_url'] = url_for('documents_settings')
+            elif file_type in ('doc', 'notebook'):
+                payload['message'] = (
+                    'Document opened. Click below the letterhead/header, then type your letter body. '
+                    'Use the same Google account that is connected in Documents Settings if prompted.'
+                )
+            return jsonify(payload)
+    except Exception as e:
+        err_str = str(e).lower()
+        if 'invalid_grant' in err_str or 'expired' in err_str or 'revoked' in err_str:
+            return jsonify({
+                'success': False,
+                'error': 'Google Drive session expired. Reconnect in Documents Settings.',
+                'settings_url': url_for('documents_settings'),
+            }), 400
+        print(f"Google branding preview error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        connection.close()
+
 
 @app.route('/system_settings/update', methods=['POST'])
 def update_company_settings():
@@ -18500,7 +20067,7 @@ def update_company_settings():
     connection = get_db_connection()
     if not connection:
         flash('Database error.', 'error')
-        return redirect(url_for('system_settings'))
+        return redirect(url_for('company_information'))
 
     # Fine-grained permission: update system settings
     deny = enforce_permission(connection, 'system_manage_settings', redirect_endpoint='system_settings')
@@ -18520,26 +20087,105 @@ def update_company_settings():
                     return "#" + "".join(ch * 2 for ch in short.group(1))
                 return fallback
 
-            cursor.execute("SELECT id FROM company_settings ORDER BY id DESC LIMIT 1")
-            row = cursor.fetchone()
-            if not row:
+            cursor.execute("SELECT * FROM company_settings WHERE id = (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1)")
+            current_settings = cursor.fetchone()
+            if not current_settings:
                 flash('No company settings record found.', 'error')
-                return redirect(url_for('system_settings'))
-            pk = row['id']
+                return redirect(url_for('company_information'))
+            pk = current_settings['id']
             upload_folder = app.config['UPLOAD_FOLDER']
-            def save_upload(file_key, prefix):
+
+            def _delete_stored_asset(stored_value):
+                basename = company_asset_basename(stored_value)
+                if not basename:
+                    return
+                path = os.path.join(upload_folder, basename)
+                if os.path.isfile(path):
+                    try:
+                        os.remove(path)
+                    except OSError as err:
+                        print(f"Could not remove asset {path}: {err}")
+
+            def save_simple_upload(file_key, prefix):
                 f = request.files.get(file_key)
                 if not f or not f.filename:
                     return None
                 filename = secure_filename(f.filename)
-                if not filename:
+                if not filename or not allowed_file(filename):
                     return None
-                ext = os.path.splitext(filename)[1] or '.bin'
+                # Special-case: normalize company logo to a compact, metadata-free PNG.
+                if file_key == 'company_logo':
+                    raw = f.read()
+                    stream = BytesIO(raw)
+                    processed, ext = process_logo_image(stream)
+                    if processed and ext:
+                        unique = f"{prefix}_{pk}_{secrets.token_hex(4)}.{ext}"
+                        path = os.path.join(upload_folder, unique)
+                        with open(path, 'wb') as out:
+                            out.write(processed.read())
+                        return unique
+                    # Fallback to saving original if processing fails.
+                    stream.seek(0)
+                    f = stream
+                    filename = secure_filename(filename)
+
+                ext = os.path.splitext(filename)[1].lower() or '.bin'
                 unique = f"{prefix}_{pk}_{secrets.token_hex(4)}{ext}"
                 path = os.path.join(upload_folder, unique)
-                f.save(path)
+                # f may be a FileStorage or BytesIO (after fallback)
+                try:
+                    f.save(path)  # FileStorage
+                except Exception:
+                    f.seek(0)
+                    with open(path, 'wb') as out:
+                        out.write(f.read())
+                return unique
+
+            def save_document_asset(file_key, col, prefix, *, letterhead=False):
+                """Save letterhead, stamp, or signature with optional image processing."""
+                processed_data = (request.form.get(f'{file_key}_processed') or '').strip()
+                f = request.files.get(file_key)
+                has_file = f and f.filename
+                if not processed_data and not has_file:
+                    return None
+                ext = 'png'
+                file_bytes = None
+                if processed_data:
+                    try:
+                        _header, encoded = processed_data.split(',', 1)
+                        file_bytes = base64.b64decode(encoded)
+                    except Exception as err:
+                        print(f"Invalid processed data for {file_key}: {err}")
+                        file_bytes = None
+                if file_bytes is None and has_file:
+                    if not allowed_file(f.filename):
+                        return None
+                    raw = f.read()
+                    stream = BytesIO(raw)
+                    if letterhead:
+                        processed, ext = process_letterhead_image(stream)
+                    else:
+                        processed = process_signature_image(stream)
+                        ext = 'png' if processed else None
+                    if processed:
+                        processed.seek(0)
+                        file_bytes = processed.read()
+                        ext = ext or 'png'
+                    elif has_file:
+                        stream.seek(0)
+                        file_bytes = stream.read()
+                        ext = secure_filename(f.filename).rsplit('.', 1)[-1].lower()
+                if not file_bytes:
+                    return None
+                unique = f"{prefix}_{pk}_{secrets.token_hex(4)}.{ext}"
+                path = os.path.join(upload_folder, unique)
+                with open(path, 'wb') as out:
+                    out.write(file_bytes)
                 return unique
             updates = {}
+            settings_section = (request.form.get('settings_section') or 'company').strip()
+            if settings_section not in ALL_SETTINGS_SECTION_KEYS:
+                settings_section = 'company'
             text_fields = [
                 'company_name', 'company_tagline', 'registration_number', 'tax_pin_vat_number', 'year_established',
                 'email', 'contact_number', 'whatsapp_number', 'alternative_phone', 'customer_support_email',
@@ -18554,63 +20200,84 @@ def update_company_settings():
                 val = request.form.get(key)
                 if val is not None:
                     updates[key] = val.strip() if isinstance(val, str) else val
-            # Validate and normalize brand colors
-            updates['primary_brand_color'] = _normalize_hex_color(
-                updates.get('primary_brand_color'),
-                '#1E1A4E'
-            )
-            updates['secondary_color'] = _normalize_hex_color(
-                updates.get('secondary_color'),
-                '#6C5CE7'
-            )
-            updates['tertiary_color'] = _normalize_hex_color(
-                updates.get('tertiary_color'),
-                '#A29BFE'
-            )
-            # Allowlist of supported theme presets (must match the UI list)
-            allowed_theme_presets = {
-                'midnight_indigo', 'forest_calm', 'slate_ocean', 'royal_plum',
-                'charcoal_amber', 'olive_mist', 'burgundy_rose', 'mocha_sand',
-                'steel_teal', 'graphite_sky', 'soft_lavender', 'rose_quartz',
-                'custom'
-            }
-            theme_preset_val = updates.get('theme_preset')
-            if theme_preset_val not in allowed_theme_presets:
-                updates['theme_preset'] = 'custom'
-            # Allowlist of supported font families (must match the UI list)
-            allowed_fonts = {
-                'Inter', 'Roboto', 'Open Sans', 'Lato', 'Poppins', 'Source Sans 3',
-                'Nunito', 'Plus Jakarta Sans', 'DM Sans', 'Manrope', 'IBM Plex Sans',
-                'Work Sans', 'Merriweather', 'Lora', 'Source Serif 4'
-            }
-            font_val = updates.get('font_family')
-            if font_val not in allowed_fonts:
-                updates['font_family'] = 'Inter'
-            # Allowlist of supported text-size presets (must match UI + base.html)
-            allowed_font_sizes = {'compact', 'comfortable', 'large', 'xl'}
-            font_size_val = updates.get('font_size')
-            if font_size_val not in allowed_font_sizes:
-                updates['font_size'] = 'comfortable'
-            # Working days: multiple checkboxes stored as comma-separated
-            wd = request.form.getlist('working_days')
-            if wd is not None:
+            if settings_section == 'branding':
+                if request.form.get('primary_brand_color') is not None:
+                    updates['primary_brand_color'] = _normalize_hex_color(
+                        updates.get('primary_brand_color'),
+                        '#1E1A4E'
+                    )
+                if request.form.get('secondary_color') is not None:
+                    updates['secondary_color'] = _normalize_hex_color(
+                        updates.get('secondary_color'),
+                        '#6C5CE7'
+                    )
+                if request.form.get('tertiary_color') is not None:
+                    updates['tertiary_color'] = _normalize_hex_color(
+                        updates.get('tertiary_color'),
+                        '#A29BFE'
+                    )
+                allowed_theme_presets = {
+                    'midnight_indigo', 'forest_calm', 'slate_ocean', 'royal_plum',
+                    'charcoal_amber', 'olive_mist', 'burgundy_rose', 'mocha_sand',
+                    'steel_teal', 'graphite_sky', 'soft_lavender', 'rose_quartz',
+                    'custom'
+                }
+                theme_preset_val = updates.get('theme_preset')
+                if theme_preset_val is not None and theme_preset_val not in allowed_theme_presets:
+                    updates['theme_preset'] = 'custom'
+                allowed_fonts = {
+                    'Inter', 'Roboto', 'Open Sans', 'Lato', 'Poppins', 'Source Sans 3',
+                    'Nunito', 'Plus Jakarta Sans', 'DM Sans', 'Manrope', 'IBM Plex Sans',
+                    'Work Sans', 'Merriweather', 'Lora', 'Source Serif 4'
+                }
+                font_val = updates.get('font_family')
+                if font_val is not None and font_val not in allowed_fonts:
+                    updates['font_family'] = 'Inter'
+                allowed_font_sizes = {'compact', 'comfortable', 'large', 'xl'}
+                font_size_val = updates.get('font_size')
+                if font_size_val is not None and font_size_val not in allowed_font_sizes:
+                    updates['font_size'] = 'comfortable'
+            if settings_section == 'business-hours':
+                wd = request.form.getlist('working_days')
                 updates['working_days'] = ','.join(wd) if wd else ''
-            for key in ['send_email_notifications', 'send_sms_notifications', 'whatsapp_notifications', 'court_date_reminders']:
-                updates[key] = 1 if request.form.get(key) == 'on' else 0
-            for file_key, col, prefix in [
-                ('company_logo', 'company_logo', 'company_logo'),
-                ('stamp_seal_upload', 'stamp_seal_upload', 'stamp_seal'),
-                ('default_signature_documents', 'default_signature_documents', 'signature'),
-                ('favicon', 'favicon', 'favicon'),
-                ('login_page_background', 'login_page_background', 'login_bg'),
-                ('default_letterhead', 'default_letterhead', 'letterhead')
-            ]:
-                saved = save_upload(file_key, prefix)
+            if settings_section == 'notifications':
+                for key in ['send_email_notifications', 'send_sms_notifications', 'whatsapp_notifications', 'court_date_reminders']:
+                    updates[key] = 1 if request.form.get(key) == 'on' else 0
+            if settings_section == 'documents':
+                for col in DOCUMENT_ASSET_COLUMNS:
+                    if request.form.get(f'remove_{col}') == '1':
+                        _delete_stored_asset(current_settings.get(col))
+                        updates[col] = ''
+                for file_key, col, prefix, is_letterhead in [
+                    ('default_letterhead', 'default_letterhead', 'letterhead', True),
+                    ('stamp_seal_upload', 'stamp_seal_upload', 'stamp_seal', False),
+                    ('default_signature_documents', 'default_signature_documents', 'signature', False),
+                ]:
+                    saved = save_document_asset(
+                        file_key, col, prefix, letterhead=is_letterhead
+                    )
+                    if saved:
+                        _delete_stored_asset(current_settings.get(col))
+                        updates[col] = saved
+            if settings_section == 'company':
+                saved = save_simple_upload('company_logo', 'company_logo')
                 if saved:
-                    updates[col] = saved
+                    _delete_stored_asset(current_settings.get('company_logo'))
+                    updates['company_logo'] = saved
+            if settings_section == 'branding':
+                for file_key, col, prefix in [
+                    ('favicon', 'favicon', 'favicon'),
+                    ('login_page_background', 'login_page_background', 'login_bg'),
+                ]:
+                    saved = save_simple_upload(file_key, prefix)
+                    if saved:
+                        _delete_stored_asset(current_settings.get(col))
+                        updates[col] = saved
             if not updates:
                 flash('No changes to save.', 'info')
-                return redirect(url_for('system_settings'))
+                if settings_section == 'company':
+                    return redirect(url_for('company_information'))
+                return redirect(url_for('system_settings_section', section=settings_section or 'contact'))
             set_clause = ', '.join([f"`{k}` = %s" for k in updates])
             sql = f"UPDATE company_settings SET {set_clause} WHERE id = %s"
             cursor.execute(sql, list(updates.values()) + [pk])
@@ -18621,7 +20288,12 @@ def update_company_settings():
         flash('An error occurred while saving.', 'error')
     finally:
         connection.close()
-    return redirect(url_for('system_settings'))
+    redirect_section = (request.form.get('settings_section') or 'company').strip()
+    if redirect_section not in ALL_SETTINGS_SECTION_KEYS:
+        redirect_section = 'company'
+    if redirect_section == 'company':
+        return redirect(url_for('company_information'))
+    return redirect(url_for('system_settings_section', section=redirect_section))
 
 @app.route('/other_matters')
 def other_matters():

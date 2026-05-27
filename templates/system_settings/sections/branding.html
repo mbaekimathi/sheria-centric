@@ -1,0 +1,182 @@
+<div id="section-11" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-palette settings-section-icon"></i>
+                    11. Branding, Theme &amp; Typography
+                </h2>
+                <p class="settings-section-subtitle">Pick a modern, eye-comfortable theme and a font for the entire system. Header, sidebar, buttons, links and active states will update everywhere.</p>
+            </div>
+            <div class="p-6 space-y-8">
+
+                <!-- Theme Presets -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-swatchbook text-indigo-600"></i>
+                                Theme Presets
+                            </h3>
+                            <p class="text-xs text-gray-500">Curated low-glare palettes designed for long reading sessions. Click a card to apply.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: legal teams often prefer Slate Ocean or Forest Calm.</span>
+                    </div>
+
+                    <input type="hidden" name="theme_preset" id="theme_preset" value="{{ cs.get('theme_preset') or 'custom' }}">
+
+                    <div id="theme-preset-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        <!-- Cards are populated dynamically by the theme script for consistency -->
+                    </div>
+                </div>
+
+                <!-- Custom Color Pickers (3 colors for a richer modern theme) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Primary Brand Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="primary_brand_color_picker" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                            <input type="text" id="primary_brand_color" name="primary_brand_color" value="{{ cs.get('primary_brand_color') or '#1E1A4E' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#1E1A4E" pattern="^#([A-Fa-f0-9]{6})$">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Deep brand color &ndash; header, sidebar, dark surfaces.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Secondary / Accent Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="secondary_color_picker" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                            <input type="text" id="secondary_color" name="secondary_color" value="{{ cs.get('secondary_color') or '#6C5CE7' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#6C5CE7" pattern="^#([A-Fa-f0-9]{6})$">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Vibrant accent &ndash; buttons, links, active states.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tertiary / Highlight Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" id="tertiary_color_picker" value="{{ cs.get('tertiary_color') or '#A29BFE' }}" class="h-11 w-14 border border-gray-300 rounded-lg bg-white cursor-pointer">
+                            <input type="text" id="tertiary_color" name="tertiary_color" value="{{ cs.get('tertiary_color') or '#A29BFE' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="#A29BFE" pattern="^#([A-Fa-f0-9]{6})$">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Soft highlight &ndash; badges, hover tints, subtle surfaces.</p>
+                    </div>
+                </div>
+
+                <!-- Live Theme Preview -->
+                <div class="rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <p class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <i class="fas fa-eye text-indigo-600"></i>
+                            Live Theme Preview
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <span id="preview-primary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Primary"></span>
+                            <span id="preview-secondary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Accent"></span>
+                            <span id="preview-tertiary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Tertiary"></span>
+                        </div>
+                    </div>
+                    <div id="theme-preview-shell" class="p-4">
+                        <div id="theme-preview-header" class="rounded-t-xl px-4 py-3 flex items-center justify-between text-white">
+                            <div class="flex items-center gap-2">
+                                <span class="h-8 w-8 rounded-lg flex items-center justify-center" id="theme-preview-logo">
+                                    <i class="fas fa-balance-scale"></i>
+                                </span>
+                                <span class="font-bold tracking-wide">SHERIA <span id="theme-preview-accent-text">CENTRIC</span></span>
+                            </div>
+                            <div class="hidden sm:flex items-center gap-3 text-xs opacity-90">
+                                <span><i class="far fa-bell"></i></span>
+                                <span><i class="far fa-user-circle"></i></span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-0 border border-gray-200 rounded-b-xl overflow-hidden">
+                            <aside id="theme-preview-sidebar" class="sm:col-span-1 p-3 text-white text-xs space-y-2">
+                                <div class="opacity-80 uppercase tracking-wide text-[10px]">Menu</div>
+                                <div class="flex items-center gap-2 px-2 py-1 rounded-md" id="theme-preview-active"><i class="fas fa-home"></i> Dashboard</div>
+                                <div class="flex items-center gap-2 px-2 py-1 rounded-md opacity-80"><i class="far fa-folder"></i> Matters</div>
+                                <div class="flex items-center gap-2 px-2 py-1 rounded-md opacity-80"><i class="far fa-user"></i> Clients</div>
+                            </aside>
+                            <div class="sm:col-span-3 bg-white p-4 space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <span id="theme-preview-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"><i class="fas fa-star text-[10px]"></i> Featured</span>
+                                    <span id="theme-preview-chip" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium">In Progress</span>
+                                </div>
+                                <p id="theme-preview-text" class="text-sm text-gray-700">The quick brown fox jumps over the lazy dog. 1234567890 &ndash; preview of body text in your chosen font.</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button type="button" id="theme-preview-btn-primary" class="px-3 py-1.5 rounded-lg text-white text-sm font-medium">Primary Button</button>
+                                    <button type="button" id="theme-preview-btn-outline" class="px-3 py-1.5 rounded-lg text-sm font-medium border bg-white">Secondary</button>
+                                    <button type="button" id="theme-preview-btn-soft" class="px-3 py-1.5 rounded-lg text-sm font-medium">Tertiary</button>
+                                    <a href="#" id="theme-preview-link" class="text-sm font-medium hover:underline">A sample link</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Typography / Fonts -->
+                {% set saved_font = cs.get('font_family') or 'Inter' %}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-font text-indigo-600"></i>
+                                System Font Presets
+                            </h3>
+                            <p class="text-xs text-gray-500">Curated professional typefaces tuned for long reading. Click a card to apply.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: Inter or DM Sans pair beautifully with any palette.</span>
+                    </div>
+
+                    <input type="hidden" name="font_family" id="font_family" value="{{ saved_font }}">
+
+                    <div id="font-preset-grid" class="space-y-5">
+                        <!-- Grouped font cards are populated dynamically -->
+                    </div>
+
+                    <div class="mt-5">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Live Font Preview</label>
+                        <div id="font-preview" class="rounded-xl border border-gray-200 bg-white p-4 space-y-1">
+                            <p class="text-xs uppercase tracking-wider text-gray-400">Heading</p>
+                            <p class="text-2xl font-bold text-gray-900">SHERIA CENTRIC &mdash; Modern Practice Management</p>
+                            <p class="text-sm text-gray-600">The quick brown fox jumps over the lazy dog. 1234567890 &mdash; abcdefghijklmnopqrstuvwxyz.</p>
+                            <p class="text-xs text-gray-500">Body copy preview at 12px / 14px / 16px sizes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text Size Presets -->
+                {% set saved_font_size = cs.get('font_size') or 'comfortable' %}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-text-height text-indigo-600"></i>
+                                Text Size
+                            </h3>
+                            <p class="text-xs text-gray-500">One global setting that scales every page consistently. Click a card to apply.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: Comfortable suits most users; Large is friendlier for long reading.</span>
+                    </div>
+
+                    <input type="hidden" name="font_size" id="font_size" value="{{ saved_font_size }}">
+
+                    <div id="font-size-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <!-- Cards populated dynamically -->
+                    </div>
+
+                    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4" id="font-size-preview">
+                        <p class="text-xs uppercase tracking-wider text-gray-400 mb-1">Live Size Preview</p>
+                        <p class="text-3xl font-bold text-gray-900" data-fs-role="display">Page heading at this size</p>
+                        <p class="text-base text-gray-700 mt-1" data-fs-role="body">Body text reads at this comfort level. The quick brown fox jumps over the lazy dog. 1234567890.</p>
+                        <p class="text-xs text-gray-500 mt-1" data-fs-role="meta">Small captions, table headers and helper text scale together.</p>
+                    </div>
+                </div>
+
+                <!-- Branding Assets -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
+                        <input type="file" name="favicon" accept="image/*,.ico" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if cs.get('favicon') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.favicon }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Login Page Background</label>
+                        <input type="file" name="login_page_background" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if cs.get('login_page_background') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.login_page_background }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>

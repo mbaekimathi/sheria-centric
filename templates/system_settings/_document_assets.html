@@ -1,0 +1,588 @@
+<script>
+(function () {
+    const MAX_BYTES = 5 * 1024 * 1024;
+
+    function processImageFile(file, mode, onDone) {
+        if (file.size > MAX_BYTES) {
+            alert('Image must be smaller than 5 MB.');
+            onDone(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onload = function () {
+                const maxW = mode === 'letterhead' ? 1200 : 400;
+                const maxH = mode === 'letterhead' ? 400 : 200;
+                let width = img.width;
+                let height = img.height;
+                if (width > maxW || height > maxH) {
+                    const ratio = Math.min(maxW / width, maxH / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                if (mode === 'letterhead') {
+                    onDone(canvas.toDataURL('image/png', 0.92));
+                    return;
+                }
+
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+                const threshold = 240;
+                let minX = width, minY = height, maxX = 0, maxY = 0;
+                const contentPixels = [];
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                    if (lum < threshold) {
+                        const x = (i / 4) % width;
+                        const y = Math.floor((i / 4) / width);
+                        contentPixels.push({ x, y, lum });
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+
+                if (!contentPixels.length) {
+                    onDone(canvas.toDataURL('image/png', 1.0));
+                    return;
+                }
+
+                const padding = 5;
+                minX = Math.max(0, minX - padding);
+                minY = Math.max(0, minY - padding);
+                maxX = Math.min(width - 1, maxX + padding);
+                maxY = Math.min(height - 1, maxY + padding);
+                const newW = maxX - minX + 1;
+                const newH = maxY - minY + 1;
+                const out = document.createElement('canvas');
+                out.width = newW;
+                out.height = newH;
+                const octx = out.getContext('2d');
+                const newData = octx.createImageData(newW, newH);
+
+                contentPixels.forEach(function (p) {
+                    const nx = p.x - minX;
+                    const ny = p.y - minY;
+                    if (nx < 0 || ny < 0 || nx >= newW || ny >= newH) return;
+                    const idx = (ny * newW + nx) * 4;
+                    const enhanced = Math.round((1 - p.lum / 255) * 255);
+                    newData.data[idx] = 0;
+                    newData.data[idx + 1] = 0;
+                    newData.data[idx + 2] = 0;
+                    newData.data[idx + 3] = enhanced;
+                });
+                octx.putImageData(newData, 0, 0);
+                onDone(out.toDataURL('image/png', 1.0));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function updateMockup(assetId, dataUrl) {
+        const map = {
+            letterhead: 'mockup-letterhead',
+            'firm-stamp': 'mockup-stamp',
+            'firm-signature': 'mockup-signature'
+        };
+        const imgId = map[assetId];
+        if (!imgId) return;
+        const img = document.getElementById(imgId);
+        const phId = assetId === 'letterhead' ? 'mockup-letterhead-ph' : null;
+        if (!img) return;
+        if (dataUrl) {
+            img.src = dataUrl;
+            img.classList.remove('hidden');
+            if (phId) {
+                const ph = document.getElementById(phId);
+                if (ph) ph.classList.add('hidden');
+            }
+        }
+    }
+
+    // -------- Letterhead designer (header strip only — body is typed in Google Docs) --------
+    const lhCanvas = document.getElementById('letterhead-designer-canvas');
+    const lhResetBtn = document.getElementById('lh-reset-btn');
+    const lhExportBtn = document.getElementById('lh-export-btn');
+
+    if (lhCanvas && lhExportBtn) {
+        const CANVAS_W = lhCanvas.width || 1240;
+        const CANVAS_H = lhCanvas.height || 280;
+
+        const primary = "{{ cs.get('primary_brand_color') or '#1E1A4E' }}";
+        const tertiary = "{{ cs.get('tertiary_color') or '#A29BFE' }}";
+        const fontFamily = "{{ cs.get('font_family') or 'Inter' }}";
+
+        const lhCompanyNameInput = document.getElementById('lh-company-name');
+        const lhTaglineInput = document.getElementById('lh-tagline');
+        const lhPhoneInput = document.getElementById('lh-phone');
+        const lhWhatsappInput = document.getElementById('lh-whatsapp');
+        const lhHeaderEmailInput = document.getElementById('lh-header-email');
+        const lhFooterWebsiteInput = document.getElementById('lh-footer-website');
+        const lhFooterHiddenInput = document.getElementById('lh-footer-hidden');
+        const POWERED_BY_LINE = 'Powered by sheriacentric.com';
+
+        const letterheadProcessed = document.getElementById('letterhead-processed');
+        const letterheadImg = document.getElementById('letterhead-current-img');
+        const letterheadPh = document.getElementById('letterhead-placeholder');
+
+        {% if company_asset_static_path(cs.get('company_logo')) %}
+        const LH_LOGO_URL = "{{ url_for('static', filename=company_asset_static_path(cs.get('company_logo'))) }}";
+        {% else %}
+        const LH_LOGO_URL = null;
+        {% endif %}
+
+        const state = {
+            texts: {
+                companyName: (lhCompanyNameInput && lhCompanyNameInput.value) ? lhCompanyNameInput.value : '',
+                tagline: (lhTaglineInput && lhTaglineInput.value) ? lhTaglineInput.value : '',
+                contacts: '',
+                footer: '',
+            },
+            elements: {
+                logo: { x: 72, y: 50, w: 118, h: 80 },
+                companyName: { x: 208, y: 52, w: 500, h: 48 },
+                tagline: { x: 208, y: 100, w: 500, h: 22 },
+                contacts: { x: 748, y: 50, w: 420, h: 88 },
+            }
+        };
+        let headerExportHeight = CANVAS_H;
+
+        const defaultElements = JSON.parse(JSON.stringify(state.elements));
+        let activeKey = null;
+        let dragOffset = { dx: 0, dy: 0 };
+        let logoImg = new Image();
+        let logoLoaded = false;
+
+        function getCanvasPoint(e) {
+            const rect = lhCanvas.getBoundingClientRect();
+            const sx = CANVAS_W / rect.width;
+            const sy = CANVAS_H / rect.height;
+            return {
+                x: (e.clientX - rect.left) * sx,
+                y: (e.clientY - rect.top) * sy,
+            };
+        }
+
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function drawRoundedRect(ctx, x, y, w, h, r) {
+            const radius = Math.min(r, w / 2, h / 2);
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.arcTo(x + w, y, x + w, y + h, radius);
+            ctx.arcTo(x + w, y + h, x, y + h, radius);
+            ctx.arcTo(x, y + h, x, y, radius);
+            ctx.arcTo(x, y, x + w, y, radius);
+            ctx.closePath();
+        }
+
+        function wrapLines(ctx, text, maxWidth) {
+            const paragraphs = String(text || '').split('\n');
+            const lines = [];
+            for (let pi = 0; pi < paragraphs.length; pi++) {
+                const p = (paragraphs[pi] || '').trim();
+                if (!p) {
+                    lines.push('');
+                    continue;
+                }
+                const words = p.split(/\s+/);
+                let cur = words[0] || '';
+                for (let i = 1; i < words.length; i++) {
+                    const candidate = cur + ' ' + words[i];
+                    if (ctx.measureText(candidate).width <= maxWidth) {
+                        cur = candidate;
+                    } else {
+                        lines.push(cur);
+                        cur = words[i];
+                    }
+                }
+                if (cur) lines.push(cur);
+            }
+            return lines;
+        }
+
+        function measureTextBlockHeight(ctx, text, maxWidth, lineHeight, maxLines, extraPadding) {
+            const lines = wrapLines(ctx, text || '', maxWidth);
+            const count = Math.min(lines.length, maxLines);
+            if (!count) return 0;
+            return (count * lineHeight) + (extraPadding || 0);
+        }
+
+        function drawContain(img, ctx, x, y, w, h) {
+            const iw = img.naturalWidth || img.width;
+            const ih = img.naturalHeight || img.height;
+            if (!iw || !ih) return;
+            const scale = Math.min(w / iw, h / ih);
+            const dw = iw * scale;
+            const dh = ih * scale;
+            const dx = x + (w - dw) / 2;
+            const dy = y + (h - dh) / 2;
+            ctx.drawImage(img, dx, dy, dw, dh);
+        }
+
+        function draw() {
+            const ctx = lhCanvas.getContext('2d');
+            ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+            // Header strip background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+            ctx.fillStyle = primary;
+            ctx.fillRect(0, 0, CANVAS_W, 48);
+
+            const contEl = state.elements.contacts;
+            const contText = String(state.texts.contacts || '').trim();
+            const contLineHeight = 20;
+            ctx.font = '500 14px ' + fontFamily;
+            const contH = measureTextBlockHeight(ctx, contText, contEl.w - 16, contLineHeight, 6, 4);
+            contEl.h = contText ? clamp(contH, 40, 120) : 0;
+
+            if (contEl.h) {
+                contEl.x = clamp(contEl.x, 0, CANVAS_W - contEl.w);
+                contEl.y = clamp(contEl.y, 48, CANVAS_H - contEl.h);
+            }
+
+            // Logo
+            const logoEl = state.elements.logo;
+            ctx.fillStyle = 'rgba(17,24,39,0.06)';
+            ctx.fillRect(logoEl.x, logoEl.y, logoEl.w, logoEl.h);
+            ctx.strokeStyle = 'rgba(17,24,39,0.10)';
+            ctx.strokeRect(logoEl.x, logoEl.y, logoEl.w, logoEl.h);
+            if (logoLoaded) {
+                drawContain(logoImg, ctx, logoEl.x, logoEl.y, logoEl.w, logoEl.h);
+            } else {
+                ctx.fillStyle = 'rgba(17,24,39,0.45)';
+                ctx.font = '600 14px ' + fontFamily;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('LOGO', logoEl.x + logoEl.w / 2, logoEl.y + logoEl.h / 2);
+            }
+
+            // Company name (left, header — leaves top-right for contacts)
+            const nameEl = state.elements.companyName;
+            ctx.fillStyle = '#111827';
+            ctx.font = '800 34px ' + fontFamily;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            const nameLines = wrapLines(ctx, String(state.texts.companyName || '').slice(0, 60), nameEl.w - 8);
+            ctx.fillText(nameLines[0] || '', nameEl.x + 4, nameEl.y + 40);
+
+            // Tagline
+            const tagEl = state.elements.tagline;
+            const tagline = String(state.texts.tagline || '').trim();
+            if (tagline) {
+                ctx.fillStyle = 'rgba(17,24,39,0.72)';
+                ctx.font = '600 16px ' + fontFamily;
+                ctx.textAlign = 'left';
+                ctx.fillText(tagline.slice(0, 70), tagEl.x + 4, tagEl.y + 20);
+            } else {
+                // If empty, keep it visually clean
+                ctx.fillStyle = 'rgba(17,24,39,0.00)';
+                ctx.fillRect(tagEl.x, tagEl.y, tagEl.w, tagEl.h);
+            }
+
+            // Header contacts — top-right, right-aligned
+            if (contEl.h > 0) {
+                const contRight = contEl.x + contEl.w - 8;
+                ctx.fillStyle = '#111827';
+                ctx.font = '500 14px ' + fontFamily;
+                const contLines = wrapLines(ctx, contText, contEl.w - 16);
+                let contY = contEl.y;
+                ctx.textBaseline = 'top';
+                ctx.textAlign = 'right';
+                for (let i = 0; i < contLines.length; i++) {
+                    if (contY + contLineHeight > contEl.y + contEl.h) break;
+                    ctx.fillText(contLines[i], contRight, contY);
+                    contY += contLineHeight;
+                }
+            }
+
+            const headerBottom = Math.max(
+                state.elements.logo.y + state.elements.logo.h,
+                state.elements.companyName.y + state.elements.companyName.h,
+                state.elements.tagline.y + state.elements.tagline.h,
+                (contEl.h ? (contEl.y + contEl.h) : 0),
+                160
+            );
+            const ruleY = headerBottom + 14;
+            ctx.strokeStyle = tertiary;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(54, ruleY);
+            ctx.lineTo(CANVAS_W - 54, ruleY);
+            ctx.stroke();
+
+            headerExportHeight = clamp(Math.ceil(ruleY + 6), 150, CANVAS_H);
+        }
+
+        function hitTest(pt) {
+            const order = ['logo', 'companyName', 'tagline', 'contacts'];
+            for (let i = 0; i < order.length; i++) {
+                const key = order[i];
+                const el = state.elements[key];
+                if (!el) continue;
+                if (key === 'contacts' && (!el.h || el.h <= 0)) {
+                    continue;
+                }
+                if (pt.x >= el.x && pt.x <= el.x + el.w && pt.y >= el.y && pt.y <= el.y + el.h) {
+                    return key;
+                }
+            }
+            return null;
+        }
+
+        lhCanvas.addEventListener('pointerdown', function (e) {
+            const pt = getCanvasPoint(e);
+            const key = hitTest(pt);
+            if (!key) return;
+            activeKey = key;
+            dragOffset.dx = pt.x - state.elements[key].x;
+            dragOffset.dy = pt.y - state.elements[key].y;
+            lhCanvas.setPointerCapture(e.pointerId);
+        });
+
+        lhCanvas.addEventListener('pointermove', function (e) {
+            if (!activeKey) return;
+            const pt = getCanvasPoint(e);
+            const el = state.elements[activeKey];
+            el.x = clamp(pt.x - dragOffset.dx, 0, CANVAS_W - el.w);
+            el.y = clamp(pt.y - dragOffset.dy, 0, CANVAS_H - el.h);
+            draw();
+        });
+
+        lhCanvas.addEventListener('pointerup', function () {
+            activeKey = null;
+        });
+
+        function buildFooterText() {
+            const website = (lhFooterWebsiteInput && lhFooterWebsiteInput.value ? lhFooterWebsiteInput.value : '').trim();
+            const parts = [];
+            if (website) parts.push(website);
+            parts.push(POWERED_BY_LINE);
+            return parts.join('   ·   ');
+        }
+
+        function syncFooterHiddenField() {
+            const composed = buildFooterText();
+            if (lhFooterHiddenInput) lhFooterHiddenInput.value = composed;
+            return composed;
+        }
+
+        function syncTextsFromInputs() {
+            if (lhCompanyNameInput) state.texts.companyName = lhCompanyNameInput.value || '';
+            if (lhTaglineInput) state.texts.tagline = lhTaglineInput.value || '';
+            const phone = (lhPhoneInput && lhPhoneInput.value ? lhPhoneInput.value : '').trim();
+            const wa = (lhWhatsappInput && lhWhatsappInput.value ? lhWhatsappInput.value : '').trim();
+            const email = (lhHeaderEmailInput && lhHeaderEmailInput.value ? lhHeaderEmailInput.value : '').trim();
+            const headerLines = [];
+            if (phone) headerLines.push('Tel: ' + phone);
+            if (wa) headerLines.push('WhatsApp: ' + wa);
+            if (email) headerLines.push(email);
+            state.texts.contacts = headerLines.join('\n');
+            state.texts.footer = syncFooterHiddenField();
+        }
+
+        function exportHeaderPng() {
+            draw();
+            const h = headerExportHeight || CANVAS_H;
+            const tmp = document.createElement('canvas');
+            tmp.width = CANVAS_W;
+            tmp.height = h;
+            const tctx = tmp.getContext('2d');
+            tctx.fillStyle = '#ffffff';
+            tctx.fillRect(0, 0, CANVAS_W, h);
+            tctx.drawImage(lhCanvas, 0, 0, CANVAS_W, h, 0, 0, CANVAS_W, h);
+            return tmp.toDataURL('image/png', 1.0);
+        }
+
+        // Re-render as user types
+        [
+            lhCompanyNameInput,
+            lhTaglineInput,
+            lhPhoneInput,
+            lhWhatsappInput,
+            lhHeaderEmailInput,
+            lhFooterWebsiteInput
+        ].forEach(function (el) {
+            if (!el) return;
+            el.addEventListener('input', function () {
+                syncTextsFromInputs();
+                draw();
+            });
+        });
+
+        // Reset positions, keep text
+        function snapContactsToHeaderCorner() {
+            const cont = state.elements.contacts;
+            cont.w = 420;
+            cont.x = CANVAS_W - 72 - cont.w;
+            cont.y = 50;
+        }
+
+        function arrangeHeaderLayout() {
+            snapContactsToHeaderCorner();
+        }
+
+        const lhForm = lhCanvas.closest('form');
+        if (lhForm) {
+            lhForm.addEventListener('submit', function () {
+                syncFooterHiddenField();
+            });
+        }
+
+        if (lhResetBtn) {
+            lhResetBtn.addEventListener('click', function () {
+                state.elements = JSON.parse(JSON.stringify(defaultElements));
+                arrangeHeaderLayout();
+                syncTextsFromInputs();
+                draw();
+            });
+        }
+
+        if (LH_LOGO_URL) {
+            logoImg.onload = function () {
+                logoLoaded = true;
+                draw();
+            };
+            logoImg.onerror = function () {
+                logoLoaded = false;
+                draw();
+            };
+            logoImg.crossOrigin = 'anonymous';
+            logoImg.src = LH_LOGO_URL;
+        }
+
+        arrangeHeaderLayout();
+        syncTextsFromInputs();
+        draw();
+
+        lhExportBtn.addEventListener('click', function () {
+            syncFooterHiddenField();
+            const dataUrl = exportHeaderPng();
+            if (letterheadProcessed) letterheadProcessed.value = dataUrl;
+
+            if (letterheadImg) {
+                letterheadImg.src = dataUrl;
+                letterheadImg.classList.remove('hidden');
+            }
+            if (letterheadPh) letterheadPh.classList.add('hidden');
+
+            // Update the main layout mockup
+            updateMockup('letterhead', dataUrl);
+        });
+    }
+
+    document.querySelectorAll('.doc-asset-file-input').forEach(function (input) {
+        input.addEventListener('change', function () {
+            const assetId = input.getAttribute('data-asset-id');
+            const mode = input.getAttribute('data-process-mode') || 'signature';
+            const label = document.getElementById(assetId + '-file-label');
+            const processing = document.getElementById(assetId + '-processing');
+            const processedInput = document.getElementById(assetId + '-processed');
+            const canvas = document.getElementById(assetId + '-canvas');
+            const currentImg = document.getElementById(assetId + '-current-img');
+            const placeholder = document.getElementById(assetId + '-placeholder');
+
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            if (label) label.textContent = file.name;
+            if (processing) processing.classList.remove('hidden');
+
+            processImageFile(file, mode, function (dataUrl) {
+                if (processing) processing.classList.add('hidden');
+                if (!dataUrl) {
+                    input.value = '';
+                    return;
+                }
+                if (processedInput) processedInput.value = dataUrl;
+                if (canvas) {
+                    const img = new Image();
+                    img.onload = function () {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        canvas.classList.remove('hidden');
+                        if (currentImg) currentImg.classList.add('hidden');
+                        if (placeholder) placeholder.classList.add('hidden');
+                    };
+                    img.src = dataUrl;
+                }
+                updateMockup(assetId, dataUrl);
+            });
+        });
+    });
+
+    const footerField = document.getElementById('document_footer_text');
+    const mockupFooter = document.getElementById('mockup-footer');
+    if (footerField && mockupFooter) {
+        footerField.addEventListener('input', function () {
+            const t = footerField.value.trim();
+            mockupFooter.textContent = t;
+            mockupFooter.classList.toggle('hidden', !t);
+        });
+    }
+
+    const previewEndpoint = '/api/system-settings/google-branding-preview';
+    document.querySelectorAll('.google-branding-preview-btn').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const fileType = btn.getAttribute('data-google-preview-type');
+            if (!fileType) return;
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Opening…';
+            try {
+                const response = await fetch(previewEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ type: fileType }),
+                });
+                let result = {};
+                try {
+                    result = await response.json();
+                } catch (parseErr) {
+                    throw new Error('Server returned an invalid response. Check that you are still logged in.');
+                }
+                if (!response.ok || !result.success) {
+                    const msg = result.error || ('Unable to open Google preview (HTTP ' + response.status + ').');
+                    if (result.settings_url && confirm(msg + '\n\nOpen Documents Settings now?')) {
+                        window.location.href = result.settings_url;
+                    } else {
+                        alert(msg);
+                    }
+                    return;
+                }
+                if (result.message) {
+                    alert(result.message);
+                }
+                const url = result.editLink || result.webViewLink;
+                if (url) {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+            } catch (err) {
+                alert(err.message || 'Unable to open Google preview.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        });
+    });
+})();
+</script>

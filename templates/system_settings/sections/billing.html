@@ -1,0 +1,31 @@
+<div id="section-8" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-dollar-sign settings-section-icon"></i>
+                    8. Billing & Finance Settings
+                </h2>
+                <p class="settings-section-subtitle">Used for invoices and payments.</p>
+            </div>
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <input type="text" name="currency" value="{{ cs.get('currency') or 'KES' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. KES">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Invoice Prefix</label>
+                    <input type="text" name="invoice_prefix" value="{{ cs.get('invoice_prefix') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. INV-0001">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                    <input type="text" name="payment_terms" value="{{ cs.get('payment_terms') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 30 days">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mobile Payment (M-Pesa Paybill / Till)</label>
+                    <input type="text" name="mobile_payment_mpesa" value="{{ cs.get('mobile_payment_mpesa') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Paybill 123456">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bank Account Details</label>
+                    <textarea name="bank_account_details" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Bank name, account number, branch...">{{ cs.get('bank_account_details') or '' }}</textarea>
+                </div>
+            </div>
+        </div>

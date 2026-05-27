@@ -1,0 +1,27 @@
+<div id="section-9" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-bell settings-section-icon"></i>
+                    9. Notification Settings
+                </h2>
+                <p class="settings-section-subtitle">Controls system communication.</p>
+            </div>
+            <div class="p-6 space-y-3">
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="send_email_notifications" {% if cs.get('send_email_notifications', 1) %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">Send Email Notifications</span>
+                </label>
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="send_sms_notifications" {% if cs.get('send_sms_notifications') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">Send SMS Notifications</span>
+                </label>
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="whatsapp_notifications" {% if cs.get('whatsapp_notifications') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">WhatsApp Notifications</span>
+                </label>
+                <label class="flex items-center gap-3">
+                    <input type="checkbox" name="court_date_reminders" {% if cs.get('court_date_reminders', 1) %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm font-medium text-gray-700">Court Date Reminders</span>
+                </label>
+            </div>
+        </div>

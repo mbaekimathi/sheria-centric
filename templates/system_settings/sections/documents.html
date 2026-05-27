@@ -1,0 +1,235 @@
+{% macro document_asset_slot(asset_id, field_name, label, icon, hint, cs, process_mode='signature') %}
+{% set stored = cs.get(field_name) %}
+{% set static_path = company_asset_static_path(stored) if stored else none %}
+<div class="doc-asset-card rounded-xl border border-gray-200 bg-gray-50/80 overflow-hidden" data-asset-field="{{ field_name }}">
+    <div class="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
+        <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <i class="fas {{ icon }} text-indigo-600"></i>
+            {{ label }}
+        </h3>
+        {% if static_path %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+            <i class="fas fa-check-circle text-[10px]"></i> Configured
+        </span>
+        {% else %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+            Not set
+        </span>
+        {% endif %}
+    </div>
+    <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <input type="file"
+                   id="{{ asset_id }}-file"
+                   name="{{ field_name }}"
+                   accept="image/png,image/jpeg,image/jpg,image/gif"
+                   class="hidden doc-asset-file-input"
+                   data-asset-id="{{ asset_id }}"
+                   data-process-mode="{{ process_mode }}">
+            <input type="hidden" name="{{ field_name }}_processed" id="{{ asset_id }}-processed" value="">
+            <label for="{{ asset_id }}-file"
+                   class="cursor-pointer flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-500 hover:bg-indigo-50/50 transition-all text-sm text-gray-600">
+                <i class="fas fa-cloud-upload-alt text-2xl text-indigo-500 mb-2"></i>
+                <span id="{{ asset_id }}-file-label">Choose image or drag here</span>
+            </label>
+            <p class="text-xs text-gray-500 mt-2">{{ hint }}</p>
+            <div id="{{ asset_id }}-processing" class="hidden mt-2 text-sm text-indigo-600 flex items-center gap-2">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Processing…</span>
+            </div>
+            {% if static_path %}
+            <div class="mt-3 flex flex-col gap-3">
+                {% include 'system_settings/_google_branding_preview.html' %}
+                <label class="inline-flex items-center gap-1.5 text-xs text-red-600 cursor-pointer">
+                    <input type="checkbox" name="remove_{{ field_name }}" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                    Remove current
+                </label>
+            </div>
+            {% endif %}
+        </div>
+        <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Preview</p>
+            <div class="doc-asset-preview-box border-2 border-dashed border-gray-300 rounded-lg p-4 bg-white min-h-[140px] flex items-center justify-center">
+                <div id="{{ asset_id }}-placeholder" class="text-center {% if static_path %}hidden{% endif %}">
+                    <i class="fas {{ icon }} text-gray-300 text-3xl mb-2"></i>
+                    <p class="text-xs text-gray-400">No image yet</p>
+                </div>
+                {% if static_path %}
+                <img id="{{ asset_id }}-current-img"
+                     src="{{ url_for('static', filename=static_path) }}"
+                     alt="{{ label }}"
+                     class="max-h-32 max-w-full object-contain doc-asset-current-img">
+                {% else %}
+                <img id="{{ asset_id }}-current-img" src="" alt="" class="hidden max-h-32 max-w-full object-contain doc-asset-current-img">
+                {% endif %}
+                <canvas id="{{ asset_id }}-canvas" class="hidden max-h-32 max-w-full object-contain"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<div id="section-documents" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-file-alt settings-section-icon"></i>
+            Document Settings
+        </h2>
+        <p class="settings-section-subtitle">
+            Letterhead appears at the top; stamp and signature appear at the sign-off (“Yours faithfully,”). Save assets below, then Preview Google Doc to verify.
+            Advocates can use personal assets from <strong>My Tools</strong>; those override these defaults.
+        </p>
+    </div>
+    <div class="p-6 space-y-6">
+        {% if not app_base_url and (request.host.startswith('127.0.0.1') or request.host.startswith('localhost')) %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <i class="fas fa-info-circle mr-1"></i>
+            For Google Docs to embed these images, set <code class="text-xs bg-amber-100 px-1 rounded">APP_BASE_URL</code>
+            to your public site URL in production (localhost URLs are not reachable by Google).
+        </div>
+        {% endif %}
+
+        {% set current_letterhead_static = company_asset_static_path(cs.get('default_letterhead')) if cs.get('default_letterhead') else none %}
+
+        <div class="grid grid-cols-1 gap-5">
+            <div class="doc-asset-card rounded-xl border border-gray-200 bg-gray-50/80 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
+                    <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-file-signature text-indigo-600"></i>
+                        Default modern letterhead
+                    </h3>
+                    {% if current_letterhead_static %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                        <i class="fas fa-check-circle text-[10px]"></i> Configured
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                        Not set
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="p-4 space-y-3">
+                    <div class="doc-asset-preview-box border-2 border-dashed border-gray-300 rounded-lg p-4 bg-white min-h-[140px] flex items-center justify-center">
+                        {% if current_letterhead_static %}
+                        <img
+                            src="{{ url_for('static', filename=current_letterhead_static) }}"
+                            alt="Default letterhead"
+                            class="max-h-32 max-w-full object-contain"
+                        >
+                        {% else %}
+                        <div class="text-center">
+                            <i class="fas fa-file-signature text-gray-300 text-3xl mb-2"></i>
+                            <p class="text-xs text-gray-400">No letterhead yet</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <a href="./letterhead"
+                           class="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                            <i class="fas fa-pen mr-1"></i>Edit letterhead
+                        </a>
+
+                        {% if current_letterhead_static %}
+                        <label class="inline-flex items-center gap-1.5 text-xs text-red-600 cursor-pointer">
+                            <input type="checkbox" name="remove_default_letterhead" value="1" class="rounded border-gray-300 text-red-600 focus:ring-red-500">
+                            Remove current
+                        </label>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                        {% include 'system_settings/_google_branding_preview.html' %}
+                    </div>
+                </div>
+            </div>
+
+            {% macro document_asset_link_card(asset_kind, field_name, label, icon, hint, cs) %}
+            {% set stored = cs.get(field_name) %}
+            {% set static_path = company_asset_static_path(stored) if stored else none %}
+            <div class="rounded-xl border border-gray-200 bg-gray-50/80 overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
+                    <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <i class="fas {{ icon }} text-indigo-600"></i>
+                        {{ label }}
+                    </h3>
+                    {% if static_path %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">
+                        <i class="fas fa-check-circle text-[10px]"></i> Configured
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800">
+                        Not set
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="p-4 flex flex-col sm:flex-row gap-4 items-center">
+                    <div class="flex-shrink-0 w-full sm:w-40 h-28 rounded-lg border-2 border-dashed border-gray-200 bg-[url('data:image/svg+xml,%3Csvg width=%2220%22 height=%2220%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cpath d=%22M0 0h10v10H0zM10 10h10v10H10z%22 fill=%22%23f3f4f6%22/%3E%3C/svg%3E')] bg-repeat flex items-center justify-center p-2">
+                        {% if static_path %}
+                        <img src="{{ url_for('static', filename=static_path) }}" alt="{{ label }}"
+                            class="max-h-full max-w-full object-contain">
+                        {% else %}
+                        <i class="fas {{ icon }} text-gray-300 text-2xl"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 text-center sm:text-left">
+                        <p class="text-xs text-gray-500 mb-3">{{ hint }}</p>
+                        <a href="{{ url_for('system_settings_asset_scan', asset_kind=asset_kind) }}"
+                           class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition-colors">
+                            <i class="fas fa-expand mr-1"></i>Scan or edit
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endmacro %}
+
+            {{ document_asset_link_card(
+                'stamp',
+                'stamp_seal_upload',
+                'Digital stamp / seal',
+                'fa-stamp',
+                'Scan on white paper — we extract the stamp ink only, not the whole picture.',
+                cs
+            ) }}
+            {{ document_asset_link_card(
+                'signature',
+                'default_signature_documents',
+                'Default signature',
+                'fa-signature',
+                'Scan, draw on screen, or type your name as a script signature. Used when the author has no personal signature in My Tools.',
+                cs
+            ) }}
+        </div>
+
+        <!-- Live letter mockup -->
+        <div class="rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <p class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <i class="fas fa-eye text-indigo-600"></i>
+                    Layout preview
+                </p>
+            </div>
+            <div id="doc-kit-mockup" class="p-6 bg-white text-sm text-gray-800 max-w-2xl mx-auto shadow-inner min-h-[320px] flex flex-col">
+                <div id="mockup-letterhead-wrap" class="mb-4 min-h-[48px] flex items-center justify-center border-b border-gray-100 pb-3">
+                    <img id="mockup-letterhead" src="{% if company_asset_static_path(cs.get('default_letterhead')) %}{{ url_for('static', filename=company_asset_static_path(cs.get('default_letterhead'))) }}{% endif %}" alt="" class="max-h-20 max-w-full object-contain {% if not company_asset_static_path(cs.get('default_letterhead')) %}hidden{% endif %}">
+                    <span id="mockup-letterhead-ph" class="text-xs text-gray-400 {% if company_asset_static_path(cs.get('default_letterhead')) %}hidden{% endif %}">Letterhead</span>
+                </div>
+                <p class="font-semibold">{{ cs.get('company_name') or 'Law Firm' }}</p>
+                <p class="text-xs text-gray-500 mt-1">Prepared by: … &nbsp;·&nbsp; Date: …</p>
+                <p class="text-gray-400 mt-6 flex-1 text-xs italic">Document body…</p>
+                <p id="mockup-footer" class="text-xs text-gray-500 border-t border-gray-100 pt-3 mt-4 {% if not cs.get('document_footer_text') %}hidden{% endif %}">{{ cs.get('document_footer_text') or '' }}</p>
+                <div class="mt-4 flex items-end gap-4">
+                    <img id="mockup-stamp" src="{% if company_asset_static_path(cs.get('stamp_seal_upload')) %}{{ url_for('static', filename=company_asset_static_path(cs.get('stamp_seal_upload'))) }}{% endif %}" alt="" class="max-h-16 object-contain {% if not company_asset_static_path(cs.get('stamp_seal_upload')) %}hidden{% endif %}">
+                    <img id="mockup-signature" src="{% if company_asset_static_path(cs.get('default_signature_documents')) %}{{ url_for('static', filename=company_asset_static_path(cs.get('default_signature_documents'))) }}{% endif %}" alt="" class="max-h-12 object-contain {% if not company_asset_static_path(cs.get('default_signature_documents')) %}hidden{% endif %}">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Document footer text</label>
+            <textarea name="document_footer_text" id="document_footer_text" rows="2"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ cs.get('document_footer_text') or '' }}</textarea>
+            <p class="text-xs text-gray-500 mt-1">Shown at the bottom of auto-generated Google Docs.</p>
+        </div>
+    </div>
+</div>

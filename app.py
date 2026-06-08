@@ -75,13 +75,10 @@ except ImportError:
 # Secret key from environment variable or generate one (must be fixed in production)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 
-# Production base URL for OAuth redirects (set on hosted e.g. https://sheriacentric.com)
-# Ensures redirect_uri matches Google Console and session cookie works across redirect
+# Optional override only (cron, unusual proxy). Normally the app auto-detects the domain per request.
 APP_BASE_URL = (os.environ.get('APP_BASE_URL') or '').strip().rstrip('/') or None
-if APP_BASE_URL:
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
 
 # Trust X-Forwarded-* when behind proxy (cPanel/Passenger) so url_for(_external=True) is correct
 try:
@@ -113,20 +110,80 @@ def validate_court_rank(value):
     return v if v in COURT_RANK_OPTIONS else None
 
 
+def _request_is_https():
+    """True when the incoming request is HTTPS (including behind reverse proxies)."""
+    try:
+        if request.is_secure:
+            return True
+        proto = (request.headers.get('X-Forwarded-Proto') or '').split(',')[0].strip().lower()
+        return proto == 'https'
+    except RuntimeError:
+        return False
+
+
+def _is_localhost_host(host):
+    if not host:
+        return True
+    h = host.split(':')[0].strip().lower()
+    return h in ('127.0.0.1', 'localhost', '::1')
+
+
 def get_public_base_url():
-    """Public base URL for building external redirects (prefers APP_BASE_URL)."""
+    """
+    Public base URL for OAuth redirects and external asset links.
+    Auto-detects from the current request (scheme + host). Set APP_BASE_URL only to override.
+    """
     if APP_BASE_URL:
         return APP_BASE_URL
     try:
+        from flask import has_request_context
+        if not has_request_context():
+            return ''
+        forwarded_host = (request.headers.get('X-Forwarded-Host') or '').split(',')[0].strip()
+        forwarded_proto = (request.headers.get('X-Forwarded-Proto') or '').split(',')[0].strip()
+        if forwarded_host and _is_localhost_host(request.host):
+            scheme = forwarded_proto or request.scheme or 'https'
+            return f'{scheme}://{forwarded_host}'.rstrip('/')
         return request.url_root.rstrip('/')
     except Exception:
         return ''
 
+
+def build_external_url(path):
+    """Build an absolute URL for the current site, e.g. build_external_url('/callback')."""
+    base = get_public_base_url()
+    if not base:
+        return None
+    if not path.startswith('/'):
+        path = '/' + path
+    return base.rstrip('/') + path
+
+
+def normalize_oauth_authorization_response(authorization_response):
+    """Rewrite http callback to https when the site is served over HTTPS behind a proxy."""
+    base = get_public_base_url()
+    if (
+        base
+        and base.startswith('https://')
+        and authorization_response.startswith('http://')
+    ):
+        return 'https://' + authorization_response[len('http://'):]
+    return authorization_response
+
+
 def get_google_drive_redirect_uri():
-    """Redirect URI for Google Drive OAuth; use APP_BASE_URL when hosted so it matches Google Console."""
-    if APP_BASE_URL:
-        return APP_BASE_URL + '/api/auth/google-drive/callback'
-    return url_for('google_drive_callback', _external=True)
+    """Redirect URI for Google Drive OAuth (auto-detected domain)."""
+    return build_external_url('/api/auth/google-drive/callback') or url_for(
+        'google_drive_callback', _external=True
+    )
+
+
+@app.before_request
+def _apply_request_security_from_host():
+    """Enable secure session cookies when the site is accessed over HTTPS."""
+    if _request_is_https():
+        app.config['SESSION_COOKIE_SECURE'] = True
+        app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 def verify_google_id_token(id_token_jwt: str):
     """
@@ -2761,7 +2818,7 @@ def _google_doc_insert_stamp_signature_footer_block(
 
 
 def _public_base_url_usable_for_google():
-    """True when APP_BASE_URL (or request root) is reachable by Google's servers."""
+    """True when the auto-detected public base URL is reachable by Google's servers."""
     base = get_public_base_url()
     if not base:
         return False
@@ -2949,8 +3006,8 @@ def apply_google_doc_company_branding(
             for k in DOCUMENT_ASSET_COLUMNS + ('company_logo',)
         ):
             warning = (
-                'Images may be missing: set APP_BASE_URL to your public site URL in production, '
-                'or use Google Drive preview (assets upload to Drive automatically).'
+                'Images may be missing on localhost — connect Google Drive so assets upload '
+                'to Drive automatically, or deploy on a public HTTPS domain.'
             )
     elif (company_settings.get('stamp_seal_upload') or company_settings.get('default_signature_documents')):
         missing = []
@@ -2961,7 +3018,7 @@ def apply_google_doc_company_branding(
         if missing:
             extra = (
                 ' Could not embed firm ' + ' and '.join(missing)
-                + ' — reconnect Google Drive or set APP_BASE_URL.'
+                + ' — reconnect Google Drive or use a public HTTPS domain.'
             )
             warning = (warning or '') + extra
 
@@ -3104,8 +3161,8 @@ def apply_google_slides_company_branding(
             for k in DOCUMENT_ASSET_COLUMNS + ('company_logo',)
         ):
             warning = (
-                'Images may be missing: set APP_BASE_URL to your public site URL in production, '
-                'or use Google Drive preview (uploads assets automatically).'
+                'Images may be missing on localhost — connect Google Drive so assets upload '
+                'to Drive automatically, or deploy on a public HTTPS domain.'
             )
 
     pres = slides_service.presentations().get(presentationId=presentation_id).execute()
@@ -3239,7 +3296,7 @@ def inject_global_theme_settings():
         'settings_section_key': section_key,
         'company_asset_static_path': company_asset_static_path,
         'company_asset_basename': company_asset_basename,
-        'app_base_url': APP_BASE_URL,
+        'app_base_url': get_public_base_url(),
     }
 
 
@@ -6599,7 +6656,7 @@ def google_login():
         flash('Google login is not configured. Please contact support.', 'error')
         return redirect(url_for('client_login'))
 
-    redirect_uri = (get_public_base_url() + '/callback') if APP_BASE_URL else url_for('google_callback', _external=True)
+    redirect_uri = build_external_url('/callback') or url_for('google_callback', _external=True)
     flow = Flow.from_client_config(
         {
             "web": {
@@ -6643,13 +6700,9 @@ def google_callback():
             return redirect(url_for('client_login'))
 
         callback_state = session_state or request_state
-        redirect_uri = (get_public_base_url() + '/callback') if APP_BASE_URL else url_for('google_callback', _external=True)
+        redirect_uri = build_external_url('/callback') or url_for('google_callback', _external=True)
 
-        # Behind a reverse-proxy (cPanel/Passenger) request.url may still use http://
-        # even though the real external URL is https://. Rewrite to match redirect_uri.
-        authorization_response = request.url
-        if APP_BASE_URL and APP_BASE_URL.startswith('https://') and authorization_response.startswith('http://'):
-            authorization_response = 'https://' + authorization_response[len('http://'):]
+        authorization_response = normalize_oauth_authorization_response(request.url)
 
         # Extract actual scopes from the callback URL and normalize them
         returned_scopes_raw = request.args.get('scope', '').split()
@@ -9018,7 +9071,7 @@ def send_client_message():
                     text_to_send = f"*{subject}*\n\n{text_to_send}"
 
                 if attachment_file and attachment_type:
-                    base_url = os.environ.get('APP_BASE_URL', request.url_root.rstrip('/'))
+                    base_url = get_public_base_url() or request.url_root.rstrip('/')
                     media_url = f"{base_url}/static/uploads/message_attachments/{attachment_file}"
                     print(f"[WhatsApp Debug] Sending media to {client_phone}: {media_url}")
                     ok, result = send_whatsapp_media(client_phone, media_url, caption=text_to_send, media_type=attachment_type, settings=ws)
@@ -15023,7 +15076,6 @@ def google_drive_authorize():
         force_consent = request.args.get('force_consent', '').lower() in ('1', 'true', 'yes')
         drive_scopes = list(GOOGLE_DRIVE_OAUTH_SCOPES)
 
-        # Use APP_BASE_URL when hosted so redirect_uri matches Google Console exactly
         redirect_uri = get_google_drive_redirect_uri()
         
         # Disable PKCE so token exchange works across redirect (session/cookie issues in popup).
@@ -15107,7 +15159,6 @@ def google_drive_callback():
 
         drive_scopes = list(GOOGLE_DRIVE_OAUTH_SCOPES)
 
-        # Must match authorize (use APP_BASE_URL when hosted)
         redirect_uri = get_google_drive_redirect_uri()
         
         # Extract actual scopes from the callback URL and normalize them
@@ -15142,11 +15193,8 @@ def google_drive_callback():
         )
         flow.redirect_uri = redirect_uri
         
-        # Behind a reverse-proxy request.url may still use http://; rewrite to match redirect_uri
-        authorization_response = request.url
-        if APP_BASE_URL and APP_BASE_URL.startswith('https://') and authorization_response.startswith('http://'):
-            authorization_response = 'https://' + authorization_response[len('http://'):]
-        
+        authorization_response = normalize_oauth_authorization_response(request.url)
+
         try:
             flow.fetch_token(authorization_response=authorization_response)
         except Exception as scope_error:
@@ -19779,7 +19827,7 @@ def system_settings_asset_capture(asset_kind):
 def branding_asset_for_google(filename):
     """
     Stamp/signature PNG optimized for Google Docs (white background, cropped).
-    Public endpoint — Google's servers fetch this when APP_BASE_URL is set.
+    Public endpoint — Google's servers fetch this on public HTTPS domains.
     """
     safe = company_asset_basename(filename)
     if not safe or not _is_stamp_or_signature_asset(safe):

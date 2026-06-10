@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Clients with Matters - SHERIA CENTRIC{% endblock %}
+{% block title %}{% if pending_only %}Approve Registered Cases{% else %}Clients with Matters{% endif %} - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
 <style>
@@ -14,11 +14,18 @@
         <div class="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center flex-wrap gap-2">
+                    {% if pending_only %}
+                    <i class="fas fa-clipboard-check text-amber-600 mr-2"></i>
+                    Approve registered cases
+                    {% else %}
                     <i class="fas fa-users text-blue-600 mr-2"></i>
                     Litigation matters
+                    {% endif %}
                 </h1>
                 <p class="text-gray-600">
-                    {% if user_role == 'Managing Partner' %}
+                    {% if pending_only %}
+                    Review newly registered cases, allocate them to an advocate, and approve.
+                    {% elif user_role == 'Managing Partner' %}
                     Search by client name or phone, then open each client to view their matters.
                     {% else %}
                     Search by client name or phone, then open each client to view their matters.
@@ -38,7 +45,7 @@
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
         <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
             <i class="fas fa-search text-green-600 mr-2"></i>
-            Search clients (name or phone)
+            {% if pending_only %}Filter pending cases{% else %}Search clients (name or phone){% endif %}
         </h2>
         <div class="flex flex-col md:flex-row gap-4">
             <div class="flex-1">
@@ -350,6 +357,68 @@ function buildCaseGroups(cases, mode) {
     return groups;
 }
 
+const PENDING_ONLY = {{ pending_only|default(false)|tojson }};
+let cachedPendingCases = [];
+
+function showPendingCasesList(cases) {
+    if (cases.length > 0) {
+        displayCases(cases);
+        document.getElementById('casesContainer').classList.remove('hidden');
+        document.getElementById('noResults').classList.add('hidden');
+    } else {
+        displayCases([]);
+        document.getElementById('casesContainer').classList.add('hidden');
+        document.getElementById('noResultsMessage').textContent = 'No matching cases pending approval.';
+        document.getElementById('noResults').classList.remove('hidden');
+    }
+}
+
+function filterPendingCases(searchTerm) {
+    const term = (searchTerm || '').trim().toLowerCase();
+    if (!term) {
+        showPendingCasesList(cachedPendingCases);
+        return;
+    }
+    const filtered = cachedPendingCases.filter(function(c) {
+        const name = String(c.client_full_name || c.client_name || '').toLowerCase();
+        const phone = String(c.client_phone || '').toLowerCase();
+        const tracking = String(c.tracking_number || '').toLowerCase();
+        return name.includes(term) || phone.includes(term) || tracking.includes(term);
+    });
+    showPendingCasesList(filtered);
+}
+
+function loadPendingApprovalCases() {
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.getElementById('casesContainer').classList.add('hidden');
+    document.getElementById('noResults').classList.add('hidden');
+    document.getElementById('clientInfo').classList.add('hidden');
+
+    fetch('/api/cases/pending-approval')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            cachedPendingCases = data.cases || [];
+            if (cachedPendingCases.length > 0) {
+                filterPendingCases(document.getElementById('client_search').value.trim());
+            } else {
+                displayCases([]);
+                document.getElementById('casesContainer').classList.add('hidden');
+                document.getElementById('noResultsMessage').textContent = data.message || 'No cases pending approval.';
+                document.getElementById('noResults').classList.remove('hidden');
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            console.error('Error loading pending cases:', error);
+            showError('Could not load pending cases. Please try again.');
+        });
+}
+
 // Load all cases on page load
 document.addEventListener('DOMContentLoaded', function() {
     syncGroupBySelect();
@@ -359,7 +428,15 @@ document.addEventListener('DOMContentLoaded', function() {
             setGroupByMode(this.value);
         });
     }
-    loadAllCases();
+    if (PENDING_ONLY) {
+        if (groupSel) {
+            groupSel.value = 'flat';
+            setGroupByMode('flat');
+        }
+        loadPendingApprovalCases();
+    } else {
+        loadAllCases();
+    }
 });
 
 // Live search as user types
@@ -367,7 +444,11 @@ document.getElementById('client_search').addEventListener('input', function(e) {
     clearTimeout(searchTimeout);
     const term = e.target.value.trim();
     searchTimeout = setTimeout(() => {
-        searchCases(term);
+        if (PENDING_ONLY) {
+            filterPendingCases(term);
+        } else {
+            searchCases(term);
+        }
     }, 500);
 });
 
@@ -421,6 +502,10 @@ function searchCases(searchTerm) {
 
 function loadAllCases() {
     document.getElementById('client_search').value = '';
+    if (PENDING_ONLY) {
+        loadPendingApprovalCases();
+        return;
+    }
     searchCases('');
 }
 
@@ -861,7 +946,11 @@ function submitApproval() {
         if (data.success) {
             closeApproveModal();
             showSuccess(data.message || 'Case approved and allocated successfully');
-            searchCases(document.getElementById('client_search').value.trim());
+            if (PENDING_ONLY) {
+                loadPendingApprovalCases();
+            } else {
+                searchCases(document.getElementById('client_search').value.trim());
+            }
         } else {
             showError(data.error || 'Could not approve case');
         }

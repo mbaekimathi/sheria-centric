@@ -1415,7 +1415,7 @@
                     {% else %}
                     <!-- Employee Sidebar Links -->
                     {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
-                    {% set matter_mgmt_pages = ['matter_management', 'case_management', 'case_tracking', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
+                    {% set matter_mgmt_pages = ['matter_management', 'all_matters', 'case_management', 'case_tracking', 'approve_cases', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'approve_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
                     <!-- Dashboard (pinned to the top of every employee sidebar) -->
                     <a href="{{ url_for('dashboard', role_slug=current_role_slug) }}"
                        class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
@@ -1445,7 +1445,7 @@
                         <i class="fas fa-users-cog"></i>
                         <span>User Management</span>
                     </a>
-                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint in ['all_matters', 'matter_management'] %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
@@ -1489,28 +1489,50 @@
                        per request for both Firm Administrator and Managing Partner. #}
                     {% endif %}
 
-                    <!-- Matter Management page only: sidebar shows Litigation Matters + Other Matters (no Case tracking here) -->
-                    {% if request.endpoint == 'matter_management' and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    <!-- Matter Management hub: All Matters + Litigation + Other Matters -->
+                    {% if request.endpoint in ['matter_management', 'all_matters'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
                     </div>
-                    <a href="{{ url_for('case_management') }}" class="sidebar-link" id="nav-case-management">
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint == 'all_matters' %}active{% endif %}" id="nav-all-matters">
+                        <i class="fas fa-list"></i>
+                        <span>All Matters</span>
+                    </a>
+                    <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-hub">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Matter Management</span>
+                    </a>
+                    <a href="{{ role_url('case_management') }}" class="sidebar-link" id="nav-case-management">
                         <i class="fas fa-gavel"></i>
                         <span>Litigation Matters</span>
                     </a>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link" id="nav-other-matters">
+                    <a href="{{ role_url('other_matters') }}" class="sidebar-link" id="nav-other-matters">
                         <i class="fas fa-folder-open"></i>
                         <span>Other Matters</span>
                     </a>
                     {% endif %}
 
                     <!-- Case Management / Case tracking: sidebar quick actions -->
-                    {% if request.endpoint in ['case_management', 'case_tracking'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    {% if request.endpoint in ['case_management', 'case_tracking', 'approve_cases', 'register_case'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
                     </div>
-                    {% if request.endpoint == 'case_management' %}
-                    <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case-case-management">
+                    <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-case-sidebar">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Matter Management</span>
+                    </a>
+                    <a href="{{ role_url('case_management') }}" class="sidebar-link {% if request.endpoint == 'case_management' %}active{% endif %}" id="nav-litigation-matters-sidebar">
+                        <i class="fas fa-gavel"></i>
+                        <span>Litigation Matters</span>
+                    </a>
+                    {% if user_role in ['Managing Partner', 'Firm Administrator', 'IT Support'] or session.get('original_role') == 'IT Support' %}
+                    <a href="{{ role_url('approve_cases') }}" class="sidebar-link {% if request.endpoint == 'approve_cases' %}active{% endif %}" id="nav-approve-cases">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Approve registered cases</span>
+                    </a>
+                    {% endif %}
+                    {% if request.endpoint in ['case_management', 'register_case'] %}
+                    <a href="{{ role_url('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case-case-management">
                         <i class="fas fa-plus-circle"></i>
                         <span>Register Case</span>
                     </a>
@@ -1895,10 +1917,24 @@
                     {% endif %}
 
                     <!-- Other Matters page: Register Matter (IT Support) then Matter Tracking -->
-                    {% if request.endpoint in ['other_matters', 'matter_task_management'] %}
+                    {% if request.endpoint in ['other_matters', 'matter_task_management', 'approve_matters', 'matter_tracking', 'register_matter'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Other Matters</p>
                     </div>
+                    <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-other-sidebar">
+                        <i class="fas fa-briefcase"></i>
+                        <span>Matter Management</span>
+                    </a>
+                    <a href="{{ role_url('other_matters') }}" class="sidebar-link {% if request.endpoint == 'other_matters' %}active{% endif %}" id="nav-other-matters-listing">
+                        <i class="fas fa-folder-open"></i>
+                        <span>Other Matters</span>
+                    </a>
+                    {% if user_role in ['Managing Partner', 'Firm Administrator', 'IT Support'] or session.get('original_role') == 'IT Support' %}
+                    <a href="{{ role_url('approve_matters') }}" class="sidebar-link {% if request.endpoint == 'approve_matters' %}active{% endif %}" id="nav-approve-matters">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Approve registered matters</span>
+                    </a>
+                    {% endif %}
                     {% if user_role == 'IT Support' %}
                     <a href="{{ url_for('register_matter') }}" class="sidebar-link" id="nav-register-matter-it-support">
                         <i class="fas fa-folder-plus"></i>
@@ -1912,17 +1948,6 @@
                     <a href="{{ url_for('matter_task_management') }}" class="sidebar-link {% if request.endpoint == 'matter_task_management' %}active{% endif %}" id="nav-matter-task-management">
                         <i class="fas fa-tasks"></i>
                         <span>Matter Task Management</span>
-                    </a>
-                    {% endif %}
-
-                    <!-- Register Matter page: show only back link -->
-                    {% if request.endpoint == 'register_matter' %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Other Matters</p>
-                    </div>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link" id="nav-back-to-other-matters-from-register">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back to Other Matters</span>
                     </a>
                     {% endif %}
 

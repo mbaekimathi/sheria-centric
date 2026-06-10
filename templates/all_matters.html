@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}All Matters - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="min-h-[60vh] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-slate-50/80 to-white pointer-events-none" aria-hidden="true"></div>
+
+    <header class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 shadow-xl border border-slate-700/50 mb-6 sm:mb-8">
+        <div class="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent" aria-hidden="true"></div>
+        <div class="relative px-5 sm:px-8 py-6 sm:py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-lg">
+                    <i class="fas fa-list text-2xl sm:text-3xl text-violet-400"></i>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">All Matters</h1>
+                    <p class="text-slate-300 text-sm sm:text-base mt-1 max-w-xl">
+                        Litigation cases and other matters in one place — status and allocation at a glance.
+                    </p>
+                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 font-medium text-emerald-300 border border-emerald-400/30">
+                            <i class="fas fa-gavel"></i>
+                            <span id="count-cases-label">0 cases</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-3 py-1 font-medium text-sky-300 border border-sky-400/30">
+                            <i class="fas fa-folder-open"></i>
+                            <span id="count-matters-label">0 other matters</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-200/80 overflow-hidden">
+        <div class="px-4 sm:px-6 py-5 sm:py-6 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-600">Filter:</span>
+                    <button type="button" data-filter="all" class="am-filter active px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-white">All</button>
+                    <button type="button" data-filter="case" class="am-filter px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">Litigation cases</button>
+                    <button type="button" data-filter="matter" class="am-filter px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">Other matters</button>
+                </div>
+                <div class="w-full sm:w-72 flex-shrink-0">
+                    <label for="am-search" class="sr-only">Search all matters</label>
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                        <input id="am-search" type="text" placeholder="Search reference, client, title…" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-4 py-2.5 text-sm placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all">
+                    </div>
+                </div>
+            </div>
+
+            <div id="am-loading" class="flex flex-col items-center justify-center py-12 sm:py-16 text-slate-500">
+                <div class="w-10 h-10 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mb-4"></div>
+                <p class="text-sm font-medium">Loading all matters…</p>
+            </div>
+
+            <div id="am-table-wrap" class="hidden overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/30">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-100 text-slate-600">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Reference</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Title / Category</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Client</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Allocated To</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Date</th>
+                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="am-body" class="bg-white divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+
+            <div id="am-empty" class="hidden flex flex-col items-center justify-center py-12 sm:py-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-center px-4">
+                <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                    <i class="fas fa-inbox text-2xl text-slate-400"></i>
+                </div>
+                <p class="text-sm font-medium text-slate-600">No matters found</p>
+                <p class="text-xs text-slate-500 mt-1">Try adjusting your search or filter.</p>
+            </div>
+
+            <div id="am-error" class="hidden flex items-center gap-3 rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
+                <i class="fas fa-exclamation-circle text-rose-500 flex-shrink-0"></i>
+                <p id="am-error-text"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.am-table tbody tr { transition: background-color 0.15s ease; }
+.am-table tbody tr:hover { background-color: rgb(248 250 252); }
+.am-filter.active { background-color: rgb(30 41 59); color: white; }
+</style>
+
+{% block extra_js %}
+{{ super() }}
+<script>
+(function () {
+    const roleSlug = {{ current_role_slug|tojson }};
+    const body = document.getElementById('am-body');
+    const loadingEl = document.getElementById('am-loading');
+    const tableWrap = document.getElementById('am-table-wrap');
+    const emptyEl = document.getElementById('am-empty');
+    const errorBox = document.getElementById('am-error');
+    const errorText = document.getElementById('am-error-text');
+    const searchInput = document.getElementById('am-search');
+    const countCasesLabel = document.getElementById('count-cases-label');
+    const countMattersLabel = document.getElementById('count-matters-label');
+    const filterButtons = document.querySelectorAll('.am-filter');
+
+    let allItems = [];
+    let activeFilter = 'all';
+
+    function detailUrl(item) {
+        if (item.item_type === 'case') {
+            return '/' + roleSlug + '/case_management/' + item.id;
+        }
+        return '/' + roleSlug + '/other_matters/' + item.id;
+    }
+
+    function typeBadge(item) {
+        if (item.item_type === 'case') {
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold"><i class="fas fa-gavel"></i> Case</span>';
+        }
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-semibold"><i class="fas fa-folder-open"></i> Matter</span>';
+    }
+
+    function statusPill(status) {
+        if (!status) return '<span class="inline-flex px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px]">Unknown</span>';
+        const s = String(status).toLowerCase();
+        let cls = 'bg-slate-100 text-slate-700';
+        if (s.includes('active') || s.includes('open')) cls = 'bg-emerald-100 text-emerald-700';
+        else if (s.includes('pending') || s.includes('approval')) cls = 'bg-amber-100 text-amber-700';
+        else if (s.includes('closed') || s.includes('suspended') || s.includes('completed')) cls = 'bg-rose-100 text-rose-700';
+        return '<span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ' + cls + '">' + status + '</span>';
+    }
+
+    function textMatch(value, q) {
+        if (!q) return true;
+        return String(value || '').toLowerCase().includes(q);
+    }
+
+    function render() {
+        const q = (searchInput && searchInput.value || '').trim().toLowerCase();
+        const filtered = allItems.filter(function (item) {
+            if (activeFilter !== 'all' && item.item_type !== activeFilter) return false;
+            if (!q) return true;
+            return (
+                textMatch(item.reference, q) ||
+                textMatch(item.title, q) ||
+                textMatch(item.client_name, q) ||
+                textMatch(item.allocated_to, q) ||
+                textMatch(item.status, q)
+            );
+        });
+
+        body.innerHTML = '';
+        if (filtered.length === 0) {
+            tableWrap.classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        tableWrap.classList.remove('hidden');
+
+        filtered.forEach(function (item) {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 cursor-pointer';
+            tr.onclick = function (e) {
+                if (e.target.closest('a')) return;
+                window.location.href = detailUrl(item);
+            };
+            tr.innerHTML = `
+                <td class="px-4 py-3">${typeBadge(item)}</td>
+                <td class="px-4 py-3 text-slate-800 font-medium">${item.reference || '-'}</td>
+                <td class="px-4 py-3 text-slate-700">${item.title || '-'}</td>
+                <td class="px-4 py-3 text-slate-700">${item.client_name || '-'}</td>
+                <td class="px-4 py-3 text-slate-700">${item.allocated_to || 'Unallocated'}</td>
+                <td class="px-4 py-3">${statusPill(item.status)}</td>
+                <td class="px-4 py-3 text-slate-600">${item.date || '-'}</td>
+                <td class="px-4 py-3">
+                    <a href="${detailUrl(item)}" class="text-violet-600 hover:text-violet-800 font-medium text-xs sm:text-sm" onclick="event.stopPropagation()">
+                        <i class="fas fa-eye mr-1"></i>View
+                    </a>
+                </td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
+    function loadData() {
+        if (errorBox) errorBox.classList.add('hidden');
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        fetch('{{ url_for("api_all_matters_overview") }}')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (data.error) {
+                    if (errorText) errorText.textContent = data.error;
+                    if (errorBox) errorBox.classList.remove('hidden');
+                    return;
+                }
+                allItems = Array.isArray(data.items) ? data.items : [];
+                const counts = data.counts || {};
+                if (countCasesLabel) countCasesLabel.textContent = (counts.cases || 0) + ' case' + ((counts.cases || 0) === 1 ? '' : 's');
+                if (countMattersLabel) countMattersLabel.textContent = (counts.matters || 0) + ' other matter' + ((counts.matters || 0) === 1 ? '' : 's');
+                render();
+            })
+            .catch(function (err) {
+                console.error('Error loading all matters', err);
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (errorText) errorText.textContent = 'Could not load matters. Please try again later.';
+                if (errorBox) errorBox.classList.remove('hidden');
+            });
+    }
+
+    filterButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            activeFilter = btn.getAttribute('data-filter') || 'all';
+            filterButtons.forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            render();
+        });
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener('input', render);
+    }
+
+    loadData();
+})();
+</script>
+{% endblock %}
+{% endblock %}

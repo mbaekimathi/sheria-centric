@@ -11101,6 +11101,149 @@ def matter_management():
     return render_template('matter_management.html', company_settings=company_settings,
                            user_role=user_role, current_employee_id=session.get('employee_id'))
 
+
+@app.route('/all_matters')
+def all_matters():
+    """Unified view of litigation cases and other matters with status and allocation."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    return render_template(
+        'all_matters.html',
+        company_settings=company_settings,
+        user_role=user_role,
+        current_employee_id=session.get('employee_id'),
+    )
+
+
+def _all_matters_overview_scope():
+    """Return (employee_id, see_firm_wide) for the all-matters overview."""
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    employee_id = session.get('employee_id')
+    see_firm_wide = (
+        user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
+        or original_role == 'IT Support'
+    )
+    return employee_id, see_firm_wide
+
+
+@app.route('/api/all-matters/overview', methods=['GET'])
+def api_all_matters_overview():
+    """Cases and other matters in one list with status and allocation."""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    employee_id, see_firm_wide = _all_matters_overview_scope()
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            case_cols = (
+                "c.id, c.tracking_number, c.client_name, c.case_category, "
+                "c.filing_date, c.status, c.filled_by_name, c.filled_by_id"
+            )
+            if see_firm_wide:
+                cursor.execute(f"""
+                    SELECT {case_cols}
+                    FROM cases c
+                    ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END,
+                             c.filing_date DESC, c.created_at DESC
+                """)
+            else:
+                cursor.execute(f"""
+                    SELECT {case_cols}
+                    FROM cases c
+                    WHERE c.filled_by_id = %s
+                    ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END,
+                             c.filing_date DESC, c.created_at DESC
+                """, (employee_id,))
+
+            cases = cursor.fetchall() or []
+            for case in cases:
+                if case.get('filing_date') and hasattr(case['filing_date'], 'strftime'):
+                    case['filing_date'] = case['filing_date'].strftime('%Y-%m-%d')
+
+            matter_cols = (
+                "m.id, m.matter_reference_number, m.matter_title, m.matter_category, "
+                "m.client_name, m.date_opened, m.status, "
+                "m.assigned_employee_name, m.assigned_employee_id"
+            )
+            if see_firm_wide:
+                cursor.execute(f"""
+                    SELECT {matter_cols}
+                    FROM matters m
+                    ORDER BY CASE WHEN m.status = 'Pending Approval' THEN 0 ELSE 1 END,
+                             m.date_opened DESC, m.created_at DESC
+                """)
+            else:
+                cursor.execute(f"""
+                    SELECT {matter_cols}
+                    FROM matters m
+                    WHERE m.assigned_employee_id = %s
+                    ORDER BY CASE WHEN m.status = 'Pending Approval' THEN 0 ELSE 1 END,
+                             m.date_opened DESC, m.created_at DESC
+                """, (employee_id,))
+
+            matters = cursor.fetchall() or []
+            for matter in matters:
+                if matter.get('date_opened') and hasattr(matter['date_opened'], 'strftime'):
+                    matter['date_opened'] = matter['date_opened'].strftime('%Y-%m-%d')
+
+            items = []
+            for case in cases:
+                items.append({
+                    'item_type': 'case',
+                    'id': case['id'],
+                    'reference': case.get('tracking_number') or '',
+                    'title': case.get('case_category') or 'Litigation case',
+                    'client_name': case.get('client_name') or '',
+                    'allocated_to': case.get('filled_by_name') or 'Unallocated',
+                    'status': case.get('status') or '',
+                    'date': case.get('filing_date') or '',
+                })
+            for matter in matters:
+                items.append({
+                    'item_type': 'matter',
+                    'id': matter['id'],
+                    'reference': matter.get('matter_reference_number') or '',
+                    'title': matter.get('matter_title') or matter.get('matter_category') or 'Other matter',
+                    'client_name': matter.get('client_name') or '',
+                    'allocated_to': matter.get('assigned_employee_name') or 'Unallocated',
+                    'status': matter.get('status') or '',
+                    'date': matter.get('date_opened') or '',
+                })
+
+            items.sort(key=lambda item: item.get('date') or '', reverse=True)
+            items.sort(key=lambda item: 0 if 'pending' in (item.get('status') or '').lower() else 1)
+
+            return jsonify({
+                'items': items,
+                'counts': {
+                    'cases': len(cases),
+                    'matters': len(matters),
+                    'total': len(items),
+                },
+                'message': f'Found {len(items)} matter(s)',
+            })
+    except Exception as e:
+        print(f"Error loading all matters overview: {e}")
+        return jsonify({'error': 'Server error: ' + str(e)}), 500
+    finally:
+        connection.close()
+
+
 @app.route('/case_management')
 def case_management():
     """Case Management page – shows only cases allocated to the current employee"""
@@ -11135,7 +11278,54 @@ def case_management():
         finally:
             connection.close()
     
-    return render_template('case_management.html', company_settings=company_settings, employee_name=employee_name, user_role=user_role)
+    return render_template(
+        'case_management.html',
+        company_settings=company_settings,
+        employee_name=employee_name,
+        user_role=user_role,
+        pending_only=False,
+    )
+
+
+@app.route('/approve_cases')
+def approve_cases():
+    """Cases awaiting Managing Partner / Firm Administrator approval."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if not ((user_role in allowed_roles) or (original_role == 'IT Support')):
+        flash('You do not have permission to approve cases.', 'error')
+        return redirect(url_for('case_management'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    employee_name = session.get('employee_name', 'Unknown')
+    if connection:
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("SELECT full_name FROM employees WHERE id = %s", (session['employee_id'],))
+                employee = cursor.fetchone()
+                if employee:
+                    employee_name = employee['full_name']
+        except Exception:
+            pass
+        finally:
+            connection.close()
+
+    return render_template(
+        'case_management.html',
+        company_settings=company_settings,
+        employee_name=employee_name,
+        user_role=user_role,
+        pending_only=True,
+    )
+
 
 @app.route('/case_management/tasks', methods=['GET', 'POST'])
 def case_task_management():
@@ -17495,6 +17685,32 @@ def download_employee_contract():
     finally:
         connection.close()
 
+def _build_calendar_events_dict(proceedings, matters):
+    """Build date-keyed event map for the shared calendar view."""
+    calendar_events = {}
+    for proceeding in proceedings:
+        key = proceeding.get('next_court_date')
+        if key:
+            calendar_events.setdefault(key, []).append(proceeding)
+    for matter in matters:
+        key = matter.get('date_opened')
+        if key:
+            calendar_events.setdefault(key, []).append(matter)
+    return calendar_events
+
+
+def _calendar_item_allocated_to_employee(item, employee_id):
+    """True when a case or matter row belongs to the signed-in employee."""
+    if not employee_id:
+        return False
+    emp = str(employee_id)
+    if item.get('source') == 'case':
+        return str(item.get('filled_by_id') or '') == emp
+    if item.get('source') == 'matter':
+        return str(item.get('assigned_employee_id') or '') == emp
+    return False
+
+
 @app.route('/calendar')
 def calendar():
     """Calendar page - displays all upcoming court dates (cases) and matter dates"""
@@ -17539,6 +17755,8 @@ def calendar():
                     p.outcome_orders,
                     c.tracking_number,
                     c.client_name,
+                    c.filled_by_id,
+                    c.filled_by_name,
                     c.id as case_table_id
                 FROM case_proceedings p
                 JOIN cases c ON p.case_id = c.id
@@ -17566,6 +17784,7 @@ def calendar():
                     m.matter_title,
                     m.matter_category,
                     m.client_name,
+                    m.assigned_employee_id,
                     m.assigned_employee_name,
                     m.date_opened,
                     m.status
@@ -17585,21 +17804,32 @@ def calendar():
                 matter_events.append(matter)
 
             # ── Build combined calendar_events dict keyed by date ────────────
-            calendar_events = {}
-            for proceeding in all_upcoming_proceedings:
-                key = proceeding.get('next_court_date')
-                if key:
-                    calendar_events.setdefault(key, []).append(proceeding)
-            for matter in matter_events:
-                key = matter.get('date_opened')
-                if key:
-                    calendar_events.setdefault(key, []).append(matter)
+            calendar_events = _build_calendar_events_dict(all_upcoming_proceedings, matter_events)
 
             # Combined agenda list sorted by date
             all_agenda = sorted(
                 all_upcoming_proceedings + matter_events,
                 key=lambda x: x.get('next_court_date') or x.get('date_opened') or ''
             )
+
+            employee_id = session.get('employee_id')
+            show_scope_toggle = user_role == 'Managing Partner'
+            calendar_events_mine = {}
+            all_agenda_mine = []
+            if show_scope_toggle:
+                mine_proceedings = [
+                    p for p in all_upcoming_proceedings
+                    if _calendar_item_allocated_to_employee(p, employee_id)
+                ]
+                mine_matters = [
+                    m for m in matter_events
+                    if _calendar_item_allocated_to_employee(m, employee_id)
+                ]
+                calendar_events_mine = _build_calendar_events_dict(mine_proceedings, mine_matters)
+                all_agenda_mine = sorted(
+                    mine_proceedings + mine_matters,
+                    key=lambda x: x.get('next_court_date') or x.get('date_opened') or ''
+                )
 
             company_settings = get_company_settings()
             if not company_settings:
@@ -17609,6 +17839,10 @@ def calendar():
                                  company_settings=company_settings,
                                  all_upcoming_proceedings=all_agenda,
                                  calendar_events=calendar_events,
+                                 calendar_events_mine=calendar_events_mine,
+                                 all_agenda_mine=all_agenda_mine,
+                                 show_scope_toggle=show_scope_toggle,
+                                 session_employee_name=session.get('employee_name') or 'Me',
                                  matter_events=matter_events)
     except Exception as e:
         print(f"Error fetching calendar: {e}")
@@ -20515,6 +20749,13 @@ def approve_matters():
     """Approve Matters page"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if not ((user_role in allowed_roles) or (original_role == 'IT Support')):
+        flash('You do not have permission to approve matters.', 'error')
+        return redirect(url_for('other_matters'))
     
     connection = get_db_connection()
     if not connection:

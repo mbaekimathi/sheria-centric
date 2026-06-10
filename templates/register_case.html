@@ -748,9 +748,9 @@ document.getElementById('caseRegistrationForm').addEventListener('submit', funct
                 ? `Case registered successfully! Tracking Number: ${data.tracking_number}`
                 : (data.message || 'Case registered successfully!');
             showMessage(message, 'success');
-            // Redirect to case management after successful registration.
+            // Redirect to case approval queue after successful registration.
             setTimeout(() => {
-                window.location.href = '/case_management';
+                window.location.href = "{{ role_url('approve_cases') }}";
             }, 1200);
         }
     })

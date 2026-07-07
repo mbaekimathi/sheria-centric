@@ -291,7 +291,7 @@ document.getElementById('matterEditForm').addEventListener('submit', function(e)
     
     // Validate required fields
     if (!document.getElementById('assigned_employee_id').value) {
-        alert('Please select an assigned employee');
+        scAlert('Please select an assigned employee');
         return;
     }
     
@@ -319,17 +319,17 @@ document.getElementById('matterEditForm').addEventListener('submit', function(e)
         submitBtn.innerHTML = originalText;
         
         if (data.success) {
-            alert('Matter updated successfully!');
+            scAlert('Matter updated successfully!');
             window.location.href = '{{ url_for("matter_details", matter_id=matter_id) }}';
         } else {
-            alert(data.error || 'Error updating matter');
+            scAlert(data.error || 'Error updating matter');
         }
     })
     .catch(error => {
         console.error('Error:', error);
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
-        alert('An error occurred while updating the matter.');
+        scAlert('An error occurred while updating the matter.');
     });
 });
 

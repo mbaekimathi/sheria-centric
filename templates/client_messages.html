@@ -434,13 +434,13 @@ document.getElementById('sendMessageForm').addEventListener('submit', function(e
                 if (data.whatsapp_error) console.warn('WhatsApp:', data.whatsapp_error);
                 window.location.reload();
             } else {
-                alert(data.error || 'Error sending message');
+                scAlert(data.error || 'Error sending message');
                 sendBtn.disabled = false;
                 sendBtn.innerHTML = '<i class="fas fa-paper-plane text-sm"></i>';
             }
         })
         .catch(() => {
-            alert('An error occurred while sending.');
+            scAlert('An error occurred while sending.');
             sendBtn.disabled = false;
             sendBtn.innerHTML = '<i class="fas fa-paper-plane text-sm"></i>';
         });

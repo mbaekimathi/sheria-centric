@@ -185,6 +185,22 @@ def _apply_request_security_from_host():
         app.config['SESSION_COOKIE_SECURE'] = True
         app.config['PREFERRED_URL_SCHEME'] = 'https'
 
+
+@app.after_request
+def _strip_sensitive_session_keys(response):
+    """Never persist sensitive OAuth credentials in client-side session cookies."""
+    try:
+        removed = False
+        for key in ('google_drive_credentials',):
+            if key in session:
+                session.pop(key, None)
+                removed = True
+        if removed:
+            session.modified = True
+    except Exception:
+        pass
+    return response
+
 def verify_google_id_token(id_token_jwt: str):
     """
     Verify Google ID token with small clock-skew tolerance.
@@ -6694,7 +6710,7 @@ def google_callback():
 
         session_state = session.get('state')
         request_state = request.args.get('state')
-        if session_state and request_state and request_state != session_state:
+        if not session_state or not request_state or request_state != session_state:
             print(f"OAuth state mismatch: session={session_state}, request={request_state}")
             flash('Authentication session expired. Please sign in again.', 'error')
             return redirect(url_for('client_login'))
@@ -15319,14 +15335,14 @@ def google_drive_callback():
         return (
             '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: '
             + json.dumps(user_msg)
-            + '}, "*"); window.close();</script>',
+            + '}, window.location.origin); window.close();</script>',
             400,
         )
 
     try:
         request_state = request.args.get('state')
         if not request_state:
-            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Missing OAuth state"}, "*"); window.close();</script>', 400
+            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Missing OAuth state"}, window.location.origin); window.close();</script>', 400
 
         # Popup return often does not include the Flask session cookie (host mismatch or browser).
         # We persist state -> employee_id in DB on authorize and resolve it here.
@@ -15338,12 +15354,12 @@ def google_drive_callback():
         if oauth_employee_id is not None:
             resolved_employee_id = oauth_employee_id
             if session_employee_id is not None and int(session_employee_id) != int(oauth_employee_id):
-                return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session mismatch. Refresh Documents Settings and try again."}, "*"); window.close();</script>', 400
+                return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session mismatch. Refresh Documents Settings and try again."}, window.location.origin); window.close();</script>', 400
         elif session_employee_id is not None and session_oauth_state and request_state == session_oauth_state:
             resolved_employee_id = session_employee_id
 
         if resolved_employee_id is None:
-            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session expired or invalid. Refresh this page, then connect Google Drive again."}, "*"); window.close();</script>', 401
+            return '<script>window.opener.postMessage({type: "GOOGLE_DRIVE_ERROR", error: "Session expired or invalid. Refresh this page, then connect Google Drive again."}, window.location.origin); window.close();</script>', 401
 
         print(f"[OK] Google Drive OAuth callback validated for employee_id={resolved_employee_id}")
 
@@ -15423,7 +15439,7 @@ def google_drive_callback():
                     'Disconnect, then reconnect and check every permission box. '
                     f'Missing: {", ".join(missing) or "unknown"}.'
                 )
-                + '}, "*"); window.close();</script>',
+                + '}, window.location.origin); window.close();</script>',
                 400,
             )
         
@@ -15470,15 +15486,8 @@ def google_drive_callback():
             finally:
                 connection.close()
         
-        # Also store in session for immediate use
-        session['google_drive_credentials'] = {
-            'token': credentials.token,
-            'refresh_token': credentials.refresh_token,
-            'token_uri': credentials.token_uri,
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
-            'scopes': credentials.scopes
-        }
+        # Never persist OAuth credential blobs to client-side session cookies.
+        # Keep only non-sensitive account metadata in session.
         session['google_drive_account'] = {
             'email': id_info.get('email'),
             'name': id_info.get('name'),
@@ -15502,7 +15511,7 @@ def google_drive_callback():
             window.opener.postMessage({{
                 type: 'GOOGLE_DRIVE_CONNECTED',
                 account: {json.dumps(account_data)}
-            }}, '*');
+            }}, window.location.origin);
             window.close();
         </script>
         '''
@@ -15514,7 +15523,7 @@ def google_drive_callback():
             window.opener.postMessage({{
                 type: 'GOOGLE_DRIVE_ERROR',
                 error: {json.dumps(error_msg)}
-            }}, '*');
+            }}, window.location.origin);
             window.close();
         </script>
         ''', 500
@@ -15540,29 +15549,8 @@ def google_drive_status():
 
     state = evaluate_drive_connection_state()
     if state['state'] == 'connected':
-        # Mirror to session for fast-path code that still reads it.
-        connection = get_db_connection()
-        if connection:
-            try:
-                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                    row = _load_drive_settings_row(cursor)
-                    if row:
-                        scopes = json.loads(row['google_drive_scopes']) if row.get('google_drive_scopes') else []
-                        session['google_drive_credentials'] = {
-                            'token': row.get('google_drive_token'),
-                            'refresh_token': row.get('google_drive_refresh_token'),
-                            'token_uri': row.get('google_drive_token_uri'),
-                            'client_id': GOOGLE_CLIENT_ID,
-                            'client_secret': GOOGLE_CLIENT_SECRET,
-                            'scopes': scopes,
-                        }
-                        session['google_drive_account'] = state['account']
-                        if row.get('google_drive_main_folder_id'):
-                            session['google_drive_main_folder_id'] = row['google_drive_main_folder_id']
-            except Exception as e:
-                print(f"[Drive] status session-mirror error: {e}")
-            finally:
-                connection.close()
+        # Mirror only non-sensitive metadata to session.
+        session['google_drive_account'] = state['account']
         session.pop(DRIVE_NOTICE_SESSION_KEY, None)
         return jsonify({
             'connected': True,
@@ -15578,7 +15566,6 @@ def google_drive_status():
             'picture': (state.get('account') or {}).get('picture'),
             'reason': state.get('reason'),
         }
-        session.pop('google_drive_credentials', None)
         return jsonify({
             'connected': False,
             'needs_reconnect': True,
@@ -15668,66 +15655,50 @@ def get_user_folder_name(phone_number, full_name, user_type='client'):
         return full_name
 
 def get_google_drive_service():
-    """Get Google Drive service from stored credentials (database or session)"""
-    # First try to load from database if not in session
-    if 'google_drive_credentials' not in session:
-        connection = get_db_connection()
-        if connection:
-            try:
-                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                    cursor.execute("""
-                        SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
-                               google_drive_scopes
-                        FROM company_settings 
-                        ORDER BY id DESC LIMIT 1
-                    """)
-                    settings = cursor.fetchone()
-                    
-                    if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
-                        scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
-                        session['google_drive_credentials'] = {
-                            'token': settings['google_drive_token'],
-                            'refresh_token': settings['google_drive_refresh_token'],
-                            'token_uri': settings.get('google_drive_token_uri'),
-                            'client_id': GOOGLE_CLIENT_ID,
-                            'client_secret': GOOGLE_CLIENT_SECRET,
-                            'scopes': scopes
-                        }
-            except Exception as e:
-                print(f"Error loading Google Drive credentials from database: {e}")
-            finally:
-                connection.close()
-    
-    if 'google_drive_credentials' not in session:
-        return None
-    
+    """Build a Drive service from DB-stored credentials (not session cookies)."""
+    connection = None
     try:
-        creds_dict = session['google_drive_credentials']
+        connection = get_db_connection()
+        if not connection:
+            return None
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri, google_drive_scopes
+                FROM company_settings
+                ORDER BY id DESC LIMIT 1
+            """)
+            settings = cursor.fetchone()
+            if not settings or not settings.get('google_drive_token') or not settings.get('google_drive_refresh_token'):
+                return None
+            scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
+
         credentials = Credentials(
-            token=creds_dict.get('token'),
-            refresh_token=creds_dict.get('refresh_token'),
-            token_uri=creds_dict.get('token_uri'),
-            client_id=creds_dict.get('client_id'),
-            client_secret=creds_dict.get('client_secret'),
-            scopes=creds_dict.get('scopes')
+            token=settings.get('google_drive_token'),
+            refresh_token=settings.get('google_drive_refresh_token'),
+            token_uri=settings.get('google_drive_token_uri'),
+            client_id=GOOGLE_CLIENT_ID,
+            client_secret=GOOGLE_CLIENT_SECRET,
+            scopes=scopes
         )
 
         # If the access token is expired, refresh through the safe helper so a
         # revoked refresh token automatically flips the global needs_reconnect
         # state instead of falling through as an opaque service error.
         if credentials.expired:
-            ok, _info = refresh_drive_credentials_safely(credentials)
+            ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
             if not ok:
-                session.pop('google_drive_credentials', None)
                 return None
-            creds_dict['token'] = credentials.token
-            session['google_drive_credentials'] = creds_dict
 
         service = build('drive', 'v3', credentials=credentials)
         return service
     except Exception as e:
         print(f"Error building Google Drive service: {e}")
         return None
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
 
 @app.route('/api/documents/create-main-folder', methods=['POST'])
 def create_main_folder():
@@ -15735,45 +15706,8 @@ def create_main_folder():
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
-    # Check if Google Drive is connected (try loading from database first)
-    if 'google_drive_credentials' not in session:
-        # Try to load from database
-        connection = get_db_connection()
-        if connection:
-            try:
-                with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                    cursor.execute("""
-                        SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
-                               google_drive_scopes, google_drive_account_email, google_drive_account_name,
-                               google_drive_account_picture, google_drive_main_folder_id
-                        FROM company_settings 
-                        ORDER BY id DESC LIMIT 1
-                    """)
-                    settings = cursor.fetchone()
-                    
-                    if settings and settings.get('google_drive_token') and settings.get('google_drive_refresh_token'):
-                        scopes = json.loads(settings['google_drive_scopes']) if settings.get('google_drive_scopes') else []
-                        session['google_drive_credentials'] = {
-                            'token': settings['google_drive_token'],
-                            'refresh_token': settings['google_drive_refresh_token'],
-                            'token_uri': settings.get('google_drive_token_uri'),
-                            'client_id': GOOGLE_CLIENT_ID,
-                            'client_secret': GOOGLE_CLIENT_SECRET,
-                            'scopes': scopes
-                        }
-                        session['google_drive_account'] = {
-                            'email': settings.get('google_drive_account_email'),
-                            'name': settings.get('google_drive_account_name'),
-                            'picture': settings.get('google_drive_account_picture')
-                        }
-                        if settings.get('google_drive_main_folder_id'):
-                            session['google_drive_main_folder_id'] = settings['google_drive_main_folder_id']
-            except Exception as e:
-                print(f"Error loading Google Drive credentials: {e}")
-            finally:
-                connection.close()
-    
-    if 'google_drive_credentials' not in session:
+    state = evaluate_drive_connection_state()
+    if state.get('state') != 'connected':
         return jsonify({'error': 'Google Drive not connected'}), 400
     
     try:
@@ -16542,7 +16476,7 @@ def create_case_google_file(case_id):
                 try:
                     service.permissions().create(
                         fileId=file_id,
-                        body={'type': 'anyone', 'role': 'writer'},
+                        body={'type': 'anyone', 'role': 'reader'},
                         fields='id'
                     ).execute()
                 except Exception as perm_err:
@@ -16753,7 +16687,7 @@ def create_matter_google_file(matter_id):
                 try:
                     service.permissions().create(
                         fileId=file_id,
-                        body={'type': 'anyone', 'role': 'writer'},
+                        body={'type': 'anyone', 'role': 'reader'},
                         fields='id'
                     ).execute()
                 except Exception as perm_err:
@@ -20219,7 +20153,7 @@ def system_settings_google_branding_preview():
             try:
                 service.permissions().create(
                     fileId=file_id,
-                    body={'type': 'anyone', 'role': 'writer'},
+                    body={'type': 'anyone', 'role': 'reader'},
                     fields='id',
                 ).execute()
             except Exception as perm_err:

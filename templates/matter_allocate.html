@@ -114,7 +114,7 @@ document.getElementById('allocationChangeForm').addEventListener('submit', funct
     const employeeId = document.getElementById('selectedEmployeeId').value;
     
     if (!employeeId) {
-        alert('Please select an employee');
+        scAlert('Please select an employee');
         return;
     }
     
@@ -131,15 +131,15 @@ document.getElementById('allocationChangeForm').addEventListener('submit', funct
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(data.message || 'Matter allocated successfully!');
+                scAlert(data.message || 'Matter allocated successfully!');
                 window.location.href = '{{ url_for("matter_details", matter_id=matter_id) }}';
             } else {
-                alert(data.error || 'Error allocating matter');
+                scAlert(data.error || 'Error allocating matter');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while allocating the matter.');
+            scAlert('An error occurred while allocating the matter.');
         });
     }
 });

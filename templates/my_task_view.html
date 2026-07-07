@@ -155,7 +155,7 @@
                         throw new Error('No edit link returned.');
                     }
                 } catch (err) {
-                    alert(err.message || 'Unable to open Google file.');
+                    scAlert(err.message || 'Unable to open Google file.');
                 } finally {
                     btn.disabled = false;
                     btn.innerHTML = original;

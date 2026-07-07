@@ -466,7 +466,7 @@ function openEmailConversation(contactEmail, empId) {
     // Use the provided ID or fallback to global variable
     const employeeIdToUse = empId || employeeId || {{ employee.id if employee else 'null' }};
     if (!employeeIdToUse) {
-        alert('Employee ID not found');
+        scAlert('Employee ID not found');
         return;
     }
     // Encode the email for URL

@@ -82,12 +82,12 @@ document.getElementById('statusChangeForm').addEventListener('submit', function(
     const status = document.getElementById('status').value;
     
     if (!status) {
-        alert('Please select a status');
+        scAlert('Please select a status');
         return;
     }
     
     if (status === '{{ matter_data.status }}') {
-        alert('Please select a different status');
+        scAlert('Please select a different status');
         return;
     }
     
@@ -102,15 +102,15 @@ document.getElementById('statusChangeForm').addEventListener('submit', function(
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(data.message || 'Status updated successfully!');
+                scAlert(data.message || 'Status updated successfully!');
                 window.location.href = '{{ url_for("matter_details", matter_id=matter_id) }}';
             } else {
-                alert(data.error || 'Error updating status');
+                scAlert(data.error || 'Error updating status');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while updating the status.');
+            scAlert('An error occurred while updating the status.');
         });
     }
 });

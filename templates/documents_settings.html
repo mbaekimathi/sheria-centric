@@ -311,12 +311,42 @@
 </div>
 
 <script>
+function askConfirm(message, confirmLabel) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4';
+        overlay.innerHTML = `
+            <div class="w-full max-w-md bg-white rounded-xl shadow-2xl border border-gray-200 p-5">
+                <p class="text-sm text-gray-800 mb-5">${message}</p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="js-cancel px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" class="js-confirm px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">${confirmLabel || 'Confirm'}</button>
+                </div>
+            </div>
+        `;
+        const cleanup = () => overlay.remove();
+        overlay.querySelector('.js-cancel').addEventListener('click', () => { cleanup(); resolve(false); });
+        overlay.querySelector('.js-confirm').addEventListener('click', () => { cleanup(); resolve(true); });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                cleanup();
+                resolve(false);
+            }
+        });
+        document.body.appendChild(overlay);
+    });
+}
+
 // Connect Google Drive function - Opens Google OAuth with account picker
-function connectGoogleDrive() {
+function connectGoogleDrive(forceConsent) {
+    const shouldForceConsent = !!forceConsent;
     showMessage('Opening Google account picker...', 'info');
     
     // Fetch authorization URL from server
-    fetch('/api/auth/google-drive/authorize', { credentials: 'same-origin' })
+    const authUrl = shouldForceConsent
+        ? '/api/auth/google-drive/authorize?force_consent=1'
+        : '/api/auth/google-drive/authorize';
+    fetch(authUrl, { credentials: 'same-origin' })
         .then(response => response.json())
         .then(data => {
             if (data.error) {
@@ -343,6 +373,9 @@ function connectGoogleDrive() {
             
             // Listen for OAuth callback message from popup
             const messageHandler = function(event) {
+                if (event.origin !== window.location.origin) {
+                    return;
+                }
                 if (event.data.type === 'GOOGLE_DRIVE_CONNECTED') {
                     handleGoogleDriveConnected(event.data.account);
                     window.removeEventListener('message', messageHandler);
@@ -434,8 +467,12 @@ function checkConnectionStatus() {
 }
 
 // Disconnect Google Drive
-function disconnectGoogleDrive() {
-    if (!confirm('Are you sure you want to disconnect Google Drive? This will prevent automatic document uploads.')) {
+async function disconnectGoogleDrive() {
+    const approved = await askConfirm(
+        'Are you sure you want to disconnect Google Drive? This will prevent automatic document uploads.',
+        'Disconnect'
+    );
+    if (!approved) {
         return;
     }
     
@@ -463,11 +500,27 @@ function disconnectGoogleDrive() {
 }
 
 // Switch Google Account
-function switchGoogleAccount() {
-    disconnectGoogleDrive();
-    setTimeout(() => {
+async function switchGoogleAccount() {
+    const approved = await askConfirm(
+        'Switch Google account now? This will disconnect the current linked account first.',
+        'Switch account'
+    );
+    if (!approved) {
+        return;
+    }
+    showMessage('Switching Google account...', 'info');
+    try {
+        const response = await fetch('/api/auth/google-drive/disconnect', { method: 'POST' });
+        const data = await response.json();
+        if (!data.success) {
+            showMessage(data.error || 'Could not disconnect current account', 'error');
+            return;
+        }
+        setDriveState('never_connected');
         connectGoogleDrive(true);
-    }, 500);
+    } catch (error) {
+        showMessage('Error switching account. Please try again.', 'error');
+    }
 }
 
 // Create main folder function

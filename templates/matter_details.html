@@ -64,13 +64,13 @@
                 if (data.success) {
                     window.location.href = '/other_matters/' + matterId;
                 } else {
-                    alert(data.error || 'Failed to accept matter');
+                    scAlert(data.error || 'Failed to accept matter');
                     btn.disabled = false;
                     btnText.textContent = 'Accept matter';
                 }
             })
             .catch(function() {
-                alert('Request failed');
+                scAlert('Request failed');
                 btn.disabled = false;
                 btnText.textContent = 'Accept matter';
             });
@@ -349,9 +349,9 @@
             uploadForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 var fileInput = document.getElementById('matter_document_file');
-                if (!fileInput.files || !fileInput.files.length) { alert('Please select a file.'); return; }
+                if (!fileInput.files || !fileInput.files.length) { scAlert('Please select a file.'); return; }
                 var file = fileInput.files[0];
-                if (file.size > 16 * 1024 * 1024) { alert('File must be 16MB or less.'); return; }
+                if (file.size > 16 * 1024 * 1024) { scAlert('File must be 16MB or less.'); return; }
                 var btn = document.getElementById('matterUploadBtn');
                 var btnText = document.getElementById('matterUploadBtnText');
                 btn.disabled = true;
@@ -365,13 +365,13 @@
                     if (data.success) {
                         window.location.reload();
                     } else {
-                        alert(data.error || 'Upload failed.');
+                        scAlert(data.error || 'Upload failed.');
                         btn.disabled = false;
                         btnText.textContent = 'Upload';
                     }
                 } catch (err) {
                     console.error(err);
-                    alert('Upload failed.');
+                    scAlert('Upload failed.');
                     btn.disabled = false;
                     btnText.textContent = 'Upload';
                 }
@@ -387,8 +387,8 @@
                     var res = await fetch('/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
                     var data = await res.json();
                     if (data.success) window.location.reload();
-                    else { alert(data.error || 'Delete failed.'); this.disabled = false; }
-                } catch (e) { alert('Request failed.'); this.disabled = false; }
+                    else { scAlert(data.error || 'Delete failed.'); this.disabled = false; }
+                } catch (e) { scAlert('Request failed.'); this.disabled = false; }
             });
         });
     })();

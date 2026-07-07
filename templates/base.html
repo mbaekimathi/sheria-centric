@@ -2234,6 +2234,24 @@
     </div>
     {% endif %}
 
+    <script>
+        // Global non-blocking replacement for legacy scAlert(...) calls.
+        function scAlert(message, type) {
+            const level = type || 'error';
+            const bgClass = level === 'success' ? 'bg-emerald-600' : (level === 'info' ? 'bg-indigo-600' : 'bg-red-600');
+            const host = document.createElement('div');
+            host.className = `fixed top-6 right-6 z-[90] ${bgClass} text-white px-4 py-3 rounded-lg shadow-xl max-w-md text-sm`;
+            host.textContent = String(message || 'Done');
+            document.body.appendChild(host);
+            setTimeout(() => host.remove(), 3600);
+        }
+
+        // Keep old code working while avoiding blocking browser dialogs.
+        window.alert = function(message) {
+            scAlert(message, 'error');
+        };
+    </script>
+
     {% block extra_js %}{% endblock %}
     
     <!-- Live Clock and Date Script -->

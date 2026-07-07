@@ -821,7 +821,7 @@
         if (input.files && input.files[0]) {
             const file = input.files[0];
             if (file.size > 16 * 1024 * 1024) {
-                alert('File size exceeds 16MB limit.');
+                scAlert('File size exceeds 16MB limit.');
                 input.value = '';
                 return;
             }

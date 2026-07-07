@@ -314,7 +314,7 @@
                 const response = responseTextarea.value.trim();
                 
                 if (!response) {
-                    alert('Please enter a response');
+                    scAlert('Please enter a response');
                     return;
                 }
                 
@@ -337,17 +337,17 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        alert('Response sent successfully!');
+                        scAlert('Response sent successfully!');
                         window.location.reload();
                     } else {
-                        alert(data.error || 'Error sending response');
+                        scAlert(data.error || 'Error sending response');
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = originalText;
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('An error occurred while sending the response.');
+                    scAlert('An error occurred while sending the response.');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalText;
                 });

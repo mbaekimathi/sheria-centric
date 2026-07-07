@@ -98,7 +98,7 @@ document.getElementById('allocationChangeForm').addEventListener('submit', funct
     const employeeId = selectEl && selectEl.value;
     
     if (!employeeId) {
-        alert('Please select a case handler');
+        scAlert('Please select a case handler');
         return;
     }
     
@@ -121,15 +121,15 @@ document.getElementById('allocationChangeForm').addEventListener('submit', funct
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(data.message || 'Case allocated successfully!');
+                scAlert(data.message || 'Case allocated successfully!');
                 window.location.href = '{{ url_for("case_details", case_id=case_id) }}';
             } else {
-                alert(data.error || 'Error allocating case');
+                scAlert(data.error || 'Error allocating case');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while allocating the case.');
+            scAlert('An error occurred while allocating the case.');
         });
     }
 });

@@ -393,7 +393,7 @@
             if (typeof extractInkFromScan === 'function') {
                 png = extractInkFromScan(img, ASSET_KIND);
             } else {
-                alert('Ink extraction failed to load. Refresh the page.');
+                scAlert('Ink extraction failed to load. Refresh the page.');
                 processingRow.classList.add('hidden');
                 return;
             }
@@ -402,7 +402,7 @@
         };
         img.onerror = function () {
             processingRow.classList.add('hidden');
-            alert('Could not read image.');
+            scAlert('Could not read image.');
         };
         img.src = dataUrl;
     }
@@ -634,7 +634,7 @@
         if (!fileInput.files || !fileInput.files[0]) return;
         const file = fileInput.files[0];
         if (file.size > MAX_BYTES) {
-            alert('Image must be smaller than 5 MB.');
+            scAlert('Image must be smaller than 5 MB.');
             fileInput.value = '';
             return;
         }
@@ -647,7 +647,7 @@
         const removing = form.querySelector('input[name="remove_asset"]:checked');
         if (!removing && !processedInput.value) {
             e.preventDefault();
-            alert('Add a signature (scan, draw, type, or upload) before saving.');
+            scAlert('Add a signature (scan, draw, type, or upload) before saving.');
         }
     });
 

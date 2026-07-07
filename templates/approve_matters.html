@@ -370,12 +370,12 @@ function confirmAllocateMatter() {
     const employeeId = document.getElementById('selectedEmployeeId').value;
     
     if (!employeeId) {
-        alert('Please select an employee');
+        scAlert('Please select an employee');
         return;
     }
     
     if (!currentAllocateMatterId) {
-        alert('Matter ID is missing');
+        scAlert('Matter ID is missing');
         return;
     }
     
@@ -389,7 +389,7 @@ function confirmAllocateMatter() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message || 'Matter allocated successfully!');
+            scAlert(data.message || 'Matter allocated successfully!');
             closeAllocateModal();
             // Update the allocated-to display
             const allocatedToElement = document.getElementById(`allocated-to-${currentAllocateMatterId}`);
@@ -399,12 +399,12 @@ function confirmAllocateMatter() {
             }
             location.reload();
         } else {
-            alert(data.error || 'Error allocating matter');
+            scAlert(data.error || 'Error allocating matter');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while allocating the matter.');
+        scAlert('An error occurred while allocating the matter.');
     });
 }
 
@@ -419,15 +419,15 @@ function approveMatter(matterId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Matter approved successfully!');
+                scAlert('Matter approved successfully!');
                 location.reload();
             } else {
-                alert(data.error || 'Error approving matter');
+                scAlert(data.error || 'Error approving matter');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred while approving the matter.');
+            scAlert('An error occurred while approving the matter.');
         });
     }
 }

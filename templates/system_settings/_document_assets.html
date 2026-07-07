@@ -4,7 +4,7 @@
 
     function processImageFile(file, mode, onDone) {
         if (file.size > MAX_BYTES) {
-            alert('Image must be smaller than 5 MB.');
+            scAlert('Image must be smaller than 5 MB.');
             onDone(null);
             return;
         }
@@ -565,19 +565,19 @@
                     if (result.settings_url && confirm(msg + '\n\nOpen Documents Settings now?')) {
                         window.location.href = result.settings_url;
                     } else {
-                        alert(msg);
+                        scAlert(msg);
                     }
                     return;
                 }
                 if (result.message) {
-                    alert(result.message);
+                    scAlert(result.message);
                 }
                 const url = result.editLink || result.webViewLink;
                 if (url) {
                     window.open(url, '_blank', 'noopener,noreferrer');
                 }
             } catch (err) {
-                alert(err.message || 'Unable to open Google preview.');
+                scAlert(err.message || 'Unable to open Google preview.');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = original;

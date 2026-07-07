@@ -301,6 +301,41 @@
 const matterId = {{ matter_id }};
 const googleDriveConnected = {{ 'true' if google_drive_connected else 'false' }};
 
+function showToast(message, type) {
+    const color = type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-emerald-600' : 'bg-indigo-600');
+    const wrap = document.createElement('div');
+    wrap.className = `fixed top-6 right-6 z-[70] ${color} text-white px-4 py-3 rounded-lg shadow-lg text-sm`;
+    wrap.textContent = message;
+    document.body.appendChild(wrap);
+    setTimeout(() => wrap.remove(), 3200);
+}
+
+function askConfirm(message, confirmLabel) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4';
+        overlay.innerHTML = `
+            <div class="w-full max-w-md bg-white rounded-xl shadow-2xl border border-gray-200 p-5">
+                <p class="text-sm text-gray-800 mb-5">${message}</p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="js-cancel px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" class="js-confirm px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700">${confirmLabel || 'Confirm'}</button>
+                </div>
+            </div>
+        `;
+        const cleanup = () => overlay.remove();
+        overlay.querySelector('.js-cancel').addEventListener('click', () => { cleanup(); resolve(false); });
+        overlay.querySelector('.js-confirm').addEventListener('click', () => { cleanup(); resolve(true); });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                cleanup();
+                resolve(false);
+            }
+        });
+        document.body.appendChild(overlay);
+    });
+}
+
 function refreshDocuments() {
     window.location.reload();
 }
@@ -309,7 +344,7 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     e.preventDefault();
     
     if (!googleDriveConnected) {
-        alert('Google Drive is not connected. Please connect it in Documents Settings.');
+        showToast('Google Drive is not connected. Please connect it in Documents Settings.', 'error');
         return;
     }
     
@@ -317,7 +352,7 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     const description = document.getElementById('document_description').value;
     
     if (!fileInput.files || fileInput.files.length === 0) {
-        alert('Please select a file to upload.');
+        showToast('Please select a file to upload.', 'error');
         return;
     }
     
@@ -325,7 +360,7 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     const maxSize = 16 * 1024 * 1024; // 16MB
     
     if (file.size > maxSize) {
-        alert('File size exceeds 16MB limit.');
+        showToast('File size exceeds 16MB limit.', 'error');
         return;
     }
     
@@ -389,10 +424,10 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
                 modal.classList.add('hidden');
                 progressBar.style.width = '0%';
                 if (data.settings_url) {
-                    const go = confirm(errorMsg + '\n\nGo to Documents Settings now to reconnect Google Drive?');
+                    const go = await askConfirm(errorMsg + '\n\nGo to Documents Settings now to reconnect Google Drive?', 'Go to settings');
                     if (go) window.location.href = settingsUrl;
                 } else {
-                    alert('Upload failed: ' + errorMsg);
+                    showToast('Upload failed: ' + errorMsg, 'error');
                 }
             }, data.settings_url ? 4000 : 2000);
         }
@@ -404,7 +439,7 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
         uploadBtnText.textContent = 'Upload Document';
         setTimeout(() => {
             modal.classList.add('hidden');
-            alert('Upload failed: ' + error.message);
+            showToast('Upload failed: ' + error.message, 'error');
         }, 2000);
     }
 });
@@ -413,7 +448,9 @@ document.querySelectorAll('.matter-doc-delete').forEach(function(btn) {
     btn.addEventListener('click', async function() {
         var fileId = this.getAttribute('data-file-id');
         var docName = this.getAttribute('data-doc-name') || 'this document';
-        if (!fileId || !confirm('Delete "' + docName + '" from Google Drive? This cannot be undone.')) return;
+        if (!fileId) return;
+        const approved = await askConfirm('Delete "' + docName + '" from Google Drive? This cannot be undone.', 'Delete');
+        if (!approved) return;
         this.disabled = true;
         try {
             var res = await fetch('/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
@@ -421,12 +458,12 @@ document.querySelectorAll('.matter-doc-delete').forEach(function(btn) {
             if (data.success) {
                 window.location.reload();
             } else {
-                alert(data.error || 'Delete failed.');
+                showToast(data.error || 'Delete failed.', 'error');
                 this.disabled = false;
             }
         } catch (e) {
             console.error(e);
-            alert('Request failed.');
+            showToast('Request failed.', 'error');
             this.disabled = false;
         }
     });

@@ -10,12 +10,6 @@
     .tree-folder > summary::-webkit-details-marker { display: none; }
     .tree-chevron { transition: transform 0.2s ease; }
     details[open] > summary .tree-chevron { transform: rotate(90deg); }
-    .verify-code-input {
-        letter-spacing: 0.4em;
-        text-align: center;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-weight: 700;
-    }
     .reg-doc-item { border: 1px solid #f1f5f9; border-radius: 0.75rem; overflow: hidden; background: #fff; }
     .reg-doc-item + .reg-doc-item { margin-top: 0.5rem; }
     .reg-doc-header {
@@ -132,18 +126,27 @@
                                 <i class="fas fa-eye mr-1.5"></i>View
                             </a>
                             <button type="button"
-                                    onclick="openDocVerifyModal('download', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
-                                    class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                                    class="js-doc-action-btn px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center"
+                                    data-doc-action="download"
+                                    data-doc-kind="legacy"
+                                    data-doc-field="{{ upload.field }}"
+                                    data-doc-label="{{ upload.label|e }}">
                                 <i class="fas fa-download mr-1.5"></i>Download
                             </button>
                             <button type="button"
-                                    onclick="openDocVerifyModal('edit', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
-                                    class="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center">
+                                    class="js-doc-action-btn px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center"
+                                    data-doc-action="edit"
+                                    data-doc-kind="legacy"
+                                    data-doc-field="{{ upload.field }}"
+                                    data-doc-label="{{ upload.label|e }}">
                                 <i class="fas fa-edit mr-1.5"></i>Edit
                             </button>
                             <button type="button"
-                                    onclick="openDocVerifyModal('delete', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
-                                    class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                                    class="js-doc-action-btn px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center"
+                                    data-doc-action="delete"
+                                    data-doc-kind="legacy"
+                                    data-doc-field="{{ upload.field }}"
+                                    data-doc-label="{{ upload.label|e }}">
                                 <i class="fas fa-trash mr-1.5"></i>Delete
                             </button>
                         </div>
@@ -177,18 +180,27 @@
                         <i class="fas fa-eye mr-1.5"></i>View
                     </a>
                     <button type="button"
-                            onclick="openDocVerifyModal('download', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
-                            class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                            class="js-doc-action-btn px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center"
+                            data-doc-action="download"
+                            data-doc-kind="custom"
+                            data-doc-id="{{ upload.id }}"
+                            data-doc-label="{{ upload.label|e }}">
                         <i class="fas fa-download mr-1.5"></i>Download
                     </button>
                     <button type="button"
-                            onclick="openDocVerifyModal('edit', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
-                            class="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center">
+                            class="js-doc-action-btn px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center"
+                            data-doc-action="edit"
+                            data-doc-kind="custom"
+                            data-doc-id="{{ upload.id }}"
+                            data-doc-label="{{ upload.label|e }}">
                         <i class="fas fa-edit mr-1.5"></i>Edit
                     </button>
                     <button type="button"
-                            onclick="openDocVerifyModal('delete', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
-                            class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                            class="js-doc-action-btn px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center"
+                            data-doc-action="delete"
+                            data-doc-kind="custom"
+                            data-doc-id="{{ upload.id }}"
+                            data-doc-label="{{ upload.label|e }}">
                         <i class="fas fa-trash mr-1.5"></i>Delete
                     </button>
                 </div>
@@ -251,20 +263,30 @@
                             </a>
                             {% endif %}
                             <button type="button"
-                                    onclick="openDocVerifyModal('download', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }} })"
-                                    class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                                    class="js-doc-action-btn px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center"
+                                    data-doc-action="download"
+                                    data-doc-kind="drive"
+                                    data-drive-file-id="{{ node.id }}"
+                                    data-doc-label="{{ node.name|e }}">
                                 <i class="fas fa-download mr-1.5"></i>Download
                             </button>
                             {% if node.edit_url %}
                             <button type="button"
-                                    onclick="openDocVerifyModal('edit', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }}, edit_url: {{ node.edit_url|tojson }} })"
-                                    class="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center">
+                                    class="js-doc-action-btn px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center"
+                                    data-doc-action="edit"
+                                    data-doc-kind="drive"
+                                    data-drive-file-id="{{ node.id }}"
+                                    data-doc-label="{{ node.name|e }}"
+                                    data-edit-url="{{ node.edit_url|e }}">
                                 <i class="fas fa-edit mr-1.5"></i>Edit
                             </button>
                             {% endif %}
                             <button type="button"
-                                    onclick="openDocVerifyModal('delete', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }} })"
-                                    class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                                    class="js-doc-action-btn px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center"
+                                    data-doc-action="delete"
+                                    data-doc-kind="drive"
+                                    data-drive-file-id="{{ node.id }}"
+                                    data-doc-label="{{ node.name|e }}">
                                 <i class="fas fa-trash mr-1.5"></i>Delete
                             </button>
                         </div>
@@ -285,28 +307,22 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10">
             <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl px-6 py-4 flex items-center justify-between">
                 <h3 class="text-lg font-bold text-white flex items-center" id="docVerifyTitle">
-                    <i class="fas fa-shield-alt mr-2"></i>Verify your identity
+                    <i class="fas fa-shield-alt mr-2"></i>Confirm your identity
                 </h3>
                 <button type="button" onclick="closeDocVerifyModal()" class="text-white hover:text-indigo-200">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             <div class="p-6">
-                <p class="text-sm text-gray-600 mb-1" id="docVerifyActionText">To continue, enter the verification code sent to your registered email.</p>
+                <p class="text-sm text-gray-600 mb-1" id="docVerifyActionText">Re-enter your account password to confirm this action.</p>
                 <p class="text-sm font-bold text-gray-900 mb-4 truncate" id="docVerifyDocName"></p>
 
-                <div id="docVerifySendStatus" class="hidden mb-4 p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-sm text-indigo-800"></div>
                 <div id="docVerifyError" class="hidden mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700"></div>
 
-                <label class="block text-sm font-semibold text-gray-700 mb-2" for="docVerifyCode">6-digit verification code</label>
-                <input type="text" id="docVerifyCode" maxlength="6" inputmode="numeric" pattern="[0-9]*"
-                       class="verify-code-input w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg"
-                       placeholder="000000" autocomplete="one-time-code">
-
-                <p class="text-xs text-gray-500 mt-3">
-                    Didn't receive it?
-                    <button type="button" id="docVerifyResendBtn" onclick="sendDocVerificationCode()" class="text-indigo-600 font-semibold hover:text-indigo-800">Resend code</button>
-                </p>
+                <label class="block text-sm font-semibold text-gray-700 mb-2" for="docVerifyPassword">Account password</label>
+                <input type="password" id="docVerifyPassword" autocomplete="current-password"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                       placeholder="Enter your login password">
             </div>
             <div class="px-6 py-4 bg-gray-50 rounded-b-2xl flex items-center justify-end gap-3">
                 <button type="button" onclick="closeDocVerifyModal()" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 text-sm font-semibold">
@@ -375,7 +391,6 @@ function toggleRegDocItem(headerBtn) {
     const API_BASE = '/api/staff/client_documents/' + CLIENT_ID;
 
     let pendingDocAction = null;
-    let codeSent = false;
     let pendingEditContext = null;
 
     function buildActionPayload() {
@@ -401,13 +416,6 @@ function toggleRegDocItem(headerBtn) {
         el.textContent = '';
         el.classList.add('hidden');
     }
-
-    function setSendStatus(msg) {
-        const el = document.getElementById('docVerifySendStatus');
-        el.textContent = msg;
-        el.classList.remove('hidden');
-    }
-
     window.openDocVerifyModal = function (action, docKind, opts) {
         pendingDocAction = {
             action: action,
@@ -418,31 +426,29 @@ function toggleRegDocItem(headerBtn) {
             editUrl: opts.edit_url || null,
             label: opts.label || 'Document',
         };
-        codeSent = false;
         pendingEditContext = null;
 
         const isDelete = action === 'delete';
         const isEdit = action === 'edit';
-        let title = 'Verify to download';
+        let title = 'Confirm download';
         let actionText = 'download';
         let confirmLabel = 'Download';
         if (isDelete) {
-            title = 'Verify to delete';
+            title = 'Confirm delete';
             actionText = 'permanently delete';
             confirmLabel = 'Delete';
         } else if (isEdit) {
-            title = 'Verify to edit';
+            title = 'Confirm edit';
             actionText = 'edit or replace';
             confirmLabel = 'Continue';
         }
         document.getElementById('docVerifyTitle').innerHTML =
             '<i class="fas fa-shield-alt mr-2"></i>' + title;
         document.getElementById('docVerifyActionText').textContent =
-            'A verification code will be sent to your registered email. Enter it below to ' + actionText + ':';
+            'Enter your account password to ' + actionText + ':';
         document.getElementById('docVerifyDocName').textContent = pendingDocAction.label;
         document.getElementById('docVerifyConfirmLabel').textContent = confirmLabel;
-        document.getElementById('docVerifyCode').value = '';
-        document.getElementById('docVerifySendStatus').classList.add('hidden');
+        document.getElementById('docVerifyPassword').value = '';
         clearVerifyError();
 
         const confirmBtn = document.getElementById('docVerifyConfirmBtn');
@@ -451,15 +457,12 @@ function toggleRegDocItem(headerBtn) {
 
         document.getElementById('docVerifyModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
-
-        sendDocVerificationCode();
     };
 
     window.closeDocVerifyModal = function () {
         document.getElementById('docVerifyModal').classList.add('hidden');
         document.body.style.overflow = '';
         pendingDocAction = null;
-        codeSent = false;
     };
 
     window.closeDocEditReplaceModal = function () {
@@ -542,44 +545,12 @@ function toggleRegDocItem(headerBtn) {
         }
     };
 
-    window.sendDocVerificationCode = async function () {
-        const payload = buildActionPayload();
-        if (!payload) return;
-
-        const resendBtn = document.getElementById('docVerifyResendBtn');
-        resendBtn.disabled = true;
-        clearVerifyError();
-
-        try {
-            const res = await fetch(API_BASE + '/action/send-code', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) {
-                showVerifyError(data.error || 'Could not send verification code.');
-                return;
-            }
-            codeSent = true;
-            setSendStatus(data.message || 'Verification code sent.');
-        } catch (e) {
-            showVerifyError('Network error. Please try again.');
-        } finally {
-            resendBtn.disabled = false;
-        }
-    };
-
     window.confirmDocVerifiedAction = async function () {
         if (!pendingDocAction) return;
 
-        const code = (document.getElementById('docVerifyCode').value || '').trim();
-        if (!/^\d{6}$/.test(code)) {
-            showVerifyError('Please enter the 6-digit verification code.');
-            return;
-        }
-        if (!codeSent) {
-            showVerifyError('Request a verification code first.');
+        const password = (document.getElementById('docVerifyPassword').value || '').trim();
+        if (!password) {
+            showVerifyError('Please enter your account password.');
             return;
         }
 
@@ -589,10 +560,10 @@ function toggleRegDocItem(headerBtn) {
         clearVerifyError();
 
         const payload = buildActionPayload();
-        payload.code = code;
+        payload.password = password;
 
         try {
-            const verifyRes = await fetch(API_BASE + '/action/verify-code', {
+            const verifyRes = await fetch(API_BASE + '/action/verify-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -673,6 +644,17 @@ function toggleRegDocItem(headerBtn) {
             confirmBtn.classList.remove('opacity-60', 'cursor-not-allowed');
         }
     };
+
+    document.addEventListener('click', function (event) {
+        var btn = event.target.closest('.js-doc-action-btn');
+        if (!btn) return;
+        var opts = { label: btn.getAttribute('data-doc-label') || 'Document' };
+        if (btn.dataset.docField) opts.field = btn.dataset.docField;
+        if (btn.dataset.docId) opts.doc_id = parseInt(btn.dataset.docId, 10);
+        if (btn.dataset.driveFileId) opts.drive_file_id = btn.dataset.driveFileId;
+        if (btn.dataset.editUrl) opts.edit_url = btn.dataset.editUrl;
+        openDocVerifyModal(btn.dataset.docAction, btn.dataset.docKind, opts);
+    });
 })();
 </script>
 {% endblock %}

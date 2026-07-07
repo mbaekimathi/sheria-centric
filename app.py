@@ -17852,6 +17852,37 @@ def _consume_staff_document_action_token(cursor, employee_id, client_id, payload
     return row['id']
 
 
+def _issue_staff_document_action_token(cursor, connection, employee_id, client_id, payload):
+    """Create a short-lived one-time action token after staff re-authentication."""
+    from datetime import datetime as _dt, timedelta as _td
+
+    cursor.execute("""
+        UPDATE document_action_verifications SET used = 1
+        WHERE employee_id = %s AND client_id = %s AND used = 0
+    """, (employee_id, client_id))
+
+    action_token = secrets.token_urlsafe(32)
+    token_hash = generate_password_hash(action_token)
+    verified_at = _dt.utcnow()
+    token_expires_at = verified_at + _td(minutes=5)
+    expires_at = verified_at + _td(minutes=10)
+
+    cursor.execute("""
+        INSERT INTO document_action_verifications
+            (employee_id, client_id, action, doc_kind, doc_field, doc_id, drive_file_id,
+             code_hash, expires_at, verified_at, action_token_hash, token_expires_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (
+        employee_id, client_id,
+        payload['action'], payload['doc_kind'],
+        payload.get('doc_field'), payload.get('doc_id'), payload.get('drive_file_id'),
+        generate_password_hash(secrets.token_hex(16)), expires_at,
+        verified_at, token_hash, token_expires_at,
+    ))
+    connection.commit()
+    return action_token
+
+
 def _parse_drive_document_action_payload(data):
     """Normalize download/delete payload for case or matter Drive documents."""
     action = (data.get('action') or '').strip().lower()
@@ -20015,6 +20046,55 @@ def staff_client_document_verify_code(client_id):
         })
     except Exception as e:
         print(f"[staff_client_document_verify_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/action/verify-password', methods=['POST'])
+def staff_client_document_verify_password(client_id):
+    """Confirm the logged-in employee's password and return a short-lived action token."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    password = (data.get('password') or '').strip()
+    if not password:
+        return jsonify({'success': False, 'error': 'Password is required.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM clients WHERE id = %s", (client_id,))
+            if not cursor.fetchone():
+                return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+            employee_id = session['employee_id']
+            cursor.execute("SELECT password_hash FROM employees WHERE id = %s", (employee_id,))
+            employee = cursor.fetchone()
+            if not employee or not check_password_hash(employee['password_hash'], password):
+                return jsonify({'success': False, 'error': 'Incorrect password.'}), 403
+
+            action_token = _issue_staff_document_action_token(
+                cursor, connection, employee_id, client_id, payload,
+            )
+
+        return jsonify({
+            'success': True,
+            'message': 'Password verified.',
+            'action_token': action_token,
+            'expires_in_minutes': 5,
+        })
+    except Exception as e:
+        print(f"[staff_client_document_verify_password] error: {e}")
         return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
     finally:
         connection.close()

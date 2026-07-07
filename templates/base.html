@@ -1444,7 +1444,7 @@
                     {% endif %}
                     
                     <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management, case pages, and company settings) -->
-                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint not in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section'] %}
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint not in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section', 'view_client_documents'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administration</p>
                     </div>
@@ -1505,10 +1505,12 @@
                         <i class="fas fa-list"></i>
                         <span>All Matters</span>
                     </a>
+                    {% if request.endpoint != 'all_matters' %}
                     <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-hub">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
+                    {% endif %}
                     <a href="{{ role_url('case_management') }}" class="sidebar-link" id="nav-case-management">
                         <i class="fas fa-gavel"></i>
                         <span>Litigation Matters</span>

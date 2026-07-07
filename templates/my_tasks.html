@@ -6,7 +6,7 @@
 {% set total = tasks|length %}
 {% set pending_n = tasks|selectattr('task_status', 'equalto', 'Pending')|list|length %}
 {% set inprog_n = tasks|selectattr('task_status', 'equalto', 'In Progress')|list|length %}
-{% set action_n = tasks|selectattr('task_status', 'equalto', 'Pending')|rejectattr('task_source', 'equalto', 'session_allocation')|list|length %}
+{% set action_n = tasks|selectattr('task_status', 'in', ['Pending', 'Received'])|rejectattr('task_source', 'equalto', 'session_allocation')|list|length %}
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
     <div class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 text-white shadow-xl shadow-emerald-900/20 mb-8">
@@ -22,7 +22,7 @@
                         My tasks
                     </h1>
                     <p class="text-emerald-100/90 text-base leading-relaxed">
-                        Case and matter work assigned to you, plus court session items. Accept tasks to start, then open details or documents from each card.
+                        Case and matter work assigned to you, plus court session items. View a task to acknowledge it, then accept or reject before you start work.
                     </p>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[380px]">
@@ -62,6 +62,7 @@
                 <select id="task-status-filter" class="w-full rounded-xl border border-gray-300 bg-white py-2.5 px-3 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                     <option value="all">All statuses</option>
                     <option value="pending">Pending</option>
+                    <option value="received">Received</option>
                     <option value="in progress">In Progress</option>
                     <option value="submitted">Submitted</option>
                     <option value="completed">Completed</option>
@@ -126,6 +127,8 @@
                 {% set st = task.task_status %}
                 {% if st == 'Pending' %}
                     {% set status_class = 'bg-amber-50 text-amber-800 ring-amber-200/80' %}
+                {% elif st == 'Received' %}
+                    {% set status_class = 'bg-orange-50 text-orange-800 ring-orange-200/80' %}
                 {% elif st == 'In Progress' %}
                     {% set status_class = 'bg-sky-50 text-sky-800 ring-sky-200/80' %}
                 {% elif st == 'Submitted' %}
@@ -139,6 +142,7 @@
                 {% endif %}
                 <tr
                     class="task-card hover:bg-gray-50/70 transition-colors"
+                    data-task-id="{{ task.id if not is_session else '' }}"
                     data-title="{{ (task.task_title or 'Untitled task')|lower }}"
                     data-linked="{{ ((task.case_tracking_number or task.matter_reference_number or '') ~ ' ' ~ (task.case_client_name or task.matter_title or ''))|lower }}"
                     data-created-by="{{ (task.created_by_name or '')|lower }}"
@@ -188,21 +192,23 @@
                         </span>
                     </td>
                     <td class="px-4 py-3 align-top text-right">
+                        <div class="inline-flex items-center justify-end gap-1.5">
                         {% if is_session %}
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs text-gray-500 bg-gray-50 ring-1 ring-gray-100">No action</span>
-                        {% elif task.task_status == 'Pending' %}
-                        <form method="POST" action="{{ url_for('accept_my_task', task_id=task.id) }}" class="inline">
-                            <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors">
-                                <i class="fas fa-check text-[10px]"></i>Accept
-                            </button>
-                        </form>
-                        {% elif task.task_status == 'In Progress' %}
-                        <a href="{{ url_for('my_task_view', task_id=task.id) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800 transition-colors">
-                            <i class="fas fa-arrow-right text-[10px]"></i>Open
+                        <a href="{{ url_for('case_details', case_id=task.linked_id) }}" class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 ring-1 ring-gray-200 transition-colors" title="View case">
+                            <i class="fas fa-eye text-xs"></i>
                         </a>
+                        {% elif task.task_status in ('Pending', 'Received', 'In Progress') %}
+                        <button type="button" class="task-view-btn inline-flex items-center justify-center {% if task.task_status == 'In Progress' %}gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800{% else %}h-8 w-8 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700{% endif %} transition-colors" data-task-id="{{ task.id }}" title="View task">
+                            {% if task.task_status == 'In Progress' %}
+                            <i class="fas fa-arrow-right text-[10px]"></i>Open
+                            {% else %}
+                            <i class="fas fa-eye text-xs"></i>
+                            {% endif %}
+                        </button>
                         {% else %}
-                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs text-gray-400 bg-gray-50">No action</span>
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs text-gray-400 bg-gray-50">—</span>
                         {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -226,6 +232,32 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Task view modal -->
+<div id="task-view-modal" class="fixed inset-0 z-[120] hidden" aria-hidden="true">
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" data-task-modal-close></div>
+    <div class="relative flex min-h-full items-center justify-center p-4 sm:p-6">
+        <div class="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
+            <div class="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-emerald-50/80 shrink-0">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold text-emerald-700 uppercase tracking-widest mb-1">Task allocation</p>
+                    <h2 id="task-modal-title" class="text-xl font-bold text-gray-900 leading-snug truncate">Loading…</h2>
+                </div>
+                <button type="button" class="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800 transition-colors" data-task-modal-close aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="task-modal-body" class="overflow-y-auto px-6 py-5 space-y-5 flex-1">
+                <div class="flex items-center justify-center py-12 text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-2xl text-indigo-500"></i>
+                </div>
+            </div>
+
+            <div id="task-modal-footer" class="shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50/80 flex flex-wrap items-center justify-end gap-3 hidden"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -233,7 +265,7 @@
 <script>
     (function () {
         const cards = Array.from(document.querySelectorAll('.task-card'));
-        if (!cards.length) return;
+        if (!cards.length || !listBody) return;
 
         const listBody = document.getElementById('task-list-body');
         const search = document.getElementById('task-search');
@@ -283,15 +315,21 @@
             });
 
             visible.forEach((card) => listBody.appendChild(card));
-            resultCount.textContent = `${visible.length} task${visible.length === 1 ? '' : 's'} shown`;
-            emptyFiltered.classList.toggle('hidden', visible.length !== 0);
+            if (resultCount) {
+                resultCount.textContent = `${visible.length} task${visible.length === 1 ? '' : 's'} shown`;
+            }
+            if (emptyFiltered) {
+                emptyFiltered.classList.toggle('hidden', visible.length !== 0);
+            }
         }
 
         [search, statusFilter, typeFilter, sourceFilter, sortSelect].forEach((el) => {
+            if (!el) return;
             el.addEventListener('input', applyFiltersAndSort);
             el.addEventListener('change', applyFiltersAndSort);
         });
 
+        if (resetBtn) {
         resetBtn.addEventListener('click', function () {
             search.value = '';
             statusFilter.value = 'all';
@@ -300,8 +338,249 @@
             sortSelect.value = 'due_asc';
             applyFiltersAndSort();
         });
+        }
 
         applyFiltersAndSort();
+    })();
+</script>
+<script>
+    (function () {
+        const modal = document.getElementById('task-view-modal');
+        if (!modal) return;
+
+        const modalTitle = document.getElementById('task-modal-title');
+        const modalBody = document.getElementById('task-modal-body');
+        const modalFooter = document.getElementById('task-modal-footer');
+        const apiTaskBase = {{ url_for('api_my_task', task_id=0)|tojson }};
+        const bootTaskId = {{ view_task_id|tojson }};
+
+        const statusClasses = {
+            'pending': 'bg-amber-50 text-amber-800 ring-amber-200/80',
+            'received': 'bg-orange-50 text-orange-800 ring-orange-200/80',
+            'in progress': 'bg-sky-50 text-sky-800 ring-sky-200/80',
+            'submitted': 'bg-violet-50 text-violet-800 ring-violet-200/80',
+            'completed': 'bg-emerald-50 text-emerald-800 ring-emerald-200/80',
+            'cancelled': 'bg-gray-100 text-gray-600 ring-gray-200/80',
+        };
+
+        function apiTaskUrl(taskId) {
+            return apiTaskBase.replace(/\/0$/, '/' + encodeURIComponent(taskId));
+        }
+
+        function escapeHtml(value) {
+            return (value || '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function statusBadge(status) {
+            const key = (status || '').toLowerCase();
+            const cls = statusClasses[key] || 'bg-gray-50 text-gray-700 ring-gray-200/80';
+            return `<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 ${cls}">${escapeHtml(status)}</span>`;
+        }
+
+        function showModal() {
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function hideModal() {
+            modal.classList.add('hidden');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        function setLoading() {
+            modalTitle.textContent = 'Loading…';
+            modalBody.innerHTML = '<div class="flex items-center justify-center py-12 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl text-indigo-500"></i></div>';
+            modalFooter.classList.add('hidden');
+            modalFooter.innerHTML = '';
+        }
+
+        function updateRowStatus(taskId, status) {
+            const row = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (!row) return;
+            row.dataset.status = (status || '').toLowerCase();
+            const badge = row.querySelector('td:nth-child(4) span');
+            if (badge) {
+                const key = (status || '').toLowerCase();
+                badge.textContent = status;
+                badge.className = `inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 ${statusClasses[key] || 'bg-gray-50 text-gray-700 ring-gray-200/80'}`;
+            }
+        }
+
+        function renderTaskModal(task) {
+            modalTitle.textContent = task.task_title || 'Untitled task';
+            const linkedHtml = task.linked_url
+                ? `<a href="${escapeHtml(task.linked_url)}" class="font-semibold text-indigo-700 hover:text-indigo-800 hover:underline">${escapeHtml(task.linked_label)}</a>`
+                : `<p class="font-semibold text-gray-800">${escapeHtml(task.linked_label)}</p>`;
+
+            const docsHtml = task.documents_url
+                ? `<a href="${escapeHtml(task.documents_url)}" class="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 hover:text-indigo-800"><i class="fas fa-folder-open"></i>Open case documents</a>`
+                : '';
+
+            const decisionHtml = task.task_status === 'Received'
+                ? `<div class="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 ring-1 ring-amber-100">
+                        <p class="text-sm font-bold text-amber-900 mb-1">Your decision is needed</p>
+                        <p class="text-sm text-amber-800/90">You have viewed this allocation. Accept to begin working on it, or reject to decline.</p>
+                   </div>`
+                : '';
+
+            modalBody.innerHTML = `
+                <div class="flex flex-wrap items-center gap-2">
+                    ${statusBadge(task.task_status)}
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 ${task.task_type === 'case' ? 'bg-indigo-50 text-indigo-800 ring-indigo-100' : 'bg-gray-100 text-gray-700 ring-gray-200'}">
+                        <i class="fas ${task.task_type === 'case' ? 'fa-briefcase' : 'fa-folder'} text-[10px]"></i>
+                        ${task.task_type === 'case' ? 'Case' : 'Matter'}
+                    </span>
+                </div>
+                ${decisionHtml}
+                <div>
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Linked record</p>
+                    ${linkedHtml}
+                    ${docsHtml}
+                </div>
+                <div class="rounded-xl bg-gray-50 ring-1 ring-gray-100 p-4">
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Description</p>
+                    <p class="text-gray-800 whitespace-pre-line leading-relaxed text-sm">${escapeHtml(task.task_description || 'No description provided.')}</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="rounded-xl border border-gray-100 p-3">
+                        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Due</p>
+                        <p class="text-sm font-bold text-gray-900 tabular-nums">${escapeHtml(task.due_at)}</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 p-3">
+                        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Reminders</p>
+                        <p class="text-sm font-bold text-gray-900">${escapeHtml(task.reminder_intervals || '—')}</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-100 p-3">
+                        <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Created by</p>
+                        <p class="text-sm font-bold text-gray-900">${escapeHtml(task.created_by_name || 'Unknown')}</p>
+                    </div>
+                </div>
+            `;
+
+            modalFooter.classList.remove('hidden');
+            if (task.task_status === 'Received') {
+                modalFooter.innerHTML = `
+                    <button type="button" class="task-modal-reject inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 bg-white text-red-700 text-sm font-semibold hover:bg-red-50 transition-colors" data-url="${escapeHtml(task.reject_url)}">
+                        <i class="fas fa-times"></i>Reject
+                    </button>
+                    <button type="button" class="task-modal-accept inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors" data-url="${escapeHtml(task.accept_url)}">
+                        <i class="fas fa-check"></i>Accept task
+                    </button>
+                `;
+            } else if (task.task_status === 'In Progress') {
+                modalFooter.innerHTML = `
+                    <button type="button" data-task-modal-close class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">Close</button>
+                    <a href="${escapeHtml(task.full_view_url)}" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors">
+                        <i class="fas fa-arrow-right"></i>Open full task
+                    </a>
+                `;
+            } else {
+                modalFooter.innerHTML = `
+                    <button type="button" data-task-modal-close class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">Close</button>
+                `;
+            }
+        }
+
+        async function openTaskModal(taskId) {
+            showModal();
+            setLoading();
+            try {
+                const response = await fetch(apiTaskUrl(taskId), {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Unable to load task.');
+                }
+                renderTaskModal(data.task);
+                updateRowStatus(taskId, data.task.task_status);
+            } catch (err) {
+                modalBody.innerHTML = `<div class="rounded-xl bg-red-50 text-red-800 px-4 py-3 text-sm ring-1 ring-red-100">${escapeHtml(err.message || 'Unable to load task.')}</div>`;
+                modalFooter.classList.remove('hidden');
+                modalFooter.innerHTML = '<button type="button" data-task-modal-close class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50">Close</button>';
+            }
+        }
+
+        async function postTaskAction(btn, url, confirmMessage) {
+            if (confirmMessage && !confirm(confirmMessage)) return;
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Action failed.');
+                }
+                if (typeof scAlert === 'function') {
+                    scAlert(data.message || 'Done.');
+                }
+                hideModal();
+                const cleanUrl = new URL(window.location.href);
+                cleanUrl.searchParams.delete('view');
+                window.location.href = cleanUrl.pathname + cleanUrl.search;
+            } catch (err) {
+                if (typeof scAlert === 'function') {
+                    scAlert(err.message || 'Action failed.');
+                } else {
+                    alert(err.message || 'Action failed.');
+                }
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.task-view-btn');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const taskId = btn.getAttribute('data-task-id');
+                if (taskId) openTaskModal(taskId);
+                return;
+            }
+
+            if (e.target.closest('[data-task-modal-close]')) {
+                hideModal();
+                return;
+            }
+            const acceptBtn = e.target.closest('.task-modal-accept');
+            if (acceptBtn) {
+                e.preventDefault();
+                postTaskAction(acceptBtn, acceptBtn.getAttribute('data-url'));
+                return;
+            }
+            const rejectBtn = e.target.closest('.task-modal-reject');
+            if (rejectBtn) {
+                e.preventDefault();
+                postTaskAction(rejectBtn, rejectBtn.getAttribute('data-url'), 'Reject this task allocation?');
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                hideModal();
+            }
+        });
+
+        if (bootTaskId) {
+            openTaskModal(bootTaskId);
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('view');
+            window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
+        }
     })();
 </script>
 {% endblock %}

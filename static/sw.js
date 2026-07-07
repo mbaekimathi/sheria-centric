@@ -14,7 +14,7 @@
  *   uploads). These must always hit the network.
  */
 
-const VERSION = "sheria-centric-pwa-v1";
+const VERSION = "sheria-centric-pwa-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -118,4 +118,64 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
+});
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+self.addEventListener("push", (event) => {
+  let payload = {
+    title: "SHERIA CENTRIC",
+    body: "You have new workspace updates.",
+    url: "/notifications",
+    count: 0,
+  };
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      payload = { ...payload, ...parsed };
+    }
+  } catch (err) {
+  }
+
+  const title = payload.title || "SHERIA CENTRIC";
+  const options = {
+    body: payload.body || "Open the app to review your notifications.",
+    icon: "/static/icon-192.png",
+    badge: "/static/icon-192.png",
+    data: { url: payload.url || "/notifications" },
+    tag: "sheria-workspace-alert",
+    renotify: true,
+    vibrate: [120, 60, 120],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/notifications";
+  event.waitUntil(
+    (async () => {
+      const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of allClients) {
+        if ("focus" in client) {
+          if (client.url.includes(targetUrl) || client.url.includes("/notifications")) {
+            return client.focus();
+          }
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })()
+  );
 });

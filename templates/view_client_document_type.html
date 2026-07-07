@@ -2,102 +2,107 @@
 
 {% block title %}{{ document_type_name }} - {{ client.full_name }} - SHERIA CENTRIC{% endblock %}
 
-{% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <!-- Page Header -->
-    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-            <div class="flex items-center space-x-4 mb-4 md:mb-0">
-                <a href="{{ url_for('view_client_documents', client_id=client_id) }}" class="text-white hover:text-indigo-200 transition-colors">
-                    <i class="fas fa-arrow-left text-xl"></i>
-                </a>
-                <div>
-                    <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
-                        <i class="fas fa-folder-open mr-3"></i>
-                        {{ document_type_name }}
-                    </h1>
-                    <p class="text-indigo-100">Viewing {{ document_type_name|lower }} for: <span class="font-semibold text-white">{{ client.full_name }}</span></p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Client Profile Card -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-            <!-- Profile Picture -->
-            <div class="flex-shrink-0">
-                {% if client.profile_picture %}
-                    {% if client.profile_picture.startswith('http') %}
-                    <img src="{{ client.profile_picture }}" alt="{{ client.full_name }}" class="w-20 h-20 md:w-24 md:h-24 rounded-xl object-cover border-4 border-indigo-200 shadow-lg">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.profile_picture) }}" alt="{{ client.full_name }}" class="w-20 h-20 md:w-24 md:h-24 rounded-xl object-cover border-4 border-indigo-200 shadow-lg">
-                    {% endif %}
-                {% else %}
-                <div class="w-20 h-20 md:w-24 md:h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl md:text-3xl font-bold border-4 border-indigo-200 shadow-lg">
-                    {{ client.full_name[0] if client.full_name else 'C' }}
-                </div>
-                {% endif %}
-            </div>
-            
-            <!-- Client Information -->
-            <div class="flex-1 min-w-0">
-                <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-2">{{ client.full_name or 'N/A' }}</h2>
-                <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                    <span class="flex items-center">
-                        <i class="fas fa-phone mr-2 text-indigo-600"></i>
-                        {{ client.phone_number or 'N/A' }}
-                    </span>
-                    <span class="flex items-center">
-                        <i class="fas fa-envelope mr-2 text-indigo-600"></i>
-                        {{ client.email or 'N/A' }}
-                    </span>
-                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
-                        {{ client.client_type or 'Pending' }} Client
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Documents Section -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-file-alt text-indigo-600 mr-3"></i>
-                {{ document_type_name }}
-            </h2>
-            <button 
-                onclick="uploadDocument()"
-                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold flex items-center"
-            >
-                <i class="fas fa-upload mr-2"></i>Upload Document
-            </button>
-        </div>
-        
-        <div class="text-center py-12">
-            <i class="fas fa-folder-open text-gray-300 text-5xl mb-4"></i>
-            <p class="text-gray-600 font-semibold mb-2">No Documents Available</p>
-            <p class="text-gray-500 text-sm mb-4">Documents for this category will appear here once uploaded.</p>
-            <button 
-                onclick="uploadDocument()"
-                class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-semibold inline-flex items-center"
-            >
-                <i class="fas fa-upload mr-2"></i>Upload First Document
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-function uploadDocument() {
-    // TODO: Implement document upload functionality
-    scAlert('Document upload functionality will be implemented soon.');
-}
-</script>
+{% block extra_css %}
+<style>
+    .doc-row { transition: background-color 0.15s ease; }
+    .doc-row:hover { background-color: #f8fafc; }
+    .tree-folder > summary { list-style: none; cursor: pointer; }
+    .tree-folder > summary::-webkit-details-marker { display: none; }
+    .tree-chevron { transition: transform 0.2s ease; }
+    details[open] > summary .tree-chevron { transform: rotate(90deg); }
+</style>
 {% endblock %}
 
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('view_client_documents', client_id=client_id) }}" class="text-white hover:text-indigo-200 transition-colors">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold mb-2 flex items-center">
+                    <i class="fas fa-folder-open mr-3"></i>
+                    {{ document_type_name }}
+                </h1>
+                <p class="text-indigo-100">{{ client.full_name }}</p>
+            </div>
+        </div>
+    </div>
 
+    {% if document_type == 'CLIENT_PERSONAL_DOCUMENT' and personal_uploads is defined and personal_uploads|length > 0 %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Registration Documents</h2>
+        <div class="space-y-2">
+            {% for upload in personal_uploads %}
+            <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-900">{{ upload.label }}</p>
+                    <p class="text-xs text-gray-500 truncate">{{ upload.filename }}</p>
+                </div>
+                <a href="{{ upload.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold">View</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
+    {% if document_type == 'CLIENT_PERSONAL_DOCUMENT' and custom_uploads is defined and custom_uploads|length > 0 %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Uploaded Personal Documents</h2>
+        <div class="space-y-2">
+            {% for upload in custom_uploads %}
+            <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-900">{{ upload.label }}</p>
+                    <p class="text-xs text-gray-500 truncate">{{ upload.filename }}</p>
+                </div>
+                <a href="{{ upload.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold">View</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fab fa-google-drive text-green-600 mr-3"></i>
+            Drive Files
+        </h2>
+        {% if not google_drive_connected %}
+        <p class="text-gray-500 text-sm">Google Drive is not connected.</p>
+        {% elif drive_tree|length == 0 %}
+        <p class="text-gray-500 text-sm">No documents in this category yet.</p>
+        {% else %}
+        <div class="border border-gray-200 rounded-xl overflow-hidden">
+            {% macro render_tree(nodes, depth=0) %}
+                {% for node in nodes %}
+                    {% if node.type == 'folder' %}
+                    <details class="tree-folder border-b border-gray-100 last:border-b-0" open>
+                        <summary class="doc-row flex items-center gap-3 px-4 py-3" style="padding-left: {{ 16 + depth * 20 }}px;">
+                            <i class="fas fa-chevron-right text-gray-400 text-xs tree-chevron"></i>
+                            <i class="fas fa-folder text-amber-500"></i>
+                            <span class="text-sm font-semibold text-gray-900">{{ node.name }}</span>
+                        </summary>
+                        {{ render_tree(node.children, depth + 1) }}
+                    </details>
+                    {% else %}
+                    <div class="doc-row flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100" style="padding-left: {{ 16 + depth * 20 }}px;">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <i class="fas fa-file text-gray-500"></i>
+                            <span class="text-sm text-gray-900 truncate">{{ node.name }}</span>
+                        </div>
+                        {% if node.url %}
+                        <a href="{{ node.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold">Open</a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% endmacro %}
+            {{ render_tree(drive_tree) }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
 

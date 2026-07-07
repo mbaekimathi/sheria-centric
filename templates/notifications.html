@@ -20,6 +20,37 @@
         </div>
     </div>
 
+    <div id="phone-push-card" class="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-emerald-50 shadow-sm p-5 sm:p-6 mb-7">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div class="flex items-start gap-4 min-w-0">
+                <span class="inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md">
+                    <i class="fas fa-mobile-screen-button text-lg"></i>
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-lg font-bold text-gray-900">Phone alerts (even when app is closed)</h2>
+                    <p class="text-sm text-gray-600 mt-1 leading-relaxed">
+                        Enable push notifications on this device to receive task, reminder, and court-date alerts on your phone lock screen — even when you are not logged in or the browser is closed.
+                    </p>
+                    <p id="push-status-text" class="text-xs font-semibold mt-2 text-gray-500">Checking push status…</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
+                <button type="button" id="push-enable-btn" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                    <i class="fas fa-bell"></i>
+                    Enable on this phone
+                </button>
+                <button type="button" id="push-test-btn" class="hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-indigo-700 text-sm font-semibold border border-indigo-200 hover:bg-indigo-50 transition-colors">
+                    <i class="fas fa-paper-plane"></i>
+                    Send test
+                </button>
+                <button type="button" id="push-disable-btn" class="hidden inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-gray-700 text-sm font-semibold border border-gray-200 hover:bg-gray-50 transition-colors">
+                    Turn off
+                </button>
+            </div>
+        </div>
+        <p id="push-feedback" class="hidden mt-3 text-sm font-medium"></p>
+    </div>
+
     {% if notifications %}
     <div class="rounded-2xl border border-gray-200 bg-white/90 backdrop-blur-sm shadow-sm overflow-x-auto">
         <table class="min-w-full text-sm">
@@ -72,4 +103,104 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const statusText = document.getElementById('push-status-text');
+    const feedback = document.getElementById('push-feedback');
+    const enableBtn = document.getElementById('push-enable-btn');
+    const disableBtn = document.getElementById('push-disable-btn');
+    const testBtn = document.getElementById('push-test-btn');
+    const card = document.getElementById('phone-push-card');
+
+    function showFeedback(message, ok) {
+        feedback.textContent = message;
+        feedback.classList.remove('hidden', 'text-emerald-700', 'text-red-600');
+        feedback.classList.add(ok ? 'text-emerald-700' : 'text-red-600');
+    }
+
+    function setSubscribedUI(subscribed, permission) {
+        if (!window.PushNotifications || !PushNotifications.isSupported()) {
+            statusText.textContent = 'This browser does not support background phone notifications.';
+            enableBtn.disabled = true;
+            enableBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            return;
+        }
+        if (permission === 'denied') {
+            statusText.textContent = 'Notifications are blocked. Allow them in your browser or phone settings, then refresh.';
+            enableBtn.disabled = true;
+            enableBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            return;
+        }
+        if (subscribed) {
+            statusText.textContent = 'Enabled on this device — alerts will pop up even when the app is closed.';
+            enableBtn.classList.add('hidden');
+            disableBtn.classList.remove('hidden');
+            testBtn.classList.remove('hidden');
+        } else {
+            statusText.textContent = 'Not enabled yet. Tap the button to allow alerts on this phone.';
+            enableBtn.classList.remove('hidden');
+            disableBtn.classList.add('hidden');
+            testBtn.classList.add('hidden');
+        }
+    }
+
+    async function refreshStatus() {
+        try {
+            const data = await PushNotifications.getStatus();
+            if (!data.success) {
+                statusText.textContent = data.error || 'Could not load push status.';
+                return;
+            }
+            if (!data.configured) {
+                statusText.textContent = 'Server push is not configured yet (VAPID keys missing).';
+                enableBtn.disabled = true;
+                return;
+            }
+            setSubscribedUI(data.subscribed, PushNotifications.permissionLabel());
+        } catch (err) {
+            statusText.textContent = 'Could not check push status.';
+        }
+    }
+
+    enableBtn.addEventListener('click', async function () {
+        enableBtn.disabled = true;
+        try {
+            await PushNotifications.subscribe();
+            showFeedback('Phone notifications enabled. You can close the app and still receive alerts.', true);
+            await refreshStatus();
+        } catch (err) {
+            showFeedback(err.message || 'Could not enable notifications.', false);
+            enableBtn.disabled = false;
+        }
+    });
+
+    disableBtn.addEventListener('click', async function () {
+        disableBtn.disabled = true;
+        try {
+            await PushNotifications.unsubscribe();
+            showFeedback('Phone notifications turned off for this device.', true);
+            await refreshStatus();
+        } catch (err) {
+            showFeedback(err.message || 'Could not disable notifications.', false);
+        } finally {
+            disableBtn.disabled = false;
+        }
+    });
+
+    testBtn.addEventListener('click', async function () {
+        testBtn.disabled = true;
+        try {
+            const result = await PushNotifications.sendTest();
+            showFeedback(result.sent ? 'Test alert sent — check your phone notification tray.' : 'No active subscription found on this device.', !!result.sent);
+        } catch (err) {
+            showFeedback(err.message || 'Test failed.', false);
+        } finally {
+            testBtn.disabled = false;
+        }
+    });
+
+    refreshStatus();
+});
+</script>
 {% endblock %}

@@ -1,10 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Client Documents - SHERIA CENTRIC{% endblock %}
+{% block title %}Client Documents - {{ client.full_name }} - SHERIA CENTRIC{% endblock %}
+
+{% block extra_css %}
+<style>
+    .doc-row { transition: background-color 0.15s ease; }
+    .doc-row:hover { background-color: #f8fafc; }
+    .tree-folder > summary { list-style: none; cursor: pointer; }
+    .tree-folder > summary::-webkit-details-marker { display: none; }
+    .tree-chevron { transition: transform 0.2s ease; }
+    details[open] > summary .tree-chevron { transform: rotate(90deg); }
+    .verify-code-input {
+        letter-spacing: 0.4em;
+        text-align: center;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 700;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-    <!-- Page Header -->
     <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl border border-indigo-200 p-6 mb-6 text-white">
         <div class="flex flex-col md:flex-row items-center justify-between">
             <div class="flex items-center space-x-4 mb-4 md:mb-0">
@@ -16,16 +32,14 @@
                         <i class="fas fa-file-alt mr-3"></i>
                         Client Documents
                     </h1>
-                    <p class="text-indigo-100">Viewing documents for: <span class="font-semibold text-white">{{ client.full_name }}</span></p>
+                    <p class="text-indigo-100">All documents for: <span class="font-semibold text-white">{{ client.full_name }}</span></p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Client Profile Card -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
         <div class="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
-            <!-- Profile Picture -->
             <div class="flex-shrink-0">
                 {% if client.profile_picture %}
                     {% if client.profile_picture.startswith('http') %}
@@ -39,122 +53,411 @@
                 </div>
                 {% endif %}
             </div>
-            
-            <!-- Client Information -->
             <div class="flex-1 min-w-0">
                 <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{{ client.full_name or 'N/A' }}</h2>
-                <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 mb-4">
-                    <span class="flex items-center">
-                        <i class="fas fa-phone mr-2 text-indigo-600"></i>
-                        {{ client.phone_number or 'N/A' }}
-                    </span>
-                    <span class="flex items-center">
-                        <i class="fas fa-envelope mr-2 text-indigo-600"></i>
-                        {{ client.email or 'N/A' }}
-                    </span>
-                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">
-                        {{ client.client_type or 'Pending' }} Client
-                    </span>
-                    {% if client.status == 'Active' %}
-                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                        <i class="fas fa-circle text-xs mr-1"></i>Active
-                    </span>
-                    {% else %}
-                    <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-semibold">
-                        <i class="fas fa-circle text-xs mr-1"></i>Inactive
-                    </span>
-                    {% endif %}
+                <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                    <span class="flex items-center"><i class="fas fa-phone mr-2 text-indigo-600"></i>{{ client.phone_number or 'N/A' }}</span>
+                    <span class="flex items-center"><i class="fas fa-envelope mr-2 text-indigo-600"></i>{{ client.email or 'N/A' }}</span>
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-semibold">{{ client.client_type or 'Pending' }} Client</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Documents Section -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-6 flex items-center">
-            <i class="fas fa-folder-open text-indigo-600 mr-3"></i>
-            Documents
+    {% set reg_count = personal_uploads|length if personal_uploads is defined else 0 %}
+    {% set custom_count = custom_uploads|length if custom_uploads is defined else 0 %}
+    {% set local_count = reg_count + custom_count %}
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <p class="text-2xl font-bold text-gray-900">{{ local_count + drive_file_count }}</p>
+            <p class="text-xs text-gray-500 font-medium">Total Files</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <p class="text-2xl font-bold text-gray-900">{{ drive_folder_count }}</p>
+            <p class="text-xs text-gray-500 font-medium">Drive Folders</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <p class="text-2xl font-bold text-gray-900">{{ local_count }}</p>
+            <p class="text-xs text-gray-500 font-medium">Registration Files</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <p class="text-lg font-bold {% if google_drive_connected %}text-green-600{% else %}text-red-500{% endif %}">
+                {% if google_drive_connected %}<i class="fas fa-check-circle"></i> Connected{% else %}<i class="fas fa-times-circle"></i> Offline{% endif %}
+            </p>
+            <p class="text-xs text-gray-500 font-medium">Google Drive</p>
+        </div>
+    </div>
+
+    {% if personal_uploads is defined and personal_uploads|length > 0 %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-id-card text-emerald-600 mr-3"></i>
+            Registration Documents
+            <span class="ml-3 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">{{ personal_uploads|length }}</span>
         </h2>
-        
-        <!-- Main Documents (ID Front and Back from clients table) -->
-        {% if client.id_front or client.id_back %}
-        <div class="mb-8">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <i class="fas fa-id-card text-blue-600 mr-2"></i>
-                Main Documents
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {% if client.id_front %}
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-blue-50">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-sm font-semibold text-gray-700 flex items-center">
-                            <i class="fas fa-id-card text-blue-600 mr-2"></i>
-                            ID Front
-                        </span>
-                        <a href="{{ url_for('static', filename='uploads/profile_pictures/' + client.id_front) }}" target="_blank" class="text-blue-600 hover:text-blue-700 flex items-center">
-                            <i class="fas fa-eye mr-1"></i>View
-                        </a>
+        <div class="space-y-2">
+            {% for upload in personal_uploads %}
+            <div class="doc-row flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-gray-100">
+                <div class="flex items-center gap-3 min-w-0">
+                    <i class="fas {{ upload.icon }} text-indigo-600"></i>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-900">{{ upload.label }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ upload.filename }} &middot; {{ upload.size_display }}</p>
                     </div>
-                    {% set id_front_ext = client.id_front.split('.')[-1].lower() if '.' in client.id_front else '' %}
-                    {% if id_front_ext in ['jpg', 'jpeg', 'png'] %}
-                    <div class="mt-2">
-                        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.id_front) }}" alt="ID Front" class="w-full rounded-lg border border-gray-200 max-h-48 object-contain">
-                    </div>
-                    {% else %}
-                    <p class="text-xs text-gray-500 mt-2">{{ client.id_front }}</p>
-                    <a href="{{ url_for('static', filename='uploads/profile_pictures/' + client.id_front) }}" target="_blank" class="text-blue-600 hover:text-blue-700 text-sm mt-2 inline-block">
-                        <i class="fas fa-download mr-1"></i>Download
-                    </a>
-                    {% endif %}
                 </div>
-                {% endif %}
-                
-                {% if client.id_back %}
-                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-blue-50">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="text-sm font-semibold text-gray-700 flex items-center">
-                            <i class="fas fa-id-card text-blue-600 mr-2"></i>
-                            ID Back
-                        </span>
-                        <a href="{{ url_for('static', filename='uploads/profile_pictures/' + client.id_back) }}" target="_blank" class="text-blue-600 hover:text-blue-700 flex items-center">
-                            <i class="fas fa-eye mr-1"></i>View
-                        </a>
-                    </div>
-                    {% set id_back_ext = client.id_back.split('.')[-1].lower() if '.' in client.id_back else '' %}
-                    {% if id_back_ext in ['jpg', 'jpeg', 'png'] %}
-                    <div class="mt-2">
-                        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + client.id_back) }}" alt="ID Back" class="w-full rounded-lg border border-gray-200 max-h-48 object-contain">
-                    </div>
-                    {% else %}
-                    <p class="text-xs text-gray-500 mt-2">{{ client.id_back }}</p>
-                    <a href="{{ url_for('static', filename='uploads/profile_pictures/' + client.id_back) }}" target="_blank" class="text-blue-600 hover:text-blue-700 text-sm mt-2 inline-block">
-                        <i class="fas fa-download mr-1"></i>Download
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="{{ upload.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-eye mr-1.5"></i>View
                     </a>
-                    {% endif %}
+                    <button type="button"
+                            onclick="openDocVerifyModal('download', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
+                            class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-download mr-1.5"></i>Download
+                    </button>
+                    <button type="button"
+                            onclick="openDocVerifyModal('delete', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
+                            class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-trash mr-1.5"></i>Delete
+                    </button>
                 </div>
-                {% endif %}
             </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if custom_uploads is defined and custom_uploads|length > 0 %}
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-upload text-blue-600 mr-3"></i>
+            Uploaded Personal Documents
+            <span class="ml-3 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">{{ custom_uploads|length }}</span>
+        </h2>
+        <div class="space-y-2">
+            {% for upload in custom_uploads %}
+            <div class="doc-row flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-gray-100" id="custom-doc-{{ upload.id }}">
+                <div class="flex items-center gap-3 min-w-0">
+                    <i class="fas fa-file-alt text-blue-600"></i>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-gray-900">{{ upload.label }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ upload.filename }} &middot; {{ upload.size_display }}{% if upload.created_time %} &middot; {{ upload.created_time }}{% endif %}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="{{ upload.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-eye mr-1.5"></i>View
+                    </a>
+                    <button type="button"
+                            onclick="openDocVerifyModal('download', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
+                            class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-download mr-1.5"></i>Download
+                    </button>
+                    <button type="button"
+                            onclick="openDocVerifyModal('delete', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
+                            class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-trash mr-1.5"></i>Delete
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fab fa-google-drive text-green-600 mr-3"></i>
+            Google Drive — {{ client_folder_name }}
+        </h2>
+        <p class="text-sm text-gray-500 mb-6">Documents and folders as arranged in Google Drive for this client.</p>
+
+        {% if not google_drive_connected %}
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+            <p class="text-yellow-800 font-semibold mb-2">Google Drive Not Connected</p>
+            <p class="text-yellow-700 text-sm">Connect Google Drive in Documents Settings to view stored client files.</p>
+        </div>
+        {% elif drive_tree|length == 0 %}
+        <div class="text-center py-10 text-gray-500">
+            <i class="fas fa-folder-open text-4xl text-gray-300 mb-3"></i>
+            <p class="font-semibold">No folders or files found in Drive for this client yet.</p>
+        </div>
+        {% else %}
+        <div class="border border-gray-200 rounded-xl overflow-hidden">
+            {% macro render_tree(nodes, depth=0) %}
+                {% for node in nodes %}
+                    {% if node.type == 'folder' %}
+                    <details class="tree-folder border-b border-gray-100 last:border-b-0" {% if depth < 2 %}open{% endif %}>
+                        <summary class="doc-row flex items-center gap-3 px-4 py-3" style="padding-left: {{ 16 + depth * 20 }}px;">
+                            <i class="fas fa-chevron-right text-gray-400 text-xs tree-chevron"></i>
+                            <i class="fas fa-folder text-amber-500"></i>
+                            <span class="text-sm font-semibold text-gray-900 flex-1">{{ node.name }}</span>
+                            <span class="text-xs text-gray-400">{{ node.children|length }} item(s)</span>
+                        </summary>
+                        <div>
+                            {{ render_tree(node.children, depth + 1) }}
+                        </div>
+                    </details>
+                    {% else %}
+                    <div class="doc-row flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0" style="padding-left: {{ 16 + depth * 20 }}px;" id="drive-doc-{{ node.id }}">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <span class="w-3"></span>
+                            <i class="fas {% if node.file_extension == 'pdf' %}fa-file-pdf text-red-500{% elif node.file_extension in ['doc','docx'] %}fa-file-word text-blue-500{% elif node.file_extension in ['xls','xlsx'] %}fa-file-excel text-green-600{% elif node.file_extension in ['jpg','jpeg','png','gif'] %}fa-file-image text-emerald-500{% else %}fa-file text-gray-500{% endif %}"></i>
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-gray-900 truncate" title="{{ node.name }}">{{ node.name }}</p>
+                                <p class="text-xs text-gray-500">
+                                    {{ node.size_display or '—' }}
+                                    {% if node.modified_time %} &middot; {{ node.modified_time }}{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            {% if node.url %}
+                            <a href="{{ node.url }}" target="_blank" rel="noopener" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-external-link-alt mr-1.5"></i>Open
+                            </a>
+                            {% endif %}
+                            <button type="button"
+                                    onclick="openDocVerifyModal('download', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }} })"
+                                    class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-download mr-1.5"></i>Download
+                            </button>
+                            <button type="button"
+                                    onclick="openDocVerifyModal('delete', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }} })"
+                                    class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-trash mr-1.5"></i>Delete
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% endmacro %}
+            {{ render_tree(drive_tree) }}
         </div>
         {% endif %}
-        
-        <!-- Other Documents (from Google Drive) -->
-        <div class="border-t border-gray-200 pt-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <i class="fab fa-google-drive text-green-600 mr-2"></i>
-                Other Documents
-            </h3>
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                <div class="text-center">
-                    <i class="fab fa-google-drive text-gray-400 text-4xl mb-4"></i>
-                    <p class="text-gray-600 font-semibold mb-2">Additional Documents</p>
-                    <p class="text-gray-500 text-sm mb-4">Other documents for this client are stored in Google Drive.</p>
-                    <p class="text-gray-500 text-sm">Use the sidebar links to navigate to Personal Documents or Case Documents.</p>
-                </div>
+    </div>
+</div>
+
+<!-- Email verification modal for download/delete -->
+<div id="docVerifyModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeDocVerifyModal()"></div>
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md relative z-10">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white flex items-center" id="docVerifyTitle">
+                    <i class="fas fa-shield-alt mr-2"></i>Verify your identity
+                </h3>
+                <button type="button" onclick="closeDocVerifyModal()" class="text-white hover:text-indigo-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-gray-600 mb-1" id="docVerifyActionText">To continue, enter the verification code sent to your registered email.</p>
+                <p class="text-sm font-bold text-gray-900 mb-4 truncate" id="docVerifyDocName"></p>
+
+                <div id="docVerifySendStatus" class="hidden mb-4 p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-sm text-indigo-800"></div>
+                <div id="docVerifyError" class="hidden mb-4 p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700"></div>
+
+                <label class="block text-sm font-semibold text-gray-700 mb-2" for="docVerifyCode">6-digit verification code</label>
+                <input type="text" id="docVerifyCode" maxlength="6" inputmode="numeric" pattern="[0-9]*"
+                       class="verify-code-input w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg"
+                       placeholder="000000" autocomplete="one-time-code">
+
+                <p class="text-xs text-gray-500 mt-3">
+                    Didn't receive it?
+                    <button type="button" id="docVerifyResendBtn" onclick="sendDocVerificationCode()" class="text-indigo-600 font-semibold hover:text-indigo-800">Resend code</button>
+                </p>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-2xl flex items-center justify-end gap-3">
+                <button type="button" onclick="closeDocVerifyModal()" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 text-sm font-semibold">
+                    Cancel
+                </button>
+                <button type="button" onclick="confirmDocVerifiedAction()" id="docVerifyConfirmBtn" class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 text-sm font-bold flex items-center">
+                    <i class="fas fa-check mr-2"></i><span id="docVerifyConfirmLabel">Confirm</span>
+                </button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+(function () {
+    const CLIENT_ID = {{ client_id }};
+    const API_BASE = '/api/staff/client_documents/' + CLIENT_ID;
 
+    let pendingDocAction = null;
+    let codeSent = false;
 
+    function buildActionPayload() {
+        if (!pendingDocAction) return null;
+        const p = {
+            action: pendingDocAction.action,
+            doc_kind: pendingDocAction.docKind,
+        };
+        if (pendingDocAction.field) p.field = pendingDocAction.field;
+        if (pendingDocAction.docId != null) p.doc_id = pendingDocAction.docId;
+        if (pendingDocAction.driveFileId) p.drive_file_id = pendingDocAction.driveFileId;
+        return p;
+    }
+
+    function showVerifyError(msg) {
+        const el = document.getElementById('docVerifyError');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+
+    function clearVerifyError() {
+        const el = document.getElementById('docVerifyError');
+        el.textContent = '';
+        el.classList.add('hidden');
+    }
+
+    function setSendStatus(msg) {
+        const el = document.getElementById('docVerifySendStatus');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+
+    window.openDocVerifyModal = function (action, docKind, opts) {
+        pendingDocAction = {
+            action: action,
+            docKind: docKind,
+            field: opts.field || null,
+            docId: opts.doc_id != null ? opts.doc_id : null,
+            driveFileId: opts.drive_file_id || null,
+            label: opts.label || 'Document',
+        };
+        codeSent = false;
+
+        const isDelete = action === 'delete';
+        document.getElementById('docVerifyTitle').innerHTML =
+            '<i class="fas fa-shield-alt mr-2"></i>' + (isDelete ? 'Verify to delete' : 'Verify to download');
+        document.getElementById('docVerifyActionText').textContent =
+            'A verification code will be sent to your registered email. Enter it below to ' +
+            (isDelete ? 'permanently delete' : 'download') + ':';
+        document.getElementById('docVerifyDocName').textContent = pendingDocAction.label;
+        document.getElementById('docVerifyConfirmLabel').textContent = isDelete ? 'Delete' : 'Download';
+        document.getElementById('docVerifyCode').value = '';
+        document.getElementById('docVerifySendStatus').classList.add('hidden');
+        clearVerifyError();
+
+        const confirmBtn = document.getElementById('docVerifyConfirmBtn');
+        confirmBtn.disabled = false;
+        confirmBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+
+        document.getElementById('docVerifyModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+
+        sendDocVerificationCode();
+    };
+
+    window.closeDocVerifyModal = function () {
+        document.getElementById('docVerifyModal').classList.add('hidden');
+        document.body.style.overflow = '';
+        pendingDocAction = null;
+        codeSent = false;
+    };
+
+    window.sendDocVerificationCode = async function () {
+        const payload = buildActionPayload();
+        if (!payload) return;
+
+        const resendBtn = document.getElementById('docVerifyResendBtn');
+        resendBtn.disabled = true;
+        clearVerifyError();
+
+        try {
+            const res = await fetch(API_BASE + '/action/send-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                showVerifyError(data.error || 'Could not send verification code.');
+                return;
+            }
+            codeSent = true;
+            setSendStatus(data.message || 'Verification code sent.');
+        } catch (e) {
+            showVerifyError('Network error. Please try again.');
+        } finally {
+            resendBtn.disabled = false;
+        }
+    };
+
+    window.confirmDocVerifiedAction = async function () {
+        if (!pendingDocAction) return;
+
+        const code = (document.getElementById('docVerifyCode').value || '').trim();
+        if (!/^\d{6}$/.test(code)) {
+            showVerifyError('Please enter the 6-digit verification code.');
+            return;
+        }
+        if (!codeSent) {
+            showVerifyError('Request a verification code first.');
+            return;
+        }
+
+        const confirmBtn = document.getElementById('docVerifyConfirmBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.classList.add('opacity-60', 'cursor-not-allowed');
+        clearVerifyError();
+
+        const payload = buildActionPayload();
+        payload.code = code;
+
+        try {
+            const verifyRes = await fetch(API_BASE + '/action/verify-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData.success) {
+                showVerifyError(verifyData.error || 'Verification failed.');
+                confirmBtn.disabled = false;
+                confirmBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+                return;
+            }
+
+            const token = verifyData.action_token;
+            if (pendingDocAction.action === 'download') {
+                const params = new URLSearchParams({
+                    token: token,
+                    doc_kind: pendingDocAction.docKind,
+                });
+                if (pendingDocAction.field) params.set('field', pendingDocAction.field);
+                if (pendingDocAction.docId != null) params.set('doc_id', String(pendingDocAction.docId));
+                if (pendingDocAction.driveFileId) params.set('drive_file_id', pendingDocAction.driveFileId);
+                closeDocVerifyModal();
+                window.location.href = API_BASE + '/download?' + params.toString();
+                return;
+            }
+
+            const deletePayload = Object.assign({}, buildActionPayload(), { token: token });
+            const deleteRes = await fetch(API_BASE + '/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(deletePayload),
+            });
+            const deleteData = await deleteRes.json();
+            if (!deleteRes.ok || !deleteData.success) {
+                showVerifyError(deleteData.error || 'Delete failed.');
+                confirmBtn.disabled = false;
+                confirmBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+                return;
+            }
+
+            closeDocVerifyModal();
+            window.location.reload();
+        } catch (e) {
+            showVerifyError('Something went wrong. Please try again.');
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+        }
+    };
+})();
+</script>
+{% endblock %}

@@ -11,12 +11,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (window.gsap && window.ScrollTrigger) {
     gsap.registerPlugin(ScrollTrigger);
     if (!prefersReducedMotion) {
-      gsap.from(".hero-copy h1", { y: 60, opacity: 0, duration: 1, ease: "power3.out" });
-      gsap.from(".hero-copy .typed-line", { y: 30, opacity: 0, delay: 0.2, duration: 0.7 });
-      gsap.from(".hero-copy .hero-lead", { y: 30, opacity: 0, delay: 0.3, duration: 0.7 });
-      gsap.from(".hero-mockup", { x: 80, opacity: 0, delay: 0.4, duration: 1, ease: "power3.out" });
-      gsap.from(".float-note", { y: 20, opacity: 0, stagger: 0.2, delay: 0.65, duration: 0.7 });
-      gsap.to(".hero-mockup", { y: -12, duration: 3, repeat: -1, yoyo: true, ease: "sine.inOut" });
+      gsap.from(".hero-maverik-copy .hero-brand-lockup", { y: 30, opacity: 0, duration: 0.8, ease: "power3.out" });
+      gsap.from(".hero-feature-orbs .hero-orb", { y: 20, opacity: 0, stagger: 0.1, delay: 0.15, duration: 0.6, ease: "power2.out" });
+      gsap.from(".hero-maverik-copy .hero-kicker", { y: 24, opacity: 0, delay: 0.25, duration: 0.7 });
+      gsap.from(".hero-maverik-copy .hero-title-caps", { y: 50, opacity: 0, delay: 0.35, duration: 1, ease: "power3.out" });
+      gsap.from(".hero-maverik-copy .typed-line", { y: 24, opacity: 0, delay: 0.5, duration: 0.7 });
+      gsap.from(".hero-maverik-copy .hero-lead", { y: 24, opacity: 0, delay: 0.58, duration: 0.7 });
+      gsap.from(".hero-maverik-copy .hero-ctas", { y: 20, opacity: 0, delay: 0.68, duration: 0.7 });
     }
 
     ScrollTrigger.create({

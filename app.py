@@ -472,6 +472,31 @@ def ensure_google_drive_oauth_pending_table(cursor, connection=None):
         print(f"[WARNING] ensure_google_drive_oauth_pending_table: {e}")
 
 
+def ensure_push_subscriptions_table(cursor, connection=None):
+    """Store browser push subscriptions for offline phone notifications."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                employee_id INT NOT NULL,
+                endpoint TEXT NOT NULL,
+                p256dh VARCHAR(255) NOT NULL,
+                auth VARCHAR(255) NOT NULL,
+                user_agent VARCHAR(512) NULL,
+                last_digest VARCHAR(128) NULL,
+                last_pushed_at DATETIME NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_endpoint (endpoint(500)),
+                INDEX idx_push_employee (employee_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_push_subscriptions_table: {e}")
+
+
 def reconcile_additive_schema(cursor, connection=None):
     """Run additive DDL on every app startup (safe after git pull / cPanel deploy).
 
@@ -484,6 +509,7 @@ def reconcile_additive_schema(cursor, connection=None):
         ensure_task_management_table(cursor, connection)
         ensure_case_proceeding_advocates_table(cursor, connection)
         ensure_google_drive_oauth_pending_table(cursor, connection)
+        ensure_push_subscriptions_table(cursor, connection)
     except Exception as e:
         print(f"[WARNING] reconcile_additive_schema: {e}")
 
@@ -546,7 +572,7 @@ def ensure_task_management_table(cursor, connection=None):
                 allow_view_case_documents TINYINT(1) DEFAULT 1,
                 allow_upload_case_documents TINYINT(1) DEFAULT 1,
                 allow_download_case_documents TINYINT(1) DEFAULT 1,
-                task_status ENUM('Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending',
+                task_status ENUM('Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending',
                 created_by_id INT NOT NULL,
                 created_by_name VARCHAR(255) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -561,7 +587,7 @@ def ensure_task_management_table(cursor, connection=None):
         try:
             cursor.execute("""
                 ALTER TABLE task_management
-                MODIFY COLUMN task_status ENUM('Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending'
+                MODIFY COLUMN task_status ENUM('Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending'
             """)
         except Exception as enum_err:
             print(f"[WARNING] ensure_task_management_table enum update: {enum_err}")
@@ -611,7 +637,7 @@ def has_active_case_task_access(cursor, case_id, employee_id, task_id=None, perm
             WHERE t.task_type = 'case'
               AND t.linked_id = %s
               AND t.assigned_to_id = %s
-              AND t.task_status IN ('Pending', 'In Progress')
+              AND t.task_status IN ('Pending', 'Received', 'In Progress')
         """
         params = [case_id, employee_id]
         if task_id:
@@ -7043,6 +7069,100 @@ def my_templates():
 
     return render_template('my_templates.html', company_settings=company_settings)
 
+def _is_ajax_json_request():
+    accept = (request.headers.get('Accept') or '').lower()
+    return (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in accept
+    )
+
+def _serialize_my_task(task):
+    """Normalize a my-task row for templates and JSON responses."""
+    if not task:
+        return None
+    due_val = task.get('due_at')
+    if due_val:
+        try:
+            task['due_at'] = due_val.strftime('%Y-%m-%d %H:%M')
+        except Exception:
+            task['due_at'] = str(due_val)
+    else:
+        task['due_at'] = '-'
+
+    created_val = task.get('created_at')
+    if created_val:
+        try:
+            task['created_at'] = created_val.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            task['created_at'] = str(created_val)
+
+    if task.get('task_type') == 'case':
+        task['linked_label'] = f"{task.get('case_tracking_number') or '-'} — {task.get('case_client_name') or 'Case'}"
+        if task.get('allow_view_case_details'):
+            task['linked_url'] = url_for('case_details', case_id=task['linked_id'], task_id=task['id'])
+        else:
+            task['linked_url'] = None
+        if task.get('allow_view_case_documents'):
+            task['documents_url'] = url_for('case_documents', case_id=task['linked_id'], task_id=task['id'])
+        else:
+            task['documents_url'] = None
+    else:
+        task['linked_label'] = f"{task.get('matter_reference_number') or '-'} — {task.get('matter_title') or 'Matter'}"
+        task['linked_url'] = url_for('matter_details', matter_id=task['linked_id'])
+        task['documents_url'] = None
+
+    task['full_view_url'] = url_for('my_task_view', task_id=task['id'])
+    task['accept_url'] = url_for('accept_my_task', task_id=task['id'])
+    task['reject_url'] = url_for('reject_my_task', task_id=task['id'])
+    return task
+
+def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection=None):
+    """Load a task allocated to the employee; optionally mark Pending as Received."""
+    cursor.execute("""
+        SELECT
+            t.id,
+            t.task_type,
+            t.linked_id,
+            t.task_title,
+            t.task_description,
+            t.due_at,
+            t.reminder_intervals,
+            t.task_status,
+            t.assigned_to_id,
+            t.assigned_to_name,
+            t.allow_view_case_details,
+            t.allow_edit_case_details,
+            t.allow_view_case_documents,
+            t.allow_upload_case_documents,
+            t.allow_download_case_documents,
+            t.created_by_name,
+            t.created_at,
+            c.tracking_number AS case_tracking_number,
+            c.client_name AS case_client_name,
+            m.matter_reference_number,
+            m.matter_title
+        FROM task_management t
+        LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+        LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+        WHERE t.id = %s
+          AND (
+            (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+            OR
+            (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
+          )
+        LIMIT 1
+    """, (task_id, employee_id, employee_id, employee_id, employee_id))
+    task = cursor.fetchone()
+    if task and mark_received and task.get('task_status') == 'Pending':
+        cursor.execute(
+            "UPDATE task_management SET task_status = 'Received' WHERE id = %s",
+            (task_id,)
+        )
+        if connection:
+            connection.commit()
+        task['task_status'] = 'Received'
+    return _serialize_my_task(task) if task else None
+
 @app.route('/my_tasks')
 def my_tasks():
     """My Tasks page - all case/matter tasks allocated to the logged-in user."""
@@ -7096,9 +7216,9 @@ def my_tasks():
                 WHERE
                     (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
                     OR
-                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                    (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
                 ORDER BY t.due_at ASC, t.created_at DESC
-            """, (employee_id, employee_id, employee_id))
+            """, (employee_id, employee_id, employee_id, employee_id))
             tasks = list(cursor.fetchall() or [])
 
             # Include allocated court-session items (case proceeding materials) assigned to this employee
@@ -7156,7 +7276,12 @@ def my_tasks():
     finally:
         connection.close()
 
-    return render_template('my_tasks.html', company_settings=company_settings, tasks=tasks)
+    return render_template(
+        'my_tasks.html',
+        company_settings=company_settings,
+        tasks=tasks,
+        view_task_id=request.args.get('view', type=int),
+    )
 
 @app.route('/my_tasks/<int:task_id>/accept', methods=['POST'])
 def accept_my_task(task_id):
@@ -7182,28 +7307,129 @@ def accept_my_task(task_id):
                   AND (
                     (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
                     OR
-                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                    (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
                   )
                 LIMIT 1
-            """, (task_id, employee_id, employee_id, employee_id))
+            """, (task_id, employee_id, employee_id, employee_id, employee_id))
             task = cursor.fetchone()
             if not task:
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Task not found or not allocated to your account.'}), 404
                 flash('Task not found or not allocated to your account.', 'error')
                 return redirect(url_for('my_tasks'))
-            if task.get('task_status') != 'Pending':
-                flash('Only pending tasks can be accepted.', 'error')
+            if task.get('task_status') not in ('Pending', 'Received'):
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Only pending or received tasks can be accepted.'}), 400
+                flash('Only pending or received tasks can be accepted.', 'error')
                 return redirect(url_for('my_tasks'))
 
             cursor.execute("UPDATE task_management SET task_status = 'In Progress' WHERE id = %s", (task_id,))
             connection.commit()
+            if _is_ajax_json_request():
+                return jsonify({
+                    'success': True,
+                    'message': 'Task accepted and moved to In Progress.',
+                    'task_status': 'In Progress',
+                    'full_view_url': url_for('my_task_view', task_id=task_id),
+                })
             flash('Task accepted and moved to In Progress.', 'success')
     except Exception as e:
         print(f"Accept task error: {e}")
+        if _is_ajax_json_request():
+            return jsonify({'success': False, 'error': 'An error occurred while accepting the task.'}), 500
         flash('An error occurred while accepting the task.', 'error')
     finally:
         connection.close()
 
+    return redirect(url_for('my_task_view', task_id=task_id))
+
+@app.route('/my_tasks/<int:task_id>/reject', methods=['POST'])
+def reject_my_task(task_id):
+    """Reject a received task assigned to the logged-in user."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            cursor.execute("""
+                SELECT t.id, t.task_status
+                FROM task_management t
+                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+                WHERE t.id = %s
+                  AND (
+                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                    OR
+                    (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
+                  )
+                LIMIT 1
+            """, (task_id, employee_id, employee_id, employee_id, employee_id))
+            task = cursor.fetchone()
+            if not task:
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Task not found or not allocated to your account.'}), 404
+                flash('Task not found or not allocated to your account.', 'error')
+                return redirect(url_for('my_tasks'))
+            if task.get('task_status') not in ('Pending', 'Received'):
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Only pending or received tasks can be rejected.'}), 400
+                flash('Only pending or received tasks can be rejected.', 'error')
+                return redirect(url_for('my_task_view', task_id=task_id))
+
+            cursor.execute("UPDATE task_management SET task_status = 'Cancelled' WHERE id = %s", (task_id,))
+            connection.commit()
+            if _is_ajax_json_request():
+                return jsonify({
+                    'success': True,
+                    'message': 'Task rejected.',
+                    'task_status': 'Cancelled',
+                })
+            flash('Task rejected.', 'success')
+    except Exception as e:
+        print(f"Reject task error: {e}")
+        if _is_ajax_json_request():
+            return jsonify({'success': False, 'error': 'An error occurred while rejecting the task.'}), 500
+        flash('An error occurred while rejecting the task.', 'error')
+    finally:
+        connection.close()
+
     return redirect(url_for('my_tasks'))
+
+@app.route('/api/my_tasks/<int:task_id>')
+def api_my_task(task_id):
+    """Return task details as JSON; marks Pending tasks as Received when viewed."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            task = _fetch_my_task(
+                cursor, task_id, employee_id,
+                mark_received=True, connection=connection
+            )
+    except Exception as e:
+        print(f"API my task error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while loading the task.'}), 500
+    finally:
+        connection.close()
+
+    if not task:
+        return jsonify({'success': False, 'error': 'Task not found or not allocated to your account.'}), 404
+
+    return jsonify({'success': True, 'task': task})
 
 @app.route('/my_tasks/<int:task_id>')
 def my_task_view(task_id):
@@ -7225,41 +7451,12 @@ def my_task_view(task_id):
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
-            cursor.execute("""
-                SELECT
-                    t.id,
-                    t.task_type,
-                    t.linked_id,
-                    t.task_title,
-                    t.task_description,
-                    t.due_at,
-                    t.reminder_intervals,
-                    t.task_status,
-                    t.assigned_to_id,
-                    t.assigned_to_name,
-                    t.allow_view_case_details,
-                    t.allow_edit_case_details,
-                    t.allow_view_case_documents,
-                    t.allow_upload_case_documents,
-                    t.allow_download_case_documents,
-                    t.created_by_name,
-                    t.created_at,
-                    c.tracking_number AS case_tracking_number,
-                    c.client_name AS case_client_name,
-                    m.matter_reference_number,
-                    m.matter_title
-                FROM task_management t
-                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
-                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
-                WHERE t.id = %s
-                  AND (
-                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
-                    OR
-                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
-                  )
-                LIMIT 1
-            """, (task_id, employee_id, employee_id, employee_id))
-            task = cursor.fetchone()
+            task = _fetch_my_task(
+                cursor, task_id, employee_id,
+                mark_received=False, connection=connection
+            )
+            if task and task.get('task_status') in ('Pending', 'Received'):
+                return redirect(url_for('my_tasks', view=task_id))
     except Exception as e:
         print(f"My task view error: {e}")
         flash('An error occurred while loading the task.', 'error')
@@ -7297,10 +7494,10 @@ def complete_my_task(task_id):
                   AND (
                     (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
                     OR
-                    (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                    (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
                   )
                 LIMIT 1
-            """, (task_id, employee_id, employee_id, employee_id))
+            """, (task_id, employee_id, employee_id, employee_id, employee_id))
             task = cursor.fetchone()
             if not task:
                 flash('Task not found or not allocated to your account.', 'error')
@@ -7319,6 +7516,402 @@ def complete_my_task(task_id):
         connection.close()
 
     return redirect(url_for('my_tasks'))
+
+# ---------------------------------------------------------------------------
+# Web Push — phone notifications when the app/browser is closed
+# ---------------------------------------------------------------------------
+
+_vapid_credentials_cache = None
+
+
+def _vapid_private_key_pem():
+    raw = (os.environ.get('VAPID_PRIVATE_KEY') or '').strip()
+    if not raw:
+        return None
+    return raw.replace('\\n', '\n')
+
+
+def _get_vapid_credentials():
+    """Return a parsed VAPID key object for pywebpush."""
+    global _vapid_credentials_cache
+    if _vapid_credentials_cache is not None:
+        return _vapid_credentials_cache
+    pem = _vapid_private_key_pem()
+    if not pem:
+        return None
+    try:
+        from py_vapid import Vapid
+        _vapid_credentials_cache = Vapid.from_pem(pem.encode('utf-8'))
+        return _vapid_credentials_cache
+    except Exception as exc:
+        print(f"[push] invalid VAPID private key: {exc}")
+        return None
+
+
+def _vapid_public_key_b64():
+    return (os.environ.get('VAPID_PUBLIC_KEY') or '').strip()
+
+
+def _push_app_origin():
+    if APP_BASE_URL:
+        return APP_BASE_URL.rstrip('/')
+    return (os.environ.get('PUSH_APP_ORIGIN') or 'http://127.0.0.1:5000').rstrip('/')
+
+
+def _compute_employee_push_payload(cursor, employee_id):
+    """Build a push notification summary for an employee."""
+    from datetime import date, timedelta
+
+    ensure_task_management_table(cursor)
+    employee_id = int(employee_id)
+    today = date.today()
+    end_date = today + timedelta(days=14)
+    items = []
+
+    cursor.execute("""
+        SELECT
+            t.id,
+            t.task_type,
+            t.task_title,
+            t.task_status,
+            t.due_at,
+            c.tracking_number AS case_tracking_number,
+            c.client_name AS case_client_name,
+            m.matter_reference_number,
+            m.matter_title
+        FROM task_management t
+        LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+        LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+        WHERE
+            t.task_status IN ('Pending', 'Received', 'In Progress')
+            AND (
+                (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                OR
+                (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
+            )
+        ORDER BY t.due_at ASC, t.created_at DESC
+        LIMIT 40
+    """, (employee_id, employee_id, employee_id, employee_id))
+    for task in cursor.fetchall() or []:
+        if task.get('task_type') == 'case':
+            ref = f"{task.get('case_tracking_number') or '-'} - {task.get('case_client_name') or 'Case'}"
+        else:
+            ref = f"{task.get('matter_reference_number') or '-'} - {task.get('matter_title') or 'Matter'}"
+        items.append({
+            'kind': 'task',
+            'title': task.get('task_title') or 'Assigned task',
+            'subtitle': ref,
+            'sort': task.get('due_at') or '9999-12-31 23:59'
+        })
+
+    cursor.execute("""
+        SELECT
+            m.material_description,
+            p.next_court_date,
+            c.tracking_number,
+            c.client_name
+        FROM case_proceeding_materials m
+        INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+        INNER JOIN cases c ON c.id = p.case_id
+        WHERE m.allocated_to_id = %s
+        ORDER BY COALESCE(p.next_court_date, m.created_at) ASC
+        LIMIT 20
+    """, (employee_id,))
+    for material in cursor.fetchall() or []:
+        items.append({
+            'kind': 'reminder',
+            'title': material.get('material_description') or 'Session reminder',
+            'subtitle': f"{material.get('tracking_number') or '-'} - {material.get('client_name') or 'Case'}",
+            'sort': material.get('next_court_date') or '9999-12-31'
+        })
+
+    cursor.execute("""
+        SELECT
+            p.next_court_date,
+            p.next_attendance,
+            c.tracking_number,
+            c.client_name
+        FROM case_proceedings p
+        INNER JOIN cases c ON c.id = p.case_id
+        WHERE p.next_court_date IS NOT NULL
+          AND p.next_court_date >= %s
+          AND p.next_court_date <= %s
+          AND c.filled_by_id = %s
+        ORDER BY p.next_court_date ASC
+        LIMIT 20
+    """, (today, end_date, employee_id))
+    for cal in cursor.fetchall() or []:
+        items.append({
+            'kind': 'calendar',
+            'title': cal.get('next_attendance') or 'Upcoming court date',
+            'subtitle': f"{cal.get('tracking_number') or '-'} - {cal.get('client_name') or 'Case'}",
+            'sort': cal.get('next_court_date') or '9999-12-31'
+        })
+
+    items.sort(key=lambda x: str(x.get('sort') or '9999-12-31'))
+    count = len(items)
+    if count == 0:
+        return {
+            'count': 0,
+            'digest': 'empty',
+            'title': 'SHERIA CENTRIC',
+            'body': 'You are all caught up — no new workspace alerts.',
+            'url': f"{_push_app_origin()}/notifications"
+        }
+
+    lead = items[0]
+    body = lead.get('subtitle') or lead.get('title') or 'Open the app to review.'
+    if count > 1:
+        body = f"{body} (+{count - 1} more)"
+    digest_src = '|'.join(f"{i.get('kind')}:{i.get('title')}:{i.get('subtitle')}" for i in items[:8])
+    digest = hashlib.sha256(digest_src.encode('utf-8')).hexdigest()[:64]
+    return {
+        'count': count,
+        'digest': digest,
+        'title': lead.get('title') or 'Workspace update',
+        'body': body,
+        'url': f"{_push_app_origin()}/notifications"
+    }
+
+
+def _send_web_push(subscription_row, payload):
+    """Send one Web Push message; returns True on success."""
+    vapid = _get_vapid_credentials()
+    if not vapid:
+        return False
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        print('[WARNING] pywebpush is not installed; phone push disabled')
+        return False
+
+    claims_email = (os.environ.get('VAPID_CLAIMS_EMAIL') or 'mailto:admin@sheriacentric.com').strip()
+    subscription_info = {
+        'endpoint': subscription_row['endpoint'],
+        'keys': {
+            'p256dh': subscription_row['p256dh'],
+            'auth': subscription_row['auth'],
+        }
+    }
+    data = json.dumps({
+        'title': payload.get('title') or 'SHERIA CENTRIC',
+        'body': payload.get('body') or 'You have workspace updates.',
+        'url': payload.get('url') or f"{_push_app_origin()}/notifications",
+        'count': int(payload.get('count') or 0),
+    })
+    try:
+        webpush(
+            subscription_info=subscription_info,
+            data=data,
+            vapid_private_key=vapid,
+            vapid_claims={'sub': claims_email},
+        )
+        return True
+    except WebPushException as exc:
+        status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
+        if status_code in (403, 404, 410):
+            return 'expired'
+        print(f"[push] send failed ({status_code}): {exc}")
+        return False
+    except Exception as exc:
+        print(f"[push] send failed: {exc}")
+        return False
+
+
+def _dispatch_push_for_employee(connection, employee_id, force=False):
+    """Push to all subscriptions for one employee when digest changes."""
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        ensure_push_subscriptions_table(cursor, connection)
+        payload = _compute_employee_push_payload(cursor, employee_id)
+        if payload['count'] == 0 and not force:
+            return 0
+
+        cursor.execute("""
+            SELECT id, endpoint, p256dh, auth, last_digest
+            FROM push_subscriptions
+            WHERE employee_id = %s
+        """, (employee_id,))
+        rows = list(cursor.fetchall() or [])
+        sent = 0
+        for row in rows:
+            if not force and row.get('last_digest') == payload['digest']:
+                continue
+            result = _send_web_push(row, payload)
+            if result == 'expired':
+                cursor.execute("DELETE FROM push_subscriptions WHERE id = %s", (row['id'],))
+                continue
+            if result:
+                cursor.execute("""
+                    UPDATE push_subscriptions
+                    SET last_digest = %s, last_pushed_at = NOW()
+                    WHERE id = %s
+                """, (payload['digest'], row['id']))
+                sent += 1
+        connection.commit()
+        return sent
+
+
+def _dispatch_all_push_notifications(force=False):
+    connection = get_db_connection()
+    if not connection:
+        return
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_push_subscriptions_table(cursor, connection)
+            cursor.execute("SELECT DISTINCT employee_id FROM push_subscriptions")
+            employee_ids = [int(r['employee_id']) for r in (cursor.fetchall() or []) if r.get('employee_id')]
+        for employee_id in employee_ids:
+            try:
+                _dispatch_push_for_employee(connection, employee_id, force=force)
+            except Exception as exc:
+                print(f"[push] employee {employee_id} dispatch error: {exc}")
+    finally:
+        connection.close()
+
+
+_push_worker_started = False
+
+
+def start_push_notification_worker():
+    """Background loop that sends push alerts even when nobody is browsing."""
+    global _push_worker_started
+    if _push_worker_started:
+        return
+    if not _get_vapid_credentials() or not _vapid_public_key_b64():
+        print('[INFO] Web Push disabled — set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in .env')
+        return
+    _push_worker_started = True
+
+    import threading
+
+    def _loop():
+        time.sleep(15)
+        while True:
+            try:
+                _dispatch_all_push_notifications(force=False)
+            except Exception as exc:
+                print(f"[push] worker loop error: {exc}")
+            time.sleep(180)
+
+    threading.Thread(target=_loop, daemon=True, name='push-notification-worker').start()
+
+
+@app.route('/api/push/vapid-public-key')
+def push_vapid_public_key():
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    public_key = _vapid_public_key_b64()
+    if not public_key:
+        return jsonify({'success': False, 'error': 'Push not configured on server'}), 503
+    return jsonify({'success': True, 'publicKey': public_key})
+
+
+@app.route('/api/push/status')
+def push_subscription_status():
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_push_subscriptions_table(cursor, connection)
+            cursor.execute(
+                "SELECT COUNT(*) AS cnt FROM push_subscriptions WHERE employee_id = %s",
+                (session['employee_id'],)
+            )
+            row = cursor.fetchone() or {}
+            return jsonify({
+                'success': True,
+                'subscribed': int(row.get('cnt') or 0) > 0,
+                'count': int(row.get('cnt') or 0),
+                'configured': bool(_vapid_public_key_b64() and _get_vapid_credentials()),
+            })
+    finally:
+        connection.close()
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+def push_subscribe():
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    endpoint = (data.get('endpoint') or '').strip()
+    keys = data.get('keys') or {}
+    p256dh = (keys.get('p256dh') or '').strip()
+    auth = (keys.get('auth') or '').strip()
+    if not endpoint or not p256dh or not auth:
+        return jsonify({'success': False, 'error': 'Invalid subscription payload'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        employee_id = session['employee_id']
+        user_agent = (request.headers.get('User-Agent') or '')[:500]
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_push_subscriptions_table(cursor, connection)
+            cursor.execute("""
+                INSERT INTO push_subscriptions (employee_id, endpoint, p256dh, auth, user_agent)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    employee_id = VALUES(employee_id),
+                    p256dh = VALUES(p256dh),
+                    auth = VALUES(auth),
+                    user_agent = VALUES(user_agent),
+                    updated_at = CURRENT_TIMESTAMP
+            """, (employee_id, endpoint, p256dh, auth, user_agent))
+            connection.commit()
+        try:
+            _dispatch_push_for_employee(connection, employee_id, force=True)
+        except Exception as exc:
+            print(f"[push] initial dispatch after subscribe failed: {exc}")
+        return jsonify({'success': True})
+    finally:
+        connection.close()
+
+
+@app.route('/api/push/unsubscribe', methods=['POST'])
+def push_unsubscribe():
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    endpoint = (data.get('endpoint') or '').strip()
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        with connection.cursor() as cursor:
+            ensure_push_subscriptions_table(cursor, connection)
+            if endpoint:
+                cursor.execute(
+                    "DELETE FROM push_subscriptions WHERE employee_id = %s AND endpoint = %s",
+                    (session['employee_id'], endpoint)
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM push_subscriptions WHERE employee_id = %s",
+                    (session['employee_id'],)
+                )
+            connection.commit()
+        return jsonify({'success': True})
+    finally:
+        connection.close()
+
+
+@app.route('/api/push/test', methods=['POST'])
+def push_test_notification():
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        sent = _dispatch_push_for_employee(connection, session['employee_id'], force=True)
+        return jsonify({'success': True, 'sent': sent})
+    finally:
+        connection.close()
+
 
 @app.route('/notifications')
 def notifications():
@@ -7359,14 +7952,14 @@ def notifications():
                 LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
                 LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
                 WHERE
-                    t.task_status IN ('Pending', 'In Progress')
+                    t.task_status IN ('Pending', 'Received', 'In Progress')
                     AND (
                         (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
                         OR
-                        (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                        (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
                     )
                 ORDER BY t.due_at ASC, t.created_at DESC
-            """, (employee_id, employee_id, employee_id))
+            """, (employee_id, employee_id, employee_id, employee_id))
             active_tasks = list(cursor.fetchall() or [])
             for task in active_tasks:
                 due_val = task.get('due_at')
@@ -7386,7 +7979,7 @@ def notifications():
                     'title': task.get('task_title') or 'Assigned task',
                     'subtitle': ref,
                     'meta': f"Status: {task.get('task_status') or '-'} | Due: {due_text}",
-                    'link': url_for('my_task_view', task_id=task['id']) if task.get('task_status') == 'In Progress' else url_for('my_tasks'),
+                    'link': url_for('my_tasks', view=task['id']),
                     'sort_key': due_text if due_text != '-' else '9999-12-31 23:59'
                 })
 
@@ -11473,7 +12066,7 @@ def case_task_management():
                     errors.append('Task timeline is required.')
                 if not reminder_intervals:
                     errors.append('Select at least one reminder interval.')
-                allowed_status = {'Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled'}
+                allowed_status = {'Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled'}
                 if edit_task_id:
                     if task_status_val not in allowed_status:
                         errors.append('Task status is required.')
@@ -11641,7 +12234,7 @@ def case_task_management():
         case_tasks=case_tasks,
         reminder_options=reminder_options,
         editing_task=editing_task,
-        task_status_options=['Pending', 'In Progress', 'Submitted', 'Completed', 'Cancelled']
+        task_status_options=['Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled']
     )
 
 @app.route('/case_management/case_tracking')
@@ -15824,6 +16417,415 @@ def get_case_drive_folder_name(case_data, case_id):
     name = f"{client_safe} - {tracking}".strip()
     return name if name else f"Case {tracking}"
 
+
+def _format_drive_timestamp(iso_ts):
+    if not iso_ts:
+        return ''
+    try:
+        from datetime import datetime
+        dt = datetime.fromisoformat(iso_ts.replace('Z', '+00:00'))
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return str(iso_ts)
+
+
+def _format_drive_file_size(size_val):
+    try:
+        size_int = int(size_val) if size_val else 0
+        if size_int < 1024:
+            return f"{size_int} B", size_int
+        if size_int < 1024 * 1024:
+            return f"{size_int / 1024:.1f} KB", size_int
+        return f"{size_int / (1024 * 1024):.1f} MB", size_int
+    except Exception:
+        return 'Unknown', 0
+
+
+def find_drive_folder(service, parent_folder_id, folder_name):
+    """Find an existing folder by name under a parent (read-only; does not create)."""
+    if not service or not parent_folder_id or not folder_name:
+        return None
+    try:
+        escaped_folder_name = folder_name.replace("'", "\\'")
+        query = (
+            f"name='{escaped_folder_name}' and '{parent_folder_id}' in parents "
+            "and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        )
+        results = service.files().list(q=query, spaces='drive', fields='files(id, name)').execute()
+        folders = results.get('files', [])
+        return folders[0]['id'] if folders else None
+    except Exception as e:
+        print(f"Error finding Drive folder {folder_name}: {e}")
+        return None
+
+
+def list_drive_folder_children(service, parent_folder_id):
+    """List immediate child folders and files in a Drive folder."""
+    if not service or not parent_folder_id:
+        return []
+    children = []
+    page_token = None
+    while True:
+        results = service.files().list(
+            q=f"'{parent_folder_id}' in parents and trashed=false",
+            spaces='drive',
+            fields='nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, webViewLink, size)',
+            orderBy='folder,name',
+            pageSize=100,
+            pageToken=page_token,
+        ).execute()
+        children.extend(results.get('files', []))
+        page_token = results.get('nextPageToken')
+        if not page_token:
+            break
+    return children
+
+
+def build_drive_folder_tree(service, folder_id, depth=0, max_depth=8):
+    """Build a nested tree of folders and files as stored in Google Drive."""
+    if not service or not folder_id or depth > max_depth:
+        return []
+    nodes = []
+    for item in list_drive_folder_children(service, folder_id):
+        is_folder = item.get('mimeType') == 'application/vnd.google-apps.folder'
+        size_display, size_int = ('', 0)
+        if not is_folder:
+            size_display, size_int = _format_drive_file_size(item.get('size'))
+        fname = item.get('name', 'Unknown')
+        ext = fname.rsplit('.', 1)[1].lower() if not is_folder and '.' in fname else ''
+        node = {
+            'id': item.get('id'),
+            'name': fname,
+            'type': 'folder' if is_folder else 'file',
+            'url': item.get('webViewLink', ''),
+            'mime_type': item.get('mimeType', ''),
+            'file_extension': ext,
+            'created_time': _format_drive_timestamp(item.get('createdTime')),
+            'modified_time': _format_drive_timestamp(item.get('modifiedTime')),
+            'size': size_int,
+            'size_display': size_display,
+            'children': [],
+        }
+        if is_folder:
+            node['children'] = build_drive_folder_tree(service, item['id'], depth + 1, max_depth)
+        nodes.append(node)
+    nodes.sort(key=lambda x: (0 if x['type'] == 'folder' else 1, x['name'].lower()))
+    return nodes
+
+
+def _build_client_registration_documents(client, client_id, cursor):
+    """Registration and locally stored personal documents for a client."""
+    upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+    personal_uploads = []
+    doc_fields = {
+        'id_front': {'label': 'NATIONAL ID / PASSPORT', 'icon': 'fa-id-card'},
+        'id_back': {'label': 'KRA PIN DOCUMENT', 'icon': 'fa-file-invoice'},
+        'instruction_note': {'label': 'SIGNED INSTRUCTION NOTE', 'icon': 'fa-file-signature'},
+        'cr12_certificate': {'label': 'CR12/CR13 CERTIFICATE', 'icon': 'fa-certificate'},
+        'corporate_kra_pin': {'label': 'CORPORATE KRA PIN', 'icon': 'fa-file-invoice-dollar'},
+    }
+    for field, meta in doc_fields.items():
+        filename = client.get(field)
+        if not filename:
+            continue
+        filepath = os.path.join(upload_folder, filename)
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        size_int = 0
+        size_str = 'N/A'
+        if os.path.exists(filepath):
+            size_int = os.path.getsize(filepath)
+            size_str, _ = _format_drive_file_size(size_int)
+        personal_uploads.append({
+            'id': None,
+            'field': field,
+            'label': meta['label'],
+            'icon': meta['icon'],
+            'filename': filename,
+            'file_extension': ext,
+            'size': size_int,
+            'size_display': size_str,
+            'url': url_for('static', filename='uploads/profile_pictures/' + filename),
+            'source': 'legacy',
+        })
+
+    custom_uploads = []
+    cursor.execute("""
+        SELECT id, document_type, filename, original_filename, file_size, created_at
+        FROM client_personal_documents
+        WHERE client_id = %s ORDER BY created_at DESC
+    """, (client_id,))
+    for doc in cursor.fetchall():
+        filename = doc['filename']
+        ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        size_int = doc.get('file_size', 0) or 0
+        size_str, _ = _format_drive_file_size(size_int)
+        created_time = ''
+        if doc.get('created_at'):
+            created_time = doc['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        custom_uploads.append({
+            'id': doc['id'],
+            'label': doc['document_type'],
+            'icon': 'fa-file-alt',
+            'filename': filename,
+            'file_extension': ext,
+            'size': size_int,
+            'size_display': size_str,
+            'created_time': created_time,
+            'url': url_for('static', filename='uploads/profile_pictures/' + filename),
+            'source': 'custom',
+        })
+    return personal_uploads, custom_uploads
+
+
+_CLIENT_LEGACY_DOC_FIELDS = frozenset({
+    'id_front', 'id_back', 'instruction_note', 'cr12_certificate', 'corporate_kra_pin',
+})
+
+
+def _staff_can_manage_client_documents():
+    """True when the logged-in employee may manage client documents."""
+    if 'employee_id' not in session:
+        return False
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    return (user_role in allowed_roles) or (original_role == 'IT Support')
+
+
+def _mask_email_address(email):
+    try:
+        local, _, domain = (email or '').partition('@')
+        if local and domain:
+            masked_local = local[0] + '*' * max(0, len(local) - 2) + (local[-1] if len(local) > 1 else '')
+            return f"{masked_local}@{domain}"
+    except Exception:
+        pass
+    return email or ''
+
+
+def _ensure_document_action_verifications_table():
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS document_action_verifications (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        employee_id INT NOT NULL,
+                        client_id INT NOT NULL,
+                        action VARCHAR(20) NOT NULL,
+                        doc_kind VARCHAR(20) NOT NULL,
+                        doc_field VARCHAR(50) NULL,
+                        doc_id INT NULL,
+                        drive_file_id VARCHAR(128) NULL,
+                        code_hash VARCHAR(255) NOT NULL,
+                        action_token_hash VARCHAR(255) NULL,
+                        expires_at DATETIME NOT NULL,
+                        token_expires_at DATETIME NULL,
+                        verified_at DATETIME NULL,
+                        used TINYINT(1) NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_doc_action_employee (employee_id),
+                        INDEX idx_doc_action_client (client_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+            return True
+        finally:
+            connection.close()
+    except Exception as e:
+        print(f"[document_action_verifications] Failed to ensure table: {e}")
+        return False
+
+
+def _send_document_action_code_email(to_email, code, full_name, action_label):
+    """Email a 6-digit verification code for a sensitive client-document action."""
+    try:
+        email_settings = get_email_settings()
+        if not email_settings:
+            return False
+
+        from_email = email_settings.get('main_email') or ''
+        password = email_settings.get('main_email_password') or ''
+        smtp_host = email_settings.get('smtp_host') or ''
+        smtp_port = int(email_settings.get('smtp_port') or 587)
+        use_tls = bool(email_settings.get('smtp_use_tls', True))
+        sender_name = email_settings.get('sender_name') or 'SHERIA CENTRIC'
+
+        if not from_email or not password or not smtp_host:
+            return False
+
+        greeting_name = (full_name or 'there').split(' ')[0]
+        subject = f'Your SHERIA CENTRIC verification code — {action_label}'
+        text_body = (
+            f"Hi {greeting_name},\n\n"
+            f"Your verification code to {action_label.lower()} is: {code}\n\n"
+            f"It expires in 10 minutes. If you didn't request this, you can ignore this email.\n\n"
+            f"— SHERIA CENTRIC"
+        )
+        html_body = f"""
+        <div style="font-family:-apple-system,Segoe UI,Inter,Arial,sans-serif;background:#f4f3fb;padding:32px 12px;">
+          <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 18px 40px rgba(23,18,63,0.12);border:1px solid #e5e3f5;">
+            <div style="padding:28px 32px 22px;background:linear-gradient(135deg,#1f1853 0%,#3a2e95 100%);color:#fff;">
+              <div style="font-size:0.78rem;letter-spacing:0.18em;text-transform:uppercase;opacity:0.8;">Document security</div>
+              <div style="font-size:1.4rem;font-weight:800;margin-top:4px;">Verification required</div>
+            </div>
+            <div style="padding:28px 32px;">
+              <p style="margin:0 0 14px;color:#374151;font-size:0.95rem;">Hi {greeting_name},</p>
+              <p style="margin:0 0 18px;color:#374151;font-size:0.95rem;line-height:1.55;">
+                Use the code below to confirm you want to <strong>{action_label.lower()}</strong>.
+                It expires in <strong>10 minutes</strong>.
+              </p>
+              <div style="text-align:center;margin:22px 0;">
+                <div style="display:inline-block;padding:18px 28px;border-radius:14px;background:#f3f2ff;border:1px solid #cfc9ff;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:2rem;font-weight:800;letter-spacing:0.4em;color:#1E1A4E;">
+                  {code}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        """
+        return send_email_via_smtp(
+            from_email, password, to_email, subject, text_body,
+            smtp_host, smtp_port, use_tls, html_body=html_body,
+            sender_name=sender_name,
+        )
+    except Exception as e:
+        print(f"[document_action_verifications] Send error: {e}")
+        return False
+
+
+def _parse_staff_document_action_payload(data):
+    """Normalize action payload from JSON/form for client document operations."""
+    action = (data.get('action') or '').strip().lower()
+    doc_kind = (data.get('doc_kind') or '').strip().lower()
+    doc_field = (data.get('field') or '').strip() or None
+    doc_id = data.get('doc_id')
+    drive_file_id = (data.get('drive_file_id') or '').strip() or None
+
+    if action not in ('download', 'delete'):
+        return None, 'Invalid action.'
+    if doc_kind not in ('legacy', 'custom', 'drive'):
+        return None, 'Invalid document type.'
+
+    if doc_kind == 'legacy':
+        if not doc_field or doc_field not in _CLIENT_LEGACY_DOC_FIELDS:
+            return None, 'Invalid registration document field.'
+    elif doc_kind == 'custom':
+        try:
+            doc_id = int(doc_id)
+        except (TypeError, ValueError):
+            return None, 'Invalid document id.'
+    elif doc_kind == 'drive':
+        if not drive_file_id:
+            return None, 'Google Drive file id is required.'
+
+    return {
+        'action': action,
+        'doc_kind': doc_kind,
+        'doc_field': doc_field,
+        'doc_id': doc_id if doc_kind == 'custom' else None,
+        'drive_file_id': drive_file_id if doc_kind == 'drive' else None,
+    }, None
+
+
+def _drive_file_belongs_to_folder(service, file_id, root_folder_id, max_hops=25):
+    """Return True when file_id is the root folder or a descendant of it."""
+    if not service or not file_id or not root_folder_id:
+        return False
+    if file_id == root_folder_id:
+        return True
+    current = file_id
+    for _ in range(max_hops):
+        try:
+            meta = service.files().get(fileId=current, fields='parents').execute()
+        except Exception:
+            return False
+        parents = meta.get('parents') or []
+        if not parents:
+            return False
+        if root_folder_id in parents:
+            return True
+        current = parents[0]
+    return False
+
+
+def _get_client_drive_folder_context(cursor, connection, client_id):
+    """Return (service, client_folder_id) for a client, or (None, None)."""
+    cursor.execute("""
+        SELECT phone_number, full_name
+        FROM clients WHERE id = %s
+    """, (client_id,))
+    client = cursor.fetchone()
+    if not client:
+        return None, None
+
+    cursor.execute("""
+        SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+               google_drive_scopes, google_drive_main_folder_id
+        FROM company_settings ORDER BY id DESC LIMIT 1
+    """)
+    drive_settings = cursor.fetchone()
+    if not drive_settings or not drive_settings.get('google_drive_token'):
+        return None, None
+
+    scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+    credentials = Credentials(
+        token=drive_settings['google_drive_token'],
+        refresh_token=drive_settings.get('google_drive_refresh_token'),
+        token_uri=drive_settings.get('google_drive_token_uri'),
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=scopes,
+    )
+    ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+    if not ok:
+        return None, None
+
+    service = build('drive', 'v3', credentials=credentials)
+    main_folder_id = drive_settings.get('google_drive_main_folder_id')
+    if not service or not main_folder_id:
+        return None, None
+
+    client_folder_name = get_user_folder_name(client.get('phone_number'), client.get('full_name'), 'client')
+    client_folder_id = find_drive_folder(service, main_folder_id, client_folder_name)
+    return service, client_folder_id
+
+
+def _consume_staff_document_action_token(cursor, employee_id, client_id, payload, token):
+    """Validate and consume a one-time action token. Returns row id or None."""
+    from datetime import datetime as _dt
+    if not token:
+        return None
+
+    cursor.execute("""
+        SELECT id, action_token_hash, token_expires_at, used
+        FROM document_action_verifications
+        WHERE employee_id = %s AND client_id = %s
+          AND action = %s AND doc_kind = %s
+          AND (doc_field <=> %s) AND (doc_id <=> %s) AND (drive_file_id <=> %s)
+          AND verified_at IS NOT NULL AND used = 0
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        employee_id, client_id,
+        payload['action'], payload['doc_kind'],
+        payload.get('doc_field'), payload.get('doc_id'), payload.get('drive_file_id'),
+    ))
+    row = cursor.fetchone()
+    if not row or not row.get('action_token_hash'):
+        return None
+    if row.get('token_expires_at') and row['token_expires_at'] < _dt.utcnow():
+        return None
+    if not check_password_hash(row['action_token_hash'], token):
+        return None
+
+    cursor.execute("UPDATE document_action_verifications SET used = 1 WHERE id = %s", (row['id'],))
+    return row['id']
+
+
 def get_or_create_folder(service, parent_folder_id, folder_name):
     """Get or create a folder in Google Drive"""
     try:
@@ -17278,7 +18280,6 @@ def view_client_documents(client_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch client details
             cursor.execute("""
                 SELECT 
                     id,
@@ -17289,7 +18290,12 @@ def view_client_documents(client_id):
                     profile_picture,
                     client_type,
                     status,
-                    created_at
+                    created_at,
+                    id_front,
+                    id_back,
+                    instruction_note,
+                    cr12_certificate,
+                    corporate_kra_pin
                 FROM clients
                 WHERE id = %s
             """, (client_id,))
@@ -17299,9 +18305,65 @@ def view_client_documents(client_id):
                 flash('Client not found', 'error')
                 return redirect(url_for('document_management'))
             
-            # Convert date objects to strings
             if client.get('created_at'):
                 client['created_at'] = client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+
+            personal_uploads, custom_uploads = _build_client_registration_documents(client, client_id, cursor)
+
+            google_drive_connected = False
+            client_folder_name = get_user_folder_name(client.get('phone_number'), client.get('full_name'), 'client')
+            drive_tree = []
+            drive_file_count = 0
+            drive_folder_count = 0
+
+            cursor.execute("""
+                SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                       google_drive_scopes, google_drive_main_folder_id
+                FROM company_settings ORDER BY id DESC LIMIT 1
+            """)
+            drive_settings = cursor.fetchone()
+            if drive_settings and drive_settings.get('google_drive_token') and drive_settings.get('google_drive_refresh_token'):
+                google_drive_connected = True
+
+            if google_drive_connected:
+                try:
+                    scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+                    credentials = Credentials(
+                        token=drive_settings['google_drive_token'],
+                        refresh_token=drive_settings['google_drive_refresh_token'],
+                        token_uri=drive_settings.get('google_drive_token_uri'),
+                        client_id=GOOGLE_CLIENT_ID,
+                        client_secret=GOOGLE_CLIENT_SECRET,
+                        scopes=scopes,
+                    )
+                    ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                    if not ok:
+                        raise RefreshError('invalid_grant: Google Drive needs reconnect')
+                    service = build('drive', 'v3', credentials=credentials)
+                    main_folder_id = drive_settings.get('google_drive_main_folder_id')
+                    if service and main_folder_id:
+                        client_folder_id = find_drive_folder(service, main_folder_id, client_folder_name)
+                        if client_folder_id:
+                            drive_tree = build_drive_folder_tree(service, client_folder_id)
+
+                            def _count_nodes(nodes):
+                                files = 0
+                                folders = 0
+                                for node in nodes:
+                                    if node['type'] == 'folder':
+                                        folders += 1
+                                        f, d = _count_nodes(node.get('children', []))
+                                        files += f
+                                        folders += d
+                                    else:
+                                        files += 1
+                                return files, folders
+
+                            drive_file_count, drive_folder_count = _count_nodes(drive_tree)
+                except Exception as e:
+                    print(f"Error fetching client Drive tree: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             company_settings = get_company_settings()
             if not company_settings:
@@ -17310,13 +18372,364 @@ def view_client_documents(client_id):
             return render_template('view_client_documents.html',
                                  client=client,
                                  client_id=client_id,
-                                 company_settings=company_settings)
+                                 company_settings=company_settings,
+                                 personal_uploads=personal_uploads,
+                                 custom_uploads=custom_uploads,
+                                 google_drive_connected=google_drive_connected,
+                                 client_folder_name=client_folder_name,
+                                 drive_tree=drive_tree,
+                                 drive_file_count=drive_file_count,
+                                 drive_folder_count=drive_folder_count)
     except Exception as e:
         print(f"Error fetching client documents: {e}")
         flash('An error occurred while fetching client information.', 'error')
         return redirect(url_for('document_management'))
     finally:
         connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/action/send-code', methods=['POST'])
+def staff_client_document_send_code(client_id):
+    """Send a verification code to the logged-in employee's email before download/delete."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("SELECT id FROM clients WHERE id = %s", (client_id,))
+            if not cursor.fetchone():
+                return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+            employee_id = session['employee_id']
+            cursor.execute("""
+                SELECT id, full_name, work_email, personal_email
+                FROM employees WHERE id = %s
+            """, (employee_id,))
+            employee = cursor.fetchone()
+            if not employee:
+                return jsonify({'success': False, 'error': 'Employee not found'}), 404
+
+            delivery_email = (employee.get('personal_email') or employee.get('work_email') or '').strip()
+            if not delivery_email:
+                return jsonify({'success': False, 'error': 'No registered email on your account. Contact your administrator.'}), 400
+
+            cursor.execute("""
+                UPDATE document_action_verifications SET used = 1
+                WHERE employee_id = %s AND client_id = %s AND used = 0
+            """, (employee_id, client_id))
+
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            code_hash = generate_password_hash(code)
+            expires_at = _dt.utcnow() + _td(minutes=10)
+
+            cursor.execute("""
+                INSERT INTO document_action_verifications
+                    (employee_id, client_id, action, doc_kind, doc_field, doc_id, drive_file_id, code_hash, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                employee_id, client_id,
+                payload['action'], payload['doc_kind'],
+                payload.get('doc_field'), payload.get('doc_id'), payload.get('drive_file_id'),
+                code_hash, expires_at,
+            ))
+            connection.commit()
+
+        action_label = 'Download document' if payload['action'] == 'download' else 'Delete document'
+        sent = _send_document_action_code_email(delivery_email, code, employee.get('full_name'), action_label)
+        if not sent:
+            return jsonify({'success': False, 'error': 'Could not send verification email. Try again later.'}), 500
+
+        return jsonify({
+            'success': True,
+            'message': f'A verification code has been sent to {_mask_email_address(delivery_email)}.',
+            'delivery_email': _mask_email_address(delivery_email),
+            'expires_in_minutes': 10,
+        })
+    except Exception as e:
+        print(f"[staff_client_document_send_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/action/verify-code', methods=['POST'])
+def staff_client_document_verify_code(client_id):
+    """Verify the emailed code and return a short-lived one-time action token."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    code = (data.get('code') or '').strip()
+    if not code.isdigit() or len(code) != 6:
+        return jsonify({'success': False, 'error': 'Code must be 6 digits.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session['employee_id']
+            cursor.execute("""
+                SELECT id, code_hash, expires_at, used
+                FROM document_action_verifications
+                WHERE employee_id = %s AND client_id = %s
+                  AND action = %s AND doc_kind = %s
+                  AND (doc_field <=> %s) AND (doc_id <=> %s) AND (drive_file_id <=> %s)
+                  AND used = 0
+                ORDER BY id DESC
+                LIMIT 1
+            """, (
+                employee_id, client_id,
+                payload['action'], payload['doc_kind'],
+                payload.get('doc_field'), payload.get('doc_id'), payload.get('drive_file_id'),
+            ))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Invalid or expired code. Request a new one.'}), 400
+            if row.get('expires_at') and row['expires_at'] < _dt.utcnow():
+                return jsonify({'success': False, 'error': 'Code expired. Please request a new one.'}), 400
+            if not check_password_hash(row['code_hash'], code):
+                return jsonify({'success': False, 'error': 'Incorrect verification code.'}), 400
+
+            action_token = secrets.token_urlsafe(32)
+            token_hash = generate_password_hash(action_token)
+            verified_at = _dt.utcnow()
+            token_expires_at = verified_at + _td(minutes=5)
+
+            cursor.execute("""
+                UPDATE document_action_verifications
+                SET verified_at = %s, action_token_hash = %s, token_expires_at = %s
+                WHERE id = %s
+            """, (verified_at, token_hash, token_expires_at, row['id']))
+            connection.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Code verified.',
+            'action_token': action_token,
+            'expires_in_minutes': 5,
+        })
+    except Exception as e:
+        print(f"[staff_client_document_verify_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/download', methods=['GET'])
+def staff_client_document_download(client_id):
+    """Download a client document after email verification."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = {
+        'action': 'download',
+        'doc_kind': request.args.get('doc_kind'),
+        'field': request.args.get('field'),
+        'doc_id': request.args.get('doc_id'),
+        'drive_file_id': request.args.get('drive_file_id'),
+    }
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        flash(err, 'error')
+        return redirect(url_for('view_client_documents', client_id=client_id))
+
+    token = (request.args.get('token') or '').strip()
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('view_client_documents', client_id=client_id))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session['employee_id']
+            if not _consume_staff_document_action_token(cursor, employee_id, client_id, payload, token):
+                flash('Verification expired or invalid. Please try again.', 'error')
+                return redirect(url_for('view_client_documents', client_id=client_id))
+            connection.commit()
+
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+
+            if payload['doc_kind'] == 'legacy':
+                field = payload['doc_field']
+                cursor.execute(f"SELECT {field} FROM clients WHERE id = %s", (client_id,))
+                client = cursor.fetchone()
+                if not client or not client.get(field):
+                    flash('Document not found.', 'error')
+                    return redirect(url_for('view_client_documents', client_id=client_id))
+                return send_from_directory(
+                    os.path.abspath(upload_folder),
+                    client[field],
+                    as_attachment=True,
+                )
+
+            if payload['doc_kind'] == 'custom':
+                cursor.execute("""
+                    SELECT filename, original_filename
+                    FROM client_personal_documents
+                    WHERE id = %s AND client_id = %s
+                """, (payload['doc_id'], client_id))
+                doc = cursor.fetchone()
+                if not doc:
+                    flash('Document not found.', 'error')
+                    return redirect(url_for('view_client_documents', client_id=client_id))
+                return send_from_directory(
+                    os.path.abspath(upload_folder),
+                    doc['filename'],
+                    as_attachment=True,
+                    download_name=doc.get('original_filename') or doc['filename'],
+                )
+
+            service, client_folder_id = _get_client_drive_folder_context(cursor, connection, client_id)
+            if not service or not client_folder_id:
+                flash('Google Drive is not connected for this client.', 'error')
+                return redirect(url_for('view_client_documents', client_id=client_id))
+
+            file_id = payload['drive_file_id']
+            if not _drive_file_belongs_to_folder(service, file_id, client_folder_id):
+                flash('File is not in this client\'s Drive folder.', 'error')
+                return redirect(url_for('view_client_documents', client_id=client_id))
+
+            meta = service.files().get(fileId=file_id, fields='name,mimeType').execute()
+            name = meta.get('name', 'document')
+            mime = meta.get('mimeType', '')
+            if mime and mime.startswith('application/vnd.google-apps.'):
+                export_map = {
+                    'application/vnd.google-apps.document': ('application/pdf', '.pdf'),
+                    'application/vnd.google-apps.spreadsheet': (
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'
+                    ),
+                    'application/vnd.google-apps.presentation': ('application/pdf', '.pdf'),
+                }
+                exp_mime, ext = export_map.get(mime, ('application/pdf', '.pdf'))
+                content = service.files().export(fileId=file_id, mimeType=exp_mime).execute()
+                base_name = name.rsplit('.', 1)[0] if '.' in name else name
+                return send_file(
+                    BytesIO(content), as_attachment=True,
+                    download_name=base_name + ext, mimetype=exp_mime,
+                )
+
+            request_dl = service.files().get_media(fileId=file_id)
+            buf = BytesIO()
+            downloader = MediaIoBaseDownload(buf, request_dl)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            buf.seek(0)
+            return send_file(buf, as_attachment=True, download_name=name, mimetype=mime or 'application/octet-stream')
+    except HttpError as e:
+        print(f"[staff_client_document_download] Drive error: {e}")
+        flash('Could not download file from Google Drive.', 'error')
+        return redirect(url_for('view_client_documents', client_id=client_id))
+    except Exception as e:
+        print(f"[staff_client_document_download] error: {e}")
+        flash('Download failed.', 'error')
+        return redirect(url_for('view_client_documents', client_id=client_id))
+    finally:
+        connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/delete', methods=['POST'])
+def staff_client_document_delete(client_id):
+    """Delete a client document after email verification."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    token = (data.get('token') or '').strip()
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session['employee_id']
+            if not _consume_staff_document_action_token(cursor, employee_id, client_id, payload, token):
+                return jsonify({'success': False, 'error': 'Verification expired or invalid. Please try again.'}), 403
+
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+
+            if payload['doc_kind'] == 'legacy':
+                field = payload['doc_field']
+                cursor.execute(f"SELECT {field} FROM clients WHERE id = %s", (client_id,))
+                client = cursor.fetchone()
+                if not client or not client.get(field):
+                    return jsonify({'success': False, 'error': 'Document not found'}), 404
+                old_filename = client[field]
+                cursor.execute(f"UPDATE clients SET {field} = NULL WHERE id = %s", (client_id,))
+                connection.commit()
+                if old_filename:
+                    old_path = os.path.join(upload_folder, old_filename)
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except Exception:
+                            pass
+                return jsonify({'success': True, 'message': 'Document deleted successfully'})
+
+            if payload['doc_kind'] == 'custom':
+                cursor.execute("""
+                    SELECT filename FROM client_personal_documents
+                    WHERE id = %s AND client_id = %s
+                """, (payload['doc_id'], client_id))
+                doc = cursor.fetchone()
+                if not doc:
+                    return jsonify({'success': False, 'error': 'Document not found'}), 404
+                cursor.execute("DELETE FROM client_personal_documents WHERE id = %s AND client_id = %s",
+                               (payload['doc_id'], client_id))
+                connection.commit()
+                old_path = os.path.join(upload_folder, doc['filename'])
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception:
+                        pass
+                return jsonify({'success': True, 'message': 'Document deleted successfully'})
+
+            service, client_folder_id = _get_client_drive_folder_context(cursor, connection, client_id)
+            if not service or not client_folder_id:
+                return jsonify({'success': False, 'error': 'Google Drive is not connected'}), 400
+
+            file_id = payload['drive_file_id']
+            if not _drive_file_belongs_to_folder(service, file_id, client_folder_id):
+                return jsonify({'success': False, 'error': 'File is not in this client\'s Drive folder'}), 403
+
+            service.files().update(fileId=file_id, body={'trashed': True}).execute()
+            connection.commit()
+            return jsonify({'success': True, 'message': 'Document moved to Google Drive trash'})
+    except HttpError as e:
+        print(f"[staff_client_document_delete] Drive error: {e}")
+        return jsonify({'success': False, 'error': f'Failed to delete: {str(e)}'}), 500
+    except Exception as e:
+        print(f"[staff_client_document_delete] error: {e}")
+        return jsonify({'success': False, 'error': 'Delete failed'}), 500
+    finally:
+        connection.close()
+
 
 @app.route('/view_client_documents/<int:client_id>/<document_type>')
 def view_client_document_type(client_id, document_type):
@@ -17326,7 +18739,7 @@ def view_client_document_type(client_id, document_type):
     
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
     has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
     
     if not has_permission:
@@ -17420,20 +18833,11 @@ def view_client_document_type(client_id, document_type):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Fetch client details
             cursor.execute("""
-                SELECT 
-                    id,
-                    google_id,
-                    full_name,
-                    email,
-                    phone_number,
-                    profile_picture,
-                    client_type,
-                    status,
-                    created_at
-                FROM clients
-                WHERE id = %s
+                SELECT id, google_id, full_name, email, phone_number, profile_picture,
+                       client_type, status, created_at,
+                       id_front, id_back, instruction_note, cr12_certificate, corporate_kra_pin
+                FROM clients WHERE id = %s
             """, (client_id,))
             client = cursor.fetchone()
             
@@ -17441,16 +18845,69 @@ def view_client_document_type(client_id, document_type):
                 flash('Client not found', 'error')
                 return redirect(url_for('document_management'))
             
-            # Convert date objects to strings
             if client.get('created_at'):
                 client['created_at'] = client['created_at'].strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Map document type to display name
+
+            personal_uploads, custom_uploads = _build_client_registration_documents(client, client_id, cursor)
+            if document_type != 'CLIENT_PERSONAL_DOCUMENT':
+                personal_uploads = []
+                custom_uploads = []
+
             document_type_names = {
                 'CLIENT_PERSONAL_DOCUMENT': 'Personal Documents',
                 'CLIENT_CASE_DOCUMENT': 'Case Documents'
             }
             document_type_name = document_type_names.get(document_type, document_type)
+
+            google_drive_connected = False
+            drive_tree = []
+            client_folder_name = get_user_folder_name(client.get('phone_number'), client.get('full_name'), 'client')
+
+            cursor.execute("""
+                SELECT google_drive_token, google_drive_refresh_token, google_drive_token_uri,
+                       google_drive_scopes, google_drive_main_folder_id
+                FROM company_settings ORDER BY id DESC LIMIT 1
+            """)
+            drive_settings = cursor.fetchone()
+            if drive_settings and drive_settings.get('google_drive_token') and drive_settings.get('google_drive_refresh_token'):
+                google_drive_connected = True
+
+            if google_drive_connected:
+                try:
+                    scopes = json.loads(drive_settings['google_drive_scopes']) if drive_settings.get('google_drive_scopes') else []
+                    credentials = Credentials(
+                        token=drive_settings['google_drive_token'],
+                        refresh_token=drive_settings['google_drive_refresh_token'],
+                        token_uri=drive_settings.get('google_drive_token_uri'),
+                        client_id=GOOGLE_CLIENT_ID,
+                        client_secret=GOOGLE_CLIENT_SECRET,
+                        scopes=scopes,
+                    )
+                    ok, _info = refresh_drive_credentials_safely(credentials, cursor, connection)
+                    if not ok:
+                        raise RefreshError('invalid_grant: Google Drive needs reconnect')
+                    service = build('drive', 'v3', credentials=credentials)
+                    main_folder_id = drive_settings.get('google_drive_main_folder_id')
+                    if service and main_folder_id:
+                        client_folder_id = find_drive_folder(service, main_folder_id, client_folder_name)
+                        if client_folder_id:
+                            if document_type == 'CLIENT_CASE_DOCUMENT':
+                                reserved = {'CLIENT_PERSONAL_DOCUMENT'}
+                                for child in list_drive_folder_children(service, client_folder_id):
+                                    if child.get('mimeType') != 'application/vnd.google-apps.folder':
+                                        continue
+                                    name = child.get('name', '')
+                                    if name in reserved:
+                                        continue
+                                    drive_tree.extend(build_drive_folder_tree(service, child['id']))
+                            else:
+                                type_folder_id = find_drive_folder(service, client_folder_id, document_type)
+                                if type_folder_id:
+                                    drive_tree = build_drive_folder_tree(service, type_folder_id)
+                except Exception as e:
+                    print(f"Error fetching client document type from Drive: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             company_settings = get_company_settings()
             if not company_settings:
@@ -17461,7 +18918,12 @@ def view_client_document_type(client_id, document_type):
                                  client_id=client_id,
                                  document_type=document_type,
                                  document_type_name=document_type_name,
-                                 company_settings=company_settings)
+                                 company_settings=company_settings,
+                                 personal_uploads=personal_uploads,
+                                 custom_uploads=custom_uploads,
+                                 google_drive_connected=google_drive_connected,
+                                 client_folder_name=client_folder_name,
+                                 drive_tree=drive_tree)
     except Exception as e:
         print(f"Error fetching client documents: {e}")
         flash('An error occurred while fetching client information.', 'error')
@@ -17643,8 +19105,68 @@ def download_employee_contract():
     finally:
         connection.close()
 
+def _format_calendar_proceeding(proceeding, today=None):
+    """Normalize proceeding date fields for calendar templates."""
+    if proceeding.get('date_of_court_appeared'):
+        proceeding['date_of_court_appeared'] = proceeding['date_of_court_appeared'].strftime('%Y-%m-%d')
+    if proceeding.get('next_court_date'):
+        next_date = proceeding['next_court_date']
+        proceeding['next_court_date'] = next_date.strftime('%Y-%m-%d')
+        if today is not None:
+            proceeding['days_until'] = (next_date - today).days
+    if proceeding.get('created_at'):
+        proceeding['created_at'] = proceeding['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+    proceeding['source'] = 'case'
+    return proceeding
+
+
+def _format_calendar_matter(matter, today=None):
+    """Normalize matter date fields for calendar templates."""
+    if matter.get('date_opened'):
+        d = matter['date_opened']
+        matter['date_opened'] = d.strftime('%Y-%m-%d')
+        if today is not None:
+            matter['days_until'] = (d - today).days
+    matter['source'] = 'matter'
+    return matter
+
+
+def _build_firm_calendar_events(upcoming_proceedings, all_proceedings, matters):
+    """Build date-keyed event map matching case_calendar format."""
+    calendar_events = {}
+
+    for proceeding in upcoming_proceedings:
+        key = proceeding.get('next_court_date')
+        if key:
+            calendar_events.setdefault(key, []).append({
+                'type': 'next',
+                'source': 'case',
+                'proceeding': proceeding,
+            })
+
+    for proceeding in all_proceedings:
+        key = proceeding.get('date_of_court_appeared')
+        if key:
+            calendar_events.setdefault(key, []).append({
+                'type': 'appeared',
+                'source': 'case',
+                'proceeding': proceeding,
+            })
+
+    for matter in matters:
+        key = matter.get('date_opened')
+        if key:
+            calendar_events.setdefault(key, []).append({
+                'type': 'matter',
+                'source': 'matter',
+                'matter': matter,
+            })
+
+    return calendar_events
+
+
 def _build_calendar_events_dict(proceedings, matters):
-    """Build date-keyed event map for the shared calendar view."""
+    """Build date-keyed event map for the shared calendar view (legacy flat format)."""
     calendar_events = {}
     for proceeding in proceedings:
         key = proceeding.get('next_court_date')
@@ -17696,45 +19218,57 @@ def calendar():
     try:
         from datetime import date
         today = date.today()
+
+        proceeding_select = """
+            SELECT
+                p.id,
+                p.case_id,
+                p.court_activity_type,
+                p.court_room,
+                p.judicial_officer,
+                p.date_of_court_appeared,
+                p.next_court_date,
+                p.attendance,
+                p.next_attendance,
+                p.next_activity_type,
+                p.next_judicial_officer,
+                p.virtual_link,
+                p.outcome_orders,
+                p.created_at,
+                c.tracking_number,
+                c.client_name,
+                c.filled_by_id,
+                c.filled_by_name,
+                c.id AS case_table_id
+            FROM case_proceedings p
+            JOIN cases c ON p.case_id = c.id
+        """
         
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # ── Case proceedings (upcoming court dates) ──────────────────────
-            cursor.execute("""
-                SELECT 
-                    p.id,
-                    p.case_id,
-                    p.court_activity_type,
-                    p.court_room,
-                    p.judicial_officer,
-                    p.date_of_court_appeared,
-                    p.next_court_date,
-                    p.next_attendance,
-                    p.virtual_link,
-                    p.outcome_orders,
-                    c.tracking_number,
-                    c.client_name,
-                    c.filled_by_id,
-                    c.filled_by_name,
-                    c.id as case_table_id
-                FROM case_proceedings p
-                JOIN cases c ON p.case_id = c.id
+            # Upcoming court dates (future)
+            cursor.execute(
+                proceeding_select + """
                 WHERE p.next_court_date IS NOT NULL AND p.next_court_date >= %s
                 ORDER BY p.next_court_date ASC
-            """, (today,))
+                """,
+                (today,),
+            )
             all_upcoming_proceedings = list(cursor.fetchall() or [])
-
             for proceeding in all_upcoming_proceedings:
-                proceeding['source'] = 'case'
-                if proceeding.get('date_of_court_appeared'):
-                    proceeding['date_of_court_appeared'] = proceeding['date_of_court_appeared'].strftime('%Y-%m-%d')
-                if proceeding.get('next_court_date'):
-                    next_date = proceeding['next_court_date']
-                    proceeding['next_court_date'] = next_date.strftime('%Y-%m-%d')
-                    proceeding['days_until'] = (next_date - today).days
-                if proceeding.get('created_at'):
-                    proceeding['created_at'] = proceeding['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                _format_calendar_proceeding(proceeding, today)
 
-            # ── Matters ──────────────────────────────────────────────────────
+            # All proceedings for appearance history and past calendar dots
+            cursor.execute(
+                proceeding_select + """
+                WHERE p.date_of_court_appeared IS NOT NULL
+                ORDER BY p.date_of_court_appeared DESC
+                """,
+            )
+            all_proceedings = list(cursor.fetchall() or [])
+            for proceeding in all_proceedings:
+                _format_calendar_proceeding(proceeding, today)
+
+            # Active matters
             cursor.execute("""
                 SELECT
                     m.id,
@@ -17751,20 +19285,14 @@ def calendar():
                 ORDER BY m.date_opened ASC
             """)
             all_matters = list(cursor.fetchall() or [])
-
             matter_events = []
             for matter in all_matters:
-                matter['source'] = 'matter'
-                if matter.get('date_opened'):
-                    d = matter['date_opened']
-                    matter['date_opened'] = d.strftime('%Y-%m-%d')
-                    matter['days_until'] = (d - today).days
-                matter_events.append(matter)
+                matter_events.append(_format_calendar_matter(matter, today))
 
-            # ── Build combined calendar_events dict keyed by date ────────────
-            calendar_events = _build_calendar_events_dict(all_upcoming_proceedings, matter_events)
+            calendar_events = _build_firm_calendar_events(
+                all_upcoming_proceedings, all_proceedings, matter_events
+            )
 
-            # Combined agenda list sorted by date
             all_agenda = sorted(
                 all_upcoming_proceedings + matter_events,
                 key=lambda x: x.get('next_court_date') or x.get('date_opened') or ''
@@ -17774,18 +19302,27 @@ def calendar():
             show_scope_toggle = user_role == 'Managing Partner'
             calendar_events_mine = {}
             all_agenda_mine = []
+            upcoming_mine = []
+            proceedings_mine = []
+            matters_mine = []
             if show_scope_toggle:
-                mine_proceedings = [
+                upcoming_mine = [
                     p for p in all_upcoming_proceedings
                     if _calendar_item_allocated_to_employee(p, employee_id)
                 ]
-                mine_matters = [
+                proceedings_mine = [
+                    p for p in all_proceedings
+                    if _calendar_item_allocated_to_employee(p, employee_id)
+                ]
+                matters_mine = [
                     m for m in matter_events
                     if _calendar_item_allocated_to_employee(m, employee_id)
                 ]
-                calendar_events_mine = _build_calendar_events_dict(mine_proceedings, mine_matters)
+                calendar_events_mine = _build_firm_calendar_events(
+                    upcoming_mine, proceedings_mine, matters_mine
+                )
                 all_agenda_mine = sorted(
-                    mine_proceedings + mine_matters,
+                    upcoming_mine + matters_mine,
                     key=lambda x: x.get('next_court_date') or x.get('date_opened') or ''
                 )
 
@@ -17795,13 +19332,19 @@ def calendar():
             
             return render_template('calendar.html', 
                                  company_settings=company_settings,
-                                 all_upcoming_proceedings=all_agenda,
+                                 all_upcoming_proceedings=all_upcoming_proceedings,
+                                 upcoming_proceedings=all_upcoming_proceedings,
+                                 all_proceedings=all_proceedings,
                                  calendar_events=calendar_events,
                                  calendar_events_mine=calendar_events_mine,
                                  all_agenda_mine=all_agenda_mine,
+                                 upcoming_mine=upcoming_mine,
+                                 proceedings_mine=proceedings_mine,
+                                 matters_mine=matters_mine,
                                  show_scope_toggle=show_scope_toggle,
                                  session_employee_name=session.get('employee_name') or 'Me',
-                                 matter_events=matter_events)
+                                 matter_events=matter_events,
+                                 all_agenda=all_agenda)
     except Exception as e:
         print(f"Error fetching calendar: {e}")
         flash('An error occurred while fetching calendar.', 'error')
@@ -20591,6 +22134,7 @@ def matter_task_management():
 
     current_employee_id = session.get('employee_id')
     matters = []
+    employees = []
     matter_tasks = []
     reminder_options = [
         ('10m', '10 minutes before'),
@@ -20609,13 +22153,13 @@ def matter_task_management():
 
             if user_role == 'IT Support' or original_role == 'IT Support':
                 cursor.execute("""
-                    SELECT id, matter_reference_number, matter_title, assigned_employee_name, status
+                    SELECT id, matter_reference_number, matter_title, assigned_employee_id, assigned_employee_name, status
                     FROM matters
                     ORDER BY updated_at DESC
                 """)
             else:
                 cursor.execute("""
-                    SELECT id, matter_reference_number, matter_title, assigned_employee_name, status
+                    SELECT id, matter_reference_number, matter_title, assigned_employee_id, assigned_employee_name, status
                     FROM matters
                     WHERE assigned_employee_id = %s
                     ORDER BY updated_at DESC
@@ -20623,8 +22167,18 @@ def matter_task_management():
             matters = cursor.fetchall()
             matter_ids = {str(m['id']) for m in matters}
 
+            cursor.execute("""
+                SELECT id, full_name, role
+                FROM employees
+                WHERE status = 'Active'
+                ORDER BY full_name ASC
+            """)
+            employees = cursor.fetchall()
+            employee_map = {str(e['id']): e for e in employees}
+
             if request.method == 'POST':
                 linked_matter_id = (request.form.get('linked_matter_id') or '').strip()
+                assigned_employee_id = (request.form.get('assigned_employee_id') or '').strip()
                 task_title = (request.form.get('task_title') or '').strip()
                 task_description = (request.form.get('task_description') or '').strip()
                 due_at = (request.form.get('due_at') or '').strip()
@@ -20635,6 +22189,10 @@ def matter_task_management():
                     errors.append('Please select a matter.')
                 elif linked_matter_id not in matter_ids:
                     errors.append('Selected matter is not available for your account.')
+                if not assigned_employee_id:
+                    errors.append('Please select the employee to allocate this task to.')
+                elif assigned_employee_id not in employee_map:
+                    errors.append('Selected employee is not available.')
                 if not task_title:
                     errors.append('Task title is required.')
                 if not due_at:
@@ -20648,14 +22206,16 @@ def matter_task_management():
                 else:
                     cursor.execute("""
                         INSERT INTO task_management
-                        (task_type, linked_id, task_title, task_description, due_at, reminder_intervals, created_by_id, created_by_name)
-                        VALUES ('matter', %s, %s, %s, %s, %s, %s, %s)
+                        (task_type, linked_id, task_title, task_description, due_at, reminder_intervals, assigned_to_id, assigned_to_name, created_by_id, created_by_name)
+                        VALUES ('matter', %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         int(linked_matter_id),
                         task_title,
                         task_description,
                         due_at.replace('T', ' '),
                         ','.join(reminder_intervals),
+                        int(assigned_employee_id),
+                        employee_map[assigned_employee_id]['full_name'],
                         current_employee_id,
                         session.get('employee_name') or 'Unknown'
                     ))
@@ -20673,6 +22233,7 @@ def matter_task_management():
                         t.reminder_intervals,
                         t.task_status,
                         t.created_by_name,
+                        t.assigned_to_name,
                         m.id AS matter_id,
                         m.matter_reference_number,
                         m.matter_title
@@ -20698,6 +22259,7 @@ def matter_task_management():
         user_role=user_role,
         current_employee_id=current_employee_id,
         matters=matters,
+        employees=employees,
         matter_tasks=matter_tasks,
         reminder_options=reminder_options
     )
@@ -22507,13 +24069,13 @@ def inject_my_task_badge():
                     LEFT JOIN matters m
                         ON t.task_type = 'matter' AND t.linked_id = m.id
                     WHERE
-                        t.task_status IN ('Pending', 'In Progress')
+                        t.task_status IN ('Pending', 'Received', 'In Progress')
                         AND (
                             (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
                             OR
-                            (t.task_type = 'matter' AND m.assigned_employee_id = %s)
+                            (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
                         )
-                """, (employee_id, employee_id, employee_id))
+                """, (employee_id, employee_id, employee_id, employee_id))
                 base_cnt_row = cursor.fetchone() or {}
                 base_cnt = int(base_cnt_row.get('cnt') or 0)
 

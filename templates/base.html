@@ -1889,7 +1889,7 @@
                     {% endif %}
 
                     <!-- Client Documents Page Links -->
-                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'view_client_documents' %}
+                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk'] or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint in ['view_client_documents', 'view_client_document_type'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Client Documents</p>
                     </div>
@@ -1913,18 +1913,6 @@
                     <a href="{{ url_for('view_client_document_type', client_id=current_client_id, document_type='CLIENT_OTHER_MATTERS') }}" class="sidebar-link {% if request.endpoint == 'view_client_document_type' and request.view_args.get('document_type') == 'CLIENT_OTHER_MATTERS' %}active{% endif %}" id="nav-client-other-matters">
                         <i class="fas fa-folder-open"></i>
                         <span>Other Matters</span>
-                    </a>
-                    {% endif %}
-
-                    <!-- Client Document Type Page Links (Only Back Button) -->
-                    {% if (user_role == 'IT Support' or (session.get('original_role') == 'IT Support' and session.get('employee_role') != 'IT Support')) and request.endpoint == 'view_client_document_type' %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Client Documents</p>
-                    </div>
-                    {% set current_client_id = request.view_args.get('client_id', 0) %}
-                    <a href="{{ url_for('document_management') }}" class="sidebar-link" id="nav-back-to-document-management">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back to Document Management</span>
                     </a>
                     {% endif %}
 
@@ -2530,6 +2518,10 @@
     });
     </script>
     {% endif %}
+    {% endif %}
+
+    {% if session.get('employee_id') %}
+    <script src="{{ url_for('static', filename='push-notifications.js') }}" defer></script>
     {% endif %}
 </body>
 </html>

@@ -560,7 +560,8 @@
                                 {% elif doc.url %}
                                 <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                                 {% endif %}
-                                <a href="{{ url_for('download_case_document', case_id=case_id, file_id=doc.id, task_id=access_task_id) if access_task_id else url_for('download_case_document', case_id=case_id, file_id=doc.id) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100 transition-colors"><i class="fas fa-download text-xs"></i> Download</a>
+                                <button type="button" onclick="caseDocVerify.open('download', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100 transition-colors"><i class="fas fa-download text-xs"></i> Download</button>
+                                <button type="button" onclick="caseDocVerify.open('delete', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100 transition-colors"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                             </div>
                         </div>
                         {% endfor %}
@@ -578,6 +579,28 @@
         {% endif %}
     </div>
 </div>
+
+{% include '_document_action_verify_modal.html' %}
+
+<script src="{{ url_for('static', filename='document-action-verify.js') }}"></script>
+<script>
+const caseId = {{ case_id }};
+const accessTaskId = {{ access_task_id|tojson if access_task_id else 'null' }};
+const caseDocVerify = createDocumentActionVerify({
+    apiBase: '/api/case/' + caseId + '/document',
+    taskId: accessTaskId,
+    downloadUrlBuilder: function (fileId, token) {
+        var url = '/case_management/' + caseId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
+        if (accessTaskId) url += '&task_id=' + encodeURIComponent(accessTaskId);
+        return url;
+    },
+    deleteUrlBuilder: function (fileId) {
+        var url = '/api/case/' + caseId + '/document/' + encodeURIComponent(fileId) + '/delete';
+        if (accessTaskId) url += '?task_id=' + encodeURIComponent(accessTaskId);
+        return url;
+    }
+});
+</script>
 
 <script>
 (function setupCaseDocumentPartyGroups() {

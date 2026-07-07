@@ -4,6 +4,7 @@
 
 {% block content %}
 {% set st = task.task_status %}
+{% set is_session = task.task_source == 'session_allocation' %}
 
 <div class="max-w-4xl mx-auto px-4 sm:px-6 pb-12">
     <div class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-slate-800 via-slate-900 to-emerald-900 text-white shadow-xl mb-8">
@@ -16,7 +17,7 @@
             </a>
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div class="space-y-2">
-                    <p class="text-emerald-300/90 text-xs font-semibold uppercase tracking-widest">Task</p>
+                    <p class="text-emerald-300/90 text-xs font-semibold uppercase tracking-widest">{% if is_session %}Session allocation{% else %}Task{% endif %}</p>
                     <h1 class="text-2xl sm:text-3xl font-bold tracking-tight leading-tight max-w-2xl">{{ task.task_title }}</h1>
                     <p class="text-slate-300 text-sm sm:text-base max-w-xl">
                         {% if st == 'Received' %}
@@ -46,13 +47,13 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-3">
-                <form method="POST" action="{{ url_for('accept_my_task', task_id=task.id) }}">
+                <form method="POST" action="{{ url_for('accept_my_session_task', material_id=task.id) if is_session else url_for('accept_my_task', task_id=task.id) }}">
                     <button type="submit" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all">
                         <i class="fas fa-check"></i>
                         Accept task
                     </button>
                 </form>
-                <form method="POST" action="{{ url_for('reject_my_task', task_id=task.id) }}" onsubmit="return confirm('Reject this task allocation?');">
+                <form method="POST" action="{{ url_for('reject_my_session_task', material_id=task.id) if is_session else url_for('reject_my_task', task_id=task.id) }}" onsubmit="return confirm('Reject this task allocation?');">
                     <button type="submit" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-red-200 bg-white text-red-700 font-semibold hover:bg-red-50 shadow-sm transition-colors">
                         <i class="fas fa-times"></i>
                         Reject task
@@ -66,8 +67,8 @@
             <div>
                 <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Linked record</p>
                 {% if task.task_type == 'case' %}
-                {% if task.allow_view_case_details %}
-                <a href="{{ url_for('case_details', case_id=task.linked_id, task_id=task.id) }}" class="text-lg font-semibold text-emerald-700 hover:text-emerald-800 hover:underline decoration-emerald-300 underline-offset-2">
+                {% if is_session or task.allow_view_case_details %}
+                <a href="{{ url_for('case_details', case_id=task.linked_id) if is_session else url_for('case_details', case_id=task.linked_id, task_id=task.id) }}" class="text-lg font-semibold text-emerald-700 hover:text-emerald-800 hover:underline decoration-emerald-300 underline-offset-2">
                     {{ task.case_tracking_number }} — {{ task.case_client_name }}
                 </a>
                 {% else %}
@@ -143,7 +144,7 @@
                 All tasks
             </a>
             {% if task.task_status == 'In Progress' %}
-            <form method="POST" action="{{ url_for('complete_my_task', task_id=task.id) }}">
+            <form method="POST" action="{{ task.complete_url }}">
                 <button type="submit" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all">
                     <i class="fas fa-check-double"></i>
                     Complete task
@@ -163,6 +164,7 @@
         const taskId = {{ task.id }};
         const taskType = "{{ task.task_type }}";
         const linkedId = {{ task.linked_id }};
+        const isSession = {{ 'true' if is_session else 'false' }};
 
         const endpoint = taskType === 'case'
             ? `/api/case/${linkedId}/create-google-file`
@@ -178,7 +180,7 @@
                     const response = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ type: fileType, task_id: taskId })
+                        body: JSON.stringify({ type: fileType, task_id: isSession ? null : taskId })
                     });
                     const result = await response.json();
                     if (!response.ok || !result.success) {

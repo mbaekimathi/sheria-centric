@@ -337,8 +337,8 @@
                                     {% elif doc.url %}
                                     <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-slate-600 hover:text-slate-800 font-semibold text-sm" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                                     {% endif %}
-                                    <a href="{{ url_for('download_matter_document', matter_id=matter_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm"><i class="fas fa-download text-xs"></i> Download</a>
-                                    <button type="button" class="matter-doc-delete inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                                    <button type="button" onclick="matterDocVerify.open('download', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0"><i class="fas fa-download text-xs"></i> Download</button>
+                                    <button type="button" onclick="matterDocVerify.open('delete', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold text-sm bg-transparent border-0 cursor-pointer p-0"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                                 </div>
                             </td>
                         </tr>
@@ -376,8 +376,8 @@
                             {% elif doc.url %}
                             <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200"><i class="fas fa-external-link-alt text-xs"></i> View</a>
                             {% endif %}
-                            <a href="{{ url_for('download_matter_document', matter_id=matter_id, file_id=doc.id) }}" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</a>
-                            <button type="button" class="matter-doc-delete inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                            <button type="button" onclick="matterDocVerify.open('download', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-semibold text-sm hover:bg-indigo-100"><i class="fas fa-download text-xs"></i> Download</button>
+                            <button type="button" onclick="matterDocVerify.open('delete', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
                         </div>
                     </div>
                 </div>
@@ -411,9 +411,22 @@
     </div>
 </div>
 
+{% include '_document_action_verify_modal.html' %}
+
+<script src="{{ url_for('static', filename='document-action-verify.js') }}"></script>
 <script>
 const matterId = {{ matter_id }};
 const googleDriveConnected = {{ 'true' if google_drive_connected else 'false' }};
+const matterDocVerify = createDocumentActionVerify({
+    apiBase: '/api/matter/' + matterId + '/document',
+    downloadUrlBuilder: function (fileId, token) {
+        return '/other_matters/' + matterId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
+    },
+    deleteUrlBuilder: function (fileId) {
+        return '/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete';
+    },
+    onDeleteSuccess: function () { window.location.reload(); }
+});
 
 function showToast(message, type) {
     const color = type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-emerald-600' : 'bg-indigo-600');
@@ -706,29 +719,5 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
     }
 });
 
-document.querySelectorAll('.matter-doc-delete').forEach(function(btn) {
-    btn.addEventListener('click', async function() {
-        var fileId = this.getAttribute('data-file-id');
-        var docName = this.getAttribute('data-doc-name') || 'this document';
-        if (!fileId) return;
-        const approved = await askConfirm('Delete "' + docName + '" from Google Drive? This cannot be undone.', 'Delete');
-        if (!approved) return;
-        this.disabled = true;
-        try {
-            var res = await fetch('/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
-            var data = await res.json();
-            if (data.success) {
-                window.location.reload();
-            } else {
-                showToast(data.error || 'Delete failed.', 'error');
-                this.disabled = false;
-            }
-        } catch (e) {
-            console.error(e);
-            showToast('Request failed.', 'error');
-            this.disabled = false;
-        }
-    });
-});
 </script>
 {% endblock %}

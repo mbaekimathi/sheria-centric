@@ -455,6 +455,38 @@ def ensure_case_proceeding_advocates_table(cursor, connection=None):
         print(f"[WARNING] ensure_case_proceeding_advocates_table: {e}")
 
 
+def ensure_case_proceeding_materials_table(cursor, connection=None):
+    """Ensure proceeding materials table exists with task workflow status."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS case_proceeding_materials (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                proceeding_id INT NOT NULL,
+                material_description TEXT NOT NULL,
+                reminder_frequency VARCHAR(50),
+                allocated_to_id INT,
+                allocated_to_name VARCHAR(255),
+                task_status ENUM('Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_proceeding_id (proceeding_id),
+                INDEX idx_allocated_to_id (allocated_to_id),
+                INDEX idx_material_task_status (task_status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        try:
+            cursor.execute("""
+                ALTER TABLE case_proceeding_materials
+                ADD COLUMN task_status ENUM('Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending'
+            """)
+        except Exception:
+            pass
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_case_proceeding_materials_table: {e}")
+
+
 def ensure_google_drive_oauth_pending_table(cursor, connection=None):
     """Store OAuth state server-side so the Drive popup callback works when the session cookie is not sent."""
     try:
@@ -473,7 +505,7 @@ def ensure_google_drive_oauth_pending_table(cursor, connection=None):
 
 
 def ensure_push_subscriptions_table(cursor, connection=None):
-    """Store browser push subscriptions for offline phone notifications."""
+    """Store browser push subscriptions for offline device notifications."""
     try:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -508,6 +540,7 @@ def reconcile_additive_schema(cursor, connection=None):
     try:
         ensure_task_management_table(cursor, connection)
         ensure_case_proceeding_advocates_table(cursor, connection)
+        ensure_case_proceeding_materials_table(cursor, connection)
         ensure_google_drive_oauth_pending_table(cursor, connection)
         ensure_push_subscriptions_table(cursor, connection)
     except Exception as e:
@@ -831,6 +864,12 @@ def create_company_settings_table():
                     ('send_sms_notifications', 'TINYINT(1) DEFAULT 0'),
                     ('whatsapp_notifications', 'TINYINT(1) DEFAULT 0'),
                     ('court_date_reminders', 'TINYINT(1) DEFAULT 1'),
+                    ('browser_push_notifications', 'TINYINT(1) DEFAULT 1'),
+                    ('court_reminder_days_ahead', 'INT DEFAULT 14'),
+                    ('vapid_public_key', 'TEXT'),
+                    ('vapid_private_key', 'TEXT'),
+                    ('vapid_claims_email', 'VARCHAR(255)'),
+                    ('push_app_origin', 'VARCHAR(500)'),
                     ('primary_brand_color', 'VARCHAR(20)'),
                     ('secondary_color', 'VARCHAR(20)'),
                     ('tertiary_color', 'VARCHAR(20)'),
@@ -7080,41 +7119,79 @@ def _serialize_my_task(task):
     """Normalize a my-task row for templates and JSON responses."""
     if not task:
         return None
-    due_val = task.get('due_at')
-    if due_val:
-        try:
-            task['due_at'] = due_val.strftime('%Y-%m-%d %H:%M')
-        except Exception:
-            task['due_at'] = str(due_val)
-    else:
-        task['due_at'] = '-'
-
-    created_val = task.get('created_at')
-    if created_val:
-        try:
-            task['created_at'] = created_val.strftime('%Y-%m-%d %H:%M:%S')
-        except Exception:
-            task['created_at'] = str(created_val)
+    task = dict(task)
+    _normalize_my_task_row_dates(task)
+    task_source = task.get('task_source') or 'task_management'
+    is_session = task_source == 'session_allocation'
+    task['task_source'] = task_source
 
     if task.get('task_type') == 'case':
         task['linked_label'] = f"{task.get('case_tracking_number') or '-'} — {task.get('case_client_name') or 'Case'}"
-        if task.get('allow_view_case_details'):
-            task['linked_url'] = url_for('case_details', case_id=task['linked_id'], task_id=task['id'])
-        else:
-            task['linked_url'] = None
-        if task.get('allow_view_case_documents'):
-            task['documents_url'] = url_for('case_documents', case_id=task['linked_id'], task_id=task['id'])
-        else:
+        if is_session:
+            task['linked_url'] = url_for('case_details', case_id=task['linked_id'])
             task['documents_url'] = None
+            task['full_view_url'] = url_for('my_session_task_view', material_id=task['id'])
+            task['accept_url'] = url_for('accept_my_session_task', material_id=task['id'])
+            task['reject_url'] = url_for('reject_my_session_task', material_id=task['id'])
+            task['complete_url'] = url_for('complete_my_session_task', material_id=task['id'])
+        else:
+            if task.get('allow_view_case_details'):
+                task['linked_url'] = url_for('case_details', case_id=task['linked_id'], task_id=task['id'])
+            else:
+                task['linked_url'] = None
+            if task.get('allow_view_case_documents'):
+                task['documents_url'] = url_for('case_documents', case_id=task['linked_id'], task_id=task['id'])
+            else:
+                task['documents_url'] = None
+            task['full_view_url'] = url_for('my_task_view', task_id=task['id'])
+            task['accept_url'] = url_for('accept_my_task', task_id=task['id'])
+            task['reject_url'] = url_for('reject_my_task', task_id=task['id'])
+            task['complete_url'] = url_for('complete_my_task', task_id=task['id'])
     else:
         task['linked_label'] = f"{task.get('matter_reference_number') or '-'} — {task.get('matter_title') or 'Matter'}"
         task['linked_url'] = url_for('matter_details', matter_id=task['linked_id'])
         task['documents_url'] = None
-
-    task['full_view_url'] = url_for('my_task_view', task_id=task['id'])
-    task['accept_url'] = url_for('accept_my_task', task_id=task['id'])
-    task['reject_url'] = url_for('reject_my_task', task_id=task['id'])
+        task['full_view_url'] = url_for('my_task_view', task_id=task['id'])
+        task['accept_url'] = url_for('accept_my_task', task_id=task['id'])
+        task['reject_url'] = url_for('reject_my_task', task_id=task['id'])
+        task['complete_url'] = url_for('complete_my_task', task_id=task['id'])
     return task
+
+def _fetch_session_allocation(cursor, material_id, employee_id, mark_received=False, connection=None):
+    """Load a session allocation for the employee; optionally mark Pending as Received."""
+    ensure_case_proceeding_materials_table(cursor, connection)
+    cursor.execute("""
+        SELECT
+            m.id,
+            'case' AS task_type,
+            p.case_id AS linked_id,
+            COALESCE(NULLIF(m.material_description, ''), 'Allocated Session Item') AS task_title,
+            m.material_description AS task_description,
+            COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) AS due_at,
+            m.reminder_frequency AS reminder_intervals,
+            COALESCE(m.task_status, 'Pending') AS task_status,
+            m.allocated_to_name AS created_by_name,
+            m.created_at,
+            c.tracking_number AS case_tracking_number,
+            c.client_name AS case_client_name,
+            'session_allocation' AS task_source,
+            p.id AS proceeding_id
+        FROM case_proceeding_materials m
+        INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+        INNER JOIN cases c ON c.id = p.case_id
+        WHERE m.id = %s AND m.allocated_to_id = %s
+        LIMIT 1
+    """, (material_id, employee_id))
+    task = cursor.fetchone()
+    if task and mark_received and task.get('task_status') == 'Pending':
+        cursor.execute(
+            "UPDATE case_proceeding_materials SET task_status = 'Received' WHERE id = %s",
+            (material_id,)
+        )
+        if connection:
+            connection.commit()
+        task['task_status'] = 'Received'
+    return _serialize_my_task(task) if task else None
 
 def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection=None):
     """Load a task allocated to the employee; optionally mark Pending as Received."""
@@ -7140,7 +7217,8 @@ def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection
             c.tracking_number AS case_tracking_number,
             c.client_name AS case_client_name,
             m.matter_reference_number,
-            m.matter_title
+            m.matter_title,
+            'task_management' AS task_source
         FROM task_management t
         LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
         LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
@@ -7163,6 +7241,374 @@ def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection
         task['task_status'] = 'Received'
     return _serialize_my_task(task) if task else None
 
+def _normalize_my_task_row_dates(task):
+    """Format due_at and created_at on a my-task row for display/API."""
+    due_val = task.get('due_at')
+    if due_val:
+        try:
+            task['due_at'] = due_val.strftime('%Y-%m-%d %H:%M')
+        except Exception:
+            task['due_at'] = str(due_val)
+    else:
+        task['due_at'] = '-'
+
+    created_val = task.get('created_at')
+    if created_val:
+        try:
+            task['created_at'] = created_val.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
+            task['created_at'] = str(created_val)
+    return task
+
+def _serialize_my_task_list_item(task):
+    """Add list-view URLs and flags for My Tasks UI and JSON API."""
+    task = dict(task)
+    _normalize_my_task_row_dates(task)
+    is_case = task.get('task_type') == 'case'
+    is_session = task.get('task_source') == 'session_allocation'
+
+    if is_case:
+        if is_session or task.get('allow_view_case_details'):
+            if is_session:
+                task['linked_url'] = url_for('case_details', case_id=task['linked_id'])
+            else:
+                task['linked_url'] = url_for('case_details', case_id=task['linked_id'], task_id=task['id'])
+        else:
+            task['linked_url'] = None
+    else:
+        task['linked_url'] = url_for('matter_details', matter_id=task['linked_id'])
+
+    task['is_session'] = is_session
+    task['can_open_task'] = task.get('task_status') in ('Pending', 'Received', 'In Progress')
+    if is_session:
+        task['full_view_url'] = url_for('my_session_task_view', material_id=task['id'])
+    else:
+        task['full_view_url'] = url_for('my_task_view', task_id=task['id'])
+    return task
+
+def _fetch_my_tasks_for_employee(cursor, employee_id):
+    """Return all case/matter/session items shown on My Tasks."""
+    cursor.execute("""
+        SELECT
+            t.id,
+            t.task_type,
+            t.linked_id,
+            t.task_title,
+            t.task_description,
+            t.due_at,
+            t.reminder_intervals,
+            t.task_status,
+            t.assigned_to_id,
+            t.assigned_to_name,
+            t.allow_view_case_details,
+            t.allow_edit_case_details,
+            t.allow_view_case_documents,
+            t.allow_upload_case_documents,
+            t.allow_download_case_documents,
+            t.created_by_name,
+            t.created_at,
+            c.tracking_number AS case_tracking_number,
+            c.client_name AS case_client_name,
+            m.matter_reference_number,
+            m.matter_title,
+            'task_management' AS task_source,
+            NULL AS proceeding_id
+        FROM task_management t
+        LEFT JOIN cases c
+            ON t.task_type = 'case' AND t.linked_id = c.id
+        LEFT JOIN matters m
+            ON t.task_type = 'matter' AND t.linked_id = m.id
+        WHERE
+            (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+            OR
+            (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
+        ORDER BY t.due_at ASC, t.created_at DESC
+    """, (employee_id, employee_id, employee_id, employee_id))
+    tasks = list(cursor.fetchall() or [])
+
+    ensure_case_proceeding_materials_table(cursor)
+    cursor.execute("""
+        SELECT
+            m.id,
+            'case' AS task_type,
+            p.case_id AS linked_id,
+            COALESCE(NULLIF(m.material_description, ''), 'Allocated Session Item') AS task_title,
+            m.material_description AS task_description,
+            COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) AS due_at,
+            m.reminder_frequency AS reminder_intervals,
+            COALESCE(m.task_status, 'Pending') AS task_status,
+            m.allocated_to_name AS created_by_name,
+            m.created_at,
+            c.tracking_number AS case_tracking_number,
+            c.client_name AS case_client_name,
+            NULL AS matter_reference_number,
+            NULL AS matter_title,
+            'session_allocation' AS task_source,
+            p.id AS proceeding_id
+        FROM case_proceeding_materials m
+        INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+        INNER JOIN cases c ON c.id = p.case_id
+        WHERE m.allocated_to_id = %s
+        ORDER BY COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) ASC, m.created_at DESC
+    """, (employee_id,))
+    session_tasks = list(cursor.fetchall() or [])
+    if session_tasks:
+        tasks.extend(session_tasks)
+
+    for task in tasks:
+        _normalize_my_task_row_dates(task)
+
+    tasks.sort(
+        key=lambda x: (x.get('due_at') or '9999-12-31 23:59', x.get('created_at') or ''),
+        reverse=False,
+    )
+    return tasks
+
+def _summarize_my_tasks(tasks):
+    """Compute summary counts for My Tasks header badges."""
+    pending = 0
+    in_progress = 0
+    needs_accept = 0
+    for task in tasks:
+        status = task.get('task_status') or ''
+        source = task.get('task_source') or ''
+        if status == 'Pending':
+            pending += 1
+        if status == 'In Progress':
+            in_progress += 1
+        if status in ('Pending', 'Received'):
+            needs_accept += 1
+    return {
+        'total': len(tasks),
+        'pending': pending,
+        'in_progress': in_progress,
+        'needs_accept': needs_accept,
+    }
+
+def _build_employee_notifications_feed(cursor, employee_id):
+    """Build unified notifications feed for an employee."""
+    from datetime import date, timedelta
+    today = date.today()
+    settings = get_company_settings() or {}
+    court_reminders_on = bool(int(settings.get('court_date_reminders', 1) or 0))
+    days_ahead = max(1, min(90, int(settings.get('court_reminder_days_ahead') or 14)))
+    end_date = today + timedelta(days=days_ahead)
+    notifications_feed = []
+
+    cursor.execute("""
+        SELECT
+            t.id,
+            t.task_type,
+            t.linked_id,
+            t.task_title,
+            t.task_status,
+            t.due_at,
+            c.tracking_number AS case_tracking_number,
+            c.client_name AS case_client_name,
+            m.matter_reference_number,
+            m.matter_title
+        FROM task_management t
+        LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+        LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+        WHERE
+            t.task_status IN ('Pending', 'Received', 'In Progress')
+            AND (
+                (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                OR
+                (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
+            )
+        ORDER BY t.due_at ASC, t.created_at DESC
+    """, (employee_id, employee_id, employee_id, employee_id))
+    for task in cursor.fetchall() or []:
+        due_val = task.get('due_at')
+        due_text = '-'
+        if due_val:
+            try:
+                due_text = due_val.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                due_text = str(due_val)
+        if task.get('task_type') == 'case':
+            ref = f"{task.get('case_tracking_number') or '-'} - {task.get('case_client_name') or 'Case'}"
+        else:
+            ref = f"{task.get('matter_reference_number') or '-'} - {task.get('matter_title') or 'Matter'}"
+        notifications_feed.append({
+            'type': 'task',
+            'icon': 'fa-tasks',
+            'title': task.get('task_title') or 'Assigned task',
+            'subtitle': ref,
+            'meta': f"Status: {task.get('task_status') or '-'} | Due: {due_text}",
+            'link': url_for('my_tasks', view=task['id']),
+            'sort_key': due_text if due_text != '-' else '9999-12-31 23:59',
+        })
+
+    cursor.execute("""
+        SELECT
+            m.id,
+            m.material_description,
+            m.reminder_frequency,
+            p.case_id,
+            p.next_court_date,
+            c.tracking_number,
+            c.client_name,
+            COALESCE(m.task_status, 'Pending') AS task_status
+        FROM case_proceeding_materials m
+        INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+        INNER JOIN cases c ON c.id = p.case_id
+        WHERE m.allocated_to_id = %s
+          AND COALESCE(m.task_status, 'Pending') IN ('Pending', 'Received', 'In Progress')
+        ORDER BY COALESCE(p.next_court_date, m.created_at) ASC
+    """, (employee_id,))
+    for material in cursor.fetchall() or []:
+        next_date = material.get('next_court_date')
+        next_text = '-'
+        if next_date:
+            try:
+                next_text = next_date.strftime('%Y-%m-%d')
+            except Exception:
+                next_text = str(next_date)
+        notifications_feed.append({
+            'type': 'reminder',
+            'icon': 'fa-bell',
+            'title': material.get('material_description') or 'Session allocation',
+            'subtitle': f"{material.get('tracking_number') or '-'} - {material.get('client_name') or 'Case'}",
+            'meta': f"Status: {material.get('task_status') or 'Pending'} | Next court: {next_text}",
+            'link': url_for('my_tasks', session_view=material.get('id')),
+            'sort_key': next_text if next_text != '-' else '9999-12-31',
+        })
+
+    cursor.execute("""
+        SELECT
+            p.case_id,
+            p.next_court_date,
+            p.next_attendance,
+            c.tracking_number,
+            c.client_name
+        FROM case_proceedings p
+        INNER JOIN cases c ON c.id = p.case_id
+        WHERE p.next_court_date IS NOT NULL
+          AND p.next_court_date >= %s
+          AND p.next_court_date <= %s
+          AND c.filled_by_id = %s
+        ORDER BY p.next_court_date ASC
+        LIMIT 50
+    """, (today, end_date, employee_id))
+    if court_reminders_on:
+        for cal in cursor.fetchall() or []:
+            next_date = cal.get('next_court_date')
+            next_text = '-'
+            if next_date:
+                try:
+                    next_text = next_date.strftime('%Y-%m-%d')
+                except Exception:
+                    next_text = str(next_date)
+            notifications_feed.append({
+                'type': 'calendar',
+                'icon': 'fa-calendar-alt',
+                'title': cal.get('next_attendance') or 'Upcoming court date',
+                'subtitle': f"{cal.get('tracking_number') or '-'} - {cal.get('client_name') or 'Case'}",
+                'meta': f"Scheduled: {next_text}",
+                'link': url_for('case_calendar', case_id=cal.get('case_id')),
+                'sort_key': next_text if next_text != '-' else '9999-12-31',
+            })
+
+    notifications_feed.sort(key=lambda x: x.get('sort_key') or '9999-12-31 23:59')
+    return notifications_feed[:120]
+
+def _compute_employee_badge_counts(cursor, employee_id, user_role=None, original_role=None):
+    """Compute nav badge counts for tasks, notifications, and approvals."""
+    cursor.execute("""
+        SELECT COUNT(*) AS cnt
+        FROM task_management t
+        LEFT JOIN cases c
+            ON t.task_type = 'case' AND t.linked_id = c.id
+        LEFT JOIN matters m
+            ON t.task_type = 'matter' AND t.linked_id = m.id
+        WHERE
+            t.task_status IN ('Pending', 'Received', 'In Progress')
+            AND (
+                (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
+                OR
+                (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
+            )
+    """, (employee_id, employee_id, employee_id, employee_id))
+    base_cnt_row = cursor.fetchone() or {}
+    base_cnt = int(base_cnt_row.get('cnt') or 0)
+
+    session_cnt = 0
+    try:
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt
+            FROM case_proceeding_materials m
+            WHERE m.allocated_to_id = %s
+              AND COALESCE(m.task_status, 'Pending') IN ('Pending', 'Received', 'In Progress')
+        """, (employee_id,))
+        session_cnt_row = cursor.fetchone() or {}
+        session_cnt = int(session_cnt_row.get('cnt') or 0)
+    except Exception:
+        session_cnt = 0
+
+    calendar_cnt = 0
+    try:
+        from datetime import date, timedelta
+        settings = get_company_settings() or {}
+        if bool(int(settings.get('court_date_reminders', 1) or 0)):
+            start_date = date.today()
+            days_ahead = max(1, min(90, int(settings.get('court_reminder_days_ahead') or 14)))
+            end_date = start_date + timedelta(days=days_ahead)
+            cursor.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM case_proceedings p
+                INNER JOIN cases c ON c.id = p.case_id
+                WHERE p.next_court_date IS NOT NULL
+                  AND p.next_court_date >= %s
+                  AND p.next_court_date <= %s
+                  AND c.filled_by_id = %s
+            """, (start_date, end_date, employee_id))
+            calendar_cnt_row = cursor.fetchone() or {}
+            calendar_cnt = int(calendar_cnt_row.get('cnt') or 0)
+    except Exception:
+        calendar_cnt = 0
+
+    approve_matters_badge_count = 0
+    can_approve_matters = (
+        user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
+    ) or (original_role == 'IT Support')
+    if can_approve_matters:
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM matters
+                WHERE status = 'Pending Approval'
+            """)
+            row = cursor.fetchone() or {}
+            approve_matters_badge_count = int(row.get('cnt') or 0)
+        except Exception:
+            approve_matters_badge_count = 0
+
+    approve_cases_badge_count = 0
+    can_approve_cases = (
+        user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
+    ) or (original_role == 'IT Support')
+    if can_approve_cases:
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM cases
+                WHERE status = 'Pending Approval'
+            """)
+            row = cursor.fetchone() or {}
+            approve_cases_badge_count = int(row.get('cnt') or 0)
+        except Exception:
+            approve_cases_badge_count = 0
+
+    my_task_badge_count = base_cnt + session_cnt
+    return {
+        'my_task_badge_count': my_task_badge_count,
+        'notification_badge_count': my_task_badge_count + calendar_cnt,
+        'approve_matters_badge_count': approve_matters_badge_count,
+        'approve_cases_badge_count': approve_cases_badge_count,
+    }
+
 @app.route('/my_tasks')
 def my_tasks():
     """My Tasks page - all case/matter tasks allocated to the logged-in user."""
@@ -7183,93 +7629,8 @@ def my_tasks():
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
-            cursor.execute("""
-                SELECT
-                    t.id,
-                    t.task_type,
-                    t.linked_id,
-                    t.task_title,
-                    t.task_description,
-                    t.due_at,
-                    t.reminder_intervals,
-                    t.task_status,
-                    t.assigned_to_id,
-                    t.assigned_to_name,
-                    t.allow_view_case_details,
-                    t.allow_edit_case_details,
-                    t.allow_view_case_documents,
-                    t.allow_upload_case_documents,
-                    t.allow_download_case_documents,
-                    t.created_by_name,
-                    t.created_at,
-                    c.tracking_number AS case_tracking_number,
-                    c.client_name AS case_client_name,
-                    m.matter_reference_number,
-                    m.matter_title,
-                    'task_management' AS task_source,
-                    NULL AS proceeding_id
-                FROM task_management t
-                LEFT JOIN cases c
-                    ON t.task_type = 'case' AND t.linked_id = c.id
-                LEFT JOIN matters m
-                    ON t.task_type = 'matter' AND t.linked_id = m.id
-                WHERE
-                    (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
-                    OR
-                    (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
-                ORDER BY t.due_at ASC, t.created_at DESC
-            """, (employee_id, employee_id, employee_id, employee_id))
-            tasks = list(cursor.fetchall() or [])
-
-            # Include allocated court-session items (case proceeding materials) assigned to this employee
-            cursor.execute("""
-                SELECT
-                    m.id,
-                    'case' AS task_type,
-                    p.case_id AS linked_id,
-                    COALESCE(NULLIF(m.material_description, ''), 'Allocated Session Item') AS task_title,
-                    m.material_description AS task_description,
-                    COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) AS due_at,
-                    m.reminder_frequency AS reminder_intervals,
-                    'Pending' AS task_status,
-                    m.allocated_to_name AS created_by_name,
-                    m.created_at,
-                    c.tracking_number AS case_tracking_number,
-                    c.client_name AS case_client_name,
-                    NULL AS matter_reference_number,
-                    NULL AS matter_title,
-                    'session_allocation' AS task_source,
-                    p.id AS proceeding_id
-                FROM case_proceeding_materials m
-                INNER JOIN case_proceedings p ON p.id = m.proceeding_id
-                INNER JOIN cases c ON c.id = p.case_id
-                WHERE m.allocated_to_id = %s
-                ORDER BY COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) ASC, m.created_at DESC
-            """, (employee_id,))
-            session_tasks = list(cursor.fetchall() or [])
-
-            if session_tasks:
-                tasks.extend(session_tasks)
-
-            # Normalize date display for mixed task sources
-            for t in tasks:
-                due_val = t.get('due_at')
-                if due_val:
-                    try:
-                        t['due_at'] = due_val.strftime('%Y-%m-%d %H:%M')
-                    except Exception:
-                        t['due_at'] = str(due_val)
-                else:
-                    t['due_at'] = '-'
-
-                created_val = t.get('created_at')
-                if created_val:
-                    try:
-                        t['created_at'] = created_val.strftime('%Y-%m-%d %H:%M:%S')
-                    except Exception:
-                        t['created_at'] = str(created_val)
-
-            tasks.sort(key=lambda x: (x.get('due_at') or '9999-12-31 23:59', x.get('created_at') or ''), reverse=False)
+            ensure_case_proceeding_materials_table(cursor, connection)
+            tasks = _fetch_my_tasks_for_employee(cursor, employee_id)
     except Exception as e:
         print(f"Error loading my tasks: {e}")
         flash('An error occurred while loading your tasks.', 'error')
@@ -7281,6 +7642,7 @@ def my_tasks():
         company_settings=company_settings,
         tasks=tasks,
         view_task_id=request.args.get('view', type=int),
+        session_view_id=request.args.get('session_view', type=int),
     )
 
 @app.route('/my_tasks/<int:task_id>/accept', methods=['POST'])
@@ -7431,6 +7793,115 @@ def api_my_task(task_id):
 
     return jsonify({'success': True, 'task': task})
 
+@app.route('/api/my_tasks/session/<int:material_id>')
+def api_my_session_task(material_id):
+    """Return session allocation details as JSON; marks Pending as Received when viewed."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            task = _fetch_session_allocation(
+                cursor, material_id, employee_id,
+                mark_received=True, connection=connection
+            )
+    except Exception as e:
+        print(f"API session task error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while loading the task.'}), 500
+    finally:
+        connection.close()
+
+    if not task:
+        return jsonify({'success': False, 'error': 'Task not found or not allocated to your account.'}), 404
+
+    return jsonify({'success': True, 'task': task})
+
+@app.route('/api/my_tasks')
+def api_my_tasks_list():
+    """Return the logged-in employee's task list for live UI updates."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            ensure_case_proceeding_materials_table(cursor, connection)
+            tasks = _fetch_my_tasks_for_employee(cursor, employee_id)
+            serialized = [_serialize_my_task_list_item(task) for task in tasks]
+            return jsonify({
+                'success': True,
+                'tasks': serialized,
+                'summary': _summarize_my_tasks(tasks),
+            })
+    except Exception as e:
+        print(f"API my tasks list error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while loading tasks.'}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/notifications')
+def api_notifications_feed():
+    """Return notifications feed JSON for live UI updates."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            notifications_feed = _build_employee_notifications_feed(cursor, employee_id)
+            return jsonify({
+                'success': True,
+                'notifications': notifications_feed,
+                'count': len(notifications_feed),
+            })
+    except Exception as e:
+        print(f"API notifications error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while loading notifications.'}), 500
+    finally:
+        connection.close()
+
+@app.route('/api/employee/badge-counts')
+def api_employee_badge_counts():
+    """Return live nav badge counts for the logged-in employee."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            counts = _compute_employee_badge_counts(
+                cursor,
+                employee_id,
+                session.get('employee_role'),
+                session.get('original_role'),
+            )
+            return jsonify({'success': True, **counts})
+    except Exception as e:
+        print(f"API badge counts error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while loading badge counts.'}), 500
+    finally:
+        connection.close()
+
 @app.route('/my_tasks/<int:task_id>')
 def my_task_view(task_id):
     """View a single allocated task."""
@@ -7517,18 +7988,366 @@ def complete_my_task(task_id):
 
     return redirect(url_for('my_tasks'))
 
+@app.route('/my_tasks/session/<int:material_id>')
+def my_session_task_view(material_id):
+    """View a single session allocation."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    task = None
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            task = _fetch_session_allocation(
+                cursor, material_id, employee_id,
+                mark_received=False, connection=connection
+            )
+            if task and task.get('task_status') in ('Pending', 'Received'):
+                return redirect(url_for('my_tasks', session_view=material_id))
+    except Exception as e:
+        print(f"Session task view error: {e}")
+        flash('An error occurred while loading the task.', 'error')
+        return redirect(url_for('my_tasks'))
+    finally:
+        connection.close()
+
+    if not task:
+        flash('Task not found or not allocated to your account.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    return render_template('my_task_view.html', company_settings=company_settings, task=task)
+
+@app.route('/my_tasks/session/<int:material_id>/accept', methods=['POST'])
+def accept_my_session_task(material_id):
+    """Accept a session allocation and set it In Progress."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_case_proceeding_materials_table(cursor, connection)
+            cursor.execute("""
+                SELECT id, COALESCE(task_status, 'Pending') AS task_status
+                FROM case_proceeding_materials
+                WHERE id = %s AND allocated_to_id = %s
+                LIMIT 1
+            """, (material_id, employee_id))
+            task = cursor.fetchone()
+            if not task:
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Task not found or not allocated to your account.'}), 404
+                flash('Task not found or not allocated to your account.', 'error')
+                return redirect(url_for('my_tasks'))
+            if task.get('task_status') not in ('Pending', 'Received'):
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Only pending or received tasks can be accepted.'}), 400
+                flash('Only pending or received tasks can be accepted.', 'error')
+                return redirect(url_for('my_tasks'))
+
+            cursor.execute(
+                "UPDATE case_proceeding_materials SET task_status = 'In Progress' WHERE id = %s",
+                (material_id,)
+            )
+            connection.commit()
+            if _is_ajax_json_request():
+                return jsonify({
+                    'success': True,
+                    'message': 'Session allocation accepted and moved to In Progress.',
+                    'task_status': 'In Progress',
+                    'full_view_url': url_for('my_session_task_view', material_id=material_id),
+                })
+            flash('Session allocation accepted and moved to In Progress.', 'success')
+    except Exception as e:
+        print(f"Accept session task error: {e}")
+        if _is_ajax_json_request():
+            return jsonify({'success': False, 'error': 'An error occurred while accepting the task.'}), 500
+        flash('An error occurred while accepting the task.', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('my_session_task_view', material_id=material_id))
+
+@app.route('/my_tasks/session/<int:material_id>/reject', methods=['POST'])
+def reject_my_session_task(material_id):
+    """Reject a received session allocation."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_case_proceeding_materials_table(cursor, connection)
+            cursor.execute("""
+                SELECT id, COALESCE(task_status, 'Pending') AS task_status
+                FROM case_proceeding_materials
+                WHERE id = %s AND allocated_to_id = %s
+                LIMIT 1
+            """, (material_id, employee_id))
+            task = cursor.fetchone()
+            if not task:
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Task not found or not allocated to your account.'}), 404
+                flash('Task not found or not allocated to your account.', 'error')
+                return redirect(url_for('my_tasks'))
+            if task.get('task_status') not in ('Pending', 'Received'):
+                if _is_ajax_json_request():
+                    return jsonify({'success': False, 'error': 'Only pending or received tasks can be rejected.'}), 400
+                flash('Only pending or received tasks can be rejected.', 'error')
+                return redirect(url_for('my_session_task_view', material_id=material_id))
+
+            cursor.execute(
+                "UPDATE case_proceeding_materials SET task_status = 'Cancelled' WHERE id = %s",
+                (material_id,)
+            )
+            connection.commit()
+            if _is_ajax_json_request():
+                return jsonify({
+                    'success': True,
+                    'message': 'Session allocation rejected.',
+                    'task_status': 'Cancelled',
+                })
+            flash('Session allocation rejected.', 'success')
+    except Exception as e:
+        print(f"Reject session task error: {e}")
+        if _is_ajax_json_request():
+            return jsonify({'success': False, 'error': 'An error occurred while rejecting the task.'}), 500
+        flash('An error occurred while rejecting the task.', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('my_tasks'))
+
+@app.route('/my_tasks/session/<int:material_id>/complete', methods=['POST'])
+def complete_my_session_task(material_id):
+    """Submit an in-progress session allocation."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('my_tasks'))
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_case_proceeding_materials_table(cursor, connection)
+            cursor.execute("""
+                SELECT id, COALESCE(task_status, 'Pending') AS task_status
+                FROM case_proceeding_materials
+                WHERE id = %s AND allocated_to_id = %s
+                LIMIT 1
+            """, (material_id, employee_id))
+            task = cursor.fetchone()
+            if not task:
+                flash('Task not found or not allocated to your account.', 'error')
+                return redirect(url_for('my_tasks'))
+            if task.get('task_status') != 'In Progress':
+                flash('Only in-progress tasks can be submitted.', 'error')
+                return redirect(url_for('my_session_task_view', material_id=material_id))
+
+            cursor.execute(
+                "UPDATE case_proceeding_materials SET task_status = 'Submitted' WHERE id = %s",
+                (material_id,)
+            )
+            connection.commit()
+            flash('Session allocation submitted successfully.', 'success')
+    except Exception as e:
+        print(f"Complete session task error: {e}")
+        flash('An error occurred while submitting the task.', 'error')
+    finally:
+        connection.close()
+
+    return redirect(url_for('my_tasks'))
+
 # ---------------------------------------------------------------------------
-# Web Push — phone notifications when the app/browser is closed
+# Web Push — device notifications when the app/browser is closed
 # ---------------------------------------------------------------------------
 
 _vapid_credentials_cache = None
 
 
-def _vapid_private_key_pem():
-    raw = (os.environ.get('VAPID_PRIVATE_KEY') or '').strip()
+def _reset_vapid_cache():
+    global _vapid_credentials_cache
+    _vapid_credentials_cache = None
+
+
+def _vapid_env_public_key():
+    return (os.environ.get('VAPID_PUBLIC_KEY') or '').strip()
+
+
+def _vapid_env_private_key():
+    return (os.environ.get('VAPID_PRIVATE_KEY') or '').strip()
+
+
+def _push_key_storage_status():
+    """Summarise where active VAPID keys are loaded from."""
+    db_pub = _vapid_public_key_from_settings()
+    db_priv = _vapid_private_key_from_settings()
+    env_pub = _vapid_env_public_key()
+    env_priv = _vapid_env_private_key()
+    has_db = bool(db_pub and db_priv)
+    has_env = bool(env_pub and env_priv)
+    if has_db and has_env:
+        source = 'database'
+        note = 'Saved in company settings (server environment also has keys).'
+    elif has_db:
+        source = 'database'
+        note = 'Saved in company settings.'
+    elif has_env:
+        source = 'environment'
+        note = 'Loaded from server environment (.env). Save here to persist in the database.'
+    else:
+        source = 'none'
+        note = 'Generate keys or paste your VAPID key pair below.'
+    return {
+        'source': source,
+        'note': note,
+        'has_database': has_db,
+        'has_environment': has_env,
+        'configured': bool(_vapid_public_key_b64() and _get_vapid_credentials()),
+    }
+
+
+def _generate_vapid_keypair():
+    """Create a new VAPID key pair for Web Push."""
+    from cryptography.hazmat.primitives import serialization
+    from py_vapid import Vapid
+    import base64
+
+    vapid = Vapid()
+    vapid.generate_keys()
+    private_pem = vapid.private_pem().decode('utf-8')
+    raw_public = vapid.public_key.public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint,
+    )
+    public_b64 = base64.urlsafe_b64encode(raw_public).decode('utf-8').rstrip('=')
+    return public_b64, private_pem
+
+
+def _save_vapid_keys_to_db(cursor, connection, public_key, private_key=None, claims_email=None, push_origin=None):
+    """Persist VAPID settings on the company_settings row."""
+    cursor.execute(
+        "SELECT id FROM company_settings ORDER BY id DESC LIMIT 1"
+    )
+    row = cursor.fetchone() or {}
+    settings_id = row.get('id')
+    if not settings_id:
+        raise ValueError('No company settings record found.')
+
+    fields = []
+    values = []
+    if public_key:
+        fields.append('vapid_public_key = %s')
+        values.append(public_key)
+    if private_key:
+        fields.append('vapid_private_key = %s')
+        values.append(private_key)
+    if claims_email:
+        fields.append('vapid_claims_email = %s')
+        values.append(claims_email)
+    if push_origin:
+        fields.append('push_app_origin = %s')
+        values.append(push_origin.rstrip('/'))
+    if not fields:
+        return False
+
+    values.append(settings_id)
+    cursor.execute(
+        f"UPDATE company_settings SET {', '.join(fields)} WHERE id = %s",
+        tuple(values),
+    )
+    connection.commit()
+    _reset_vapid_cache()
+    return True
+
+
+def _push_admin_json_guard():
+    """Return a JSON error response when push admin APIs are not allowed."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    if user_role not in allowed_roles and original_role != 'IT Support':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        deny = enforce_permission(connection, 'system_manage_settings')
+        if deny:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    finally:
+        connection.close()
+    return None
+
+
+def _company_notification_flag(key, default=False):
+    """Return whether a notification channel toggle is enabled in company_settings."""
+    settings = get_company_settings() or {}
+    val = settings.get(key)
+    if val is None:
+        return default
+    return bool(int(val))
+
+
+def _vapid_public_key_from_settings():
+    settings = get_company_settings() or {}
+    return (settings.get('vapid_public_key') or '').strip()
+
+
+def _vapid_private_key_from_settings():
+    settings = get_company_settings() or {}
+    return (settings.get('vapid_private_key') or '').strip()
+
+
+def _vapid_claims_email():
+    settings = get_company_settings() or {}
+    from_db = (settings.get('vapid_claims_email') or '').strip()
+    if from_db:
+        return from_db
+    return (os.environ.get('VAPID_CLAIMS_EMAIL') or 'mailto:admin@sheriacentric.com').strip()
+
+
+def _normalize_vapid_private_pem(raw):
     if not raw:
         return None
-    return raw.replace('\\n', '\n')
+    raw = str(raw).strip()
+    if '\\n' in raw:
+        raw = raw.replace('\\n', '\n')
+    if 'BEGIN PRIVATE KEY' in raw and '\n' not in raw:
+        raw = raw.replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+        raw = raw.replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+    return raw
+
+
+def _vapid_private_key_pem():
+    raw = _vapid_private_key_from_settings()
+    if not raw:
+        raw = (os.environ.get('VAPID_PRIVATE_KEY') or '').strip()
+    return _normalize_vapid_private_pem(raw)
 
 
 def _get_vapid_credentials():
@@ -7549,10 +8368,17 @@ def _get_vapid_credentials():
 
 
 def _vapid_public_key_b64():
+    from_db = _vapid_public_key_from_settings()
+    if from_db:
+        return from_db
     return (os.environ.get('VAPID_PUBLIC_KEY') or '').strip()
 
 
 def _push_app_origin():
+    settings = get_company_settings() or {}
+    from_db = (settings.get('push_app_origin') or '').strip()
+    if from_db:
+        return from_db.rstrip('/')
     if APP_BASE_URL:
         return APP_BASE_URL.rstrip('/')
     return (os.environ.get('PUSH_APP_ORIGIN') or 'http://127.0.0.1:5000').rstrip('/')
@@ -7565,7 +8391,10 @@ def _compute_employee_push_payload(cursor, employee_id):
     ensure_task_management_table(cursor)
     employee_id = int(employee_id)
     today = date.today()
-    end_date = today + timedelta(days=14)
+    settings = get_company_settings() or {}
+    days_ahead = int(settings.get('court_reminder_days_ahead') or 14)
+    days_ahead = max(1, min(90, days_ahead))
+    end_date = today + timedelta(days=days_ahead)
     items = []
 
     cursor.execute("""
@@ -7606,6 +8435,7 @@ def _compute_employee_push_payload(cursor, employee_id):
 
     cursor.execute("""
         SELECT
+            m.id,
             m.material_description,
             p.next_court_date,
             c.tracking_number,
@@ -7614,6 +8444,7 @@ def _compute_employee_push_payload(cursor, employee_id):
         INNER JOIN case_proceedings p ON p.id = m.proceeding_id
         INNER JOIN cases c ON c.id = p.case_id
         WHERE m.allocated_to_id = %s
+          AND COALESCE(m.task_status, 'Pending') IN ('Pending', 'Received', 'In Progress')
         ORDER BY COALESCE(p.next_court_date, m.created_at) ASC
         LIMIT 20
     """, (employee_id,))
@@ -7685,7 +8516,7 @@ def _send_web_push(subscription_row, payload):
         print('[WARNING] pywebpush is not installed; phone push disabled')
         return False
 
-    claims_email = (os.environ.get('VAPID_CLAIMS_EMAIL') or 'mailto:admin@sheriacentric.com').strip()
+    claims_email = _vapid_claims_email()
     subscription_info = {
         'endpoint': subscription_row['endpoint'],
         'keys': {
@@ -7718,8 +8549,128 @@ def _send_web_push(subscription_row, payload):
         return False
 
 
+def _notify_employee_workspace_push(employee_id, title, body, url=None):
+    """Send an immediate web push to every subscribed device for one employee."""
+    if not employee_id or not _get_vapid_credentials() or not _vapid_public_key_b64():
+        return 0
+
+    connection = get_db_connection()
+    if not connection:
+        return 0
+
+    payload = {
+        'title': title or 'SHERIA CENTRIC',
+        'body': body or 'You have a new workspace update.',
+        'url': url or f"{_push_app_origin()}/my_tasks",
+        'count': 1,
+        'digest': hashlib.sha256(
+            f"immediate:{time.time()}:{employee_id}:{title}:{body}".encode('utf-8')
+        ).hexdigest()[:64],
+    }
+    sent = 0
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_push_subscriptions_table(cursor, connection)
+            cursor.execute("""
+                SELECT id, endpoint, p256dh, auth
+                FROM push_subscriptions
+                WHERE employee_id = %s
+            """, (int(employee_id),))
+            rows = list(cursor.fetchall() or [])
+            for row in rows:
+                result = _send_web_push(row, payload)
+                if result == 'expired':
+                    cursor.execute("DELETE FROM push_subscriptions WHERE id = %s", (row['id'],))
+                    continue
+                if result:
+                    cursor.execute("""
+                        UPDATE push_subscriptions
+                        SET last_digest = %s, last_pushed_at = NOW()
+                        WHERE id = %s
+                    """, (payload['digest'], row['id']))
+                    sent += 1
+            connection.commit()
+    except Exception as exc:
+        print(f"[push] immediate notify error for employee {employee_id}: {exc}")
+    finally:
+        connection.close()
+    return sent
+
+
+def _schedule_employee_workspace_push(employee_id, title, body, url=None):
+    """Queue an immediate push without blocking the current HTTP request."""
+    if not employee_id or not _company_notification_flag('browser_push_notifications', True):
+        return
+
+    import threading
+
+    def _run():
+        try:
+            _notify_employee_workspace_push(employee_id, title, body, url)
+        except Exception as exc:
+            print(f"[push] scheduled notify error for employee {employee_id}: {exc}")
+
+    threading.Thread(
+        target=_run,
+        daemon=True,
+        name=f'push-immediate-{employee_id}',
+    ).start()
+
+
+def _schedule_push_for_employee(employee_id):
+    """Recompute digest-based alerts and push when the workspace feed changes."""
+    if not employee_id or not _company_notification_flag('browser_push_notifications', True):
+        return
+
+    import threading
+
+    def _run():
+        connection = get_db_connection()
+        if not connection:
+            return
+        try:
+            _dispatch_push_for_employee(connection, int(employee_id), force=False)
+        except Exception as exc:
+            print(f"[push] scheduled digest dispatch error for employee {employee_id}: {exc}")
+        finally:
+            connection.close()
+
+    threading.Thread(
+        target=_run,
+        daemon=True,
+        name=f'push-digest-{employee_id}',
+    ).start()
+
+
+def _notify_session_allocated_push(employee_id, task_title, reference_label, material_id=None):
+    """Push a phone alert when a court session item is allocated."""
+    title = 'New session allocation'
+    body = f"{task_title or 'Session item'} — {reference_label or 'Case'}"
+    if material_id:
+        url = f"{_push_app_origin()}/my_tasks?session_view={int(material_id)}"
+    else:
+        url = f"{_push_app_origin()}/my_tasks"
+    _schedule_employee_workspace_push(employee_id, title, body, url)
+    _schedule_push_for_employee(employee_id)
+
+
+def _notify_task_assigned_push(employee_id, task_title, task_type, reference_label, task_id=None):
+    """Push a phone alert when a case/matter task is allocated."""
+    label = 'Case' if task_type == 'case' else 'Matter'
+    title = f'New {label.lower()} task assigned'
+    body = f"{task_title or 'New task'} — {reference_label or label}"
+    if task_id:
+        url = f"{_push_app_origin()}/my_tasks?view={int(task_id)}"
+    else:
+        url = f"{_push_app_origin()}/my_tasks"
+    _schedule_employee_workspace_push(employee_id, title, body, url)
+    _schedule_push_for_employee(employee_id)
+
+
 def _dispatch_push_for_employee(connection, employee_id, force=False):
     """Push to all subscriptions for one employee when digest changes."""
+    if not _company_notification_flag('browser_push_notifications', True):
+        return 0
     with connection.cursor(pymysql.cursors.DictCursor) as cursor:
         ensure_push_subscriptions_table(cursor, connection)
         payload = _compute_employee_push_payload(cursor, employee_id)
@@ -7791,7 +8742,7 @@ def start_push_notification_worker():
                 _dispatch_all_push_notifications(force=False)
             except Exception as exc:
                 print(f"[push] worker loop error: {exc}")
-            time.sleep(180)
+            time.sleep(60)
 
     threading.Thread(target=_loop, daemon=True, name='push-notification-worker').start()
 
@@ -7813,6 +8764,7 @@ def push_subscription_status():
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    endpoint = (request.args.get('endpoint') or '').strip()
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_push_subscriptions_table(cursor, connection)
@@ -7821,10 +8773,28 @@ def push_subscription_status():
                 (session['employee_id'],)
             )
             row = cursor.fetchone() or {}
+            total_count = int(row.get('cnt') or 0)
+            device_subscribed = False
+            if endpoint:
+                cursor.execute(
+                    "SELECT COUNT(*) AS cnt FROM push_subscriptions WHERE employee_id = %s AND endpoint = %s",
+                    (session['employee_id'], endpoint)
+                )
+                device_row = cursor.fetchone() or {}
+                device_subscribed = int(device_row.get('cnt') or 0) > 0
+            session_enabled = bool(session.get('push_alerts_enabled'))
+            enabled = device_subscribed if endpoint else (total_count > 0 and session_enabled)
+            if endpoint and device_subscribed:
+                session['push_alerts_enabled'] = True
+                session.modified = True
+                enabled = True
             return jsonify({
                 'success': True,
-                'subscribed': int(row.get('cnt') or 0) > 0,
-                'count': int(row.get('cnt') or 0),
+                'enabled': enabled,
+                'session_enabled': session_enabled,
+                'subscribed': total_count > 0,
+                'device_subscribed': device_subscribed,
+                'count': total_count,
                 'configured': bool(_vapid_public_key_b64() and _get_vapid_credentials()),
             })
     finally:
@@ -7862,11 +8832,16 @@ def push_subscribe():
                     updated_at = CURRENT_TIMESTAMP
             """, (employee_id, endpoint, p256dh, auth, user_agent))
             connection.commit()
+        session['push_alerts_enabled'] = True
+        session.modified = True
         try:
             _dispatch_push_for_employee(connection, employee_id, force=True)
         except Exception as exc:
             print(f"[push] initial dispatch after subscribe failed: {exc}")
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'enabled': True})
+    except Exception as exc:
+        print(f"[push] subscribe error: {exc}")
+        return jsonify({'success': False, 'error': 'Could not save push subscription.'}), 500
     finally:
         connection.close()
 
@@ -7894,9 +8869,114 @@ def push_unsubscribe():
                     (session['employee_id'],)
                 )
             connection.commit()
-        return jsonify({'success': True})
+        session['push_alerts_enabled'] = False
+        session.modified = True
+        return jsonify({'success': True, 'enabled': False})
+    except Exception as exc:
+        print(f"[push] unsubscribe error: {exc}")
+        return jsonify({'success': False, 'error': 'Could not remove push subscription.'}), 500
     finally:
         connection.close()
+
+
+@app.route('/api/push/toggle', methods=['POST'])
+def push_toggle_preference():
+    """Persist push alert preference for the logged-in employee session."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get('enabled'))
+    session['push_alerts_enabled'] = enabled
+    session.modified = True
+    return jsonify({'success': True, 'enabled': enabled})
+
+
+@app.route('/api/push/admin/generate-keys', methods=['POST'])
+def push_admin_generate_keys():
+    """Generate and save a new VAPID key pair (system settings admins only)."""
+    denied = _push_admin_json_guard()
+    if denied:
+        return denied
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        public_key, private_pem = _generate_vapid_keypair()
+        claims_email = _vapid_claims_email()
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            _save_vapid_keys_to_db(
+                cursor,
+                connection,
+                public_key,
+                private_pem,
+                claims_email=claims_email,
+            )
+        return jsonify({
+            'success': True,
+            'publicKey': public_key,
+            'privateKey': private_pem,
+            'message': 'New VAPID keys generated and saved.',
+        })
+    except Exception as exc:
+        print(f"[push] generate keys error: {exc}")
+        return jsonify({'success': False, 'error': 'Could not generate VAPID keys.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/push/admin/import-env-keys', methods=['POST'])
+def push_admin_import_env_keys():
+    """Copy VAPID keys from server environment into company settings."""
+    denied = _push_admin_json_guard()
+    if denied:
+        return denied
+    public_key = _vapid_env_public_key()
+    private_key = _normalize_vapid_private_pem(_vapid_env_private_key())
+    if not public_key or not private_key:
+        return jsonify({'success': False, 'error': 'No VAPID keys found in server environment.'}), 400
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            _save_vapid_keys_to_db(
+                cursor,
+                connection,
+                public_key,
+                private_key,
+                claims_email=(os.environ.get('VAPID_CLAIMS_EMAIL') or '').strip() or None,
+            )
+        return jsonify({
+            'success': True,
+            'publicKey': public_key,
+            'message': 'VAPID keys imported from server environment.',
+        })
+    except Exception as exc:
+        print(f"[push] import env keys error: {exc}")
+        return jsonify({'success': False, 'error': 'Could not import VAPID keys.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/push/admin/validate-config', methods=['POST'])
+def push_admin_validate_config():
+    """Validate the currently active VAPID configuration."""
+    denied = _push_admin_json_guard()
+    if denied:
+        return denied
+    public_key = _vapid_public_key_b64()
+    credentials = _get_vapid_credentials()
+    if not public_key or not credentials:
+        return jsonify({
+            'success': False,
+            'error': 'VAPID keys are missing or invalid. Generate keys or import from environment.',
+        }), 400
+    return jsonify({
+        'success': True,
+        'message': 'VAPID keys are valid. Employees can enable device alerts from Notifications.',
+        'publicKey': public_key,
+        'storage': _push_key_storage_status(),
+    })
 
 
 @app.route('/api/push/test', methods=['POST'])
@@ -7931,128 +9011,9 @@ def notifications():
     employee_id = session.get('employee_id')
     notifications_feed = []
     try:
-        from datetime import date
-        today = date.today()
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
-
-            cursor.execute("""
-                SELECT
-                    t.id,
-                    t.task_type,
-                    t.linked_id,
-                    t.task_title,
-                    t.task_status,
-                    t.due_at,
-                    c.tracking_number AS case_tracking_number,
-                    c.client_name AS case_client_name,
-                    m.matter_reference_number,
-                    m.matter_title
-                FROM task_management t
-                LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
-                LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
-                WHERE
-                    t.task_status IN ('Pending', 'Received', 'In Progress')
-                    AND (
-                        (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
-                        OR
-                        (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
-                    )
-                ORDER BY t.due_at ASC, t.created_at DESC
-            """, (employee_id, employee_id, employee_id, employee_id))
-            active_tasks = list(cursor.fetchall() or [])
-            for task in active_tasks:
-                due_val = task.get('due_at')
-                due_text = '-'
-                if due_val:
-                    try:
-                        due_text = due_val.strftime('%Y-%m-%d %H:%M')
-                    except Exception:
-                        due_text = str(due_val)
-                if task.get('task_type') == 'case':
-                    ref = f"{task.get('case_tracking_number') or '-'} - {task.get('case_client_name') or 'Case'}"
-                else:
-                    ref = f"{task.get('matter_reference_number') or '-'} - {task.get('matter_title') or 'Matter'}"
-                notifications_feed.append({
-                    'type': 'task',
-                    'icon': 'fa-tasks',
-                    'title': task.get('task_title') or 'Assigned task',
-                    'subtitle': ref,
-                    'meta': f"Status: {task.get('task_status') or '-'} | Due: {due_text}",
-                    'link': url_for('my_tasks', view=task['id']),
-                    'sort_key': due_text if due_text != '-' else '9999-12-31 23:59'
-                })
-
-            cursor.execute("""
-                SELECT
-                    m.id,
-                    m.material_description,
-                    m.reminder_frequency,
-                    p.case_id,
-                    p.next_court_date,
-                    c.tracking_number,
-                    c.client_name
-                FROM case_proceeding_materials m
-                INNER JOIN case_proceedings p ON p.id = m.proceeding_id
-                INNER JOIN cases c ON c.id = p.case_id
-                WHERE m.allocated_to_id = %s
-                ORDER BY COALESCE(p.next_court_date, m.created_at) ASC
-            """, (employee_id,))
-            allocated_materials = list(cursor.fetchall() or [])
-            for material in allocated_materials:
-                next_date = material.get('next_court_date')
-                next_text = '-'
-                if next_date:
-                    try:
-                        next_text = next_date.strftime('%Y-%m-%d')
-                    except Exception:
-                        next_text = str(next_date)
-                notifications_feed.append({
-                    'type': 'reminder',
-                    'icon': 'fa-bell',
-                    'title': material.get('material_description') or 'Session reminder',
-                    'subtitle': f"{material.get('tracking_number') or '-'} - {material.get('client_name') or 'Case'}",
-                    'meta': f"Reminder: {material.get('reminder_frequency') or '-'} | Next court: {next_text}",
-                    'link': url_for('case_details', case_id=material.get('case_id')),
-                    'sort_key': next_text if next_text != '-' else '9999-12-31'
-                })
-
-            cursor.execute("""
-                SELECT
-                    p.case_id,
-                    p.next_court_date,
-                    p.next_attendance,
-                    c.tracking_number,
-                    c.client_name
-                FROM case_proceedings p
-                INNER JOIN cases c ON c.id = p.case_id
-                WHERE p.next_court_date IS NOT NULL
-                  AND p.next_court_date >= %s
-                  AND c.filled_by_id = %s
-                ORDER BY p.next_court_date ASC
-                LIMIT 50
-            """, (today, employee_id))
-            upcoming_calendar = list(cursor.fetchall() or [])
-            for cal in upcoming_calendar:
-                next_date = cal.get('next_court_date')
-                next_text = '-'
-                if next_date:
-                    try:
-                        next_text = next_date.strftime('%Y-%m-%d')
-                    except Exception:
-                        next_text = str(next_date)
-                notifications_feed.append({
-                    'type': 'calendar',
-                    'icon': 'fa-calendar-alt',
-                    'title': cal.get('next_attendance') or 'Upcoming court date',
-                    'subtitle': f"{cal.get('tracking_number') or '-'} - {cal.get('client_name') or 'Case'}",
-                    'meta': f"Scheduled: {next_text}",
-                    'link': url_for('case_calendar', case_id=cal.get('case_id')),
-                    'sort_key': next_text if next_text != '-' else '9999-12-31'
-                })
-
-            notifications_feed.sort(key=lambda x: x.get('sort_key') or '9999-12-31 23:59')
-            notifications_feed = notifications_feed[:120]
+            notifications_feed = _build_employee_notifications_feed(cursor, employee_id)
     except Exception as e:
         print(f"Error loading notifications: {e}")
         flash('An error occurred while loading notifications.', 'error')
@@ -12185,6 +13146,19 @@ def case_task_management():
                             session.get('employee_name') or 'Unknown'
                         ))
                         connection.commit()
+                        task_id = cursor.lastrowid
+                        try:
+                            cursor.execute(
+                                "SELECT tracking_number, client_name FROM cases WHERE id = %s",
+                                (int(linked_case_id),),
+                            )
+                            case_row = cursor.fetchone() or {}
+                            ref = f"{case_row.get('tracking_number') or '-'} - {case_row.get('client_name') or 'Case'}"
+                            _notify_task_assigned_push(
+                                assigned_employee_id, task_title, 'case', ref, task_id=task_id
+                            )
+                        except Exception as push_exc:
+                            print(f"[push] case task create notify error: {push_exc}")
                         flash('Case task created successfully.', 'success')
                         return redirect(url_for('case_task_management'))
 
@@ -14121,7 +15095,28 @@ def api_add_proceeding():
                             material.get('allocated_to_id') if material.get('allocated_to_id') else None,
                             material.get('allocated_to_name') if material.get('allocated_to_name') else None
                         ))
+                        material_id = cursor.lastrowid
                         materials_added += 1
+                        alloc_id = material.get('allocated_to_id')
+                        if alloc_id and material_id:
+                            try:
+                                cursor.execute(
+                                    "SELECT tracking_number, client_name FROM cases WHERE id = %s",
+                                    (data['case_id'],),
+                                )
+                                case_row = cursor.fetchone()
+                                if case_row:
+                                    ref = f"{case_row[0] or '-'} - {case_row[1] or 'Case'}"
+                                else:
+                                    ref = 'Case'
+                                _notify_session_allocated_push(
+                                    alloc_id,
+                                    material['material_description'],
+                                    ref,
+                                    material_id=material_id,
+                                )
+                            except Exception as push_exc:
+                                print(f"[push] session material notify error: {push_exc}")
                 connection.commit()
             
             advocates_added = 0
@@ -14539,6 +15534,15 @@ def api_approve_case(case_id):
                         (proceeding_id, material_description, allocated_to_id, allocated_to_name, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, NOW(), NOW())
                 """, (proceeding_id, orders_text, alloc_employee_id, employee_name))
+                material_id = cursor.lastrowid
+                if alloc_employee_id and material_id:
+                    try:
+                        ref = f"{case.get('tracking_number') or '-'} - {case.get('client_name') or 'Case'}"
+                        _notify_session_allocated_push(
+                            alloc_employee_id, orders_text, ref, material_id=material_id
+                        )
+                    except Exception as push_exc:
+                        print(f"[push] case approval session notify error: {push_exc}")
 
             connection.commit()
             return jsonify({'success': True, 'message': f'Case approved and allocated to {employee_name} successfully'})
@@ -16493,12 +17497,21 @@ def build_drive_folder_tree(service, folder_id, depth=0, max_depth=8):
             size_display, size_int = _format_drive_file_size(item.get('size'))
         fname = item.get('name', 'Unknown')
         ext = fname.rsplit('.', 1)[1].lower() if not is_folder and '.' in fname else ''
+        mime = item.get('mimeType', '')
+        edit_url = ''
+        if mime == 'application/vnd.google-apps.document':
+            edit_url = f'https://docs.google.com/document/d/{item.get("id")}/edit'
+        elif mime == 'application/vnd.google-apps.spreadsheet':
+            edit_url = f'https://docs.google.com/spreadsheets/d/{item.get("id")}/edit'
+        elif mime == 'application/vnd.google-apps.presentation':
+            edit_url = f'https://docs.google.com/presentation/d/{item.get("id")}/edit'
         node = {
             'id': item.get('id'),
             'name': fname,
             'type': 'folder' if is_folder else 'file',
             'url': item.get('webViewLink', ''),
-            'mime_type': item.get('mimeType', ''),
+            'edit_url': edit_url,
+            'mime_type': mime,
             'file_extension': ext,
             'created_time': _format_drive_timestamp(item.get('createdTime')),
             'modified_time': _format_drive_timestamp(item.get('modifiedTime')),
@@ -16614,7 +17627,9 @@ def _ensure_document_action_verifications_table():
                     CREATE TABLE IF NOT EXISTS document_action_verifications (
                         id INT AUTO_INCREMENT PRIMARY KEY,
                         employee_id INT NOT NULL,
-                        client_id INT NOT NULL,
+                        client_id INT NULL,
+                        case_id INT NULL,
+                        matter_id INT NULL,
                         action VARCHAR(20) NOT NULL,
                         doc_kind VARCHAR(20) NOT NULL,
                         doc_field VARCHAR(50) NULL,
@@ -16628,9 +17643,20 @@ def _ensure_document_action_verifications_table():
                         used TINYINT(1) NOT NULL DEFAULT 0,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         INDEX idx_doc_action_employee (employee_id),
-                        INDEX idx_doc_action_client (client_id)
+                        INDEX idx_doc_action_client (client_id),
+                        INDEX idx_doc_action_case (case_id),
+                        INDEX idx_doc_action_matter (matter_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
+                for migration_sql in (
+                    "ALTER TABLE document_action_verifications MODIFY client_id INT NULL",
+                    "ALTER TABLE document_action_verifications ADD COLUMN case_id INT NULL",
+                    "ALTER TABLE document_action_verifications ADD COLUMN matter_id INT NULL",
+                ):
+                    try:
+                        cursor.execute(migration_sql)
+                    except Exception:
+                        pass
                 connection.commit()
             return True
         finally:
@@ -16705,7 +17731,7 @@ def _parse_staff_document_action_payload(data):
     doc_id = data.get('doc_id')
     drive_file_id = (data.get('drive_file_id') or '').strip() or None
 
-    if action not in ('download', 'delete'):
+    if action not in ('download', 'delete', 'edit'):
         return None, 'Invalid action.'
     if doc_kind not in ('legacy', 'custom', 'drive'):
         return None, 'Invalid document type.'
@@ -16824,6 +17850,137 @@ def _consume_staff_document_action_token(cursor, employee_id, client_id, payload
 
     cursor.execute("UPDATE document_action_verifications SET used = 1 WHERE id = %s", (row['id'],))
     return row['id']
+
+
+def _parse_drive_document_action_payload(data):
+    """Normalize download/delete payload for case or matter Drive documents."""
+    action = (data.get('action') or '').strip().lower()
+    drive_file_id = (data.get('drive_file_id') or data.get('file_id') or '').strip() or None
+    if action not in ('download', 'delete'):
+        return None, 'Invalid action.'
+    if not drive_file_id:
+        return None, 'Google Drive file id is required.'
+    return {
+        'action': action,
+        'doc_kind': 'drive',
+        'doc_field': None,
+        'doc_id': None,
+        'drive_file_id': drive_file_id,
+    }, None
+
+
+def _case_document_action_allowed(cursor, case_id, employee_id, task_id=None, permission_key='download'):
+    """Return (allowed: bool, error_message or None)."""
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
+    if (user_role not in allowed_roles) and (original_role != 'IT Support'):
+        return False, 'You do not have permission for this action.'
+    cursor.execute("SELECT id, filled_by_id FROM cases WHERE id = %s", (case_id,))
+    case_row = cursor.fetchone()
+    if not case_row:
+        return False, 'Case not found.'
+    is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+    is_privileged = user_role in ['Managing Partner', 'Firm Administrator']
+    is_case_owner = str(case_row.get('filled_by_id') or '') == str(employee_id)
+    if is_it_support or is_privileged or is_case_owner:
+        return True, None
+    ensure_task_management_table(cursor, None)
+    if has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key=permission_key):
+        return True, None
+    return False, 'You can only perform this action while your allocated task is active.'
+
+
+def _matter_document_action_allowed(cursor, matter_id, employee_id):
+    """Return (allowed: bool, error_message or None)."""
+    cursor.execute("SELECT id, assigned_employee_id FROM matters WHERE id = %s", (matter_id,))
+    row = cursor.fetchone()
+    if not row:
+        return False, 'Matter not found.'
+    assigned_id = row.get('assigned_employee_id')
+    if assigned_id is None or str(assigned_id) != str(employee_id):
+        return False, 'You do not have permission for this action.'
+    return True, None
+
+
+def _consume_case_document_action_token(cursor, employee_id, case_id, payload, token):
+    from datetime import datetime as _dt
+    if not token:
+        return None
+    cursor.execute("""
+        SELECT id, action_token_hash, token_expires_at, used
+        FROM document_action_verifications
+        WHERE employee_id = %s AND case_id = %s
+          AND action = %s AND doc_kind = %s
+          AND (drive_file_id <=> %s)
+          AND verified_at IS NOT NULL AND used = 0
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        employee_id, case_id,
+        payload['action'], payload['doc_kind'],
+        payload.get('drive_file_id'),
+    ))
+    row = cursor.fetchone()
+    if not row or not row.get('action_token_hash'):
+        return None
+    if row.get('token_expires_at') and row['token_expires_at'] < _dt.utcnow():
+        return None
+    if not check_password_hash(row['action_token_hash'], token):
+        return None
+    cursor.execute("UPDATE document_action_verifications SET used = 1 WHERE id = %s", (row['id'],))
+    return row['id']
+
+
+def _consume_matter_document_action_token(cursor, employee_id, matter_id, payload, token):
+    from datetime import datetime as _dt
+    if not token:
+        return None
+    cursor.execute("""
+        SELECT id, action_token_hash, token_expires_at, used
+        FROM document_action_verifications
+        WHERE employee_id = %s AND matter_id = %s
+          AND action = %s AND doc_kind = %s
+          AND (drive_file_id <=> %s)
+          AND verified_at IS NOT NULL AND used = 0
+        ORDER BY id DESC
+        LIMIT 1
+    """, (
+        employee_id, matter_id,
+        payload['action'], payload['doc_kind'],
+        payload.get('drive_file_id'),
+    ))
+    row = cursor.fetchone()
+    if not row or not row.get('action_token_hash'):
+        return None
+    if row.get('token_expires_at') and row['token_expires_at'] < _dt.utcnow():
+        return None
+    if not check_password_hash(row['action_token_hash'], token):
+        return None
+    cursor.execute("UPDATE document_action_verifications SET used = 1 WHERE id = %s", (row['id'],))
+    return row['id']
+
+
+def _send_employee_document_action_code(employee_id):
+    """Load employee and send a verification code email. Returns (delivery_email, error)."""
+    connection = get_db_connection()
+    if not connection:
+        return None, 'Database connection error'
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                SELECT id, full_name, work_email, personal_email
+                FROM employees WHERE id = %s
+            """, (employee_id,))
+            employee = cursor.fetchone()
+            if not employee:
+                return None, 'Employee not found'
+            delivery_email = (employee.get('personal_email') or employee.get('work_email') or '').strip()
+            if not delivery_email:
+                return None, 'No registered email on your account. Contact your administrator.'
+            return employee, None
+    finally:
+        connection.close()
 
 
 def get_or_create_folder(service, parent_folder_id, folder_name):
@@ -17794,6 +18951,290 @@ def create_matter_google_file(matter_id):
         print(f"Create matter google file error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/case/<int:case_id>/document/action/send-code', methods=['POST'])
+def case_document_send_code(case_id):
+    """Send a verification code before downloading or deleting a case document."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_drive_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    task_id = (data.get('task_id') or request.args.get('task_id') or '').strip() or None
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            allowed, deny_msg = _case_document_action_allowed(
+                cursor, case_id, session['employee_id'], task_id,
+                permission_key='download' if payload['action'] == 'download' else 'view',
+            )
+            if not allowed:
+                return jsonify({'success': False, 'error': deny_msg}), 403
+
+            employee, emp_err = _send_employee_document_action_code(session['employee_id'])
+            if emp_err:
+                return jsonify({'success': False, 'error': emp_err}), 400
+            delivery_email = (employee.get('personal_email') or employee.get('work_email') or '').strip()
+
+            cursor.execute("""
+                UPDATE document_action_verifications SET used = 1
+                WHERE employee_id = %s AND case_id = %s AND used = 0
+            """, (session['employee_id'], case_id))
+
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            code_hash = generate_password_hash(code)
+            expires_at = _dt.utcnow() + _td(minutes=10)
+            cursor.execute("""
+                INSERT INTO document_action_verifications
+                    (employee_id, case_id, action, doc_kind, drive_file_id, code_hash, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                session['employee_id'], case_id,
+                payload['action'], payload['doc_kind'],
+                payload['drive_file_id'], code_hash, expires_at,
+            ))
+            connection.commit()
+
+        action_label = 'Download document' if payload['action'] == 'download' else 'Delete document'
+        sent = _send_document_action_code_email(delivery_email, code, employee.get('full_name'), action_label)
+        if not sent:
+            return jsonify({'success': False, 'error': 'Could not send verification email. Try again later.'}), 500
+
+        return jsonify({
+            'success': True,
+            'message': f'A verification code has been sent to {_mask_email_address(delivery_email)}.',
+            'delivery_email': _mask_email_address(delivery_email),
+            'expires_in_minutes': 10,
+        })
+    except Exception as e:
+        print(f"[case_document_send_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/case/<int:case_id>/document/action/verify-code', methods=['POST'])
+def case_document_verify_code(case_id):
+    """Verify the emailed code and return a short-lived one-time action token."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_drive_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    code = (data.get('code') or '').strip()
+    if not code.isdigit() or len(code) != 6:
+        return jsonify({'success': False, 'error': 'Code must be 6 digits.'}), 400
+
+    task_id = (data.get('task_id') or '').strip() or None
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            allowed, deny_msg = _case_document_action_allowed(
+                cursor, case_id, session['employee_id'], task_id,
+                permission_key='download' if payload['action'] == 'download' else 'view',
+            )
+            if not allowed:
+                return jsonify({'success': False, 'error': deny_msg}), 403
+
+            cursor.execute("""
+                SELECT id, code_hash, expires_at, used
+                FROM document_action_verifications
+                WHERE employee_id = %s AND case_id = %s
+                  AND action = %s AND doc_kind = %s
+                  AND (drive_file_id <=> %s)
+                  AND used = 0
+                ORDER BY id DESC
+                LIMIT 1
+            """, (
+                session['employee_id'], case_id,
+                payload['action'], payload['doc_kind'],
+                payload['drive_file_id'],
+            ))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Invalid or expired code. Request a new one.'}), 400
+            if row.get('expires_at') and row['expires_at'] < _dt.utcnow():
+                return jsonify({'success': False, 'error': 'Code expired. Please request a new one.'}), 400
+            if not check_password_hash(row['code_hash'], code):
+                return jsonify({'success': False, 'error': 'Incorrect verification code.'}), 400
+
+            action_token = secrets.token_urlsafe(32)
+            token_hash = generate_password_hash(action_token)
+            verified_at = _dt.utcnow()
+            token_expires_at = verified_at + _td(minutes=5)
+            cursor.execute("""
+                UPDATE document_action_verifications
+                SET verified_at = %s, action_token_hash = %s, token_expires_at = %s
+                WHERE id = %s
+            """, (verified_at, token_hash, token_expires_at, row['id']))
+            connection.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Code verified.',
+            'action_token': action_token,
+            'expires_in_minutes': 5,
+        })
+    except Exception as e:
+        print(f"[case_document_verify_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/matter/<int:matter_id>/document/action/send-code', methods=['POST'])
+def matter_document_send_code(matter_id):
+    """Send a verification code before downloading or deleting a matter document."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_drive_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            allowed, deny_msg = _matter_document_action_allowed(cursor, matter_id, session['employee_id'])
+            if not allowed:
+                return jsonify({'success': False, 'error': deny_msg}), 403
+
+            employee, emp_err = _send_employee_document_action_code(session['employee_id'])
+            if emp_err:
+                return jsonify({'success': False, 'error': emp_err}), 400
+            delivery_email = (employee.get('personal_email') or employee.get('work_email') or '').strip()
+
+            cursor.execute("""
+                UPDATE document_action_verifications SET used = 1
+                WHERE employee_id = %s AND matter_id = %s AND used = 0
+            """, (session['employee_id'], matter_id))
+
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            code_hash = generate_password_hash(code)
+            expires_at = _dt.utcnow() + _td(minutes=10)
+            cursor.execute("""
+                INSERT INTO document_action_verifications
+                    (employee_id, matter_id, action, doc_kind, drive_file_id, code_hash, expires_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                session['employee_id'], matter_id,
+                payload['action'], payload['doc_kind'],
+                payload['drive_file_id'], code_hash, expires_at,
+            ))
+            connection.commit()
+
+        action_label = 'Download document' if payload['action'] == 'download' else 'Delete document'
+        sent = _send_document_action_code_email(delivery_email, code, employee.get('full_name'), action_label)
+        if not sent:
+            return jsonify({'success': False, 'error': 'Could not send verification email. Try again later.'}), 500
+
+        return jsonify({
+            'success': True,
+            'message': f'A verification code has been sent to {_mask_email_address(delivery_email)}.',
+            'delivery_email': _mask_email_address(delivery_email),
+            'expires_in_minutes': 10,
+        })
+    except Exception as e:
+        print(f"[matter_document_send_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/matter/<int:matter_id>/document/action/verify-code', methods=['POST'])
+def matter_document_verify_code(matter_id):
+    """Verify the emailed code and return a short-lived one-time action token."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    payload, err = _parse_drive_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    code = (data.get('code') or '').strip()
+    if not code.isdigit() or len(code) != 6:
+        return jsonify({'success': False, 'error': 'Code must be 6 digits.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            allowed, deny_msg = _matter_document_action_allowed(cursor, matter_id, session['employee_id'])
+            if not allowed:
+                return jsonify({'success': False, 'error': deny_msg}), 403
+
+            cursor.execute("""
+                SELECT id, code_hash, expires_at, used
+                FROM document_action_verifications
+                WHERE employee_id = %s AND matter_id = %s
+                  AND action = %s AND doc_kind = %s
+                  AND (drive_file_id <=> %s)
+                  AND used = 0
+                ORDER BY id DESC
+                LIMIT 1
+            """, (
+                session['employee_id'], matter_id,
+                payload['action'], payload['doc_kind'],
+                payload['drive_file_id'],
+            ))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'Invalid or expired code. Request a new one.'}), 400
+            if row.get('expires_at') and row['expires_at'] < _dt.utcnow():
+                return jsonify({'success': False, 'error': 'Code expired. Please request a new one.'}), 400
+            if not check_password_hash(row['code_hash'], code):
+                return jsonify({'success': False, 'error': 'Incorrect verification code.'}), 400
+
+            action_token = secrets.token_urlsafe(32)
+            token_hash = generate_password_hash(action_token)
+            verified_at = _dt.utcnow()
+            token_expires_at = verified_at + _td(minutes=5)
+            cursor.execute("""
+                UPDATE document_action_verifications
+                SET verified_at = %s, action_token_hash = %s, token_expires_at = %s
+                WHERE id = %s
+            """, (verified_at, token_hash, token_expires_at, row['id']))
+            connection.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Code verified.',
+            'action_token': action_token,
+            'expires_in_minutes': 5,
+        })
+    except Exception as e:
+        print(f"[matter_document_verify_code] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
 @app.route('/case_management/<int:case_id>/document/<file_id>/download')
 def download_case_document(case_id, file_id):
     """Stream a case document from Google Drive as a download (attachment)."""
@@ -17805,26 +19246,39 @@ def download_case_document(case_id, file_id):
     if (user_role not in allowed_roles) and (original_role != 'IT Support'):
         flash('You do not have permission to download this document.', 'error')
         return redirect(url_for('case_management'))
+    token = (request.args.get('token') or '').strip()
+    if not token:
+        flash('Email verification is required before downloading. Please verify from the case page.', 'error')
+        redirect_kw = {'case_id': case_id}
+        _task_id = (request.args.get('task_id') or '').strip()
+        if _task_id:
+            redirect_kw['task_id'] = _task_id
+        return redirect(url_for('case_details', **redirect_kw))
     connection = get_db_connection()
     if not connection:
         return redirect(url_for('case_documents', case_id=case_id))
+    task_id = (request.args.get('task_id') or '').strip()
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT id, filled_by_id FROM cases WHERE id = %s", (case_id,))
-            case_row = cursor.fetchone()
-            if not case_row:
-                flash('Case not found.', 'error')
-                return redirect(url_for('case_management'))
-            employee_id = session.get('employee_id')
-            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
-            is_case_owner = str(case_row.get('filled_by_id') or '') == str(employee_id)
-            task_id = (request.args.get('task_id') or '').strip()
-            if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
-                ensure_task_management_table(cursor, connection)
-                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='download'):
-                    flash('You can only download while your allocated task is active.', 'error')
-                    return redirect(url_for('my_tasks'))
+            allowed, deny_msg = _case_document_action_allowed(
+                cursor, case_id, session['employee_id'], task_id or None, permission_key='download',
+            )
+            if not allowed:
+                flash(deny_msg or 'Permission denied.', 'error')
+                return redirect(url_for('my_tasks') if 'task' in (deny_msg or '').lower() else url_for('case_management'))
+            _ensure_document_action_verifications_table()
+            payload = {
+                'action': 'download',
+                'doc_kind': 'drive',
+                'drive_file_id': file_id,
+            }
+            if not _consume_case_document_action_token(cursor, session['employee_id'], case_id, payload, token):
+                flash('Verification expired or invalid. Please try again.', 'error')
+                redirect_kw = {'case_id': case_id}
+                if task_id:
+                    redirect_kw['task_id'] = task_id
+                return redirect(url_for('case_details', **redirect_kw))
+            connection.commit()
     finally:
         connection.close()
     service = get_google_drive_service()
@@ -17873,11 +19327,31 @@ def delete_case_document_api(case_id, file_id):
     allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
     if (user_role not in allowed_roles) and (original_role != 'IT Support'):
         return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    data = request.get_json(silent=True) or request.form
+    token = (data.get('token') or request.args.get('token') or '').strip()
+    if not token:
+        return jsonify({'success': False, 'error': 'Email verification is required before deleting.'}), 403
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database error'}), 500
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            task_id = (data.get('task_id') or request.args.get('task_id') or '').strip()
+            allowed, deny_msg = _case_document_action_allowed(
+                cursor, case_id, session['employee_id'], task_id or None, permission_key='view',
+            )
+            if not allowed:
+                return jsonify({'success': False, 'error': deny_msg or 'Permission denied'}), 403
+            _ensure_document_action_verifications_table()
+            payload = {
+                'action': 'delete',
+                'doc_kind': 'drive',
+                'drive_file_id': file_id,
+            }
+            if not _consume_case_document_action_token(cursor, session['employee_id'], case_id, payload, token):
+                return jsonify({'success': False, 'error': 'Verification expired or invalid. Please try again.'}), 403
+            connection.commit()
+
             cursor.execute("""
                 SELECT c.id, c.client_id, c.tracking_number, c.filled_by_id, cl.id as client_table_id,
                        cl.full_name as client_full_name, cl.phone_number as client_phone
@@ -17886,15 +19360,6 @@ def delete_case_document_api(case_id, file_id):
                 WHERE c.id = %s
             """, (case_id,))
             case_data = cursor.fetchone()
-            employee_id = session.get('employee_id')
-            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
-            is_case_owner = str((case_data or {}).get('filled_by_id') or '') == str(employee_id)
-            task_id = (request.args.get('task_id') or '').strip()
-            if case_data and not is_it_support and not is_privileged_case_view_role and not is_case_owner:
-                ensure_task_management_table(cursor, connection)
-                if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view'):
-                    return jsonify({'success': False, 'error': 'You can only delete while your allocated task is active.'}), 403
         if not case_data:
             return jsonify({'success': False, 'error': 'Case not found'}), 404
         service = get_google_drive_service()
@@ -18066,21 +19531,29 @@ def download_matter_document(matter_id, file_id):
     """Stream a matter document from Google Drive as a download."""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
+    token = (request.args.get('token') or '').strip()
+    if not token:
+        flash('Email verification is required before downloading. Please verify from the matter page.', 'error')
+        return redirect(url_for('matter_details', matter_id=matter_id))
     connection = get_db_connection()
     if not connection:
         return redirect(url_for('matter_documents', matter_id=matter_id))
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT id, assigned_employee_id FROM matters WHERE id = %s", (matter_id,))
-            row = cursor.fetchone()
-            if not row:
-                flash('Matter not found.', 'error')
+            allowed, deny_msg = _matter_document_action_allowed(cursor, matter_id, session['employee_id'])
+            if not allowed:
+                flash(deny_msg or 'Permission denied.', 'error')
                 return redirect(url_for('other_matters'))
-            current_employee_id = session.get('employee_id')
-            assigned_id = row.get('assigned_employee_id')
-            if assigned_id is None or str(assigned_id) != str(current_employee_id):
-                flash('You do not have permission to download this document.', 'error')
-                return redirect(url_for('other_matters'))
+            _ensure_document_action_verifications_table()
+            payload = {
+                'action': 'download',
+                'doc_kind': 'drive',
+                'drive_file_id': file_id,
+            }
+            if not _consume_matter_document_action_token(cursor, session['employee_id'], matter_id, payload, token):
+                flash('Verification expired or invalid. Please try again.', 'error')
+                return redirect(url_for('matter_details', matter_id=matter_id))
+            connection.commit()
     finally:
         connection.close()
     service = get_google_drive_service()
@@ -18124,11 +19597,28 @@ def delete_matter_document_api(matter_id, file_id):
     """Delete a matter document from Google Drive. File must be in the matter's folder."""
     if 'employee_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    data = request.get_json(silent=True) or request.form
+    token = (data.get('token') or request.args.get('token') or '').strip()
+    if not token:
+        return jsonify({'success': False, 'error': 'Email verification is required before deleting.'}), 403
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database error'}), 500
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            allowed, deny_msg = _matter_document_action_allowed(cursor, matter_id, session['employee_id'])
+            if not allowed:
+                return jsonify({'success': False, 'error': deny_msg or 'Permission denied'}), 403
+            _ensure_document_action_verifications_table()
+            payload = {
+                'action': 'delete',
+                'doc_kind': 'drive',
+                'drive_file_id': file_id,
+            }
+            if not _consume_matter_document_action_token(cursor, session['employee_id'], matter_id, payload, token):
+                return jsonify({'success': False, 'error': 'Verification expired or invalid. Please try again.'}), 403
+            connection.commit()
+
             cursor.execute("""
                 SELECT m.id, m.matter_reference_number, m.assigned_employee_id,
                        m.client_id, cl.full_name as client_full_name, cl.phone_number as client_phone_number,
@@ -18140,10 +19630,6 @@ def delete_matter_document_api(matter_id, file_id):
             matter_data = cursor.fetchone()
         if not matter_data:
             return jsonify({'success': False, 'error': 'Matter not found'}), 404
-        current_employee_id = session.get('employee_id')
-        assigned_id = matter_data.get('assigned_employee_id')
-        if assigned_id is None or str(assigned_id) != str(current_employee_id):
-            return jsonify({'success': False, 'error': 'You do not have access to this matter'}), 403
         service = get_google_drive_service()
         if not service:
             return jsonify({'success': False, 'error': 'Google Drive not connected'}), 503
@@ -18727,6 +20213,166 @@ def staff_client_document_delete(client_id):
     except Exception as e:
         print(f"[staff_client_document_delete] error: {e}")
         return jsonify({'success': False, 'error': 'Delete failed'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/edit-open', methods=['POST'])
+def staff_client_document_edit_open(client_id):
+    """Consume verification token and return a Google Drive edit URL."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    data = request.get_json(silent=True) or request.form
+    token = (data.get('token') or '').strip()
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+    if payload['action'] != 'edit' or payload['doc_kind'] != 'drive':
+        return jsonify({'success': False, 'error': 'Invalid edit request.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session['employee_id']
+            if not _consume_staff_document_action_token(cursor, employee_id, client_id, payload, token):
+                return jsonify({'success': False, 'error': 'Verification expired or invalid. Please try again.'}), 403
+            connection.commit()
+
+            service, client_folder_id = _get_client_drive_folder_context(cursor, connection, client_id)
+            if not service or not client_folder_id:
+                return jsonify({'success': False, 'error': 'Google Drive is not connected'}), 400
+
+            file_id = payload['drive_file_id']
+            if not _drive_file_belongs_to_folder(service, file_id, client_folder_id):
+                return jsonify({'success': False, 'error': 'File is not in this client\'s Drive folder'}), 403
+
+            meta = service.files().get(fileId=file_id, fields='mimeType').execute()
+            mime = meta.get('mimeType', '')
+            edit_url = ''
+            if mime == 'application/vnd.google-apps.document':
+                edit_url = f'https://docs.google.com/document/d/{file_id}/edit'
+            elif mime == 'application/vnd.google-apps.spreadsheet':
+                edit_url = f'https://docs.google.com/spreadsheets/d/{file_id}/edit'
+            elif mime == 'application/vnd.google-apps.presentation':
+                edit_url = f'https://docs.google.com/presentation/d/{file_id}/edit'
+            else:
+                return jsonify({'success': False, 'error': 'This file type cannot be edited online. Replace it instead.'}), 400
+
+        return jsonify({'success': True, 'edit_url': edit_url})
+    except HttpError as e:
+        print(f"[staff_client_document_edit_open] Drive error: {e}")
+        return jsonify({'success': False, 'error': 'Could not open document for editing.'}), 500
+    except Exception as e:
+        print(f"[staff_client_document_edit_open] error: {e}")
+        return jsonify({'success': False, 'error': 'Something went wrong. Please try again.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/staff/client_documents/<int:client_id>/update', methods=['POST'])
+def staff_client_document_update(client_id):
+    """Replace a client registration or personal document after email verification."""
+    if not _staff_can_manage_client_documents():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    _ensure_document_action_verifications_table()
+    token = (request.form.get('token') or '').strip()
+    data = {
+        'action': 'edit',
+        'doc_kind': request.form.get('doc_kind'),
+        'field': request.form.get('field'),
+        'doc_id': request.form.get('doc_id'),
+        'drive_file_id': request.form.get('drive_file_id'),
+    }
+    payload, err = _parse_staff_document_action_payload(data)
+    if err:
+        return jsonify({'success': False, 'error': err}), 400
+
+    if 'document_file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file provided'}), 400
+    file = request.files['document_file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            employee_id = session['employee_id']
+            if not _consume_staff_document_action_token(cursor, employee_id, client_id, payload, token):
+                return jsonify({'success': False, 'error': 'Verification expired or invalid. Please try again.'}), 403
+
+            upload_folder = app.config.get('UPLOAD_FOLDER', os.path.join('static', 'uploads', 'profile_pictures'))
+
+            if payload['doc_kind'] == 'legacy':
+                field = payload['doc_field']
+                cursor.execute(f"SELECT {field} FROM clients WHERE id = %s", (client_id,))
+                client = cursor.fetchone()
+                if not client:
+                    return jsonify({'success': False, 'error': 'Client not found'}), 404
+
+                old_filename = client.get(field)
+                original_filename = secure_filename(file.filename)
+                file_ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'bin'
+                unique_filename = f"{field}_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+                filepath = os.path.join(upload_folder, unique_filename)
+                file.save(filepath)
+
+                cursor.execute(f"UPDATE clients SET {field} = %s WHERE id = %s", (unique_filename, client_id))
+                connection.commit()
+
+                if old_filename:
+                    old_path = os.path.join(upload_folder, old_filename)
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except Exception:
+                            pass
+                return jsonify({'success': True, 'message': 'Document replaced successfully'})
+
+            if payload['doc_kind'] == 'custom':
+                cursor.execute("""
+                    SELECT filename FROM client_personal_documents
+                    WHERE id = %s AND client_id = %s
+                """, (payload['doc_id'], client_id))
+                doc = cursor.fetchone()
+                if not doc:
+                    return jsonify({'success': False, 'error': 'Document not found'}), 404
+
+                old_filename = doc['filename']
+                original_filename = secure_filename(file.filename)
+                file_ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'bin'
+                unique_filename = f"personal_doc_{client_id}_{secrets.token_hex(8)}.{file_ext}"
+                filepath = os.path.join(upload_folder, unique_filename)
+                file.save(filepath)
+                file_size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+
+                cursor.execute("""
+                    UPDATE client_personal_documents
+                    SET filename = %s, original_filename = %s, file_size = %s
+                    WHERE id = %s AND client_id = %s
+                """, (unique_filename, original_filename, file_size, payload['doc_id'], client_id))
+                connection.commit()
+
+                old_path = os.path.join(upload_folder, old_filename)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception:
+                        pass
+                return jsonify({'success': True, 'message': 'Document replaced successfully'})
+
+            return jsonify({'success': False, 'error': 'Unsupported document type for replace.'}), 400
+    except Exception as e:
+        print(f"[staff_client_document_update] error: {e}")
+        return jsonify({'success': False, 'error': 'Update failed'}), 500
     finally:
         connection.close()
 
@@ -19900,9 +21546,255 @@ def save_email_settings(cpanel_user, cpanel_domain, cpanel_api_token, cpanel_api
         if connection:
             connection.close()
 
+def _persist_notification_email_from_form(form, cursor):
+    """Save SMTP settings used for system email notifications."""
+    smtp_host = (form.get('notify_smtp_host') or '').strip()
+    main_email = (form.get('notify_main_email') or '').strip()
+    if not smtp_host and not main_email:
+        return False, 'skipped'
+
+    cursor.execute("SELECT * FROM email_settings ORDER BY id DESC LIMIT 1")
+    existing = cursor.fetchone() or {}
+
+    cpanel_user = (form.get('notify_cpanel_user') or existing.get('cpanel_user') or 'notifications').strip()
+    cpanel_domain = (form.get('notify_cpanel_domain') or existing.get('cpanel_domain') or 'sheriacentric.com').strip()
+    cpanel_api_token = (form.get('notify_cpanel_api_token') or existing.get('cpanel_api_token') or 'not-configured').strip()
+    cpanel_api_port = int(form.get('notify_cpanel_api_port') or existing.get('cpanel_api_port') or 2083)
+    main_email = main_email or (existing.get('main_email') or '').strip()
+    form_password = (form.get('notify_main_email_password') or '').strip()
+    main_password = form_password or (existing.get('main_email_password') or '')
+    smtp_host = smtp_host or (existing.get('smtp_host') or 'mail.sheriacentric.com')
+    smtp_port = int(form.get('notify_smtp_port') or existing.get('smtp_port') or 587)
+    smtp_use_tls_raw = form.get('notify_smtp_use_tls')
+    if smtp_use_tls_raw is None:
+        smtp_use_tls = bool(existing.get('smtp_use_tls', True))
+    else:
+        smtp_use_tls = str(smtp_use_tls_raw).lower() in ('true', '1', 'on', 'yes')
+    imap_host = smtp_host
+    imap_port = int(existing.get('imap_port') or 993)
+    imap_use_ssl = bool(existing.get('imap_use_ssl', True))
+    sender_name = (form.get('notify_sender_name') or existing.get('sender_name') or 'BAUNI LAW GROUP').strip()
+
+    if not main_email:
+        return False, 'Email address is required.'
+    if not smtp_host:
+        return False, 'SMTP host is required.'
+    if not main_password:
+        return False, 'Email password is required the first time you save notification email settings.'
+
+    if existing.get('id'):
+        cursor.execute("""
+            UPDATE email_settings SET
+                cpanel_user = %s, cpanel_domain = %s, cpanel_api_token = %s,
+                cpanel_api_port = %s, main_email = %s, main_email_password = %s,
+                smtp_host = %s, smtp_port = %s, smtp_use_tls = %s,
+                imap_host = %s, imap_port = %s, imap_use_ssl = %s, sender_name = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (
+            cpanel_user, cpanel_domain, cpanel_api_token, cpanel_api_port,
+            main_email, main_password, smtp_host, smtp_port, int(smtp_use_tls),
+            imap_host, imap_port, int(imap_use_ssl), sender_name, existing['id'],
+        ))
+    else:
+        cursor.execute("""
+            INSERT INTO email_settings
+            (cpanel_user, cpanel_domain, cpanel_api_token, cpanel_api_port,
+             main_email, main_email_password, smtp_host, smtp_port, smtp_use_tls,
+             imap_host, imap_port, imap_use_ssl, sender_name)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            cpanel_user, cpanel_domain, cpanel_api_token, cpanel_api_port,
+            main_email, main_password, smtp_host, smtp_port, int(smtp_use_tls),
+            imap_host, imap_port, int(imap_use_ssl), sender_name,
+        ))
+    return True, None
+
+
+def _save_notification_gateways_from_form(form, connection):
+    """Persist email/SMS/WhatsApp gateway rows and commit independently."""
+    messages = []
+    errors = []
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        try:
+            ok, err = _persist_notification_email_from_form(form, cursor)
+            if ok:
+                connection.commit()
+                messages.append('Email notification settings saved.')
+            elif err and err != 'skipped':
+                errors.append(err)
+        except Exception as exc:
+            connection.rollback()
+            errors.append(f'Email settings could not be saved: {exc}')
+
+        try:
+            if _persist_notification_sms_from_form(form, cursor):
+                connection.commit()
+                messages.append('SMS gateway settings saved.')
+        except Exception as exc:
+            connection.rollback()
+            errors.append(f'SMS settings could not be saved: {exc}')
+
+        try:
+            if _persist_notification_whatsapp_from_form(form, cursor):
+                connection.commit()
+                messages.append('WhatsApp settings saved.')
+        except Exception as exc:
+            connection.rollback()
+            errors.append(f'WhatsApp settings could not be saved: {exc}')
+
+    return messages, errors
+
+
+def _notification_email_configured(email_settings):
+    es = email_settings or {}
+    return bool((es.get('main_email') or '').strip() and (es.get('smtp_host') or '').strip() and (es.get('main_email_password') or '').strip())
+
+
+def _notification_sms_configured(sms_settings):
+    ss = sms_settings or {}
+    return bool(ss.get('is_active') and ss.get('provider') and ss.get('api_key'))
+
+
+def _notification_whatsapp_configured(whatsapp_settings):
+    ws = whatsapp_settings or {}
+    return bool(ws.get('is_active') and ws.get('access_token') and ws.get('phone_number_id'))
+
+
+def _persist_notification_sms_from_form(form, cursor):
+    """Save SMS gateway settings from the notifications settings form."""
+    provider = (form.get('sms_provider') or '').strip()
+    api_key = (form.get('sms_api_key') or '').strip()
+    if not provider and not api_key:
+        return False
+
+    cursor.execute("SELECT * FROM sms_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1")
+    existing = cursor.fetchone() or {}
+
+    provider = provider or (existing.get('provider') or '').strip()
+    if not provider:
+        return False
+
+    api_key = api_key or (existing.get('api_key') or '').strip()
+    if not api_key:
+        return False
+
+    api_secret = (form.get('sms_api_secret') or '').strip() or (existing.get('api_secret') or '')
+    sender_id = (form.get('sms_sender_id') or '').strip() or (existing.get('sender_id') or '')
+    username = (form.get('sms_username') or '').strip() or (existing.get('username') or '')
+    country_code = (form.get('sms_country_code') or '').strip() or (existing.get('default_country_code') or '+254')
+    custom_url = (form.get('sms_custom_url') or '').strip() or (existing.get('custom_api_url') or '')
+
+    if existing.get('id'):
+        cursor.execute("""
+            UPDATE sms_settings SET
+                provider=%s, api_key=%s, api_secret=%s, sender_id=%s,
+                username=%s, default_country_code=%s, custom_api_url=%s, is_active=1
+            WHERE id=%s
+        """, (provider, api_key, api_secret, sender_id, username, country_code, custom_url, existing['id']))
+    else:
+        cursor.execute("""
+            INSERT INTO sms_settings
+                (provider, api_key, api_secret, sender_id, username, default_country_code, custom_api_url, is_active)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,1)
+        """, (provider, api_key, api_secret, sender_id, username, country_code, custom_url))
+    return True
+
+
+def _persist_notification_whatsapp_from_form(form, cursor):
+    """Save WhatsApp Cloud API settings from the notifications settings form."""
+    access_token = (form.get('wa_access_token') or '').strip()
+    phone_number_id = (form.get('wa_phone_number_id') or '').strip()
+    webhook_verify_token = (form.get('wa_verify_token') or '').strip()
+    if not access_token and not phone_number_id and not webhook_verify_token:
+        return False
+
+    cursor.execute("SELECT * FROM whatsapp_settings ORDER BY id DESC LIMIT 1")
+    existing = cursor.fetchone() or {}
+
+    access_token = access_token or (existing.get('access_token') or '').strip()
+    phone_number_id = phone_number_id or (existing.get('phone_number_id') or '').strip()
+    webhook_verify_token = webhook_verify_token or (existing.get('webhook_verify_token') or '').strip()
+    if not access_token or not phone_number_id or not webhook_verify_token:
+        return False
+
+    waba_id = (form.get('wa_waba_id') or '').strip() or (existing.get('whatsapp_business_account_id') or '')
+    display_phone = (form.get('wa_display_phone') or '').strip() or (existing.get('display_phone_number') or '')
+    api_version = (form.get('wa_api_version') or '').strip() or (existing.get('api_version') or 'v21.0')
+
+    if existing.get('id'):
+        cursor.execute("""
+            UPDATE whatsapp_settings SET
+                access_token=%s, phone_number_id=%s, whatsapp_business_account_id=%s,
+                webhook_verify_token=%s, display_phone_number=%s, api_version=%s, is_active=1
+            WHERE id=%s
+        """, (access_token, phone_number_id, waba_id, webhook_verify_token, display_phone, api_version, existing['id']))
+    else:
+        cursor.execute("""
+            INSERT INTO whatsapp_settings
+                (access_token, phone_number_id, whatsapp_business_account_id, webhook_verify_token, display_phone_number, api_version, is_active)
+            VALUES (%s,%s,%s,%s,%s,%s,1)
+        """, (access_token, phone_number_id, waba_id, webhook_verify_token, display_phone, api_version))
+    return True
+
 # Connection pool for persistent connections
 _cpanel_sessions = {}
 _email_connections = {}
+
+
+def _smtp_connection_mode(smtp_port, use_tls=True):
+    """Return how to connect: ssl (SMTPS), starttls, or plain.
+
+    cPanel and most hosts use port 465 for implicit SSL/TLS (SMTPS), and
+    port 587 for STARTTLS. The notifications UI label "Use TLS" maps to
+    encrypted transport — port 465 always uses SSL regardless.
+    """
+    port = int(smtp_port or 587)
+    encrypted = bool(use_tls) if use_tls is not None else True
+    if port == 465:
+        return 'ssl'
+    if encrypted:
+        return 'starttls'
+    return 'plain'
+
+
+def _connect_smtp_server(smtp_host, smtp_port, email_address, password, use_tls=True, timeout=30):
+    """Open an authenticated SMTP connection using the correct TLS mode."""
+    host = str(smtp_host or '').strip()
+    port = int(smtp_port or 587)
+    email_address = str(email_address or '').strip()
+    password = str(password or '')
+    mode = _smtp_connection_mode(port, use_tls)
+
+    if mode == 'ssl':
+        server = smtplib.SMTP_SSL(host, port, timeout=timeout)
+    else:
+        server = smtplib.SMTP(host, port, timeout=timeout)
+        if mode == 'starttls':
+            server.starttls()
+    server.login(email_address, password)
+    return server
+
+
+def _test_smtp_connection(smtp_host, smtp_port, email_address, password, use_tls=True):
+    """Verify SMTP login; returns (success, message)."""
+    try:
+        server = _connect_smtp_server(smtp_host, smtp_port, email_address, password, use_tls)
+        server.quit()
+        port = int(smtp_port or 587)
+        mode = _smtp_connection_mode(port, use_tls)
+        mode_label = {'ssl': 'SSL/TLS (SMTPS)', 'starttls': 'STARTTLS', 'plain': 'unencrypted'}[mode]
+        return True, f'SMTP connection successful via {mode_label} on port {port}.'
+    except Exception as exc:
+        port = int(smtp_port or 587)
+        mode = _smtp_connection_mode(port, use_tls)
+        hint = ''
+        if port == 465 and mode != 'ssl':
+            hint = ' Port 465 requires SSL — save settings and try again.'
+        elif port == 587 and 'WRONG_VERSION_NUMBER' in str(exc).upper():
+            hint = ' Try port 465 with SSL, or port 587 with STARTTLS.'
+        return False, f'SMTP connection failed: {exc}.{hint}'
+
 
 def get_cpanel_session(api_token, domain, user, api_port):
     """Get or create a persistent cPanel API session"""
@@ -19947,12 +21839,7 @@ def get_email_connection(email_address, password, smtp_host, smtp_port, use_tls,
     
     if conn_key not in _email_connections:
         if connection_type == 'smtp':
-            if use_tls:
-                server = smtplib.SMTP(smtp_host, smtp_port)
-                server.starttls()
-            else:
-                server = smtplib.SMTP_SSL(smtp_host, smtp_port)
-            server.login(email_address, password)
+            server = _connect_smtp_server(smtp_host, smtp_port, email_address, password, use_tls)
             _email_connections[conn_key] = {
                 'connection': server,
                 'type': 'smtp',
@@ -20625,39 +22512,39 @@ def api_save_email_settings():
 
 @app.route('/api/email/test-connection', methods=['POST'])
 def api_test_email_connection():
-    """Test email connection"""
+    """Test email connection (uses request body fields when provided, else saved settings)."""
     if 'employee_id' not in session:
         return jsonify({'success': False, 'error': 'Not authenticated'}), 401
-    
+
     try:
-        email_settings = get_email_settings()
-        
-        if not email_settings:
-            return jsonify({'success': False, 'error': 'Email settings not configured'}), 400
-        
-        # Test SMTP connection
-        try:
-            # Handle boolean values (may be 0/1 from database)
-            use_tls = bool(email_settings.get('smtp_use_tls', True))
-            smtp_host = email_settings.get('smtp_host', 'mail.baunilawgroup.com')
-            smtp_port = int(email_settings.get('smtp_port', 587))
-            main_email = email_settings.get('main_email', '')
-            main_password = email_settings.get('main_email_password', '')
-            
-            if not main_email or not main_password:
-                return jsonify({'success': False, 'error': 'Main email and password must be configured'}), 400
-            
-            if use_tls:
-                server = smtplib.SMTP(smtp_host, smtp_port)
-                server.starttls()
-            else:
-                server = smtplib.SMTP_SSL(smtp_host, smtp_port)
-            
-            server.login(main_email, main_password)
-            server.quit()
-            return jsonify({'success': True, 'message': 'SMTP connection successful'})
-        except Exception as e:
-            return jsonify({'success': False, 'error': f'SMTP connection failed: {str(e)}'}), 400
+        data = request.get_json(silent=True) or {}
+        email_settings = get_email_settings() or {}
+
+        smtp_host = (data.get('smtp_host') or email_settings.get('smtp_host') or '').strip()
+        smtp_port = int(data.get('smtp_port') or email_settings.get('smtp_port') or 587)
+        main_email = (data.get('main_email') or email_settings.get('main_email') or '').strip()
+        main_password = (data.get('main_email_password') or '').strip()
+        if not main_password:
+            main_password = (email_settings.get('main_email_password') or '')
+
+        use_tls_raw = data.get('smtp_use_tls', email_settings.get('smtp_use_tls', True))
+        if isinstance(use_tls_raw, str):
+            use_tls = use_tls_raw.lower() in ('true', '1', 'on', 'yes')
+        else:
+            use_tls = bool(use_tls_raw) if use_tls_raw is not None else True
+
+        if not smtp_host:
+            return jsonify({'success': False, 'error': 'SMTP host is required'}), 400
+        if not main_email or not main_password:
+            return jsonify({
+                'success': False,
+                'error': 'Email address and password are required. Enter the password in the form, then test (or save first).'
+            }), 400
+
+        ok, message = _test_smtp_connection(smtp_host, smtp_port, main_email, main_password, use_tls)
+        if ok:
+            return jsonify({'success': True, 'message': message})
+        return jsonify({'success': False, 'error': message}), 400
     except Exception as e:
         import traceback
         print(f"Error in test-connection: {traceback.format_exc()}")
@@ -21396,13 +23283,32 @@ def system_settings_section(section):
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    return render_template(
-        'system_settings_page.html',
+    template_kwargs = dict(
         company_settings=company_settings,
         settings_section_key=section,
         section_meta=SYSTEM_SETTINGS_SECTIONS[section],
         page_group='company',
     )
+    if section == 'notifications':
+        push_status = _push_key_storage_status()
+        es = get_email_settings()
+        ss = get_sms_settings()
+        ws = get_whatsapp_settings()
+        template_kwargs.update(
+            email_settings=es,
+            sms_settings=ss,
+            whatsapp_settings=ws,
+            push_configured=push_status['configured'],
+            push_public_key=_vapid_public_key_b64(),
+            push_key_source=push_status['source'],
+            push_key_note=push_status['note'],
+            push_has_env_keys=push_status['has_environment'],
+            app_base_url=APP_BASE_URL or request.url_root.rstrip('/'),
+            email_configured=_notification_email_configured(es),
+            sms_configured=_notification_sms_configured(ss),
+            whatsapp_configured=_notification_whatsapp_configured(ws),
+        )
+    return render_template('system_settings_page.html', **template_kwargs)
 
 
 @app.route('/system_settings/letterhead')
@@ -22024,8 +23930,37 @@ def update_company_settings():
                 wd = request.form.getlist('working_days')
                 updates['working_days'] = ','.join(wd) if wd else ''
             if settings_section == 'notifications':
-                for key in ['send_email_notifications', 'send_sms_notifications', 'whatsapp_notifications', 'court_date_reminders']:
+                for key in [
+                    'send_email_notifications', 'send_sms_notifications', 'whatsapp_notifications',
+                    'court_date_reminders', 'browser_push_notifications',
+                ]:
                     updates[key] = 1 if request.form.get(key) == 'on' else 0
+                days_raw = (request.form.get('court_reminder_days_ahead') or '').strip()
+                if days_raw.isdigit():
+                    updates['court_reminder_days_ahead'] = max(1, min(90, int(days_raw)))
+                vapid_pub = (request.form.get('vapid_public_key') or '').strip()
+                vapid_priv = (request.form.get('vapid_private_key') or '').strip()
+                vapid_email = (request.form.get('vapid_claims_email') or '').strip()
+                push_origin = (request.form.get('push_app_origin') or '').strip()
+                if vapid_pub:
+                    updates['vapid_public_key'] = vapid_pub
+                if vapid_priv:
+                    updates['vapid_private_key'] = vapid_priv
+                if vapid_email:
+                    updates['vapid_claims_email'] = vapid_email
+                if push_origin:
+                    updates['push_app_origin'] = push_origin.rstrip('/')
+                try:
+                    gateway_messages, gateway_errors = _save_notification_gateways_from_form(request.form, connection)
+                    for msg in gateway_messages:
+                        flash(msg, 'success')
+                    for err in gateway_errors:
+                        flash(err, 'error')
+                except Exception as gateway_err:
+                    print(f"Error saving notification gateway settings: {gateway_err}")
+                    flash('Some notification gateway settings could not be saved.', 'error')
+                if vapid_pub or vapid_priv:
+                    _reset_vapid_cache()
             if settings_section == 'documents':
                 for col in DOCUMENT_ASSET_COLUMNS:
                     if request.form.get(f'remove_{col}') == '1':
@@ -22220,6 +24155,19 @@ def matter_task_management():
                         session.get('employee_name') or 'Unknown'
                     ))
                     connection.commit()
+                    task_id = cursor.lastrowid
+                    try:
+                        cursor.execute(
+                            "SELECT matter_reference_number, matter_title FROM matters WHERE id = %s",
+                            (int(linked_matter_id),),
+                        )
+                        matter_row = cursor.fetchone() or {}
+                        ref = f"{matter_row.get('matter_reference_number') or '-'} - {matter_row.get('matter_title') or 'Matter'}"
+                        _notify_task_assigned_push(
+                            assigned_employee_id, task_title, 'matter', ref, task_id=task_id
+                        )
+                    except Exception as push_exc:
+                        print(f"[push] matter task create notify error: {push_exc}")
                     flash('Matter task created successfully.', 'success')
                     return redirect(url_for('matter_task_management'))
 
@@ -24059,97 +26007,12 @@ def inject_my_task_badge():
         try:
             with connection.cursor(pymysql.cursors.DictCursor) as cursor:
                 ensure_task_management_table(cursor, connection)
-
-                # Match "My Tasks" visibility, but only count active work items.
-                cursor.execute("""
-                    SELECT COUNT(*) AS cnt
-                    FROM task_management t
-                    LEFT JOIN cases c
-                        ON t.task_type = 'case' AND t.linked_id = c.id
-                    LEFT JOIN matters m
-                        ON t.task_type = 'matter' AND t.linked_id = m.id
-                    WHERE
-                        t.task_status IN ('Pending', 'Received', 'In Progress')
-                        AND (
-                            (t.task_type = 'case' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND c.filled_by_id = %s)))
-                            OR
-                            (t.task_type = 'matter' AND ((t.assigned_to_id IS NOT NULL AND t.assigned_to_id = %s) OR (t.assigned_to_id IS NULL AND m.assigned_employee_id = %s)))
-                        )
-                """, (employee_id, employee_id, employee_id, employee_id))
-                base_cnt_row = cursor.fetchone() or {}
-                base_cnt = int(base_cnt_row.get('cnt') or 0)
-
-                # Session allocations (court-session materials) are always actionable in My Tasks.
-                session_cnt = 0
-                try:
-                    cursor.execute("""
-                        SELECT COUNT(*) AS cnt
-                        FROM case_proceeding_materials m
-                        WHERE m.allocated_to_id = %s
-                    """, (employee_id,))
-                    session_cnt_row = cursor.fetchone() or {}
-                    session_cnt = int(session_cnt_row.get('cnt') or 0)
-                except Exception:
-                    session_cnt = 0
-
-                calendar_cnt = 0
-                try:
-                    from datetime import date, timedelta
-                    start_date = date.today()
-                    end_date = start_date + timedelta(days=14)
-                    cursor.execute("""
-                        SELECT COUNT(*) AS cnt
-                        FROM case_proceedings p
-                        INNER JOIN cases c ON c.id = p.case_id
-                        WHERE p.next_court_date IS NOT NULL
-                          AND p.next_court_date >= %s
-                          AND p.next_court_date <= %s
-                          AND c.filled_by_id = %s
-                    """, (start_date, end_date, employee_id))
-                    calendar_cnt_row = cursor.fetchone() or {}
-                    calendar_cnt = int(calendar_cnt_row.get('cnt') or 0)
-                except Exception:
-                    calendar_cnt = 0
-
-                approve_matters_badge_count = 0
-                can_approve_matters = (
-                    user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
-                ) or (original_role == 'IT Support')
-                if can_approve_matters:
-                    try:
-                        cursor.execute("""
-                            SELECT COUNT(*) AS cnt
-                            FROM matters
-                            WHERE status = 'Pending Approval'
-                        """)
-                        row = cursor.fetchone() or {}
-                        approve_matters_badge_count = int(row.get('cnt') or 0)
-                    except Exception:
-                        approve_matters_badge_count = 0
-
-                approve_cases_badge_count = 0
-                can_approve_cases = (
-                    user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
-                ) or (original_role == 'IT Support')
-                if can_approve_cases:
-                    try:
-                        cursor.execute("""
-                            SELECT COUNT(*) AS cnt
-                            FROM cases
-                            WHERE status = 'Pending Approval'
-                        """)
-                        row = cursor.fetchone() or {}
-                        approve_cases_badge_count = int(row.get('cnt') or 0)
-                    except Exception:
-                        approve_cases_badge_count = 0
-
-                my_task_badge_count = base_cnt + session_cnt
-                return {
-                    'my_task_badge_count': my_task_badge_count,
-                    'notification_badge_count': my_task_badge_count + calendar_cnt,
-                    'approve_matters_badge_count': approve_matters_badge_count,
-                    'approve_cases_badge_count': approve_cases_badge_count
-                }
+                return _compute_employee_badge_counts(
+                    cursor,
+                    employee_id,
+                    user_role,
+                    original_role,
+                )
         finally:
             connection.close()
     except Exception:
@@ -24174,6 +26037,11 @@ try:
     init_database()
 except Exception as e:
     print(f"[WARNING] Database initialization failed (may be first run or DB not configured): {e}")
+
+try:
+    start_push_notification_worker()
+except Exception as e:
+    print(f"[WARNING] Push notification worker failed to start: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

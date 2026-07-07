@@ -20,7 +20,7 @@
         </p>
     </div>
 
-    <form action="{{ url_for('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6">
+    <form action="{{ role_url('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6" id="systemSettingsForm">
         <input type="hidden" name="settings_section" value="{{ settings_section_key }}">
         {% include 'system_settings/sections/' + settings_section_key + '.html' %}
         <div class="flex justify-end pb-8">
@@ -39,5 +39,8 @@
 {% endif %}
 {% if settings_section_key == 'documents' %}
 {% include 'system_settings/_document_assets.html' %}
+{% endif %}
+{% if settings_section_key == 'notifications' %}
+{% include 'system_settings/_notification_settings.html' %}
 {% endif %}
 {% endblock %}

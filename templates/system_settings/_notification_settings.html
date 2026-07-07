@@ -1,0 +1,307 @@
+<script>
+(function () {
+    function showResult(el, message, ok) {
+        if (!el) return;
+        el.textContent = message;
+        el.classList.remove('hidden', 'text-green-700', 'text-red-700');
+        el.classList.add(ok ? 'text-green-700' : 'text-red-700');
+    }
+
+    function setBadge(badgeEl, textEl, configured, okText) {
+        if (!badgeEl || !textEl) return;
+        badgeEl.classList.remove('bg-green-100', 'text-green-800', 'bg-amber-100', 'text-amber-800');
+        var icon = badgeEl.querySelector('i');
+        if (configured) {
+            badgeEl.classList.add('bg-green-100', 'text-green-800');
+            if (icon) icon.className = 'fas fa-check-circle mr-1';
+            textEl.textContent = okText;
+        } else {
+            badgeEl.classList.add('bg-amber-100', 'text-amber-800');
+            if (icon) icon.className = 'fas fa-exclamation-circle mr-1';
+            textEl.textContent = 'Not configured';
+        }
+    }
+
+    function updateEmailConfiguredBadge() {
+        var form = document.getElementById('systemSettingsForm');
+        if (!form) return;
+        var email = (form.querySelector('[name="notify_main_email"]') || {}).value || '';
+        var host = (form.querySelector('[name="notify_smtp_host"]') || {}).value || '';
+        var pass = (form.querySelector('[name="notify_main_email_password"]') || {}).value || '';
+        var badge = document.getElementById('emailConfigBadge');
+        var text = document.getElementById('emailConfigBadgeText');
+        var saved = badge && badge.dataset.saved === '1';
+        var configured = email.trim() && host.trim() && (pass || saved);
+        setBadge(badge, text, configured, 'SMTP configured');
+    }
+
+    function updateSmsConfiguredBadge() {
+        var form = document.getElementById('systemSettingsForm');
+        if (!form) return;
+        var provider = (form.querySelector('[name="sms_provider"]') || {}).value || '';
+        var apiKey = (form.querySelector('[name="sms_api_key"]') || {}).value || '';
+        var badge = document.getElementById('smsConfigBadge');
+        var text = document.getElementById('smsConfigBadgeText');
+        var saved = badge && badge.dataset.saved === '1';
+        var configured = provider && (apiKey || saved);
+        var label = provider ? provider.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : 'Configured';
+        setBadge(badge, text, configured, label);
+    }
+
+    function updateWaConfiguredBadge() {
+        var form = document.getElementById('systemSettingsForm');
+        if (!form) return;
+        var token = (form.querySelector('[name="wa_access_token"]') || {}).value || '';
+        var phoneId = (form.querySelector('[name="wa_phone_number_id"]') || {}).value || '';
+        var verify = (form.querySelector('[name="wa_verify_token"]') || {}).value || '';
+        var badge = document.getElementById('waConfigBadge');
+        var text = document.getElementById('waConfigBadgeText');
+        var saved = badge && badge.dataset.saved === '1';
+        var configured = phoneId.trim() && verify.trim() && (token || saved);
+        setBadge(badge, text, configured, 'Connected');
+    }
+
+    function refreshConfiguredBadges() {
+        updateEmailConfiguredBadge();
+        updateSmsConfiguredBadge();
+        updateWaConfiguredBadge();
+    }
+
+    document.addEventListener('input', function (e) {
+        if (!e.target || !e.target.name) return;
+        if (e.target.name.indexOf('notify_') === 0) updateEmailConfiguredBadge();
+        if (e.target.name.indexOf('sms_') === 0) updateSmsConfiguredBadge();
+        if (e.target.name.indexOf('wa_') === 0) updateWaConfiguredBadge();
+    });
+    document.addEventListener('change', function (e) {
+        if (!e.target || !e.target.name) return;
+        if (e.target.name.indexOf('sms_') === 0) updateSmsConfiguredBadge();
+    });
+    refreshConfiguredBadges();
+
+    async function fetchJson(url, options) {
+        const opts = options || {};
+        const headers = Object.assign({ Accept: 'application/json' }, opts.headers || {});
+        if (opts.body && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+        const res = await fetch(url, {
+            method: opts.method || 'GET',
+            credentials: 'same-origin',
+            headers: headers,
+            body: opts.body,
+        });
+        const text = await res.text();
+        let data = null;
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
+        if (text && (contentType.includes('json') || text.trim().startsWith('{'))) {
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                data = null;
+            }
+        }
+        if (!data) {
+            const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 100);
+            if (res.status === 401) {
+                throw new Error('Your session expired. Refresh the page and log in again.');
+            }
+            if (snippet.toLowerCase().startsWith('<!doctype') || snippet.startsWith('<html')) {
+                throw new Error('Server returned a web page instead of data. Refresh and try again.');
+            }
+            throw new Error(snippet || 'Request failed (' + res.status + ')');
+        }
+        if (!res.ok) {
+            throw new Error(data.error || data.message || 'Request failed (' + res.status + ')');
+        }
+        return data;
+    }
+
+    function toggleSmsFields() {
+        var provider = document.getElementById('sms_provider');
+        var customGroup = document.getElementById('sms_custom_url_group');
+        var usernameGroup = document.getElementById('sms_username_group');
+        if (!provider) return;
+        var val = provider.value;
+        if (customGroup) customGroup.classList.toggle('hidden', val !== 'custom');
+        if (usernameGroup) usernameGroup.classList.toggle('hidden', val === 'twilio' || val === 'vonage' || val === '');
+    }
+
+    toggleSmsFields();
+    var smsProvider = document.getElementById('sms_provider');
+    if (smsProvider) smsProvider.addEventListener('change', toggleSmsFields);
+
+    var browserPushToggle = document.getElementById('browser_push_notifications');
+    var browserPushLabel = document.getElementById('browser-push-toggle-label');
+    if (browserPushToggle && browserPushLabel) {
+        browserPushToggle.addEventListener('change', function () {
+            browserPushLabel.textContent = browserPushToggle.checked ? 'On' : 'Off';
+        });
+    }
+
+    var btnEmail = document.getElementById('btnTestEmail');
+    if (btnEmail) {
+        btnEmail.addEventListener('click', async function () {
+            var resultEl = document.getElementById('emailTestResult');
+            var form = document.getElementById('systemSettingsForm');
+            var payload = {
+                main_email: form && form.querySelector('[name="notify_main_email"]') ? form.querySelector('[name="notify_main_email"]').value.trim() : '',
+                main_email_password: form && form.querySelector('[name="notify_main_email_password"]') ? form.querySelector('[name="notify_main_email_password"]').value : '',
+                smtp_host: form && form.querySelector('[name="notify_smtp_host"]') ? form.querySelector('[name="notify_smtp_host"]').value.trim() : '',
+                smtp_port: form && form.querySelector('[name="notify_smtp_port"]') ? form.querySelector('[name="notify_smtp_port"]').value : 587,
+                smtp_use_tls: form && form.querySelector('[name="notify_smtp_use_tls"]') ? form.querySelector('[name="notify_smtp_use_tls"]').value : 'true'
+            };
+            if (!payload.main_email || !payload.smtp_host) {
+                showResult(resultEl, 'Enter the from email and SMTP host first.', false);
+                return;
+            }
+            if (!payload.main_email_password) {
+                showResult(resultEl, 'Enter the email password to test (or save settings first if already stored).', false);
+                return;
+            }
+            btnEmail.disabled = true;
+            showResult(resultEl, 'Testing SMTP connection...', true);
+            try {
+                const data = await fetchJson('/api/email/test-connection', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                showResult(resultEl, data.message || data.error || 'Done', !!data.success);
+            } catch (err) {
+                showResult(resultEl, err.message || 'Connection test failed.', false);
+            } finally {
+                btnEmail.disabled = false;
+            }
+        });
+    }
+
+    var btnSms = document.getElementById('btnTestSms');
+    if (btnSms) {
+        btnSms.addEventListener('click', async function () {
+            var phone = (document.getElementById('sms_test_phone') || {}).value || '';
+            var resultEl = document.getElementById('smsTestResult');
+            if (!phone.trim()) {
+                showResult(resultEl, 'Enter a test phone number first.', false);
+                return;
+            }
+            btnSms.disabled = true;
+            showResult(resultEl, 'Sending test SMS...', true);
+            try {
+                const data = await fetchJson('/api/sms/send-direct', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        phone: phone.trim(),
+                        message: 'Test SMS from SHERIA CENTRIC notification settings.'
+                    })
+                });
+                showResult(resultEl, data.message || data.error || 'Done', !!data.success);
+            } catch (err) {
+                showResult(resultEl, err.message || 'SMS test failed.', false);
+            } finally {
+                btnSms.disabled = false;
+            }
+        });
+    }
+
+    var btnWa = document.getElementById('btnTestWhatsApp');
+    if (btnWa) {
+        btnWa.addEventListener('click', async function () {
+            var phone = (document.getElementById('wa_test_phone') || {}).value || '';
+            var resultEl = document.getElementById('waTestResult');
+            if (!phone.trim()) {
+                showResult(resultEl, 'Enter a test phone number first.', false);
+                return;
+            }
+            btnWa.disabled = true;
+            showResult(resultEl, 'Sending test WhatsApp message...', true);
+            try {
+                const data = await fetchJson('/api/whatsapp/test', {
+                    method: 'POST',
+                    body: JSON.stringify({ test_phone: phone.trim() })
+                });
+                showResult(resultEl, data.message || data.error || 'Done', !!data.success);
+            } catch (err) {
+                showResult(resultEl, err.message || 'WhatsApp test failed.', false);
+            } finally {
+                btnWa.disabled = false;
+            }
+        });
+    }
+
+    var pushResult = document.getElementById('pushAdminResult');
+    var publicKeyInput = document.getElementById('vapid_public_key');
+    var privateKeyInput = document.getElementById('vapid_private_key');
+    var keySourceNote = document.getElementById('push-key-source-note');
+
+    function applyGeneratedKeys(data) {
+        if (publicKeyInput && data.publicKey) {
+            publicKeyInput.value = data.publicKey;
+        }
+        if (privateKeyInput && data.privateKey) {
+            privateKeyInput.value = data.privateKey;
+        }
+        if (keySourceNote) {
+            keySourceNote.textContent = 'Keys ready to use. Click Save Settings to persist any manual edits.';
+        }
+    }
+
+    var btnGenerate = document.getElementById('btnGenerateVapidKeys');
+    if (btnGenerate) {
+        btnGenerate.addEventListener('click', async function () {
+            if (!window.confirm('Generate a new VAPID key pair? Existing device subscriptions may stop working until employees re-enable alerts.')) {
+                return;
+            }
+            btnGenerate.disabled = true;
+            showResult(pushResult, 'Generating VAPID keys...', true);
+            try {
+                const data = await fetchJson('/api/push/admin/generate-keys', { method: 'POST', body: '{}' });
+                applyGeneratedKeys(data);
+                showResult(pushResult, data.message || 'VAPID keys generated.', true);
+            } catch (err) {
+                showResult(pushResult, err.message || 'Could not generate keys.', false);
+            } finally {
+                btnGenerate.disabled = false;
+            }
+        });
+    }
+
+    var btnImport = document.getElementById('btnImportEnvVapidKeys');
+    if (btnImport) {
+        btnImport.addEventListener('click', async function () {
+            btnImport.disabled = true;
+            showResult(pushResult, 'Importing keys from server environment...', true);
+            try {
+                const data = await fetchJson('/api/push/admin/import-env-keys', { method: 'POST', body: '{}' });
+                applyGeneratedKeys(data);
+                showResult(pushResult, data.message || 'Keys imported.', true);
+            } catch (err) {
+                showResult(pushResult, err.message || 'Could not import keys.', false);
+            } finally {
+                btnImport.disabled = false;
+            }
+        });
+    }
+
+    var btnValidate = document.getElementById('btnValidateVapidKeys');
+    if (btnValidate) {
+        btnValidate.addEventListener('click', async function () {
+            btnValidate.disabled = true;
+            showResult(pushResult, 'Validating VAPID configuration...', true);
+            try {
+                const data = await fetchJson('/api/push/admin/validate-config', { method: 'POST', body: '{}' });
+                if (data.publicKey && publicKeyInput && !publicKeyInput.value.trim()) {
+                    publicKeyInput.value = data.publicKey;
+                }
+                if (data.storage && keySourceNote) {
+                    keySourceNote.textContent = data.storage.note || data.message;
+                }
+                showResult(pushResult, data.message || 'VAPID keys are valid.', true);
+            } catch (err) {
+                showResult(pushResult, err.message || 'VAPID validation failed.', false);
+            } finally {
+                btnValidate.disabled = false;
+            }
+        });
+    }
+})();
+</script>

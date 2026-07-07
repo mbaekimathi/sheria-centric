@@ -16,6 +16,19 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-weight: 700;
     }
+    .reg-doc-item { border: 1px solid #f1f5f9; border-radius: 0.75rem; overflow: hidden; background: #fff; }
+    .reg-doc-item + .reg-doc-item { margin-top: 0.5rem; }
+    .reg-doc-header {
+        width: 100%; display: flex; align-items: center; justify-content: gap-3;
+        padding: 0.875rem 1rem; text-align: left; cursor: pointer;
+        background: #f8fafc; transition: background-color 0.15s ease;
+    }
+    .reg-doc-header:hover { background: #ecfdf5; }
+    .reg-doc-item.open > .reg-doc-header { background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%); border-bottom: 1px solid #a7f3d0; }
+    .reg-doc-chevron { transition: transform 0.18s ease; color: #94a3b8; flex-shrink: 0; }
+    .reg-doc-item.open > .reg-doc-header .reg-doc-chevron { transform: rotate(90deg); color: #059669; }
+    .reg-doc-body { display: none; padding: 1rem; border-top: 1px solid #f1f5f9; background: #fff; }
+    .reg-doc-item.open > .reg-doc-body { display: block; }
 </style>
 {% endblock %}
 
@@ -90,35 +103,51 @@
 
     {% if personal_uploads is defined and personal_uploads|length > 0 %}
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <i class="fas fa-id-card text-emerald-600 mr-3"></i>
-            Registration Documents
-            <span class="ml-3 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">{{ personal_uploads|length }}</span>
-        </h2>
-        <div class="space-y-2">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <h2 class="text-xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-id-card text-emerald-600 mr-3"></i>
+                Registration Documents
+                <span class="ml-3 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">{{ personal_uploads|length }}</span>
+            </h2>
+            <p class="text-xs text-gray-500 sm:text-right">Click a document to view details and actions</p>
+        </div>
+        <div id="reg-doc-list">
             {% for upload in personal_uploads %}
-            <div class="doc-row flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-gray-100">
-                <div class="flex items-center gap-3 min-w-0">
-                    <i class="fas {{ upload.icon }} text-indigo-600"></i>
-                    <div class="min-w-0">
-                        <p class="text-sm font-semibold text-gray-900">{{ upload.label }}</p>
-                        <p class="text-xs text-gray-500 truncate">{{ upload.filename }} &middot; {{ upload.size_display }}</p>
+            <div class="reg-doc-item" data-reg-doc>
+                <button type="button" class="reg-doc-header" aria-expanded="false" onclick="toggleRegDocItem(this)">
+                    <i class="fas fa-chevron-right text-xs reg-doc-chevron"></i>
+                    <i class="fas {{ upload.icon }} text-emerald-600"></i>
+                    <span class="text-sm font-semibold text-gray-900 flex-1 min-w-0 truncate">{{ upload.label }}</span>
+                    <span class="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">View details</span>
+                </button>
+                <div class="reg-doc-body">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">File details</p>
+                            <p class="text-sm font-medium text-gray-900 truncate" title="{{ upload.filename }}">{{ upload.filename }}</p>
+                            <p class="text-xs text-gray-500 mt-0.5">Size: {{ upload.size_display }}</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+                            <a href="{{ upload.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-eye mr-1.5"></i>View
+                            </a>
+                            <button type="button"
+                                    onclick="openDocVerifyModal('download', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
+                                    class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-download mr-1.5"></i>Download
+                            </button>
+                            <button type="button"
+                                    onclick="openDocVerifyModal('edit', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
+                                    class="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-edit mr-1.5"></i>Edit
+                            </button>
+                            <button type="button"
+                                    onclick="openDocVerifyModal('delete', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
+                                    class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-trash mr-1.5"></i>Delete
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div class="flex items-center gap-2 flex-shrink-0">
-                    <a href="{{ upload.url }}" target="_blank" class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-xs font-semibold inline-flex items-center">
-                        <i class="fas fa-eye mr-1.5"></i>View
-                    </a>
-                    <button type="button"
-                            onclick="openDocVerifyModal('download', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
-                            class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
-                        <i class="fas fa-download mr-1.5"></i>Download
-                    </button>
-                    <button type="button"
-                            onclick="openDocVerifyModal('delete', 'legacy', { field: '{{ upload.field }}', label: {{ upload.label|tojson }} })"
-                            class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
-                        <i class="fas fa-trash mr-1.5"></i>Delete
-                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -151,6 +180,11 @@
                             onclick="openDocVerifyModal('download', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
                             class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
                         <i class="fas fa-download mr-1.5"></i>Download
+                    </button>
+                    <button type="button"
+                            onclick="openDocVerifyModal('edit', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
+                            class="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center">
+                        <i class="fas fa-edit mr-1.5"></i>Edit
                     </button>
                     <button type="button"
                             onclick="openDocVerifyModal('delete', 'custom', { doc_id: {{ upload.id }}, label: {{ upload.label|tojson }} })"
@@ -221,6 +255,13 @@
                                     class="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-semibold inline-flex items-center">
                                 <i class="fas fa-download mr-1.5"></i>Download
                             </button>
+                            {% if node.edit_url %}
+                            <button type="button"
+                                    onclick="openDocVerifyModal('edit', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }}, edit_url: {{ node.edit_url|tojson }} })"
+                                    class="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-semibold inline-flex items-center">
+                                <i class="fas fa-edit mr-1.5"></i>Edit
+                            </button>
+                            {% endif %}
                             <button type="button"
                                     onclick="openDocVerifyModal('delete', 'drive', { drive_file_id: '{{ node.id }}', label: {{ node.name|tojson }} })"
                                     class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-semibold inline-flex items-center">
@@ -237,7 +278,7 @@
     </div>
 </div>
 
-<!-- Email verification modal for download/delete -->
+<!-- Email verification modal for download/edit/delete -->
 <div id="docVerifyModal" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-black/50" onclick="closeDocVerifyModal()"></div>
     <div class="flex items-center justify-center min-h-screen p-4">
@@ -278,9 +319,56 @@
         </div>
     </div>
 </div>
+
+<!-- Replace document modal (after verification) -->
+<div id="docEditReplaceModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeDocEditReplaceModal()"></div>
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative z-10">
+            <div class="bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white flex items-center">
+                    <i class="fas fa-edit mr-2"></i>Replace Document
+                </h3>
+                <button type="button" onclick="closeDocEditReplaceModal()" class="text-white hover:text-amber-200">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-gray-600">Replacing:</p>
+                <p class="text-sm font-bold text-gray-900 truncate" id="docEditReplaceName"></p>
+                <div id="docEditReplaceError" class="hidden p-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-700"></div>
+                <label class="block text-sm font-semibold text-gray-700" for="docEditReplaceFile">New file</label>
+                <input type="file" id="docEditReplaceFile" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm">
+            </div>
+            <div class="px-6 py-4 bg-gray-50 rounded-b-2xl flex items-center justify-end gap-3">
+                <button type="button" onclick="closeDocEditReplaceModal()" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 text-sm font-semibold">Cancel</button>
+                <button type="button" onclick="submitDocEditReplace()" id="docEditReplaceBtn" class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl hover:from-amber-600 hover:to-orange-600 text-sm font-bold flex items-center">
+                    <i class="fas fa-check mr-2"></i>Replace
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script>
+function toggleRegDocItem(headerBtn) {
+    var item = headerBtn.closest('.reg-doc-item');
+    if (!item) return;
+    var isOpen = item.classList.contains('open');
+    document.querySelectorAll('.reg-doc-item.open').forEach(function (el) {
+        el.classList.remove('open');
+        var btn = el.querySelector('.reg-doc-header');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+    if (!isOpen) {
+        item.classList.add('open');
+        headerBtn.setAttribute('aria-expanded', 'true');
+    }
+}
+</script>
 <script>
 (function () {
     const CLIENT_ID = {{ client_id }};
@@ -288,6 +376,7 @@
 
     let pendingDocAction = null;
     let codeSent = false;
+    let pendingEditContext = null;
 
     function buildActionPayload() {
         if (!pendingDocAction) return null;
@@ -326,18 +415,32 @@
             field: opts.field || null,
             docId: opts.doc_id != null ? opts.doc_id : null,
             driveFileId: opts.drive_file_id || null,
+            editUrl: opts.edit_url || null,
             label: opts.label || 'Document',
         };
         codeSent = false;
+        pendingEditContext = null;
 
         const isDelete = action === 'delete';
+        const isEdit = action === 'edit';
+        let title = 'Verify to download';
+        let actionText = 'download';
+        let confirmLabel = 'Download';
+        if (isDelete) {
+            title = 'Verify to delete';
+            actionText = 'permanently delete';
+            confirmLabel = 'Delete';
+        } else if (isEdit) {
+            title = 'Verify to edit';
+            actionText = 'edit or replace';
+            confirmLabel = 'Continue';
+        }
         document.getElementById('docVerifyTitle').innerHTML =
-            '<i class="fas fa-shield-alt mr-2"></i>' + (isDelete ? 'Verify to delete' : 'Verify to download');
+            '<i class="fas fa-shield-alt mr-2"></i>' + title;
         document.getElementById('docVerifyActionText').textContent =
-            'A verification code will be sent to your registered email. Enter it below to ' +
-            (isDelete ? 'permanently delete' : 'download') + ':';
+            'A verification code will be sent to your registered email. Enter it below to ' + actionText + ':';
         document.getElementById('docVerifyDocName').textContent = pendingDocAction.label;
-        document.getElementById('docVerifyConfirmLabel').textContent = isDelete ? 'Delete' : 'Download';
+        document.getElementById('docVerifyConfirmLabel').textContent = confirmLabel;
         document.getElementById('docVerifyCode').value = '';
         document.getElementById('docVerifySendStatus').classList.add('hidden');
         clearVerifyError();
@@ -357,6 +460,86 @@
         document.body.style.overflow = '';
         pendingDocAction = null;
         codeSent = false;
+    };
+
+    window.closeDocEditReplaceModal = function () {
+        document.getElementById('docEditReplaceModal').classList.add('hidden');
+        if (!document.getElementById('docVerifyModal').classList.contains('hidden')) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        document.getElementById('docEditReplaceFile').value = '';
+        const errEl = document.getElementById('docEditReplaceError');
+        if (errEl) {
+            errEl.textContent = '';
+            errEl.classList.add('hidden');
+        }
+        pendingEditContext = null;
+    };
+
+    window.openDocEditReplaceModal = function (context) {
+        pendingEditContext = context;
+        document.getElementById('docEditReplaceName').textContent = context.label || '';
+        document.getElementById('docEditReplaceFile').value = '';
+        document.getElementById('docEditReplaceModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.submitDocEditReplace = async function () {
+        if (!pendingEditContext || !pendingEditContext.token) return;
+        const fileInput = document.getElementById('docEditReplaceFile');
+        const errEl = document.getElementById('docEditReplaceError');
+        if (!fileInput || !fileInput.files || !fileInput.files.length) {
+            if (errEl) {
+                errEl.textContent = 'Please select a file to upload.';
+                errEl.classList.remove('hidden');
+            }
+            return;
+        }
+        const btn = document.getElementById('docEditReplaceBtn');
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-60', 'cursor-not-allowed');
+        }
+        if (errEl) errEl.classList.add('hidden');
+
+        const ctx = pendingEditContext;
+        const formData = new FormData();
+        formData.append('token', ctx.token);
+        formData.append('action', 'edit');
+        formData.append('doc_kind', ctx.docKind);
+        if (ctx.field) formData.append('field', ctx.field);
+        if (ctx.docId != null) formData.append('doc_id', String(ctx.docId));
+        formData.append('document_file', fileInput.files[0]);
+
+        try {
+            const res = await fetch(API_BASE + '/update', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                if (errEl) {
+                    errEl.textContent = data.error || 'Replace failed.';
+                    errEl.classList.remove('hidden');
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                }
+                return;
+            }
+            closeDocEditReplaceModal();
+            closeDocVerifyModal();
+            window.location.reload();
+        } catch (e) {
+            if (errEl) {
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.classList.remove('hidden');
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+            }
+        }
     };
 
     window.sendDocVerificationCode = async function () {
@@ -433,6 +616,38 @@
                 if (pendingDocAction.driveFileId) params.set('drive_file_id', pendingDocAction.driveFileId);
                 closeDocVerifyModal();
                 window.location.href = API_BASE + '/download?' + params.toString();
+                return;
+            }
+
+            if (pendingDocAction.action === 'edit') {
+                if (pendingDocAction.docKind === 'drive') {
+                    const openPayload = Object.assign({}, buildActionPayload(), { token: token });
+                    const openRes = await fetch(API_BASE + '/edit-open', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(openPayload),
+                    });
+                    const openData = await openRes.json();
+                    if (!openRes.ok || !openData.success) {
+                        showVerifyError(openData.error || 'Could not open document for editing.');
+                        confirmBtn.disabled = false;
+                        confirmBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+                        return;
+                    }
+                    closeDocVerifyModal();
+                    if (openData.edit_url) {
+                        window.open(openData.edit_url, '_blank', 'noopener,noreferrer');
+                    }
+                    return;
+                }
+                closeDocVerifyModal();
+                openDocEditReplaceModal({
+                    token: token,
+                    docKind: pendingDocAction.docKind,
+                    field: pendingDocAction.field,
+                    docId: pendingDocAction.docId,
+                    label: pendingDocAction.label,
+                });
                 return;
             }
 

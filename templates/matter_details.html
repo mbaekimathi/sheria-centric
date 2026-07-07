@@ -199,6 +199,75 @@
     </div>
     {% endif %}
 
+    <!-- Matter Documents -->
+    {% if not pending_accept %}
+    <div class="matter-card documents-card p-5 sm:p-6 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-folder-open text-amber-600"></i>
+                Matter Documents
+                <span class="text-gray-500 font-normal text-base">({{ documents|length if documents else 0 }})</span>
+            </h2>
+            <a href="{{ url_for('matter_documents', matter_id=matter_id) }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800">Manage documents →</a>
+        </div>
+        {% if not google_drive_connected %}
+        <div class="py-6 text-center rounded-xl bg-amber-50 border border-amber-200">
+            <i class="fab fa-google-drive text-amber-500 text-3xl mb-2"></i>
+            <p class="text-amber-800 font-semibold">Google Drive not connected</p>
+            <p class="text-amber-700 text-sm mt-1">Connect Drive in Documents Settings to view matter documents.</p>
+        </div>
+        {% elif documents and documents|length > 0 %}
+        <div class="space-y-2">
+            {% for doc in documents %}
+            {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
+            <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-100 bg-white hover:border-amber-200 transition-colors">
+                <div class="flex items-center gap-3 min-w-0">
+                    {% if 'pdf' in (doc.mime_type or '') or file_ext == 'pdf' %}
+                    <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
+                    {% elif 'word' in (doc.mime_type or '') or 'document' in (doc.mime_type or '') or file_ext in ['doc', 'docx'] %}
+                    <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
+                    {% else %}
+                    <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
+                    {% endif %}
+                    <div class="min-w-0">
+                        <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
+                        <p class="text-xs text-gray-500">Size: {{ doc.size or '—' }} · Uploaded: {{ doc.created_time or '—' }}</p>
+                    </div>
+                </div>
+                <div class="flex flex-shrink-0 items-center gap-2">
+                    {% if doc.url %}
+                    <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200 transition-colors"><i class="fas fa-external-link-alt text-xs"></i> View</a>
+                    {% endif %}
+                    <button type="button" onclick="matterDocVerify.open('download', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100 transition-colors"><i class="fas fa-download text-xs"></i> Download</button>
+                    <button type="button" onclick="matterDocVerify.open('delete', {{ doc.id|tojson }}, {{ doc.name|tojson }})" class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100 transition-colors"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="py-8 text-center rounded-xl bg-slate-50 border-2 border-dashed border-slate-200">
+            <i class="fas fa-folder-open text-slate-300 text-4xl mb-3 block"></i>
+            <p class="font-semibold text-gray-700 mb-1">No documents linked to this matter</p>
+            <p class="text-gray-500 text-sm">Upload documents from the Matter Documents page.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% include '_document_action_verify_modal.html' %}
+    <script src="{{ url_for('static', filename='document-action-verify.js') }}"></script>
+    <script>
+    const matterId = {{ matter_id }};
+    const matterDocVerify = createDocumentActionVerify({
+        apiBase: '/api/matter/' + matterId + '/document',
+        downloadUrlBuilder: function (fileId, token) {
+            return '/other_matters/' + matterId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
+        },
+        deleteUrlBuilder: function (fileId) {
+            return '/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete';
+        }
+    });
+    </script>
+    {% endif %}
+
     {% endif %}
 </div>
 {% endblock %}

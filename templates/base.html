@@ -746,7 +746,7 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body class="min-h-screen antialiased">
+<body class="min-h-screen antialiased" data-live-page="{% if request.endpoint == 'my_tasks' %}my_tasks{% elif request.endpoint == 'notifications' %}notifications{% endif %}"{% if session.get('employee_id') %} data-employee-id="{{ session.get('employee_id') }}"{% endif %}>
     <!-- Header -->
     <header class="app-header glass-effect border-b border-gray-200/50 sticky top-0 z-50 shadow-lg">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -895,11 +895,9 @@
                     {% if session.get('employee_id') %}
                     <a href="{{ url_for('notifications') }}" class="relative inline-flex items-center justify-center w-11 h-11 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 {% if request.endpoint == 'notifications' %}ring-2 ring-emerald-500/40{% endif %}" title="Notifications">
                         <i class="fas fa-bell text-green-700"></i>
-                        {% if notification_badge_count and notification_badge_count > 0 %}
-                        <span class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white">
-                            {{ notification_badge_count }}
+                        <span data-live-badge="notifications" class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white {% if not notification_badge_count or notification_badge_count <= 0 %}hidden{% endif %}">
+                            {{ notification_badge_count or 0 }}
                         </span>
-                        {% endif %}
                     </a>
                     {% endif %}
 
@@ -1319,6 +1317,7 @@
     {% set user_role = session.get('employee_role', 'Employee') %}
     {% set original_role = session.get('original_role') %}
     {% set is_role_switched = original_role and original_role == 'IT Support' and user_role != 'IT Support' %}
+    {% set hide_sidebar_nav_links = request.endpoint == 'system_settings_section' and settings_section_key == 'notifications' %}
     {% if user_role == 'Firm Administrator' %}
         {% set role_class = 'role-admin' %}
         {% set role_color = 'from-purple-600 to-purple-700' %}
@@ -1423,12 +1422,14 @@
                     {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
                     {% set matter_mgmt_pages = ['matter_management', 'all_matters', 'case_management', 'case_tracking', 'approve_cases', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'approve_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
                     <!-- Dashboard (pinned to the top of every employee sidebar) -->
+                    {% if not hide_sidebar_nav_links %}
                     <a href="{{ url_for('dashboard', role_slug=current_role_slug) }}"
                        class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
                        id="nav-dashboard">
                         <i class="fas fa-home"></i>
                         <span>Dashboard</span>
                     </a>
+                    {% endif %}
                     
                     <!-- Role Switch Indicator (hidden on case_documents / matter_documents) -->
                     {% if is_role_switched and request.endpoint != 'case_documents' and request.endpoint != 'matter_documents' %}
@@ -1806,7 +1807,7 @@
                     {% endif %}
 
                     <!-- Company settings (all firm / company configuration pages) -->
-                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section', 'system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] %}
+                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section', 'system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] and not hide_sidebar_nav_links %}
                     {% if settings_section_key == 'documents' or request.endpoint in ['system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Document Settings</p>
@@ -2114,11 +2115,9 @@
                     <a href="{{ url_for('my_tasks') }}" class="sidebar-link {% if request.endpoint == 'my_tasks' %}active{% endif %}" id="nav-tasks">
                         <span class="relative inline-flex items-center justify-center w-5">
                             <i class="fas fa-bell"></i>
-                            {% if my_task_badge_count and my_task_badge_count > 0 %}
-                            <span class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white">
-                                {{ my_task_badge_count }}
+                            <span data-live-badge="my-tasks" class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white {% if not my_task_badge_count or my_task_badge_count <= 0 %}hidden{% endif %}">
+                                {{ my_task_badge_count or 0 }}
                             </span>
-                            {% endif %}
                         </span>
                         <span>My Tasks</span>
                     </a>
@@ -2137,14 +2136,13 @@
             
             <!-- Sidebar Footer -->
             <div class="p-4 border-t border-gray-200/50">
+                {% if not hide_sidebar_nav_links %}
                 <a href="{{ url_for('my_tasks') }}" class="sidebar-link {% if request.endpoint == 'my_tasks' %}active{% endif %}" id="nav-my-tasks-footer">
                     <span class="relative inline-flex items-center justify-center w-5">
                         <i class="fas fa-bell"></i>
-                        {% if my_task_badge_count and my_task_badge_count > 0 %}
-                        <span class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white">
-                            {{ my_task_badge_count }}
+                        <span data-live-badge="my-tasks" class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white {% if not my_task_badge_count or my_task_badge_count <= 0 %}hidden{% endif %}">
+                            {{ my_task_badge_count or 0 }}
                         </span>
-                        {% endif %}
                     </span>
                     <span>My Tasks</span>
                 </a>
@@ -2157,6 +2155,7 @@
                     <i class="fas fa-building"></i>
                     <span>Company Settings</span>
                 </a>
+                {% endif %}
                 {% endif %}
                 <a href="{{ url_for('logout') }}" class="sidebar-link text-red-600 hover:bg-red-50 hover:text-red-700">
                     <i class="fas fa-sign-out-alt"></i>
@@ -2521,6 +2520,7 @@
     {% endif %}
 
     {% if session.get('employee_id') %}
+    <script src="{{ url_for('static', filename='live-updates.js') }}" defer></script>
     <script src="{{ url_for('static', filename='push-notifications.js') }}" defer></script>
     {% endif %}
 </body>

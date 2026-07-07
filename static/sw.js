@@ -14,7 +14,7 @@
  *   uploads). These must always hit the network.
  */
 
-const VERSION = "sheria-centric-pwa-v2";
+const VERSION = "sheria-centric-pwa-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -151,10 +151,16 @@ self.addEventListener("push", (event) => {
     body: payload.body || "Open the app to review your notifications.",
     icon: "/static/icon-192.png",
     badge: "/static/icon-192.png",
+    image: payload.image || undefined,
     data: { url: payload.url || "/notifications" },
     tag: "sheria-workspace-alert",
     renotify: true,
-    vibrate: [120, 60, 120],
+    vibrate: [120, 60, 120, 60, 120],
+    requireInteraction: false,
+    silent: false,
+    actions: [
+      { action: "open", title: "Open" },
+    ],
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -168,7 +174,7 @@ self.addEventListener("notificationclick", (event) => {
       const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of allClients) {
         if ("focus" in client) {
-          if (client.url.includes(targetUrl) || client.url.includes("/notifications")) {
+          if (client.url.includes(targetUrl) || client.url.includes("/notifications") || client.url.includes("/my_tasks")) {
             return client.focus();
           }
         }

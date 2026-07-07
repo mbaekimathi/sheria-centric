@@ -6,7 +6,7 @@
 {% set total = tasks|length %}
 {% set pending_n = tasks|selectattr('task_status', 'equalto', 'Pending')|list|length %}
 {% set inprog_n = tasks|selectattr('task_status', 'equalto', 'In Progress')|list|length %}
-{% set action_n = tasks|selectattr('task_status', 'in', ['Pending', 'Received'])|rejectattr('task_source', 'equalto', 'session_allocation')|list|length %}
+{% set action_n = tasks|selectattr('task_status', 'in', ['Pending', 'Received'])|list|length %}
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
     <div class="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-600 via-green-600 to-teal-700 text-white shadow-xl shadow-emerald-900/20 mb-8">
@@ -28,26 +28,26 @@
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto lg:min-w-[380px]">
                     <div class="rounded-xl bg-white/10 backdrop-blur-md ring-1 ring-white/20 px-4 py-3 text-center sm:text-left">
                         <p class="text-emerald-200/80 text-xs font-semibold uppercase tracking-wide">Total</p>
-                        <p class="text-2xl font-bold tabular-nums">{{ total }}</p>
+                        <p class="text-2xl font-bold tabular-nums" id="my-tasks-stat-total">{{ total }}</p>
                     </div>
                     <div class="rounded-xl bg-white/10 backdrop-blur-md ring-1 ring-white/20 px-4 py-3 text-center sm:text-left">
                         <p class="text-emerald-200/80 text-xs font-semibold uppercase tracking-wide">Pending</p>
-                        <p class="text-2xl font-bold tabular-nums">{{ pending_n }}</p>
+                        <p class="text-2xl font-bold tabular-nums" id="my-tasks-stat-pending">{{ pending_n }}</p>
                     </div>
                     <div class="rounded-xl bg-white/10 backdrop-blur-md ring-1 ring-white/20 px-4 py-3 text-center sm:text-left">
                         <p class="text-emerald-200/80 text-xs font-semibold uppercase tracking-wide">In progress</p>
-                        <p class="text-2xl font-bold tabular-nums">{{ inprog_n }}</p>
+                        <p class="text-2xl font-bold tabular-nums" id="my-tasks-stat-in-progress">{{ inprog_n }}</p>
                     </div>
                     <div class="rounded-xl bg-amber-400/20 backdrop-blur-md ring-1 ring-amber-200/30 px-4 py-3 text-center sm:text-left">
                         <p class="text-amber-100 text-xs font-semibold uppercase tracking-wide">Needs accept</p>
-                        <p class="text-2xl font-bold tabular-nums">{{ action_n }}</p>
+                        <p class="text-2xl font-bold tabular-nums" id="my-tasks-stat-needs-accept">{{ action_n }}</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    {% if tasks %}
+    <div id="my-tasks-workspace" class="{% if not tasks %}hidden{% endif %}">
     <div class="mb-5 rounded-2xl border border-gray-200/80 bg-white/90 backdrop-blur-sm shadow-sm p-4 sm:p-5">
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <div class="xl:col-span-2">
@@ -142,7 +142,8 @@
                 {% endif %}
                 <tr
                     class="task-card hover:bg-gray-50/70 transition-colors"
-                    data-task-id="{{ task.id if not is_session else '' }}"
+                    data-task-id="{{ task.id }}"
+                    data-task-source="{{ task.task_source or 'task_management' }}"
                     data-title="{{ (task.task_title or 'Untitled task')|lower }}"
                     data-linked="{{ ((task.case_tracking_number or task.matter_reference_number or '') ~ ' ' ~ (task.case_client_name or task.matter_title or ''))|lower }}"
                     data-created-by="{{ (task.created_by_name or '')|lower }}"
@@ -193,12 +194,8 @@
                     </td>
                     <td class="px-4 py-3 align-top text-right">
                         <div class="inline-flex items-center justify-end gap-1.5">
-                        {% if is_session %}
-                        <a href="{{ url_for('case_details', case_id=task.linked_id) }}" class="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 ring-1 ring-gray-200 transition-colors" title="View case">
-                            <i class="fas fa-eye text-xs"></i>
-                        </a>
-                        {% elif task.task_status in ('Pending', 'Received', 'In Progress') %}
-                        <button type="button" class="task-view-btn inline-flex items-center justify-center {% if task.task_status == 'In Progress' %}gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800{% else %}h-8 w-8 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700{% endif %} transition-colors" data-task-id="{{ task.id }}" title="View task">
+                        {% if task.task_status in ('Pending', 'Received', 'In Progress') %}
+                        <button type="button" class="task-view-btn inline-flex items-center justify-center {% if task.task_status == 'In Progress' %}gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800{% else %}h-8 w-8 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700{% endif %} transition-colors" data-task-id="{{ task.id }}" data-task-source="{{ task.task_source or 'task_management' }}" title="View task">
                             {% if task.task_status == 'In Progress' %}
                             <i class="fas fa-arrow-right text-[10px]"></i>Open
                             {% else %}
@@ -222,16 +219,29 @@
         <h2 class="text-lg font-bold text-gray-900 mb-1">No matching tasks</h2>
         <p class="text-gray-600">Try adjusting your search or filter selections.</p>
     </div>
-    {% else %}
-    <div class="rounded-2xl border border-dashed border-gray-300 bg-white/70 px-8 py-16 text-center shadow-sm">
+    </div>
+    </div>
+    <div id="my-tasks-empty" class="rounded-2xl border border-dashed border-gray-300 bg-white/70 px-8 py-16 text-center shadow-sm {% if tasks %}hidden{% endif %}">
         <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 text-emerald-600 mb-5 ring-1 ring-emerald-100">
             <i class="fas fa-clipboard-check text-2xl"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900 mb-2">All clear</h2>
         <p class="text-gray-600 max-w-md mx-auto leading-relaxed">No tasks are allocated to your account right now. New assignments from case task management or matters will show up here.</p>
     </div>
-    {% endif %}
 </div>
+
+<style>
+    #task-modal-decision .task-decision-banner {
+        background: linear-gradient(145deg, #1e1a4e 0%, #131038 100%);
+        border: 1px solid #fbbf24;
+    }
+    #task-modal-decision .task-decision-title {
+        color: #fcd34d;
+    }
+    #task-modal-decision .task-decision-body {
+        color: #fde68a;
+    }
+</style>
 
 <!-- Task view modal -->
 <div id="task-view-modal" class="fixed inset-0 z-[120] hidden" aria-hidden="true">
@@ -246,6 +256,13 @@
                 <button type="button" class="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-white hover:text-gray-800 transition-colors" data-task-modal-close aria-label="Close">
                     <i class="fas fa-times"></i>
                 </button>
+            </div>
+
+            <div id="task-modal-decision" class="hidden shrink-0 px-6 pt-4" role="status" aria-live="polite">
+                <div class="task-decision-banner rounded-xl px-4 py-3.5 shadow-sm">
+                    <p class="task-decision-title text-sm font-bold mb-1">Your decision is needed</p>
+                    <p class="task-decision-body text-sm leading-relaxed">You have viewed this allocation. Accept to begin working on it, or reject to decline.</p>
+                </div>
             </div>
 
             <div id="task-modal-body" class="overflow-y-auto px-6 py-5 space-y-5 flex-1">
@@ -264,10 +281,11 @@
 {{ super() }}
 <script>
     (function () {
-        const cards = Array.from(document.querySelectorAll('.task-card'));
-        if (!cards.length || !listBody) return;
-
         const listBody = document.getElementById('task-list-body');
+        const workspace = document.getElementById('my-tasks-workspace');
+        const emptyState = document.getElementById('my-tasks-empty');
+        if (!listBody) return;
+
         const search = document.getElementById('task-search');
         const statusFilter = document.getElementById('task-status-filter');
         const typeFilter = document.getElementById('task-type-filter');
@@ -276,6 +294,29 @@
         const resetBtn = document.getElementById('task-filter-reset');
         const resultCount = document.getElementById('task-results-count');
         const emptyFiltered = document.getElementById('task-empty-filtered');
+        const statTotal = document.getElementById('my-tasks-stat-total');
+        const statPending = document.getElementById('my-tasks-stat-pending');
+        const statInProgress = document.getElementById('my-tasks-stat-in-progress');
+        const statNeedsAccept = document.getElementById('my-tasks-stat-needs-accept');
+
+        let cards = Array.from(document.querySelectorAll('.task-card'));
+
+        const statusClasses = {
+            'pending': 'bg-amber-50 text-amber-800 ring-amber-200/80',
+            'received': 'bg-orange-50 text-orange-800 ring-orange-200/80',
+            'in progress': 'bg-sky-50 text-sky-800 ring-sky-200/80',
+            'submitted': 'bg-violet-50 text-violet-800 ring-violet-200/80',
+            'completed': 'bg-emerald-50 text-emerald-800 ring-emerald-200/80',
+            'cancelled': 'bg-gray-100 text-gray-600 ring-gray-200/80',
+        };
+
+        function escapeHtml(value) {
+            return (value || '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
 
         function normalizeText(value) {
             return (value || '').toString().trim().toLowerCase();
@@ -287,12 +328,102 @@
             return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
         }
 
+        function buildTaskRow(task) {
+            const isCase = task.task_type === 'case';
+            const isSession = !!task.is_session;
+            const st = task.task_status || '';
+            const statusClass = statusClasses[(st || '').toLowerCase()] || 'bg-gray-50 text-gray-700 ring-gray-200/80';
+            const title = task.task_title || 'Untitled task';
+            const linkedLabel = isCase
+                ? `${task.case_tracking_number || ''} — ${task.case_client_name || ''}`
+                : `${task.matter_reference_number || ''} — ${task.matter_title || ''}`;
+            const rowKey = isSession ? `s${task.id}` : String(task.id || '');
+
+            let linkedCell = '';
+            if (isCase) {
+                if (task.linked_url) {
+                    linkedCell = `<a href="${escapeHtml(task.linked_url)}" class="font-medium text-indigo-700 hover:text-indigo-800 hover:underline">${escapeHtml(linkedLabel)}</a>`;
+                } else {
+                    linkedCell = `<span class="text-gray-700">${escapeHtml(linkedLabel)}</span>`;
+                }
+            } else if (task.linked_url) {
+                linkedCell = `<a href="${escapeHtml(task.linked_url)}" class="font-medium text-indigo-700 hover:text-indigo-800 hover:underline">${escapeHtml(linkedLabel)}</a>`;
+            } else {
+                linkedCell = `<span class="text-gray-700">${escapeHtml(linkedLabel)}</span>`;
+            }
+
+            let actionCell = '';
+            if (task.can_open_task) {
+                const openClass = st === 'In Progress'
+                    ? 'gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800'
+                    : 'h-8 w-8 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700';
+                const openInner = st === 'In Progress'
+                    ? '<i class="fas fa-arrow-right text-[10px]"></i>Open'
+                    : '<i class="fas fa-eye text-xs"></i>';
+                const taskSource = task.task_source || 'task_management';
+                actionCell = `<button type="button" class="task-view-btn inline-flex items-center justify-center ${openClass} transition-colors" data-task-id="${escapeHtml(task.id)}" data-task-source="${escapeHtml(taskSource)}" title="View task">${openInner}</button>`;
+            } else {
+                actionCell = '<span class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs text-gray-400 bg-gray-50">—</span>';
+            }
+
+            const tr = document.createElement('tr');
+            tr.className = 'task-card hover:bg-gray-50/70 transition-colors';
+            tr.dataset.taskId = String(task.id || '');
+            tr.dataset.taskSource = task.task_source || 'task_management';
+            tr.dataset.title = title.toLowerCase();
+            tr.dataset.linked = linkedLabel.toLowerCase();
+            tr.dataset.createdBy = (task.created_by_name || '').toLowerCase();
+            tr.dataset.status = st.toLowerCase();
+            tr.dataset.type = (task.task_type || '').toLowerCase();
+            tr.dataset.source = (task.task_source || '').toLowerCase();
+            tr.dataset.due = task.due_at || '';
+            tr.dataset.created = task.created_at || '';
+            tr.dataset.rowKey = rowKey;
+            tr.innerHTML = `
+                <td class="px-4 py-3 align-top">
+                    <p class="font-semibold text-gray-900">${escapeHtml(title)}</p>
+                    ${task.created_by_name ? `<p class="text-xs text-gray-500 mt-0.5">From ${escapeHtml(task.created_by_name)}</p>` : ''}
+                </td>
+                <td class="px-4 py-3 align-top">${linkedCell}</td>
+                <td class="px-4 py-3 align-top">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 ${isCase ? 'bg-indigo-50 text-indigo-800 ring-indigo-100' : 'bg-gray-100 text-gray-700 ring-gray-200'}">
+                        <i class="fas ${isCase ? 'fa-briefcase' : 'fa-folder'} text-[10px]"></i>
+                        ${isCase ? 'Case' : 'Matter'}
+                    </span>
+                </td>
+                <td class="px-4 py-3 align-top">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 ${statusClass}">${escapeHtml(st)}</span>
+                </td>
+                <td class="px-4 py-3 align-top">
+                    <p class="font-semibold text-gray-900 tabular-nums">${escapeHtml(task.due_at || '-')}</p>
+                    <p class="text-xs text-gray-500">${escapeHtml(task.reminder_intervals || '—')}</p>
+                </td>
+                <td class="px-4 py-3 align-top">
+                    <span class="text-xs font-semibold ${isSession ? 'text-amber-700' : 'text-gray-600'}">
+                        ${isSession ? 'Session allocation' : 'Task management'}
+                    </span>
+                </td>
+                <td class="px-4 py-3 align-top text-right">
+                    <div class="inline-flex items-center justify-end gap-1.5">${actionCell}</div>
+                </td>
+            `;
+            return tr;
+        }
+
+        function updateSummary(summary) {
+            if (!summary) return;
+            if (statTotal) statTotal.textContent = summary.total ?? 0;
+            if (statPending) statPending.textContent = summary.pending ?? 0;
+            if (statInProgress) statInProgress.textContent = summary.in_progress ?? 0;
+            if (statNeedsAccept) statNeedsAccept.textContent = summary.needs_accept ?? 0;
+        }
+
         function applyFiltersAndSort() {
-            const q = normalizeText(search.value);
-            const st = normalizeText(statusFilter.value);
-            const tp = normalizeText(typeFilter.value);
-            const src = normalizeText(sourceFilter.value);
-            const sortMode = normalizeText(sortSelect.value);
+            const q = normalizeText(search && search.value);
+            const st = normalizeText(statusFilter && statusFilter.value);
+            const tp = normalizeText(typeFilter && typeFilter.value);
+            const src = normalizeText(sourceFilter && sourceFilter.value);
+            const sortMode = normalizeText(sortSelect && sortSelect.value);
 
             const visible = [];
             cards.forEach((card) => {
@@ -323,6 +454,17 @@
             }
         }
 
+        window.SheriaMyTasksRefresh = function (data) {
+            const tasks = data.tasks || [];
+            updateSummary(data.summary);
+            if (workspace) workspace.classList.toggle('hidden', tasks.length === 0);
+            if (emptyState) emptyState.classList.toggle('hidden', tasks.length > 0);
+            listBody.innerHTML = '';
+            cards = tasks.map(buildTaskRow);
+            cards.forEach((card) => listBody.appendChild(card));
+            applyFiltersAndSort();
+        };
+
         [search, statusFilter, typeFilter, sourceFilter, sortSelect].forEach((el) => {
             if (!el) return;
             el.addEventListener('input', applyFiltersAndSort);
@@ -330,17 +472,19 @@
         });
 
         if (resetBtn) {
-        resetBtn.addEventListener('click', function () {
-            search.value = '';
-            statusFilter.value = 'all';
-            typeFilter.value = 'all';
-            sourceFilter.value = 'all';
-            sortSelect.value = 'due_asc';
-            applyFiltersAndSort();
-        });
+            resetBtn.addEventListener('click', function () {
+                if (search) search.value = '';
+                if (statusFilter) statusFilter.value = 'all';
+                if (typeFilter) typeFilter.value = 'all';
+                if (sourceFilter) sourceFilter.value = 'all';
+                if (sortSelect) sortSelect.value = 'due_asc';
+                applyFiltersAndSort();
+            });
         }
 
-        applyFiltersAndSort();
+        if (cards.length) {
+            applyFiltersAndSort();
+        }
     })();
 </script>
 <script>
@@ -349,10 +493,13 @@
         if (!modal) return;
 
         const modalTitle = document.getElementById('task-modal-title');
+        const modalDecision = document.getElementById('task-modal-decision');
         const modalBody = document.getElementById('task-modal-body');
         const modalFooter = document.getElementById('task-modal-footer');
         const apiTaskBase = {{ url_for('api_my_task', task_id=0)|tojson }};
+        const apiSessionTaskBase = {{ url_for('api_my_session_task', material_id=0)|tojson }};
         const bootTaskId = {{ view_task_id|tojson }};
+        const bootSessionViewId = {{ session_view_id|tojson }};
 
         const statusClasses = {
             'pending': 'bg-amber-50 text-amber-800 ring-amber-200/80',
@@ -363,7 +510,10 @@
             'cancelled': 'bg-gray-100 text-gray-600 ring-gray-200/80',
         };
 
-        function apiTaskUrl(taskId) {
+        function apiTaskUrl(taskId, taskSource) {
+            if (taskSource === 'session_allocation') {
+                return apiSessionTaskBase.replace(/\/0$/, '/' + encodeURIComponent(taskId));
+            }
             return apiTaskBase.replace(/\/0$/, '/' + encodeURIComponent(taskId));
         }
 
@@ -381,6 +531,11 @@
             return `<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 ${cls}">${escapeHtml(status)}</span>`;
         }
 
+        function needsDecision(status) {
+            const key = (status || '').toLowerCase();
+            return key === 'pending' || key === 'received';
+        }
+
         function showModal() {
             modal.classList.remove('hidden');
             modal.setAttribute('aria-hidden', 'false');
@@ -395,13 +550,17 @@
 
         function setLoading() {
             modalTitle.textContent = 'Loading…';
+            if (modalDecision) modalDecision.classList.add('hidden');
             modalBody.innerHTML = '<div class="flex items-center justify-center py-12 text-gray-500"><i class="fas fa-spinner fa-spin text-2xl text-indigo-500"></i></div>';
             modalFooter.classList.add('hidden');
             modalFooter.innerHTML = '';
         }
 
-        function updateRowStatus(taskId, status) {
-            const row = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+        function updateRowStatus(taskId, status, taskSource) {
+            const selector = taskSource === 'session_allocation'
+                ? `.task-card[data-task-id="${taskId}"][data-task-source="session_allocation"]`
+                : `.task-card[data-task-id="${taskId}"]:not([data-task-source="session_allocation"])`;
+            const row = document.querySelector(selector);
             if (!row) return;
             row.dataset.status = (status || '').toLowerCase();
             const badge = row.querySelector('td:nth-child(4) span');
@@ -422,12 +581,9 @@
                 ? `<a href="${escapeHtml(task.documents_url)}" class="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 hover:text-indigo-800"><i class="fas fa-folder-open"></i>Open case documents</a>`
                 : '';
 
-            const decisionHtml = task.task_status === 'Received'
-                ? `<div class="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 ring-1 ring-amber-100">
-                        <p class="text-sm font-bold text-amber-900 mb-1">Your decision is needed</p>
-                        <p class="text-sm text-amber-800/90">You have viewed this allocation. Accept to begin working on it, or reject to decline.</p>
-                   </div>`
-                : '';
+            if (modalDecision) {
+                modalDecision.classList.toggle('hidden', !needsDecision(task.task_status));
+            }
 
             modalBody.innerHTML = `
                 <div class="flex flex-wrap items-center gap-2">
@@ -436,8 +592,8 @@
                         <i class="fas ${task.task_type === 'case' ? 'fa-briefcase' : 'fa-folder'} text-[10px]"></i>
                         ${task.task_type === 'case' ? 'Case' : 'Matter'}
                     </span>
+                    ${task.task_source === 'session_allocation' ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ring-1 bg-amber-50 text-amber-800 ring-amber-100"><i class="fas fa-gavel text-[10px]"></i>Session allocation</span>' : ''}
                 </div>
-                ${decisionHtml}
                 <div>
                     <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Linked record</p>
                     ${linkedHtml}
@@ -464,7 +620,7 @@
             `;
 
             modalFooter.classList.remove('hidden');
-            if (task.task_status === 'Received') {
+            if (needsDecision(task.task_status)) {
                 modalFooter.innerHTML = `
                     <button type="button" class="task-modal-reject inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 bg-white text-red-700 text-sm font-semibold hover:bg-red-50 transition-colors" data-url="${escapeHtml(task.reject_url)}">
                         <i class="fas fa-times"></i>Reject
@@ -487,11 +643,11 @@
             }
         }
 
-        async function openTaskModal(taskId) {
+        async function openTaskModal(taskId, taskSource) {
             showModal();
             setLoading();
             try {
-                const response = await fetch(apiTaskUrl(taskId), {
+                const response = await fetch(apiTaskUrl(taskId, taskSource), {
                     headers: { 'Accept': 'application/json' }
                 });
                 const data = await response.json();
@@ -499,7 +655,7 @@
                     throw new Error(data.error || 'Unable to load task.');
                 }
                 renderTaskModal(data.task);
-                updateRowStatus(taskId, data.task.task_status);
+                updateRowStatus(taskId, data.task.task_status, data.task.task_source || taskSource);
             } catch (err) {
                 modalBody.innerHTML = `<div class="rounded-xl bg-red-50 text-red-800 px-4 py-3 text-sm ring-1 ring-red-100">${escapeHtml(err.message || 'Unable to load task.')}</div>`;
                 modalFooter.classList.remove('hidden');
@@ -530,7 +686,12 @@
                 hideModal();
                 const cleanUrl = new URL(window.location.href);
                 cleanUrl.searchParams.delete('view');
-                window.location.href = cleanUrl.pathname + cleanUrl.search;
+                cleanUrl.searchParams.delete('session_view');
+                window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
+                if (window.SheriaLiveUpdates) {
+                    window.SheriaLiveUpdates.resetMyTasksKey();
+                    window.SheriaLiveUpdates.refreshNow();
+                }
             } catch (err) {
                 if (typeof scAlert === 'function') {
                     scAlert(err.message || 'Action failed.');
@@ -548,7 +709,8 @@
                 e.preventDefault();
                 e.stopPropagation();
                 const taskId = btn.getAttribute('data-task-id');
-                if (taskId) openTaskModal(taskId);
+                const taskSource = btn.getAttribute('data-task-source') || 'task_management';
+                if (taskId) openTaskModal(taskId, taskSource);
                 return;
             }
 
@@ -576,9 +738,15 @@
         });
 
         if (bootTaskId) {
-            openTaskModal(bootTaskId);
+            openTaskModal(bootTaskId, 'task_management');
             const cleanUrl = new URL(window.location.href);
             cleanUrl.searchParams.delete('view');
+            window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
+        }
+        if (bootSessionViewId) {
+            openTaskModal(bootSessionViewId, 'session_allocation');
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('session_view');
             window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
         }
     })();

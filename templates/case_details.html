@@ -276,10 +276,11 @@
                 <div class="flex items-center gap-3">
                     <div class="hero-avatar-ring">
                         {% if case_data.client_profile_picture %}
-                            {% if case_data.client_profile_picture.startswith('http') %}
-                            <img src="{{ case_data.client_profile_picture }}" alt="{{ case_data.client_full_name or case_data.client_name }}" class="hero-avatar">
+                            {% set _client_pic = (case_data.client_profile_picture or '')|trim %}
+                            {% if _client_pic.startswith('http://') or _client_pic.startswith('https://') %}
+                            <img src="{{ _client_pic }}" alt="{{ case_data.client_full_name or case_data.client_name }}" class="hero-avatar">
                             {% else %}
-                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + case_data.client_profile_picture) }}" alt="{{ case_data.client_full_name or case_data.client_name }}" class="hero-avatar">
+                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + _client_pic) }}" alt="{{ case_data.client_full_name or case_data.client_name }}" class="hero-avatar">
                             {% endif %}
                         {% else %}
                         <div class="hero-avatar-fallback">

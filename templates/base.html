@@ -910,8 +910,14 @@
                             <!-- Profile Photo -->
                             {% if session.get('profile_picture') %}
                             <div class="w-10 h-10 rounded-lg overflow-hidden border-2 border-green-500 shadow-md">
+                                {% set _employee_pic = (session.get('profile_picture') or '')|trim %}
+                                {% if _employee_pic.startswith('http://') or _employee_pic.startswith('https://') %}
+                                <img src="{{ _employee_pic }}" 
+                                     alt="Profile" class="w-full h-full object-cover">
+                                {% else %}
                                 <img src="{{ url_for('static', filename='uploads/profile_pictures/' + session.get('profile_picture')) }}" 
                                      alt="Profile" class="w-full h-full object-cover">
+                                {% endif %}
                             </div>
                             {% else %}
                             <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-sm border-2 border-green-500">
@@ -1489,7 +1495,7 @@
                        per request for both Firm Administrator and Managing Partner. #}
                     {% endif %}
 
-                    <!-- Matter Management hub: All Matters + Litigation + Other Matters -->
+                    <!-- Matter Management hub: show on Matter Management and All Matters pages -->
                     {% if request.endpoint in ['matter_management', 'all_matters'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
@@ -1529,6 +1535,12 @@
                     <a href="{{ role_url('approve_cases') }}" class="sidebar-link {% if request.endpoint == 'approve_cases' %}active{% endif %}" id="nav-approve-cases">
                         <i class="fas fa-clipboard-check"></i>
                         <span>Approve registered cases</span>
+                        {% if approve_cases_badge_count and approve_cases_badge_count > 0 %}
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[11px] font-bold border border-red-200" title="{{ approve_cases_badge_count }} case(s) pending approval">
+                            <i class="fas fa-exclamation-circle text-[10px]"></i>
+                            <span>{{ approve_cases_badge_count }}</span>
+                        </span>
+                        {% endif %}
                     </a>
                     {% endif %}
                     {% if request.endpoint in ['case_management', 'register_case'] %}
@@ -1921,6 +1933,12 @@
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Other Matters</p>
                     </div>
+                    {% if user_role in ['Managing Partner', 'Firm Administrator', 'Associate Advocate', 'IT Support'] or session.get('original_role') == 'IT Support' %}
+                    <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %}" id="nav-register-matter-other-sidebar">
+                        <i class="fas fa-folder-plus"></i>
+                        <span>Register New Matter</span>
+                    </a>
+                    {% endif %}
                     <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-other-sidebar">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
@@ -1933,12 +1951,12 @@
                     <a href="{{ role_url('approve_matters') }}" class="sidebar-link {% if request.endpoint == 'approve_matters' %}active{% endif %}" id="nav-approve-matters">
                         <i class="fas fa-clipboard-check"></i>
                         <span>Approve registered matters</span>
-                    </a>
-                    {% endif %}
-                    {% if user_role == 'IT Support' %}
-                    <a href="{{ url_for('register_matter') }}" class="sidebar-link" id="nav-register-matter-it-support">
-                        <i class="fas fa-folder-plus"></i>
-                        <span>Register Matter</span>
+                        {% if approve_matters_badge_count and approve_matters_badge_count > 0 %}
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[11px] font-bold border border-red-200" title="{{ approve_matters_badge_count }} matter(s) pending approval">
+                            <i class="fas fa-exclamation-circle text-[10px]"></i>
+                            <span>{{ approve_matters_badge_count }}</span>
+                        </span>
+                        {% endif %}
                     </a>
                     {% endif %}
                     <a href="{{ url_for('matter_tracking') }}" class="sidebar-link" id="nav-matter-tracking-other-matters">
@@ -1966,8 +1984,8 @@
                         <span>Matter Details</span>
                     </a>
                     <a href="{{ url_for('matter_documents', matter_id=current_matter_id) }}" class="sidebar-link {% if request.endpoint == 'matter_documents' %}active{% endif %}" id="nav-matter-documents">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Documents</span>
+                        <i class="fas fa-upload"></i>
+                        <span>Upload Documents</span>
                     </a>
                     <a href="/other_matters/{{ current_matter_id }}/edit" class="sidebar-link {% if request.endpoint == 'matter_edit' %}active{% endif %}" id="nav-matter-edit">
                         <i class="fas fa-edit"></i>

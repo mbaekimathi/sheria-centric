@@ -11970,6 +11970,7 @@ def case_details(case_id):
             employee_id = session.get('employee_id')
             task_id = (request.args.get('task_id') or '').strip()
             is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
             # Fetch case details with client and employee information
             cursor.execute("""
                 SELECT 
@@ -12023,7 +12024,7 @@ def case_details(case_id):
                 return redirect(url_for('case_management'))
 
             is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-            if not is_it_support and not is_case_owner:
+            if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view'):
                     flash('You can only access this case while your allocated task is active.', 'error')
@@ -12396,6 +12397,7 @@ def case_documents(case_id):
             employee_id = session.get('employee_id')
             task_id = (request.args.get('task_id') or '').strip()
             is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
             # Fetch case details with client information
             cursor.execute("""
                 SELECT 
@@ -12424,7 +12426,7 @@ def case_documents(case_id):
                 return redirect(url_for('case_management'))
 
             is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-            if not is_it_support and not is_case_owner:
+            if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view_documents'):
                     flash('You can only access case documents while your allocated task is active.', 'error')
@@ -16001,9 +16003,10 @@ def upload_case_document(case_id):
                 user_role = session.get('employee_role')
                 original_role = session.get('original_role')
                 is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+                is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
                 is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
                 task_id = (request.form.get('task_id') or request.args.get('task_id') or '').strip()
-                if not is_it_support and not is_case_owner:
+                if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
                     ensure_task_management_table(cursor, connection)
                     if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='upload_documents'):
                         return jsonify({'success': False, 'error': 'You can only upload while your allocated task is active.'}), 403
@@ -16177,6 +16180,24 @@ def upload_case_document(case_id):
                 ).execute()
                 
                 file_id = uploaded_file.get('id')
+                if not file_id:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Upload could not be verified. Please try again.'
+                    }), 502
+                try:
+                    verified = service.files().get(fileId=file_id, fields='id').execute()
+                    if not verified or not verified.get('id'):
+                        return jsonify({
+                            'success': False,
+                            'error': 'Upload verification failed. Please try again.'
+                        }), 502
+                except Exception as verify_error:
+                    print(f"Upload verification failed for file {file_id}: {verify_error}")
+                    return jsonify({
+                        'success': False,
+                        'error': 'Upload verification failed. Please try again.'
+                    }), 502
                 file_url = uploaded_file.get('webViewLink', f"https://drive.google.com/file/d/{file_id}/view")
                 
                 return jsonify({
@@ -16374,8 +16395,9 @@ def create_case_google_file(case_id):
                 user_role = session.get('employee_role')
                 original_role = session.get('original_role')
                 is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+                is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
                 is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-                if not is_it_support and not is_case_owner:
+                if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
                     ensure_task_management_table(cursor, connection)
                     if not task_id:
                         return jsonify({'success': False, 'error': 'task_id is required for task-based case access.'}), 403
@@ -16793,9 +16815,10 @@ def download_case_document(case_id, file_id):
                 return redirect(url_for('case_management'))
             employee_id = session.get('employee_id')
             is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
             is_case_owner = str(case_row.get('filled_by_id') or '') == str(employee_id)
             task_id = (request.args.get('task_id') or '').strip()
-            if not is_it_support and not is_case_owner:
+            if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='download'):
                     flash('You can only download while your allocated task is active.', 'error')
@@ -16863,9 +16886,10 @@ def delete_case_document_api(case_id, file_id):
             case_data = cursor.fetchone()
             employee_id = session.get('employee_id')
             is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
             is_case_owner = str((case_data or {}).get('filled_by_id') or '') == str(employee_id)
             task_id = (request.args.get('task_id') or '').strip()
-            if case_data and not is_it_support and not is_case_owner:
+            if case_data and not is_it_support and not is_privileged_case_view_role and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view'):
                     return jsonify({'success': False, 'error': 'You can only delete while your allocated task is active.'}), 403
@@ -21113,22 +21137,10 @@ def api_approve_matter(matter_id):
     if user_role not in _matter_approve_roles and original_role != 'IT Support':
         return jsonify({'error': 'Only Firm Administrators, Managing Partners, or IT Support can approve matters'}), 403
 
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     allocated_employee_id = data.get('allocated_employee_id')
     allocation_description = (data.get('allocation_description') or '').strip()
     allocation_timeline = (data.get('allocation_timeline') or '').strip()
-
-    if not allocated_employee_id:
-        return jsonify({'error': 'Allocated employee is required'}), 400
-    if not allocation_description:
-        return jsonify({'error': 'Brief description is required'}), 400
-    if not allocation_timeline:
-        return jsonify({'error': 'Timeline is required'}), 400
-
-    try:
-        allocated_employee_id = int(allocated_employee_id)
-    except (TypeError, ValueError):
-        return jsonify({'error': 'Invalid allocated employee'}), 400
 
     connection = get_db_connection()
     if not connection:
@@ -21143,7 +21155,9 @@ def api_approve_matter(matter_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             # First, verify the matter exists and has status 'Pending Approval'
             cursor.execute("""
-                SELECT id, status FROM matters WHERE id = %s
+                SELECT id, status, assigned_employee_id, allocation_description, allocation_timeline
+                FROM matters
+                WHERE id = %s
             """, (matter_id,))
             matter = cursor.fetchone()
             
@@ -21152,6 +21166,19 @@ def api_approve_matter(matter_id):
             
             if matter['status'] != 'Pending Approval':
                 return jsonify({'error': f'Matter is not pending approval. Current status: {matter["status"]}'}), 400
+
+            # Allow approve button to work after allocation even if payload is omitted.
+            effective_employee_id = allocated_employee_id or matter.get('assigned_employee_id')
+            if not effective_employee_id:
+                return jsonify({'error': 'Allocate this matter first, or provide allocated employee details.'}), 400
+
+            try:
+                effective_employee_id = int(effective_employee_id)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Invalid allocated employee'}), 400
+
+            effective_description = allocation_description or (matter.get('allocation_description') or '').strip() or 'APPROVED AND ALLOCATED'
+            effective_timeline = allocation_timeline or (matter.get('allocation_timeline') or '').strip() or 'AS SCHEDULED'
 
             # Ensure allocation metadata columns exist
             if not column_exists('matters', 'allocation_description'):
@@ -21172,7 +21199,7 @@ def api_approve_matter(matter_id):
                 SELECT id, full_name, role
                 FROM employees
                 WHERE id = %s AND status = 'Active'
-            """, (allocated_employee_id,))
+            """, (effective_employee_id,))
             assignee = cursor.fetchone()
             if not assignee:
                 return jsonify({'error': 'Allocated employee not found'}), 404
@@ -21192,8 +21219,8 @@ def api_approve_matter(matter_id):
             """, (
                 assignee['id'],
                 assignee['full_name'],
-                allocation_description,
-                allocation_timeline,
+                effective_description,
+                effective_timeline,
                 matter_id
             ))
             connection.commit()
@@ -21662,6 +21689,7 @@ def matter_documents(matter_id):
     
     documents = []
     google_drive_connected = False
+    suggested_doc_title = ''
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
@@ -21800,6 +21828,14 @@ def matter_documents(matter_id):
                 except Exception as e:
                     print(f"Error fetching matter documents from Google Drive: {e}")
             
+            try:
+                ref = (matter_data.get('matter_reference_number') or '').strip() or f"Matter-{matter_id}"
+                ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
+                emp_name = (session.get('employee_name') or '').strip()
+                suggested_doc_title = f"{emp_name or 'Document'} - {ref}"
+            except Exception:
+                suggested_doc_title = ''
+
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
@@ -21809,6 +21845,7 @@ def matter_documents(matter_id):
                                  matter_id=matter_id,
                                  google_drive_connected=google_drive_connected,
                                  documents=documents,
+                                 suggested_doc_title=suggested_doc_title,
                                  company_settings=company_settings)
     except Exception as e:
         print(f"Error loading matter documents: {e}")
@@ -22438,12 +22475,24 @@ def inject_my_task_badge():
     """Provide task and notification badge counts for nav UI."""
     try:
         employee_id = session.get('employee_id')
+        user_role = session.get('employee_role')
+        original_role = session.get('original_role')
         if not employee_id:
-            return {'my_task_badge_count': 0, 'notification_badge_count': 0}
+            return {
+                'my_task_badge_count': 0,
+                'notification_badge_count': 0,
+                'approve_matters_badge_count': 0,
+                'approve_cases_badge_count': 0
+            }
 
         connection = get_db_connection()
         if not connection:
-            return {'my_task_badge_count': 0, 'notification_badge_count': 0}
+            return {
+                'my_task_badge_count': 0,
+                'notification_badge_count': 0,
+                'approve_matters_badge_count': 0,
+                'approve_cases_badge_count': 0
+            }
 
         try:
             with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -22500,15 +22549,54 @@ def inject_my_task_badge():
                 except Exception:
                     calendar_cnt = 0
 
+                approve_matters_badge_count = 0
+                can_approve_matters = (
+                    user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
+                ) or (original_role == 'IT Support')
+                if can_approve_matters:
+                    try:
+                        cursor.execute("""
+                            SELECT COUNT(*) AS cnt
+                            FROM matters
+                            WHERE status = 'Pending Approval'
+                        """)
+                        row = cursor.fetchone() or {}
+                        approve_matters_badge_count = int(row.get('cnt') or 0)
+                    except Exception:
+                        approve_matters_badge_count = 0
+
+                approve_cases_badge_count = 0
+                can_approve_cases = (
+                    user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
+                ) or (original_role == 'IT Support')
+                if can_approve_cases:
+                    try:
+                        cursor.execute("""
+                            SELECT COUNT(*) AS cnt
+                            FROM cases
+                            WHERE status = 'Pending Approval'
+                        """)
+                        row = cursor.fetchone() or {}
+                        approve_cases_badge_count = int(row.get('cnt') or 0)
+                    except Exception:
+                        approve_cases_badge_count = 0
+
                 my_task_badge_count = base_cnt + session_cnt
                 return {
                     'my_task_badge_count': my_task_badge_count,
-                    'notification_badge_count': my_task_badge_count + calendar_cnt
+                    'notification_badge_count': my_task_badge_count + calendar_cnt,
+                    'approve_matters_badge_count': approve_matters_badge_count,
+                    'approve_cases_badge_count': approve_cases_badge_count
                 }
         finally:
             connection.close()
     except Exception:
-        return {'my_task_badge_count': 0, 'notification_badge_count': 0}
+        return {
+            'my_task_badge_count': 0,
+            'notification_badge_count': 0,
+            'approve_matters_badge_count': 0,
+            'approve_cases_badge_count': 0
+        }
 
 @app.before_request
 def cleanup_idle_connections_before_request():

@@ -389,6 +389,13 @@ function displayClients(clients) {
         return;
     }
     
+    function profilePictureSrc(pic) {
+        const value = (pic || '').toString().trim();
+        if (!value) return '';
+        if (value.startsWith('http://') || value.startsWith('https://')) return value;
+        return `/static/uploads/profile_pictures/${value}`;
+    }
+
     clients.forEach(client => {
         const clientCard = document.createElement('div');
         clientCard.className = 'border border-gray-200 rounded-lg hover:shadow-md transition-shadow';
@@ -398,7 +405,7 @@ function displayClients(clients) {
                     <div class="flex items-center space-x-4">
                         <div class="flex-shrink-0">
                             ${client.profile_picture ? 
-                                `<img class="h-12 w-12 rounded-full" src="/static/uploads/profile_pictures/${client.profile_picture}" alt="${client.full_name || 'Client'}">` :
+                                `<img class="h-12 w-12 rounded-full" src="${profilePictureSrc(client.profile_picture)}" alt="${client.full_name || 'Client'}">` :
                                 `<div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
                                     <i class="fas fa-user text-blue-600 text-xl"></i>
                                 </div>`

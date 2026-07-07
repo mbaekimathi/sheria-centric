@@ -27,6 +27,7 @@
     }
     .doc-input:focus { outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); border-color: #6366f1; }
     .doc-label { color: #334155; font-weight: 600; font-size: 0.875rem; letter-spacing: 0.01em; margin-bottom: 0.375rem; display: block; }
+    .doc-uppercase { text-transform: uppercase; }
     .doc-file-wrap {
         border: 2px dashed #94a3b8; border-radius: 0.75rem;
         background: #f8fafc; padding: 1rem; transition: border-color 0.2s, background 0.2s;
@@ -241,7 +242,7 @@
     </div>
     {% endif %}
 
-    <!-- Add a Document – unified entry point: choose Upload or Create with Google -->
+    <!-- Add a Document: Upload existing file + Create with Google -->
     <div class="doc-card doc-form-card p-5 sm:p-6 mb-6">
         <div class="flex items-center justify-between gap-3 mb-5">
             <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -253,28 +254,29 @@
             </button>
         </div>
 
-        <!-- Step 1: action selector -->
         <div id="actionSelector">
-            <p class="text-sm text-gray-600 mb-4">How would you like to add a document to this case?</p>
+            <p class="text-sm text-gray-600 mb-4">Choose how you want to add a document:</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button type="button" data-action="upload" class="action-choice-card" {% if not google_drive_connected %}disabled{% endif %}>
                     <span class="action-choice-icon upload-icon"><i class="fas fa-cloud-upload-alt"></i></span>
                     <span class="action-choice-title">Upload existing file</span>
-                    <span class="action-choice-desc">Upload a PDF, Word, image or scan (max 16MB) into this case's Google Drive folder.</span>
+                    <span class="action-choice-desc">Upload a PDF, Word file, image or scan into this case folder.</span>
                 </button>
                 <button type="button" data-action="create" class="action-choice-card" {% if not google_drive_connected %}disabled{% endif %}>
                     <span class="action-choice-icon create-icon"><i class="fab fa-google-drive"></i></span>
                     <span class="action-choice-title">Create with Google</span>
-                    <span class="action-choice-desc">Start a new Google Doc, Sheet, Slides or Notebook directly inside this case's Drive folder.</span>
+                    <span class="action-choice-desc">Create a Google Doc, Sheet, Slides, or Notebook in this case folder.</span>
                 </button>
             </div>
-            {% if not google_drive_connected %}
-            <p class="text-xs text-amber-700 mt-3"><i class="fas fa-exclamation-triangle mr-1"></i>Connect Google Drive in Documents Settings to enable these options.</p>
-            {% endif %}
         </div>
 
-        <!-- Step 2a: Upload pane -->
-        <div id="actionPaneUpload" class="hidden">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <!-- Upload existing file -->
+        <div id="actionPaneUpload" class="hidden rounded-xl border border-slate-200 bg-slate-50/40 p-4 sm:p-5">
+            <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <span class="action-choice-icon upload-icon !w-8 !h-8 !text-sm"><i class="fas fa-cloud-upload-alt"></i></span>
+                Upload existing file
+            </h3>
             <form id="documentUploadForm" enctype="multipart/form-data" class="space-y-5">
                 <div>
                     <label for="document_file" class="doc-label">Select file <span class="text-red-500">*</span></label>
@@ -285,7 +287,7 @@
                 </div>
                 <div>
                     <label for="document_description" class="doc-label">Description <span class="text-red-500">*</span></label>
-                    <input type="text" id="document_description" name="document_description" class="doc-input" placeholder="Max 5 words (e.g. client affidavit scan)" required maxlength="500" autocomplete="off" />
+                    <input type="text" id="document_description" name="document_description" class="doc-input doc-uppercase" placeholder="MAX 5 WORDS (E.G. CLIENT AFFIDAVIT SCAN)" required maxlength="500" autocomplete="off" />
                     <p class="text-xs text-gray-500 mt-1.5" id="description-word-hint">Maximum <span class="font-semibold">5 words</span>. <span id="description-word-count" class="text-indigo-600">0 / 5 words</span></p>
                 </div>
                 <div>
@@ -318,8 +320,12 @@
             </form>
         </div>
 
-        <!-- Step 2b: Create with Google pane -->
-        <div id="actionPaneCreate" class="hidden">
+        <!-- Create with Google -->
+        <div id="actionPaneCreate" class="hidden rounded-xl border border-slate-200 bg-slate-50/40 p-4 sm:p-5">
+            <h3 class="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <span class="action-choice-icon create-icon !w-8 !h-8 !text-sm"><i class="fab fa-google-drive"></i></span>
+                Create with Google
+            </h3>
             <p class="text-sm text-gray-600 mb-1 flex items-center gap-2">
                 <i class="fab fa-google-drive text-blue-600"></i>
                 Creates a new file directly inside this case's Google Drive folder, then opens it in a new tab.
@@ -334,7 +340,7 @@
 
             <div class="mb-4">
                 <label for="create_description" class="doc-label">Description <span class="text-red-500">*</span></label>
-                <input type="text" id="create_description" class="doc-input" placeholder="Max 5 words (e.g. settlement draft notes)" required maxlength="500" autocomplete="off" />
+                <input type="text" id="create_description" class="doc-input doc-uppercase" placeholder="MAX 5 WORDS (E.G. SETTLEMENT DRAFT NOTES)" required maxlength="500" autocomplete="off" />
                 <p class="text-xs text-gray-500 mt-1.5">Maximum <span class="font-semibold">5 words</span>. <span id="create-description-word-count" class="text-indigo-600">0 / 5 words</span></p>
             </div>
 
@@ -373,6 +379,10 @@
                 </button>
             </div>
         </div>
+        </div>
+        {% if not google_drive_connected %}
+        <p class="text-xs text-amber-700 mt-4"><i class="fas fa-exclamation-triangle mr-1"></i>Connect Google Drive in Documents Settings to enable upload and Google file creation.</p>
+        {% endif %}
     </div>
 
     <!-- Uploaded Documents Section (grouped per party) -->
@@ -663,6 +673,20 @@ function attachWordCounter(inputId, counterId, limit) {
 }
 attachWordCounter('document_description', 'description-word-count', 5);
 attachWordCounter('create_description', 'create-description-word-count', 5);
+
+(function enforceUppercaseDescriptions() {
+    ['document_description', 'create_description'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function() {
+            var cursorPos = el.selectionStart;
+            el.value = (el.value || '').toUpperCase();
+            if (typeof cursorPos === 'number') {
+                try { el.setSelectionRange(cursorPos, cursorPos); } catch (e) {}
+            }
+        });
+    });
+})();
 
 function refreshDocuments() {
     window.location.reload();
@@ -972,7 +996,7 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
         
         progressBar.style.width = '100%';
         
-        if (data.success) {
+        if (response.ok && data.success && data.file_id) {
             uploadStatus.textContent = 'Upload successful!';
             setTimeout(() => {
                 modal.classList.add('hidden');
@@ -987,14 +1011,14 @@ document.getElementById('documentUploadForm').addEventListener('submit', async f
                 window.location.reload();
             }, 1500);
         } else {
-            const errorMsg = data.error || 'Unknown error';
+            const errorMsg = data.error || 'Upload did not complete successfully.';
             const settingsUrl = data.settings_url || '/documents_settings';
             console.error('Upload failed:', errorMsg);
             uploadStatus.textContent = errorMsg;
             uploadStatus.innerHTML = errorMsg + (data.settings_url ? '<br><a href="' + settingsUrl + '" class="mt-4 inline-block px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors">Go to Documents Settings</a>' : '');
             uploadBtn.disabled = false;
             uploadBtnText.textContent = 'Upload Document';
-            setTimeout(() => {
+            setTimeout(async () => {
                 modal.classList.add('hidden');
                 progressBar.style.width = '0%';
                 if (data.settings_url) {

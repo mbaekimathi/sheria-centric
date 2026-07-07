@@ -119,10 +119,11 @@
         <div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
             <div class="flex-shrink-0">
                 {% if matter_data.client_profile_picture %}
-                    {% if matter_data.client_profile_picture.startswith('http') %}
-                    <img src="{{ matter_data.client_profile_picture }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
+                    {% set _client_pic = (matter_data.client_profile_picture or '')|trim %}
+                    {% if _client_pic.startswith('http://') or _client_pic.startswith('https://') %}
+                    <img src="{{ _client_pic }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
                     {% else %}
-                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + matter_data.client_profile_picture) }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
+                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + _client_pic) }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
                     {% endif %}
                 {% else %}
                 <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-indigo-100 shadow-md">
@@ -166,10 +167,6 @@
                 <i class="fas fa-info-circle text-blue-500"></i>
                 Matter Information
             </h3>
-            <a href="{{ url_for('matter_documents', matter_id=matter_id) }}" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm">
-                <i class="fas fa-file-alt"></i>
-                <span>Upload / View Documents</span>
-            </a>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             <div><p class="matter-label">Reference Number</p><p class="matter-value">{{ matter_data.matter_reference_number or '—' }}</p></div>
@@ -189,121 +186,6 @@
         {% endif %}
     </div>
 
-    <!-- Documents: Create with Google + Upload + List (only when not pending accept) -->
-    {% if not pending_accept %}
-    <div class="matter-card documents-card p-5 sm:p-6 mb-6">
-        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <i class="fas fa-file-alt text-amber-600"></i>
-            Documents
-        </h3>
-        {% if google_drive_connected %}
-        <!-- Create with Google -->
-        <div class="mb-6 p-4 rounded-xl bg-gradient-to-r from-slate-50 to-amber-50/50 border border-amber-100">
-            <p class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                <i class="fab fa-google-drive text-amber-600"></i>
-                Create with Google
-            </p>
-            <p class="text-xs text-gray-600 mb-2">Opens Google Docs, Sheets, Slides or Keep. Nothing is saved to Drive until you save in the app.</p>
-            {% if suggested_doc_title %}
-            <p class="text-xs text-gray-700 mb-3">
-                <span class="font-medium">When you save, use this title:</span>
-                <code id="matter-suggested-doc-title" class="ml-1 px-1.5 py-0.5 bg-white rounded border border-amber-200 text-amber-800">{{ suggested_doc_title }}</code>
-                <button type="button" id="matter-copy-title-btn" class="ml-2 text-xs font-semibold text-amber-700 hover:text-amber-900">Copy</button>
-            </p>
-            {% endif %}
-            <div class="flex flex-wrap gap-3">
-                <button type="button" data-google-app="doc" class="matter-open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
-                    <i class="fab fa-google-drive"></i> Google Doc
-                </button>
-                <button type="button" data-google-app="sheet" class="matter-open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
-                    <i class="fas fa-table"></i> Google Sheet
-                </button>
-                <button type="button" data-google-app="slides" class="matter-open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-amber-500 text-white hover:bg-amber-600 shadow-sm">
-                    <i class="fas fa-file-powerpoint"></i> Google Slides
-                </button>
-                <button type="button" data-google-app="notebook" class="matter-open-google-app inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm">
-                    <i class="fas fa-book"></i> Google Notebook
-                </button>
-            </div>
-        </div>
-        <!-- Upload document -->
-        <div class="mb-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <p class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <i class="fas fa-cloud-upload-alt text-indigo-600"></i>
-                Upload document
-            </p>
-            <form id="matterUploadForm" enctype="multipart/form-data" class="space-y-3">
-                <div>
-                    <label for="matter_document_file" class="block text-xs font-semibold text-gray-600 mb-1">File (PDF, DOC, DOCX, JPG, JPEG, PNG — max 16MB)</label>
-                    <input type="file" id="matter_document_file" name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required class="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-                </div>
-                <div>
-                    <label for="matter_document_description" class="block text-xs font-semibold text-gray-600 mb-1">Description (optional)</label>
-                    <textarea id="matter_document_description" name="document_description" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Brief description..."></textarea>
-                </div>
-                <button type="submit" id="matterUploadBtn" class="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-sm transition-colors">
-                    <i class="fas fa-upload"></i>
-                    <span id="matterUploadBtnText">Upload</span>
-                </button>
-            </form>
-        </div>
-        {% endif %}
-        {% if not google_drive_connected %}
-        <div class="py-4 text-center rounded-xl bg-amber-50 border border-amber-200">
-            <i class="fab fa-google-drive text-amber-500 text-2xl mb-2"></i>
-            <p class="text-amber-800 font-semibold">Google Drive not connected</p>
-            <p class="text-amber-700 text-sm mt-1">Connect Drive in Documents Settings to create and upload documents.</p>
-            <a href="{{ url_for('documents_settings') }}" class="inline-block mt-3 text-sm font-semibold text-amber-700 hover:text-amber-900">Documents Settings →</a>
-        </div>
-        {% elif documents and documents|length > 0 %}
-        <div class="space-y-2">
-            {% for doc in documents %}
-            {% set file_ext = doc.name.split('.')[-1]|lower if '.' in doc.name else '' %}
-            <div class="doc-row flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-100 bg-white hover:border-amber-200 transition-colors">
-                <div class="flex items-center gap-3 min-w-0">
-                    {% if 'pdf' in (doc.mime_type or '') or file_ext == 'pdf' %}
-                    <i class="fas fa-file-pdf text-red-600 text-xl flex-shrink-0"></i>
-                    {% elif 'word' in (doc.mime_type or '') or 'document' in (doc.mime_type or '') or file_ext in ['doc', 'docx'] %}
-                    <i class="fas fa-file-word text-blue-600 text-xl flex-shrink-0"></i>
-                    {% elif 'image' in (doc.mime_type or '') or file_ext in ['jpg', 'jpeg', 'png', 'gif'] %}
-                    <i class="fas fa-file-image text-emerald-600 text-xl flex-shrink-0"></i>
-                    {% else %}
-                    <i class="fas fa-file text-slate-500 text-xl flex-shrink-0"></i>
-                    {% endif %}
-                    <div class="min-w-0">
-                        <p class="font-semibold text-gray-900 truncate">{{ doc.name }}</p>
-                        <p class="text-xs text-gray-500">{{ doc.size }} · {{ doc.modified_time or doc.created_time or '—' }}</p>
-                    </div>
-                </div>
-                <div class="flex flex-shrink-0 items-center gap-2 flex-wrap justify-end">
-                    {% if 'vnd.google-apps.document' in (doc.mime_type or '') %}
-                    <a href="https://docs.google.com/document/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
-                    {% elif 'vnd.google-apps.spreadsheet' in (doc.mime_type or '') %}
-                    <a href="https://docs.google.com/spreadsheets/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
-                    {% elif 'vnd.google-apps.presentation' in (doc.mime_type or '') %}
-                    <a href="https://docs.google.com/presentation/d/{{ doc.id }}/edit" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-800 rounded-lg font-semibold text-sm hover:bg-blue-100" title="Edit"><i class="fas fa-edit text-xs"></i> Edit</a>
-                    {% elif doc.url %}
-                    <a href="{{ doc.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold text-sm hover:bg-slate-200" title="View"><i class="fas fa-external-link-alt text-xs"></i> View</a>
-                    {% endif %}
-                    <a href="{{ url_for('download_matter_document', matter_id=matter_id, file_id=doc.id) }}" class="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-800 rounded-lg font-semibold text-sm hover:bg-amber-100"><i class="fas fa-download text-xs"></i> Download</a>
-                    <button type="button" class="matter-doc-delete inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-lg font-semibold text-sm hover:bg-red-100" data-file-id="{{ doc.id }}" data-doc-name="{{ doc.name|e }}"><i class="fas fa-trash-alt text-xs"></i> Delete</button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        <p class="mt-4 text-sm text-gray-500">
-            <a href="{{ url_for('matter_documents', matter_id=matter_id) }}" class="text-amber-600 hover:text-amber-700 font-semibold">View all documents and upload more →</a>
-        </p>
-        {% else %}
-        <div class="py-6 text-center rounded-xl bg-slate-50 border-2 border-dashed border-slate-200">
-            <i class="fas fa-folder-open text-slate-300 text-4xl mb-3 block"></i>
-            <p class="font-semibold text-gray-700 mb-1">No documents yet</p>
-            <p class="text-gray-500 text-sm">Use the buttons above to create or upload documents for this matter.</p>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
-
     <!-- Client Instructions Card -->
     {% if matter_data.client_instructions %}
     <div class="matter-card instructions-card p-5 sm:p-6 mb-6">
@@ -317,82 +199,6 @@
     </div>
     {% endif %}
 
-    <script>
-    (function() {
-        var matterId = {{ matter_id }};
-        var googleAppUrls = {
-            doc: 'https://docs.google.com/document/create',
-            sheet: 'https://docs.google.com/spreadsheets/create',
-            slides: 'https://docs.google.com/presentation/create',
-            notebook: 'https://keep.google.com'
-        };
-        document.querySelectorAll('.matter-open-google-app').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var app = this.getAttribute('data-google-app');
-                if (app && googleAppUrls[app]) window.open(googleAppUrls[app], '_blank', 'noopener,noreferrer');
-            });
-        });
-        var copyBtn = document.getElementById('matter-copy-title-btn');
-        if (copyBtn) {
-            copyBtn.addEventListener('click', function() {
-                var el = document.getElementById('matter-suggested-doc-title');
-                if (el && navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(el.textContent);
-                    var b = this;
-                    b.textContent = 'Copied!';
-                    setTimeout(function() { b.textContent = 'Copy'; }, 1500);
-                }
-            });
-        }
-        var uploadForm = document.getElementById('matterUploadForm');
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                var fileInput = document.getElementById('matter_document_file');
-                if (!fileInput.files || !fileInput.files.length) { scAlert('Please select a file.'); return; }
-                var file = fileInput.files[0];
-                if (file.size > 16 * 1024 * 1024) { scAlert('File must be 16MB or less.'); return; }
-                var btn = document.getElementById('matterUploadBtn');
-                var btnText = document.getElementById('matterUploadBtnText');
-                btn.disabled = true;
-                btnText.textContent = 'Uploading...';
-                var formData = new FormData();
-                formData.append('document_file', file);
-                formData.append('description', (document.getElementById('matter_document_description') || {}).value || '');
-                try {
-                    var res = await fetch('/api/matter/' + matterId + '/upload-document', { method: 'POST', body: formData });
-                    var data = await res.json();
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        scAlert(data.error || 'Upload failed.');
-                        btn.disabled = false;
-                        btnText.textContent = 'Upload';
-                    }
-                } catch (err) {
-                    console.error(err);
-                    scAlert('Upload failed.');
-                    btn.disabled = false;
-                    btnText.textContent = 'Upload';
-                }
-            });
-        }
-        document.querySelectorAll('.matter-doc-delete').forEach(function(btn) {
-            btn.addEventListener('click', async function() {
-                var fileId = this.getAttribute('data-file-id');
-                var docName = this.getAttribute('data-doc-name') || 'this document';
-                if (!fileId || !confirm('Delete "' + docName + '" from Google Drive? This cannot be undone.')) return;
-                this.disabled = true;
-                try {
-                    var res = await fetch('/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete', { method: 'POST' });
-                    var data = await res.json();
-                    if (data.success) window.location.reload();
-                    else { scAlert(data.error || 'Delete failed.'); this.disabled = false; }
-                } catch (e) { scAlert('Request failed.'); this.disabled = false; }
-            });
-        });
-    })();
-    </script>
     {% endif %}
 </div>
 {% endblock %}

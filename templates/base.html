@@ -1765,9 +1765,9 @@
                         </span>
                         <span>Reminders</span>
                     </a>
-                    {% endif %}
                     {# Case tracking and Reports & Analytics removed from the Administration block
                        per request for both Firm Administrator and Managing Partner. #}
+                    {% endif %}
                     {% endif %}
 
                     <!-- Matter Management hub: show on All Matters page -->
@@ -2418,12 +2418,10 @@
                     </span>
                     <span>My Tasks</span>
                 </a>
-                {% if user_role != 'Associate Advocate' %}
                 <a href="{{ url_for('my_tools') }}" class="sidebar-link {% if request.endpoint == 'my_tools' %}active{% endif %}" id="nav-my-tools">
                     <i class="fas fa-tools"></i>
                     <span>My Tools</span>
                 </a>
-                {% endif %}
                 {% if user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or (session.get('original_role') == 'IT Support') %}
                 <a href="{{ url_for('company_information') }}" class="sidebar-link {% if request.endpoint in ['company_information', 'website_templates_settings', 'company_templates_settings', 'system_settings', 'system_settings_section'] %}active{% endif %}" id="nav-company-footer">
                     <i class="fas fa-building"></i>

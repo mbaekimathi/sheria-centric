@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, send_file, Response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, send_file, Response, g
 import pymysql
 import os
 from werkzeug.utils import secure_filename
@@ -15016,6 +15016,8 @@ def update_profile():
         full_name = request.form.get('full_name', '').strip()
         phone_number = request.form.get('phone_number', '').strip()
         work_email = request.form.get('work_email', '').strip()
+        professional_title = (request.form.get('professional_title') or '').strip()[:255]
+        attorney_bio = (request.form.get('attorney_bio') or '').strip()[:4000]
         
         # Validation
         errors = []
@@ -15075,6 +15077,7 @@ def update_profile():
             confirm_password = request.form.get('confirm_password', '').strip()
             
             password_updated = False
+            new_password_hash = None
             if current_password or new_password or confirm_password:
                 # All password fields must be filled if changing password
                 if not current_password or not new_password or not confirm_password:
@@ -15100,33 +15103,44 @@ def update_profile():
                 new_password_hash = generate_password_hash(new_password)
                 password_updated = True
             
-            # Update employee data
+            # Update employee data (bio/title feed Legal settings + firm website)
             if profile_picture and password_updated:
                 cursor.execute("""
                     UPDATE employees 
-                    SET full_name = %s, phone_number = %s, work_email = %s, profile_picture = %s, password_hash = %s
+                    SET full_name = %s, phone_number = %s, work_email = %s,
+                        professional_title = %s, attorney_bio = %s,
+                        profile_picture = %s, password_hash = %s
                     WHERE id = %s
-                """, (full_name, phone_number, work_email, profile_picture, new_password_hash, session['employee_id']))
+                """, (full_name, phone_number, work_email, professional_title, attorney_bio,
+                      profile_picture, new_password_hash, session['employee_id']))
                 session['profile_picture'] = profile_picture
             elif profile_picture:
                 cursor.execute("""
                     UPDATE employees 
-                    SET full_name = %s, phone_number = %s, work_email = %s, profile_picture = %s
+                    SET full_name = %s, phone_number = %s, work_email = %s,
+                        professional_title = %s, attorney_bio = %s,
+                        profile_picture = %s
                     WHERE id = %s
-                """, (full_name, phone_number, work_email, profile_picture, session['employee_id']))
+                """, (full_name, phone_number, work_email, professional_title, attorney_bio,
+                      profile_picture, session['employee_id']))
                 session['profile_picture'] = profile_picture
             elif password_updated:
                 cursor.execute("""
                     UPDATE employees 
-                    SET full_name = %s, phone_number = %s, work_email = %s, password_hash = %s
+                    SET full_name = %s, phone_number = %s, work_email = %s,
+                        professional_title = %s, attorney_bio = %s,
+                        password_hash = %s
                     WHERE id = %s
-                """, (full_name, phone_number, work_email, new_password_hash, session['employee_id']))
+                """, (full_name, phone_number, work_email, professional_title, attorney_bio,
+                      new_password_hash, session['employee_id']))
             else:
                 cursor.execute("""
                     UPDATE employees 
-                    SET full_name = %s, phone_number = %s, work_email = %s
+                    SET full_name = %s, phone_number = %s, work_email = %s,
+                        professional_title = %s, attorney_bio = %s
                     WHERE id = %s
-                """, (full_name, phone_number, work_email, session['employee_id']))
+                """, (full_name, phone_number, work_email, professional_title, attorney_bio,
+                      session['employee_id']))
             
             connection.commit()
             
@@ -16085,6 +16099,45 @@ def save_employee_permissions(connection, employee_id, form_data):
         connection.rollback()
 
 
+def _permission_wants_json():
+    """True when the client expects a JSON permission denial."""
+    path = request.path or ''
+    if path.startswith('/api/'):
+        return True
+    accept = (request.headers.get('Accept') or '').lower()
+    return (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in accept
+    )
+
+
+def _load_session_permissions_map(connection=None):
+    """Request-scoped permission map for the logged-in employee (or {})."""
+    if hasattr(g, '_employee_permissions_map'):
+        return g._employee_permissions_map
+
+    employee_id = session.get('employee_id')
+    if not employee_id:
+        g._employee_permissions_map = {}
+        return g._employee_permissions_map
+
+    owns = connection is None
+    if owns:
+        connection = get_db_connection()
+    if not connection:
+        g._employee_permissions_map = {}
+        return g._employee_permissions_map
+    try:
+        g._employee_permissions_map = get_employee_permissions_map(connection, employee_id)
+    finally:
+        if owns:
+            try:
+                connection.close()
+            except Exception:
+                pass
+    return g._employee_permissions_map
+
+
 def current_user_has_permission(connection, permission_key):
     """Check if the logged-in employee has a given permission.
 
@@ -16101,42 +16154,175 @@ def current_user_has_permission(connection, permission_key):
         return True
 
     try:
-        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute(
-                """
-                SELECT allowed
-                FROM employee_permissions
-                WHERE employee_id = %s AND permission_key = %s
-                """,
-                (employee_id, permission_key),
-            )
-            row = cursor.fetchone()
-            if row is None:
-                return True
-            return bool(row['allowed'])
+        permissions = _load_session_permissions_map(connection)
+        if permission_key not in permissions:
+            return True
+        return bool(permissions[permission_key])
     except Exception as e:
         print(f"Permission check failed for employee {employee_id}, key {permission_key}: {e}")
         return True
 
 
+def permission_denied_response(permission_key, redirect_endpoint='dashboard'):
+    """Return a 403 JSON response or a flash+redirect for HTML navigations."""
+    from urllib.parse import urlparse
+
+    msg = 'You do not have permission to perform this action.'
+    if not getattr(g, '_perm_flash_sent', False):
+        try:
+            flash(msg, 'error')
+        except Exception:
+            pass
+        g._perm_flash_sent = True
+
+    if _permission_wants_json():
+        return jsonify({
+            'success': False,
+            'error': msg,
+            'permission': permission_key,
+        }), 403
+
+    referrer = request.referrer
+    if referrer:
+        try:
+            parsed = urlparse(referrer)
+            if parsed.netloc == request.host and parsed.path.startswith('/'):
+                return redirect(referrer)
+        except Exception:
+            pass
+    return redirect(url_for(redirect_endpoint))
+
+
 def enforce_permission(connection, permission_key, redirect_endpoint='dashboard'):
-    """Enforce a permission; returns a redirect response or None if allowed.
+    """Enforce a permission; returns a denial response or None if allowed.
+
     When denied, redirects back to the same page (referrer) when safe, so the user
-    stays in context and sees the permission popup there; otherwise uses redirect_endpoint.
+    stays in context; API/AJAX callers get JSON 403 instead.
     """
     if not current_user_has_permission(connection, permission_key):
-        flash('You do not have permission to perform this action.', 'error')
-        from urllib.parse import urlparse
-        referrer = request.referrer
-        if referrer:
-            try:
-                parsed = urlparse(referrer)
-                if parsed.netloc == request.host and parsed.path.startswith('/'):
-                    return redirect(referrer)
-            except Exception:
-                pass
-        return redirect(url_for(redirect_endpoint))
+        return permission_denied_response(permission_key, redirect_endpoint=redirect_endpoint)
     return None
+
+
+# endpoint -> permission_key. Applied globally in before_request so every page/API
+# honors the Employee Permissions matrix (e.g. /employee_permissions?employee_id=…).
+ENDPOINT_PERMISSION_MAP = {
+    # Employees
+    'assign_role_and_approve': 'employee_approve',
+    'onboarding_approvals': 'employee_approve',
+    'onboarding_approval_detail': 'employee_approve',
+    'update_employee': 'employee_edit',
+    'update_employee_onboarding': 'employee_edit',
+    'update_employee_status': 'employee_suspend',
+    'delete_employee': 'employee_delete',
+    # Clients
+    'register_client': 'client_register',
+    'onboard_client': 'client_approve',
+    'submit_onboard_client': 'client_approve',
+    'edit_client_page': 'client_edit',
+    'edit_client': 'client_edit',
+    'suspend_client': 'client_suspend',
+    'delete_client': 'client_delete',
+    # Matters / cases — register
+    'register_case': 'matter_register_case',
+    'api_cases_register': 'matter_register_case',
+    'register_matter': 'matter_register_other',
+    'api_register_matter': 'matter_register_other',
+    # Edit
+    'case_edit': 'matter_edit',
+    'matter_edit': 'matter_edit',
+    'api_cases_update': 'matter_edit',
+    'api_matters_update': 'matter_edit',
+    # Status
+    'case_status': 'matter_change_status',
+    'matter_status': 'matter_change_status',
+    'api_update_case_status': 'matter_change_status',
+    'api_update_matter_status': 'matter_change_status',
+    # Allocate / approve
+    'case_allocate': 'matter_allocate',
+    'matter_allocate': 'matter_allocate',
+    'api_allocate_case': 'matter_allocate',
+    'api_allocate_matter': 'matter_allocate',
+    'api_approve_case': 'matter_allocate',
+    'api_approve_matter': 'matter_allocate',
+    'approve_cases': 'matter_allocate',
+    'approve_matters': 'matter_allocate',
+    # Documents
+    'case_documents': 'matter_documents',
+    'matter_documents': 'matter_documents',
+    'upload_case_document': 'matter_documents',
+    'create_case_google_file': 'matter_documents',
+    'download_case_document': 'matter_documents',
+    'delete_case_document_api': 'matter_documents',
+    'upload_matter_document': 'matter_documents',
+    'create_matter_google_file': 'matter_documents',
+    'download_matter_document': 'matter_documents',
+    'delete_matter_document_api': 'matter_documents',
+    # Audit
+    'case_audit_progress': 'matter_audit',
+    'matter_audit_progress': 'matter_audit',
+    # Finance
+    'finance_billing': 'finance_view_dashboard',
+    # Calendar / reminders
+    'calendar': 'calendar_shared',
+    'calendar_reminders': 'calendar_shared',
+    'case_reminders': 'calendar_case_reminders',
+    'reminders': 'calendar_case_reminders',
+    'case_calendar': 'calendar_case_reminders',
+    # System
+    'system_settings': 'system_manage_settings',
+    'system_settings_section': 'system_manage_settings',
+    'company_information': 'system_manage_settings',
+    'documents_settings': 'system_manage_document_settings',
+    'communication_settings': 'system_manage_channels',
+    'employee_communication_settings': 'system_manage_channels',
+}
+
+
+@app.before_request
+def _enforce_endpoint_permissions():
+    """Block any mapped endpoint when the employee permission toggle is off."""
+    if 'employee_id' not in session:
+        return None
+    endpoint = request.endpoint
+    if not endpoint:
+        return None
+    permission_key = ENDPOINT_PERMISSION_MAP.get(endpoint)
+    if not permission_key:
+        return None
+
+    connection = get_db_connection()
+    if not connection:
+        return None
+    try:
+        if current_user_has_permission(connection, permission_key):
+            return None
+        return permission_denied_response(permission_key)
+    finally:
+        connection.close()
+
+
+@app.context_processor
+def inject_user_permissions():
+    """Expose has_perm() / user_permissions to all templates for UI gating."""
+    def has_perm(permission_key):
+        if 'employee_id' not in session:
+            return True
+        if permission_key not in PERMISSION_KEYS:
+            return True
+        permissions = _load_session_permissions_map()
+        if permission_key not in permissions:
+            return True
+        return bool(permissions[permission_key])
+
+    permissions = {}
+    if 'employee_id' in session:
+        permissions = _load_session_permissions_map()
+    return {
+        'has_perm': has_perm,
+        'user_permissions': permissions,
+        'PERMISSION_KEYS': PERMISSION_KEYS,
+    }
 
 
 @app.route('/employee_permissions', methods=['GET', 'POST'])

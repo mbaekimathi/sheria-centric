@@ -28,6 +28,9 @@
                 <!-- Profile Info -->
                 <div class="flex-1 text-center md:text-left">
                     <h1 class="text-3xl font-bold text-white mb-2">{{ employee.full_name }}</h1>
+                    {% if employee.professional_title %}
+                    <p class="text-white/90 text-base mb-2">{{ employee.professional_title }}</p>
+                    {% endif %}
                     {% if is_role_switched and switched_role %}
                     <div class="mb-3 px-4 py-2 bg-orange-500/30 backdrop-blur-sm rounded-lg border border-orange-300/50 inline-flex items-center">
                         <i class="fas fa-exchange-alt text-orange-200 mr-2"></i>
@@ -48,6 +51,21 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="profileViewMode">
+    <!-- About / Public Bio -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-2 flex items-center">
+            <i class="fas fa-quote-left text-green-600 mr-3"></i>
+            About Me
+        </h2>
+        <p class="text-xs text-gray-500 mb-4">This description also appears on the firm website under Attorney &amp; Staff Profiles.</p>
+        {% if employee.attorney_bio %}
+        <p class="text-gray-800 leading-relaxed whitespace-pre-wrap">{{ employee.attorney_bio }}</p>
+        {% else %}
+        <p class="text-gray-500 italic">No public bio yet. Click Edit Profile to add one.</p>
+        {% endif %}
     </div>
 
     <!-- Profile Details -->
@@ -152,6 +170,7 @@
             </div>
         </div>
     </div>
+    </div>
 
     <!-- Action Buttons -->
     <div class="mt-6 flex flex-col sm:flex-row gap-4">
@@ -236,6 +255,29 @@
                            class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed">
                     <p class="text-xs text-gray-500 mt-1">Employee code cannot be changed</p>
                 </div>
+
+                <!-- Professional title (public site) -->
+                <div class="md:col-span-2">
+                    <label for="professional_title" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-briefcase text-green-600 mr-2"></i>Professional Title
+                    </label>
+                    <input type="text" name="professional_title" id="professional_title"
+                           value="{{ employee.professional_title or '' }}" maxlength="255"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                           placeholder="e.g. Senior Litigation Counsel">
+                    <p class="text-xs text-gray-500 mt-1">Shown on the firm website with your name</p>
+                </div>
+
+                <!-- Public bio (same as Legal → Attorney & Staff Profiles) -->
+                <div class="md:col-span-2">
+                    <label for="attorney_bio" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-align-left text-green-600 mr-2"></i>About Me / Public Bio
+                    </label>
+                    <textarea name="attorney_bio" id="attorney_bio" rows="5" maxlength="4000"
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                              placeholder="Professional background, experience, and areas of focus…">{{ employee.attorney_bio or '' }}</textarea>
+                    <p class="text-xs text-gray-500 mt-1">Appears on your profile and on the firm website (Attorney &amp; Staff Profiles). Max 4000 characters.</p>
+                </div>
             </div>
 
             <!-- Password Change Section -->
@@ -295,20 +337,18 @@
 
 <script>
     function toggleEditMode() {
-        const viewMode = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.gap-6');
+        const viewMode = document.getElementById('profileViewMode');
         const editForm = document.getElementById('editProfileForm');
         const editBtn = document.getElementById('editBtn');
         
         if (editForm.classList.contains('hidden')) {
-            // Switch to edit mode
             viewMode.style.display = 'none';
             editForm.classList.remove('hidden');
             editBtn.innerHTML = '<i class="fas fa-eye mr-2"></i>View Profile';
             editBtn.classList.remove('from-orange-600', 'to-orange-700', 'hover:from-orange-700', 'hover:to-orange-800');
             editBtn.classList.add('from-gray-600', 'to-gray-700', 'hover:from-gray-700', 'hover:to-gray-800');
         } else {
-            // Switch to view mode
-            viewMode.style.display = 'grid';
+            viewMode.style.display = '';
             editForm.classList.add('hidden');
             editBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Profile';
             editBtn.classList.remove('from-gray-600', 'to-gray-700', 'hover:from-gray-700', 'hover:to-gray-800');

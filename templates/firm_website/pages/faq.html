@@ -1,0 +1,37 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Help centre</p>
+    <h1>{{ page_seo.h1_heading or 'Frequently Asked Questions' }}</h1>
+    <p class="firm-page-lead">{{ page_seo.meta_description or 'Answers to common questions about our firm and services.' }}</p>
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container">
+    {% if faqs %}
+    <div class="firm-reveal">
+      {% include 'firm_website/_faq_accordion.html' %}
+    </div>
+    {% else %}
+    <p class="firm-empty-state firm-reveal">FAQs will appear here once published in settings.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section firm-section-alt">
+  <div class="container firm-reveal">
+    <div class="firm-cta-band">
+      <div>
+        <h2>Still have a question?</h2>
+        <p>Our team is ready to help with your specific matter.</p>
+      </div>
+      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light">{{ hero_cta_label }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

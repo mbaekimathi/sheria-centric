@@ -1,0 +1,84 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-attorney-hero firm-reveal">
+  {% if attorney.profile_picture_url %}
+  <div class="firm-attorney-photo">
+    <img src="{{ attorney.profile_picture_url }}" alt="{{ attorney.profile_picture_alt or attorney.full_name }}" loading="eager" width="200" height="200">
+  </div>
+  {% endif %}
+  <div>
+    <p class="firm-eyebrow">Our team</p>
+    <h1>{{ page_seo.h1_heading or attorney.full_name }}</h1>
+    <p class="firm-page-lead">{{ attorney.professional_title or attorney.role or 'Attorney' }}</p>
+    {% if attorney.practice_areas %}
+    <p class="firm-attorney-areas">{{ attorney.practice_areas.replace('\n', ' · ') }}</p>
+      {% endif %}
+    </div>
+    {% if attorney_video_embed %}
+    <div class="firm-video-embed firm-reveal" style="margin-top:2rem;">
+      <iframe src="{{ attorney_video_embed }}" title="Video introduction — {{ attorney.full_name }}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container firm-about-grid">
+    <div class="firm-reveal">
+      {% if attorney.attorney_bio %}
+      <h2 class="firm-section-title">Biography</h2>
+      <div class="firm-prose">{{ attorney.attorney_bio }}</div>
+      {% endif %}
+
+      {% set education = attorney_education.get(attorney.id, []) %}
+      {% if education %}
+      <h2 class="firm-section-title" style="margin-top:2rem;">Education</h2>
+      <ul class="firm-meta-list">
+        {% for edu in education %}
+        <li>
+          <strong>{{ edu.degree or 'Qualification' }}</strong>
+          <span>{{ edu.institution }}{% if edu.year %} ({{ edu.year }}){% endif %}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% set cases = attorney_notable_cases.get(attorney.id, []) %}
+      {% if cases %}
+      <h2 class="firm-section-title" style="margin-top:2rem;">Notable matters</h2>
+      <ul class="firm-awards-list">
+        {% for case in cases %}
+        <li>{{ case.description }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if attorney.last_updated_display %}
+      <p class="firm-updated">Last updated: {{ attorney.last_updated_display }}</p>
+      {% endif %}
+    </div>
+    <aside class="firm-reveal">
+      <div class="firm-card">
+        <h2>Contact {{ attorney.full_name.split(' ')[0] }}</h2>
+        {% if attorney.public_contact_phone or attorney.phone_number %}
+        <p><i class="fas fa-phone" aria-hidden="true"></i> <a href="tel:{{ attorney.public_contact_phone or attorney.phone_number }}">{{ attorney.public_contact_phone or attorney.phone_number }}</a></p>
+        {% endif %}
+        {% if attorney.public_contact_email or attorney.work_email %}
+        <p><i class="fas fa-envelope" aria-hidden="true"></i> <a href="mailto:{{ attorney.public_contact_email or attorney.work_email }}">{{ attorney.public_contact_email or attorney.work_email }}</a></p>
+        {% endif %}
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary" style="margin-top:1rem;">Book a consultation</a>
+      </div>
+      {% if attorney.lsk_practicing_certificate_number %}
+      <div class="firm-card" style="margin-top:1rem;">
+        <h3>Credentials</h3>
+        <p>LSK Practicing Certificate: {{ attorney.lsk_practicing_certificate_number }}</p>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

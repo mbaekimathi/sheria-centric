@@ -1,0 +1,42 @@
+<header class="firm-header" data-firm-header>
+  <div class="container firm-header-inner">
+    <a href="{{ url_for('login') }}" class="firm-brand" aria-label="{{ firm_name }} employee login">
+      {% if firm_logo_url %}
+      <img src="{{ firm_logo_url }}" alt="{{ firm_logo_alt or firm_name }}" width="44" height="44" loading="eager">
+      {% else %}
+      <span class="firm-brand-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
+      {% endif %}
+      <span>{{ firm_name }}</span>
+    </a>
+    <nav class="firm-nav-desktop" aria-label="Primary">
+      {% for item in firm_nav %}
+      <a href="{{ item.url }}" class="firm-nav-link{% if current_page == item.key or (current_page == 'practice_area' and item.key == 'practice_areas') or (current_page == 'attorney' and item.key == 'team') or (current_page == 'blog_post' and item.key == 'blog') %} is-active{% endif %}">{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="firm-header-actions">
+      {% if firm_phone %}
+      <a href="tel:{{ firm_phone }}" class="firm-header-phone" aria-label="Call {{ firm_name }}">
+        <i class="fas fa-phone" aria-hidden="true"></i>
+        <span>{{ firm_phone }}</span>
+      </a>
+      {% endif %}
+      <a href="{{ url_for('client_login') }}" class="firm-client-login">
+        <i class="fas fa-user" aria-hidden="true"></i>
+        <span>Client Login</span>
+      </a>
+      <a href="{{ hero_cta_url }}" class="firm-btn firm-btn-primary firm-header-cta">{{ hero_cta_label }}</a>
+      <button type="button" class="firm-menu-toggle" data-firm-menu-toggle aria-expanded="false" aria-controls="firm-mobile-nav" aria-label="Open menu">
+        <i class="fas fa-bars" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+  <nav id="firm-mobile-nav" class="firm-mobile-nav" data-firm-mobile-nav aria-label="Mobile">
+    {% for item in firm_nav %}
+    <a href="{{ item.url }}">{{ item.label }}</a>
+    {% endfor %}
+    {% if firm_phone %}
+    <a href="tel:{{ firm_phone }}"><i class="fas fa-phone" aria-hidden="true"></i> {{ firm_phone }}</a>
+    {% endif %}
+    <a href="{{ url_for('client_login') }}"><i class="fas fa-user" aria-hidden="true"></i> Client Login</a>
+  </nav>
+</header>

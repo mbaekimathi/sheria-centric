@@ -1,0 +1,58 @@
+<footer class="firm-footer">
+  <div class="container">
+    <div class="firm-footer-grid">
+      <div>
+        <h3>{{ firm_name }}</h3>
+        <ul class="firm-footer-nap">
+          {% if firm_address %}
+          <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>{{ firm_address }}</span></li>
+          {% endif %}
+          {% if firm_phone %}
+          <li><i class="fas fa-phone" aria-hidden="true"></i><a href="tel:{{ firm_phone }}">{{ firm_phone }}</a></li>
+          {% endif %}
+          {% if firm_email %}
+          <li><i class="fas fa-envelope" aria-hidden="true"></i><a href="mailto:{{ firm_email }}">{{ firm_email }}</a></li>
+          {% endif %}
+        </ul>
+        {% set socials = [
+          (firm.get('fb_link'), 'fab fa-facebook-f', 'Facebook'),
+          (firm.get('linkedin_link'), 'fab fa-linkedin-in', 'LinkedIn'),
+          (firm.get('twitter_link'), 'fab fa-x-twitter', 'X / Twitter'),
+          (firm.get('instagram_link'), 'fab fa-instagram', 'Instagram'),
+          (firm.get('website_url'), 'fas fa-globe', 'Website')
+        ] %}
+        <div class="firm-socials" aria-label="Social media">
+          {% for url, icon, label in socials %}
+          {% if url %}
+          <a href="{{ url if url.startswith('http') else 'https://' ~ url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ label }}"><i class="{{ icon }}" aria-hidden="true"></i></a>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <h3>Explore</h3>
+        <div class="firm-footer-links">
+          {% for item in firm_nav %}
+          <a href="{{ item.url }}">{{ item.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <h3>Legal</h3>
+        <div class="firm-footer-links">
+          {% if firm.get('privacy_policy') %}<a href="{{ firm_url('privacy') }}">Privacy Policy</a>{% endif %}
+          {% if firm.get('terms_of_service') %}<a href="{{ firm_url('terms') }}">Terms of Service</a>{% endif %}
+          {% if firm.get('website_disclaimer') %}<a href="{{ firm_url('disclaimer') }}">Disclaimer</a>{% endif %}
+          <a href="{{ url_for('client_login') }}">Client Login</a>
+        </div>
+      </div>
+    </div>
+    <div class="firm-footer-bottom">
+      <span>&copy; {{ firm_name }}. All rights reserved.</span>
+      {% if site_last_updated %}
+      <span>Last updated: {{ site_last_updated }}</span>
+      {% endif %}
+      <span>Powered by SHERIA CENTRIC</span>
+    </div>
+  </div>
+</footer>

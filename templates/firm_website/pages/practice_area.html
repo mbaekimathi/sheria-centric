@@ -1,0 +1,88 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    {% if practice_area.image_url %}
+    <div class="firm-page-hero-media">
+      <img src="{{ practice_area.image_url }}" alt="{{ practice_area.image_alt or practice_area.name }}" loading="eager" width="960" height="400">
+    </div>
+    {% endif %}
+    <p class="firm-eyebrow">Practice area</p>
+    <h1>{{ page_seo.h1_heading or practice_area.name }}</h1>
+    {% if practice_area.short_description %}
+    <p class="firm-page-lead">{{ practice_area.short_description }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container firm-about-grid">
+    <div class="firm-reveal">
+      {% if practice_area.description %}
+      <div class="firm-prose">{{ practice_area.description }}</div>
+      {% endif %}
+      {% if practice_area.last_updated_display %}
+      <p class="firm-updated">Last updated: {{ practice_area.last_updated_display }}</p>
+      {% endif %}
+    </div>
+    <aside class="firm-reveal">
+      <div class="firm-card">
+        <h2>Request a consultation</h2>
+        <p>Speak with our team about your {{ practice_area.name | lower }} matter.</p>
+        {% if consultation_fee_label %}
+        <p class="firm-consult-fee"><i class="fas fa-tag" aria-hidden="true"></i> {{ consultation_fee_label }}</p>
+        {% endif %}
+        {% if response_time_label %}
+        <p class="firm-consult-fee"><i class="fas fa-clock" aria-hidden="true"></i> {{ response_time_label }}</p>
+        {% endif %}
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">{{ hero_cta_label }}</a>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-outline" style="margin-top:0.75rem;" target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp" aria-hidden="true"></i> WhatsApp
+        </a>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</section>
+
+{% if area_attorneys %}
+<section class="firm-section firm-section-alt" aria-labelledby="pa-team-heading">
+  <div class="container">
+    <div class="firm-section-head firm-reveal">
+      <h2 id="pa-team-heading" class="firm-section-title">Advocates in this area</h2>
+    </div>
+    <div class="firm-grid-3">
+      {% for emp in area_attorneys %}
+      <article class="firm-card firm-team-card firm-reveal">
+        {% if emp.profile_picture_url %}
+        <div class="firm-team-photo">
+          <img src="{{ emp.profile_picture_url }}" alt="{{ emp.full_name }}" loading="lazy" width="120" height="120">
+        </div>
+        {% endif %}
+        <h3>{{ emp.full_name }}</h3>
+        <p class="firm-team-role">{{ emp.professional_title or emp.role or 'Attorney' }}</p>
+        <a href="{{ firm_url('team/' ~ (emp.url_slug or emp.id)) }}" class="firm-card-link">View profile</a>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if faqs %}
+<section class="firm-section" aria-labelledby="pa-faq-heading">
+  <div class="container">
+    <div class="firm-section-head firm-reveal">
+      <h2 id="pa-faq-heading" class="firm-section-title">Common questions</h2>
+    </div>
+    <div class="firm-reveal">
+      {% include 'firm_website/_faq_accordion.html' %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

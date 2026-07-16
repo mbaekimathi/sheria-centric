@@ -1,0 +1,139 @@
+<div id="settings-autosave-status"
+     class="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border text-sm font-medium transition-all duration-300 bg-white border-gray-200 text-gray-600"
+     role="status" aria-live="polite" aria-atomic="true" hidden>
+    <i class="status-icon fas fa-check-circle text-emerald-500"></i>
+    <span class="status-text">All changes saved</span>
+</div>
+<script>
+(function () {
+    var form = document.getElementById('systemSettingsForm')
+        || document.getElementById('websiteTemplateForm');
+    if (!form) return;
+
+    var statusEl = document.getElementById('settings-autosave-status');
+    var statusIcon = statusEl ? statusEl.querySelector('.status-icon') : null;
+    var statusText = statusEl ? statusEl.querySelector('.status-text') : null;
+    var debounceMs = 900;
+    var saveTimer = null;
+    var saving = false;
+    var pendingSave = false;
+    var hideTimer = null;
+    var initialized = false;
+
+    function showStatus() {
+        if (!statusEl) return;
+        statusEl.hidden = false;
+        clearTimeout(hideTimer);
+    }
+
+    function setStatus(state, message) {
+        if (!statusEl || !statusIcon || !statusText) return;
+        showStatus();
+        statusEl.classList.remove('border-gray-200', 'border-emerald-200', 'border-amber-200', 'border-red-200');
+        statusEl.classList.remove('text-gray-600', 'text-emerald-700', 'text-amber-700', 'text-red-700');
+        statusIcon.className = 'status-icon fas';
+
+        if (state === 'saving') {
+            statusEl.classList.add('border-amber-200', 'text-amber-700');
+            statusIcon.classList.add('fa-spinner', 'fa-spin', 'text-amber-500');
+            statusText.textContent = message || 'Saving…';
+            return;
+        }
+        if (state === 'error') {
+            statusEl.classList.add('border-red-200', 'text-red-700');
+            statusIcon.classList.add('fa-exclamation-circle', 'text-red-500');
+            statusText.textContent = message || 'Could not save';
+            return;
+        }
+        statusEl.classList.add('border-emerald-200', 'text-emerald-700');
+        statusIcon.classList.add('fa-check-circle', 'text-emerald-500');
+        statusText.textContent = message || 'All changes saved';
+        hideTimer = setTimeout(function () {
+            if (!saving) statusEl.hidden = true;
+        }, 2800);
+    }
+
+    function scheduleSave(delay) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveNow, typeof delay === 'number' ? delay : debounceMs);
+    }
+
+    function saveNow() {
+        clearTimeout(saveTimer);
+        if (saving) {
+            pendingSave = true;
+            return;
+        }
+        saving = true;
+        setStatus('saving');
+
+        var body = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        }).then(function (res) {
+            return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+            }).catch(function () {
+                return { ok: false, data: { success: false, message: 'Invalid server response' } };
+            });
+        }).then(function (result) {
+            if (!result.ok || !result.data || result.data.success === false) {
+                setStatus('error', (result.data && result.data.message) || 'Save failed');
+                return;
+            }
+            if (result.data.unchanged) {
+                setStatus('saved', 'Up to date');
+            } else {
+                setStatus('saved', result.data.message || 'Saved');
+            }
+        }).catch(function () {
+            setStatus('error', 'Network error — try again');
+        }).finally(function () {
+            saving = false;
+            if (pendingSave) {
+                pendingSave = false;
+                scheduleSave(250);
+            }
+        });
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        saveNow();
+    });
+
+    form.addEventListener('input', function (e) {
+        if (!initialized) return;
+        if (e.target && e.target.type === 'file') return;
+        scheduleSave();
+    });
+
+    form.addEventListener('change', function (e) {
+        if (!initialized) return;
+        var t = e.target;
+        if (!t) return;
+        if (t.type === 'file' || t.type === 'checkbox' || t.type === 'color' || t.tagName === 'SELECT') {
+            saveNow();
+        }
+    });
+
+    form.addEventListener('click', function (e) {
+        if (!initialized) return;
+        if (e.target.closest('.remove-practice-area-btn') || e.target.closest('.remove-testimonial-btn')) {
+            setTimeout(saveNow, 80);
+        }
+    });
+
+    document.addEventListener('settings-autosave', function () {
+        if (initialized) saveNow();
+    });
+
+    setTimeout(function () { initialized = true; }, 400);
+})();
+</script>

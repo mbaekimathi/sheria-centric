@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_seo.meta_title or firm_name }}</title>
+  <meta name="description" content="{{ page_seo.meta_description or firm_tagline or ('Welcome to ' ~ firm_name) }}">
+  {% if page_seo.canonical_url %}<link rel="canonical" href="{{ page_seo.canonical_url }}">{% endif %}
+  {% for script in json_ld_scripts or [] %}
+  <script type="application/ld+json">{{ script | safe }}</script>
+  {% endfor %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700{% if theme.font_body != 'Inter' %}&family={{ theme.font_body | replace(' ', '+') }}:wght@400;500;600;700{% endif %}{% if theme.font_heading != 'Inter' and theme.font_heading != 'Playfair Display' %}&family={{ theme.font_heading | replace(' ', '+') }}:wght@500;600;700{% endif %}&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='firm_website.css') }}">
+  <style>
+    :root {
+      --color-primary: {{ theme.primary }};
+      --color-accent: {{ theme.secondary }};
+      --color-accent-light: {{ theme.tertiary }};
+      --color-dark: {{ theme.primary }};
+      --font-heading: "{{ theme.font_heading }}", Georgia, serif;
+      --font-body: "{{ theme.font_body }}", system-ui, sans-serif;
+    }
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="firm-site{% if preview_mode %} firm-site-preview{% endif %}">
+  <a href="#main-content" class="firm-skip-link">Skip to main content</a>
+  {% if preview_mode %}
+  <div class="firm-preview-banner" role="status">
+    <i class="fas fa-eye" aria-hidden="true"></i>
+    Website preview — visitors will see this when <strong>Use law firm website</strong> is turned on.
+  </div>
+  {% endif %}
+  {% include 'firm_website/_header.html' %}
+  <main id="main-content">
+    {% block content %}{% endblock %}
+  </main>
+  {% include 'firm_website/_footer.html' %}
+  {% if whatsapp_url %}
+  <a href="{{ whatsapp_url }}" class="firm-whatsapp-float" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
+    <i class="fab fa-whatsapp" aria-hidden="true"></i>
+  </a>
+  {% endif %}
+  <script src="{{ url_for('static', filename='firm_website.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

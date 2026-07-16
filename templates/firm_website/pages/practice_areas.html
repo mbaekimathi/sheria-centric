@@ -1,0 +1,51 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">What we do</p>
+    <h1>{{ page_seo.h1_heading or 'Practice Areas' }}</h1>
+    <p class="firm-page-lead">{{ page_seo.meta_description or 'Explore the legal services our firm provides.' }}</p>
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container">
+    {% if practice_areas %}
+    <div class="firm-grid-3">
+      {% for pa in practice_areas %}
+      <article class="firm-card firm-reveal">
+        {% if pa.image_url %}
+        <div class="firm-card-media">
+          <img src="{{ pa.image_url }}" alt="{{ pa.image_alt or pa.name }}" loading="lazy" decoding="async" width="400" height="250">
+        </div>
+        {% endif %}
+        <h2>{{ pa.h1_heading or pa.name }}</h2>
+        {% set pa_blurb = pa.short_description or pa.description %}
+        {% if pa_blurb %}<p>{{ pa_blurb | truncate(180) }}</p>{% endif %}
+        <a href="{{ firm_url('practice-areas/' ~ (pa.url_slug or pa.id)) }}" class="firm-card-link">
+          Learn more <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="firm-empty-state firm-reveal">Practice areas will appear here once configured in settings.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section firm-section-alt">
+  <div class="container firm-reveal">
+    <div class="firm-cta-band">
+      <div>
+        <h2>Not sure which practice area fits your matter?</h2>
+        <p>Contact our office and we will guide you to the right advocate.</p>
+      </div>
+      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light">{{ hero_cta_label }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

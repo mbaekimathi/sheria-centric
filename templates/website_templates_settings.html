@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% set cs = company_settings or {} %}
+{% set firm_site_on = cs.get('firm_website_enabled') %}
+{% set firm_preview_sections = firm_preview_sections or [] %}
+{% set origin = request.url_root.rstrip('/') %}
+{% set firm_preview_base = origin ~ role_url('website_firm_preview') %}
+{% set marketing_preview_home = origin ~ role_url('website_marketing_preview', page_slug='home') %}
+{% set default_preview_url = firm_preview_base if firm_site_on else marketing_preview_home %}
+
+{% block title %}Website Template - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div class="flex-1">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+                    <i class="fas fa-globe text-indigo-600 mr-3"></i>
+                    Website Template
+                </h1>
+                <p class="text-gray-600">Control whether visitors see the SHERIA CENTRIC marketing site or your law firm's public website. Changes save automatically.</p>
+            </div>
+            <button type="button" id="preview-site-btn" data-preview-url="{{ default_preview_url }}"
+               class="preview-open-link inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 font-semibold text-sm hover:bg-indigo-100 transition-colors flex-shrink-0"
+               title="Open website preview in a new tab">
+                <i class="fas fa-eye"></i>
+                <span id="preview-site-btn-label">{% if firm_site_on %}Preview firm site{% else %}Preview marketing site{% endif %}</span>
+            </button>
+        </div>
+    </div>
+
+    {% include 'system_settings/_seo_status_panel.html' %}
+
+    <form action="{{ role_url('update_company_settings') }}" method="post" class="space-y-6" id="websiteTemplateForm">
+        <input type="hidden" name="settings_section" value="website">
+
+        <div class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div class="settings-section-header">
+                <h2 class="settings-section-title">
+                    <i class="fas fa-power-off settings-section-icon"></i>
+                    Public Website
+                </h2>
+                <p class="settings-section-subtitle">Choose which site visitors see at your firm's public URL.</p>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-xl border border-gray-200 bg-gray-50">
+                    <div class="flex-1">
+                        <p class="text-base font-semibold text-gray-900">Use law firm website</p>
+                        <p class="text-sm text-gray-600 mt-1 max-w-2xl">
+                            When <strong>on</strong>, the SHERIA CENTRIC marketing site (Platform, Features, Pricing, etc.) is hidden.
+                            Visitors instead see your firm's website built from Company Information, Contact, and Legal settings.
+                        </p>
+                        <p class="text-sm text-gray-500 mt-2">
+                            When <strong>off</strong>, the default SHERIA CENTRIC website is shown to the public.
+                        </p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" name="firm_website_enabled" value="on" class="sr-only peer" {% if firm_site_on %}checked{% endif %}>
+                        <div class="w-14 h-8 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-6 peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                        <span class="ml-3 text-sm font-medium text-gray-700 peer-checked:text-indigo-700" id="firm-website-toggle-label">{{ 'On' if firm_site_on else 'Off' }}</span>
+                    </label>
+                </div>
+
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5">
+                    <p class="text-sm font-medium text-indigo-900 mb-2">
+                        <i class="fas fa-link mr-1"></i> Visitor URL (logged out)
+                    </p>
+                    <p class="text-sm text-indigo-800" id="visitor-url-text">
+                        {% if firm_site_on %}
+                        Your firm website is <strong>live</strong> for visitors at
+                        {% else %}
+                        SHERIA CENTRIC marketing site is <strong>live</strong> for visitors at
+                        {% endif %}
+                        <span class="font-semibold">{{ app_base_url or origin }}</span>
+                    </p>
+                    <p class="text-xs text-indigo-700/80 mt-2">
+                        While you are signed in, use <strong>Page Previews</strong> below — opening the visitor URL sends you to the dashboard instead of the public site.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mt-6 mb-8">
+        <div class="settings-section-header">
+            <h2 class="settings-section-title">
+                <i class="fas fa-eye settings-section-icon"></i>
+                Page Previews
+            </h2>
+            <p class="settings-section-subtitle" id="preview-section-subtitle">
+                {% if firm_site_on %}
+                Preview pages for your law firm website — the site visitors see when the toggle is on.
+                {% else %}
+                Preview pages for the SHERIA CENTRIC marketing site — what visitors see when the toggle is off.
+                {% endif %}
+            </p>
+        </div>
+        <div class="p-6">
+            <div id="preview-list-firm" class="{% if not firm_site_on %}hidden{% endif %}">
+                <p class="text-xs text-gray-500 mb-4">Built from Company, Contact, and Legal settings. Section links scroll on the same page.</p>
+                <ul class="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                    {% for section in firm_preview_sections %}
+                    {% set preview_href = section.url if section.get('url') else (firm_preview_base + ('#' + section.fragment if section.get('fragment') else '')) %}
+                    <li class="flex items-center justify-between gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                        <p class="text-sm font-medium text-gray-900">{{ section.label }}</p>
+                        <button type="button" data-preview-url="{{ preview_href }}"
+                           class="preview-open-link inline-flex items-center justify-center w-9 h-9 rounded-lg text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition-colors flex-shrink-0"
+                           title="Preview {{ section.label }}"
+                           aria-label="Preview {{ section.label }}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div id="preview-list-marketing" class="{% if firm_site_on %}hidden{% endif %}">
+                <p class="text-xs text-gray-500 mb-4">SHERIA CENTRIC product marketing pages.</p>
+                <ul class="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+                    {% for slug, label in [
+                        ('home', 'Home'),
+                        ('platform', 'Platform'),
+                        ('features', 'Features'),
+                        ('pricing', 'Pricing'),
+                        ('security', 'Security'),
+                        ('contact', 'Contact'),
+                    ] %}
+                    {% set preview_href = origin ~ role_url('website_marketing_preview', page_slug=slug) %}
+                    <li class="flex items-center justify-between gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                        <p class="text-sm font-medium text-gray-900">{{ label }}</p>
+                        <button type="button" data-preview-url="{{ preview_href }}"
+                           class="preview-open-link inline-flex items-center justify-center w-9 h-9 rounded-lg text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition-colors flex-shrink-0"
+                           title="Preview {{ label }}"
+                           aria-label="Preview {{ label }}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <p class="text-xs text-gray-500 mt-4" id="preview-toggle-hint">
+                {% if firm_site_on %}
+                Turn <strong>Use law firm website</strong> off to preview the SHERIA CENTRIC marketing pages instead.
+                {% else %}
+                Turn <strong>Use law firm website</strong> on to preview your law firm website instead.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+{% include 'system_settings/_autosave.html' %}
+{% endblock %}
+
+{% block extra_js %}
+{% include 'system_settings/_styles.html' %}
+<script>
+(function() {
+    var firmPreviewBase = {{ firm_preview_base | tojson }};
+    var marketingPreviewHome = {{ marketing_preview_home | tojson }};
+    var toggle = document.querySelector('input[name="firm_website_enabled"]');
+    var toggleLabel = document.getElementById('firm-website-toggle-label');
+    var previewBtn = document.getElementById('preview-site-btn');
+    var previewBtnLabel = document.getElementById('preview-site-btn-label');
+    var previewSubtitle = document.getElementById('preview-section-subtitle');
+    var previewHint = document.getElementById('preview-toggle-hint');
+    var visitorUrlText = document.getElementById('visitor-url-text');
+    var firmList = document.getElementById('preview-list-firm');
+    var marketingList = document.getElementById('preview-list-marketing');
+    var visitorUrl = {{ (app_base_url or origin) | tojson }};
+
+    function setPreviewMode(firmOn) {
+        if (toggleLabel) toggleLabel.textContent = firmOn ? 'On' : 'Off';
+        if (firmList) firmList.classList.toggle('hidden', !firmOn);
+        if (marketingList) marketingList.classList.toggle('hidden', firmOn);
+        if (previewBtn) {
+            previewBtn.setAttribute('data-preview-url', firmOn ? firmPreviewBase : marketingPreviewHome);
+        }
+        if (previewBtnLabel) {
+            previewBtnLabel.textContent = firmOn ? 'Preview firm site' : 'Preview marketing site';
+        }
+        if (previewSubtitle) {
+            previewSubtitle.textContent = firmOn
+                ? 'Preview pages for your law firm website — the site visitors see when the toggle is on.'
+                : 'Preview pages for the SHERIA CENTRIC marketing site — what visitors see when the toggle is off.';
+        }
+        if (previewHint) {
+            previewHint.innerHTML = firmOn
+                ? 'Turn <strong>Use law firm website</strong> off to preview the SHERIA CENTRIC marketing pages instead.'
+                : 'Turn <strong>Use law firm website</strong> on to preview your law firm website instead.';
+        }
+        if (visitorUrlText) {
+            visitorUrlText.innerHTML = firmOn
+                ? 'Your firm website is <strong>live</strong> for visitors at <span class="font-semibold">' + visitorUrl + '</span>'
+                : 'SHERIA CENTRIC marketing site is <strong>live</strong> for visitors at <span class="font-semibold">' + visitorUrl + '</span>';
+        }
+    }
+
+    if (toggle) {
+        toggle.addEventListener('change', function() {
+            setPreviewMode(toggle.checked);
+        });
+    }
+
+    document.querySelectorAll('.preview-open-link').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var url = btn.getAttribute('data-preview-url');
+            if (!url) return;
+            var opened = window.open(url, '_blank', 'noopener,noreferrer');
+            if (!opened) window.location.href = url;
+        });
+    });
+})();
+</script>
+{% endblock %}

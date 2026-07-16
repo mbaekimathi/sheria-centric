@@ -1,0 +1,13 @@
+{% if faqs %}
+<div class="firm-faq-list" data-firm-faq>
+  {% for faq in faqs %}
+  <div class="firm-faq-item{% if loop.first %} is-open{% endif %}">
+    <button type="button" class="firm-faq-question" aria-expanded="{% if loop.first %}true{% else %}false{% endif %}">
+      <span>{{ faq.question }}</span>
+      <i class="fas fa-chevron-down" aria-hidden="true"></i>
+    </button>
+    <div class="firm-faq-answer">{{ faq.answer }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

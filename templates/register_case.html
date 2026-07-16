@@ -15,27 +15,50 @@
     <!-- Case Registration Form -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6">
         <form id="caseRegistrationForm" class="space-y-6">
-            <input type="hidden" id="filled_by_id" name="filled_by_id" value="{{ employee_id or '' }}" />
-            <input type="hidden" id="filled_by_name" name="filled_by_name" value="{{ employee_name or '' }}" />
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- 1. Client Name * -->
+                <!-- 1. Filing Date * -->
+                <div>
+                    <label for="filing_date" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Filing Date <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="date" 
+                        id="filing_date" 
+                        name="filing_date"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        required
+                    />
+                </div>
+
+                <!-- 2. Client Name * -->
                 <div class="md:col-span-2">
                     <label for="client_name" class="block text-sm font-semibold text-gray-700 mb-2">
-                        Client Name <span class="text-red-500">*</span>
+                        Client (Search by Name or Phone Number) <span class="text-red-500">*</span>
                     </label>
-                    <div class="relative">
+                    <div class="relative" id="client_picker">
                         <input 
                             type="text" 
                             id="client_name" 
                             name="client_name"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
-                            placeholder="Search or select client..."
+                            class="w-full px-4 py-3 pr-20 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                            placeholder="Type to search, or open the list…"
                             autocomplete="off"
                             required
                         />
                         <input type="hidden" id="client_id" name="client_id" />
-                        <div id="client_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
-                        <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
+                        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <i class="fas fa-search text-gray-400 text-sm pointer-events-none"></i>
+                            <button
+                                type="button"
+                                id="client_dropdown_btn"
+                                class="w-9 h-9 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-green-700 hover:bg-green-50 transition-colors"
+                                title="Show all active clients"
+                                aria-label="Show all active clients"
+                            >
+                                <i class="fas fa-chevron-down text-sm"></i>
+                            </button>
+                        </div>
+                        <div id="client_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-72 overflow-y-auto"></div>
                     </div>
                 </div>
 
@@ -60,45 +83,69 @@
                     </div>
                 </div>
 
-                <!-- 2. Case Type * -->
+                <!-- Case Type * -->
                 <div>
                     <label for="case_type" class="block text-sm font-semibold text-gray-700 mb-2">
                         Case Type <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
-                        <input 
-                            type="text" 
-                            id="case_type" 
+                        <select
+                            id="case_type"
                             name="case_type"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
-                            placeholder="Select recent or type to search..."
-                            autocomplete="off"
                             required
-                        />
-                        <div id="case_type_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-y-auto"></div>
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900 appearance-none pr-10"
+                            onchange="toggleOtherField('case_type')"
+                        >
+                            <option value="">Select case type…</option>
+                            {% for opt in case_type_options %}
+                            <option value="{{ opt }}">{{ opt }}</option>
+                            {% endfor %}
+                            <option value="__other__">Other (enter new)…</option>
+                        </select>
+                        <i class="fas fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
                     </div>
+                    <input
+                        type="text"
+                        id="case_type_other"
+                        class="hidden mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                        placeholder="Enter new case type…"
+                        autocomplete="off"
+                        oninput="this.value = this.value.toUpperCase()"
+                    />
                 </div>
 
-                <!-- 3. Case Category * -->
+                <!-- Case Category * -->
                 <div>
                     <label for="case_category" class="block text-sm font-semibold text-gray-700 mb-2">
                         Case Category <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
-                        <input 
-                            type="text" 
-                            id="case_category" 
+                        <select
+                            id="case_category"
                             name="case_category"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
-                            placeholder="Select recent or type to search..."
-                            autocomplete="off"
                             required
-                        />
-                        <div id="case_category_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-y-auto"></div>
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900 appearance-none pr-10"
+                            onchange="toggleOtherField('case_category')"
+                        >
+                            <option value="">Select case category…</option>
+                            {% for opt in case_category_options %}
+                            <option value="{{ opt }}">{{ opt }}</option>
+                            {% endfor %}
+                            <option value="__other__">Other (enter new)…</option>
+                        </select>
+                        <i class="fas fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
                     </div>
+                    <input
+                        type="text"
+                        id="case_category_other"
+                        class="hidden mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                        placeholder="Enter new case category…"
+                        autocomplete="off"
+                        oninput="this.value = this.value.toUpperCase()"
+                    />
                 </div>
 
-                <!-- 4. Court Case Number -->
+                <!-- Court Case Number -->
                 <div class="md:col-span-2">
                     <label for="court_case_number" class="block text-sm font-semibold text-gray-700 mb-2">
                         Court Case Number
@@ -113,40 +160,38 @@
                     />
                 </div>
 
-                <!-- 5. Station * -->
+                <!-- Station * -->
                 <div>
                     <label for="station" class="block text-sm font-semibold text-gray-700 mb-2">
                         Station <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
-                        <input 
-                            type="text" 
-                            id="station" 
+                        <select
+                            id="station"
                             name="station"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
-                            placeholder="Select recent or type to search..."
-                            autocomplete="off"
                             required
-                        />
-                        <div id="station_dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-y-auto"></div>
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white text-gray-900 appearance-none pr-10"
+                            onchange="toggleOtherField('station')"
+                        >
+                            <option value="">Select station…</option>
+                            {% for opt in station_options %}
+                            <option value="{{ opt }}">{{ opt }}</option>
+                            {% endfor %}
+                            <option value="__other__">Other (enter new)…</option>
+                        </select>
+                        <i class="fas fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
                     </div>
-                </div>
-
-                <!-- 6. Filing Date * -->
-                <div>
-                    <label for="filing_date" class="block text-sm font-semibold text-gray-700 mb-2">
-                        Filing Date <span class="text-red-500">*</span>
-                    </label>
-                    <input 
-                        type="date" 
-                        id="filing_date" 
-                        name="filing_date"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required
+                    <input
+                        type="text"
+                        id="station_other"
+                        class="hidden mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                        placeholder="Enter new station…"
+                        autocomplete="off"
+                        oninput="this.value = this.value.toUpperCase()"
                     />
                 </div>
 
-                <!-- 7. Description -->
+                <!-- Description -->
                 <div class="md:col-span-2">
                     <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
                         Description
@@ -176,7 +221,7 @@
                         <i class="fas fa-plus mr-2"></i>Add Party
                     </button>
                 </div>
-                <p class="text-sm text-gray-500 mb-4">Add all parties involved in this case. The selected client will be added automatically.</p>
+                <p class="text-sm text-gray-500 mb-4">Add all parties involved in this case. The selected client is added first with your law firm as Firm/Agent.</p>
                 
                 <div id="partiesContainer" class="space-y-4">
                     <!-- Parties will be added here -->
@@ -207,88 +252,67 @@
 </div>
 
 <script>
-// Global variables for debouncing and recent options
+// Global variables for debouncing
 let clientSearchTimeout;
-let caseTypeSearchTimeout;
-let categorySearchTimeout;
-let stationSearchTimeout;
-let recentOptions = { case_types: [], case_categories: [], stations: [] };
+const LAW_FIRM_NAME = {{ (company_settings.company_name if company_settings and company_settings.company_name else 'BAUNI LAW GROUP')|tojson }};
 
-// Load recent options for Case Type, Case Category, Station
-function loadRecentOptions() {
-    fetch('/api/cases/recent-options')
-        .then(r => r.json())
-        .then(data => {
-            if (data.case_types) recentOptions.case_types = data.case_types;
-            if (data.case_categories) recentOptions.case_categories = data.case_categories;
-            if (data.stations) recentOptions.stations = data.stations;
-        })
-        .catch(() => {});
+function mapClientCategory(clientType) {
+    const t = (clientType || '').trim().toUpperCase();
+    if (t === 'INDIVIDUAL' || t === 'CORPORATE') return t;
+    return '';
 }
-document.addEventListener('DOMContentLoaded', loadRecentOptions);
 
-function showRecentCaseTypeDropdown() {
-    const dropdown = document.getElementById('case_type_dropdown');
-    dropdown.innerHTML = '';
-    if (recentOptions.case_types.length) {
-        const header = document.createElement('div');
-        header.className = 'px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-100 border-b border-gray-200';
-        header.textContent = 'Recently used (' + recentOptions.case_types.length + ')';
-        dropdown.appendChild(header);
-        recentOptions.case_types.forEach(v => {
-            const item = document.createElement('div');
-            item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-            item.textContent = v;
-            item.addEventListener('click', () => {
-                document.getElementById('case_type').value = v;
-                dropdown.classList.add('hidden');
-            });
-            dropdown.appendChild(item);
-        });
-        dropdown.classList.remove('hidden');
+function ensureClientAsFirstParty(client) {
+    const name = (client.full_name || client.name || '').toUpperCase();
+    const phone = client.phone_number || client.phone || '';
+    const email = client.email || '';
+    const category = mapClientCategory(client.client_type);
+    const firm = (LAW_FIRM_NAME || '').toUpperCase();
+
+    // Update existing auto-added client party if present
+    const existing = document.getElementById('party-client');
+    if (existing) {
+        const setVal = (selector, value) => {
+            const el = existing.querySelector(selector);
+            if (el) el.value = value || '';
+        };
+        setVal('[name^="party_name_"]', name);
+        setVal('[name^="party_type_"]', 'CLIENT');
+        setVal('[name^="party_category_"]', category);
+        setVal('[name^="firm_agent_"]', firm);
+        setVal('[name^="party_phone_"]', phone);
+        setVal('[name^="party_email_"]', email);
+        clientAddedAsParty = true;
+        return;
+    }
+
+    addParty(name, 'CLIENT', category, firm, phone, email, { prepend: true, isClient: true });
+    clientAddedAsParty = true;
+}
+
+function toggleOtherField(fieldId) {
+    const select = document.getElementById(fieldId);
+    const other = document.getElementById(fieldId + '_other');
+    if (!select || !other) return;
+    if (select.value === '__other__') {
+        other.classList.remove('hidden');
+        other.required = true;
+        other.focus();
+    } else {
+        other.classList.add('hidden');
+        other.required = false;
+        other.value = '';
     }
 }
-function showRecentCaseCategoryDropdown() {
-    const dropdown = document.getElementById('case_category_dropdown');
-    dropdown.innerHTML = '';
-    if (recentOptions.case_categories.length) {
-        const header = document.createElement('div');
-        header.className = 'px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-100 border-b border-gray-200';
-        header.textContent = 'Recent';
-        dropdown.appendChild(header);
-        recentOptions.case_categories.forEach(v => {
-            const item = document.createElement('div');
-            item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-            item.textContent = v;
-            item.addEventListener('click', () => {
-                document.getElementById('case_category').value = v;
-                dropdown.classList.add('hidden');
-            });
-            dropdown.appendChild(item);
-        });
-        dropdown.classList.remove('hidden');
+
+function resolveSelectValue(fieldId) {
+    const select = document.getElementById(fieldId);
+    if (!select) return '';
+    if (select.value === '__other__') {
+        const other = document.getElementById(fieldId + '_other');
+        return other ? other.value.trim().toUpperCase() : '';
     }
-}
-function showRecentStationDropdown() {
-    const dropdown = document.getElementById('station_dropdown');
-    dropdown.innerHTML = '';
-    if (recentOptions.stations.length) {
-        const header = document.createElement('div');
-        header.className = 'px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-100 border-b border-gray-200';
-        header.textContent = 'Recently used (' + recentOptions.stations.length + ')';
-        dropdown.appendChild(header);
-        recentOptions.stations.forEach(v => {
-            const item = document.createElement('div');
-            item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-            item.textContent = v;
-            item.addEventListener('click', () => {
-                document.getElementById('station').value = v;
-                dropdown.classList.add('hidden');
-            });
-            dropdown.appendChild(item);
-        });
-        dropdown.classList.remove('hidden');
-    }
+    return (select.value || '').trim();
 }
 
 // Client search functionality
@@ -310,40 +334,7 @@ document.getElementById('client_name').addEventListener('input', function(e) {
                     showMessage(data.error, 'error');
                     return;
                 }
-                
-                dropdown.innerHTML = '';
-                if (data.clients && data.clients.length > 0) {
-                    data.clients.forEach(client => {
-                        const item = document.createElement('div');
-                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-                        item.innerHTML = `
-                            <div class="font-semibold text-gray-900">${client.full_name}</div>
-                            <div class="text-sm text-gray-500">${client.email || ''} ${client.phone_number || ''}</div>
-                        `;
-                        item.addEventListener('click', () => {
-                            document.getElementById('client_name').value = client.full_name.toUpperCase();
-                            document.getElementById('client_id').value = client.id;
-                            dropdown.classList.add('hidden');
-                            
-                            // Auto-add client as first party if not already added
-                            if (!clientAddedAsParty) {
-                                addParty(
-                                    client.full_name.toUpperCase(),
-                                    'CLIENT',
-                                    '',
-                                    '',
-                                    client.phone_number || '',
-                                    client.email || ''
-                                );
-                                clientAddedAsParty = true;
-                            }
-                        });
-                        dropdown.appendChild(item);
-                    });
-                    dropdown.classList.remove('hidden');
-                } else {
-                    dropdown.classList.add('hidden');
-                }
+                renderClientDropdown(data.clients || [], false);
             })
             .catch(error => {
                 console.error('Error searching clients:', error);
@@ -352,226 +343,86 @@ document.getElementById('client_name').addEventListener('input', function(e) {
     }, 300);
 });
 
-// Case Type: focus shows recent; input shows search
-document.getElementById('case_type').addEventListener('focus', function() {
-    if (this.value.trim().length < 1) showRecentCaseTypeDropdown();
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#client_picker') && !e.target.closest('#client_dropdown')) {
+        document.getElementById('client_dropdown').classList.add('hidden');
+    }
 });
-document.getElementById('case_type').addEventListener('input', function(e) {
-    clearTimeout(caseTypeSearchTimeout);
-    const query = e.target.value.trim().toUpperCase();
-    const dropdown = document.getElementById('case_type_dropdown');
-    
-    if (query.length < 1) {
-        showRecentCaseTypeDropdown();
+
+function renderClientDropdown(clients, isFullList) {
+    const dropdown = document.getElementById('client_dropdown');
+    dropdown.dataset.mode = isFullList ? 'all' : 'search';
+    dropdown.innerHTML = '';
+
+    if (!clients || clients.length === 0) {
+        dropdown.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No clients found</div>';
+        dropdown.classList.remove('hidden');
         return;
     }
-    
-    caseTypeSearchTimeout = setTimeout(() => {
-        fetch(`/api/case-types/search?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showMessage(data.error, 'error');
-                    return;
-                }
-                dropdown.innerHTML = '';
-                if (data.types && data.types.length > 0) {
-                    data.types.forEach(type => {
-                        const item = document.createElement('div');
-                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-                        item.textContent = type.type_name;
-                        item.addEventListener('click', () => {
-                            document.getElementById('case_type').value = type.type_name;
-                            dropdown.classList.add('hidden');
-                        });
-                        dropdown.appendChild(item);
-                    });
-                    dropdown.classList.remove('hidden');
-                } else {
-                    const item = document.createElement('div');
-                    item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-blue-600';
-                    item.innerHTML = `<i class="fas fa-plus mr-2"></i>Create "${query}"`;
-                    item.addEventListener('click', () => { createCaseType(query); });
-                    dropdown.appendChild(item);
-                    dropdown.classList.remove('hidden');
-                }
-            })
-            .catch(() => dropdown.classList.add('hidden'));
-    }, 300);
-});
 
-// Case Category: focus shows recent; input shows search
-document.getElementById('case_category').addEventListener('focus', function() {
-    if (this.value.trim().length < 1) showRecentCaseCategoryDropdown();
-});
-document.getElementById('case_category').addEventListener('input', function(e) {
-    clearTimeout(categorySearchTimeout);
-    const query = e.target.value.trim().toUpperCase();
-    const dropdown = document.getElementById('case_category_dropdown');
-    
-    if (query.length < 1) {
-        showRecentCaseCategoryDropdown();
+    if (isFullList) {
+        const header = document.createElement('div');
+        header.className = 'sticky top-0 px-3 py-2 bg-slate-50 border-b border-gray-200 text-xs font-semibold text-slate-600 uppercase tracking-wide';
+        header.textContent = `${clients.length} active client${clients.length === 1 ? '' : 's'}`;
+        dropdown.appendChild(header);
+    }
+
+    clients.forEach(client => {
+        const item = document.createElement('div');
+        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
+        item.innerHTML = `
+            <div class="font-semibold text-gray-900">${client.full_name}</div>
+            <div class="text-sm text-gray-500">${client.email || ''} ${client.phone_number || ''}</div>
+        `;
+        item.addEventListener('click', () => {
+            document.getElementById('client_name').value = client.full_name.toUpperCase();
+            document.getElementById('client_id').value = client.id;
+            dropdown.classList.add('hidden');
+            ensureClientAsFirstParty(client);
+        });
+        dropdown.appendChild(item);
+    });
+    dropdown.classList.remove('hidden');
+}
+
+document.getElementById('client_dropdown_btn').addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropdown = document.getElementById('client_dropdown');
+    if (!dropdown.classList.contains('hidden') && dropdown.dataset.mode === 'all') {
+        dropdown.classList.add('hidden');
         return;
     }
-    
-    categorySearchTimeout = setTimeout(() => {
-        fetch(`/api/case-categories/search?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showMessage(data.error, 'error');
-                    return;
-                }
-                dropdown.innerHTML = '';
-                if (data.categories && data.categories.length > 0) {
-                    data.categories.forEach(category => {
-                        const item = document.createElement('div');
-                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-                        item.textContent = category.category_name;
-                        item.addEventListener('click', () => {
-                            document.getElementById('case_category').value = category.category_name;
-                            dropdown.classList.add('hidden');
-                        });
-                        dropdown.appendChild(item);
-                    });
-                    dropdown.classList.remove('hidden');
-                } else {
-                    const item = document.createElement('div');
-                    item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-blue-600';
-                    item.innerHTML = `<i class="fas fa-plus mr-2"></i>Create "${query}"`;
-                    item.addEventListener('click', () => { createCaseCategory(query); });
-                    dropdown.appendChild(item);
-                    dropdown.classList.remove('hidden');
-                }
-            })
-            .catch(() => dropdown.classList.add('hidden'));
-    }, 300);
+    dropdown.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm"><i class="fas fa-spinner fa-spin mr-2"></i>Loading clients…</div>';
+    dropdown.classList.remove('hidden');
+    dropdown.dataset.mode = 'all';
+    fetch('/api/clients/search?all=1')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showMessage(data.error, 'error');
+                dropdown.classList.add('hidden');
+                return;
+            }
+            renderClientDropdown(data.clients || [], true);
+        })
+        .catch(error => {
+            console.error('Error loading clients:', error);
+            dropdown.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Could not load clients</div>';
+        });
 });
-
-// Station: focus shows recent; input shows search
-document.getElementById('station').addEventListener('focus', function() {
-    if (this.value.trim().length < 1) showRecentStationDropdown();
-});
-document.getElementById('station').addEventListener('input', function(e) {
-    clearTimeout(stationSearchTimeout);
-    const query = e.target.value.trim().toUpperCase();
-    const dropdown = document.getElementById('station_dropdown');
-    
-    if (query.length < 1) {
-        showRecentStationDropdown();
-        return;
-    }
-    
-    stationSearchTimeout = setTimeout(() => {
-        fetch(`/api/stations/search?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showMessage(data.error, 'error');
-                    return;
-                }
-                dropdown.innerHTML = '';
-                if (data.stations && data.stations.length > 0) {
-                    data.stations.forEach(station => {
-                        const item = document.createElement('div');
-                        item.className = 'px-4 py-2 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-                        item.textContent = station.station_name;
-                        item.addEventListener('click', () => {
-                            document.getElementById('station').value = station.station_name;
-                            dropdown.classList.add('hidden');
-                        });
-                        dropdown.appendChild(item);
-                    });
-                    dropdown.classList.remove('hidden');
-                } else {
-                    const item = document.createElement('div');
-                    item.className = 'px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-blue-600';
-                    item.innerHTML = `<i class="fas fa-plus mr-2"></i>Create "${query}"`;
-                    item.addEventListener('click', () => { createStation(query); });
-                    dropdown.appendChild(item);
-                    dropdown.classList.remove('hidden');
-                }
-            })
-            .catch(() => dropdown.classList.add('hidden'));
-    }, 300);
-});
-
-// Helper functions to create new entries
-function createCaseType(typeName) {
-    fetch('/api/case-types/create', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type_name: typeName})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            showMessage(data.error, 'error');
-        } else {
-            document.getElementById('case_type').value = data.type.type_name;
-            document.getElementById('case_type_dropdown').classList.add('hidden');
-            showMessage('Case type created successfully', 'success');
-        }
-    })
-    .catch(error => {
-        console.error('Error creating case type:', error);
-        showMessage('Error creating case type', 'error');
-    });
-}
-
-function createCaseCategory(categoryName) {
-    fetch('/api/case-categories/create', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({category_name: categoryName})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            showMessage(data.error, 'error');
-        } else {
-            document.getElementById('case_category').value = data.category.category_name;
-            document.getElementById('case_category_dropdown').classList.add('hidden');
-            showMessage('Case category created successfully', 'success');
-        }
-    })
-    .catch(error => {
-        console.error('Error creating case category:', error);
-        showMessage('Error creating case category', 'error');
-    });
-}
-
-function createStation(stationName) {
-    fetch('/api/stations/create', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({station_name: stationName})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            showMessage(data.error, 'error');
-        } else {
-            document.getElementById('station').value = data.station.station_name;
-            document.getElementById('station_dropdown').classList.add('hidden');
-            showMessage('Station created successfully', 'success');
-        }
-    })
-    .catch(error => {
-        console.error('Error creating station:', error);
-        showMessage('Error creating station', 'error');
-    });
-}
 
 // Parties management
 let partyCounter = 0;
 let clientAddedAsParty = false;
 
-function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent = '', partyPhone = '', partyEmail = '') {
+function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent = '', partyPhone = '', partyEmail = '', options = {}) {
     const container = document.getElementById('partiesContainer');
     const partyDiv = document.createElement('div');
-    partyDiv.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
-    partyDiv.id = `party-${partyCounter}`;
+    const isClient = !!options.isClient;
+    partyDiv.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200' + (isClient ? ' ring-1 ring-indigo-200' : '');
+    partyDiv.id = isClient ? 'party-client' : `party-${partyCounter}`;
+    const idx = partyCounter;
     
     partyDiv.innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -579,7 +430,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Party Name <span class="text-red-500">*</span></label>
                 <input 
                     type="text" 
-                    name="party_name_${partyCounter}"
+                    name="party_name_${idx}"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
                     placeholder="Party name..."
                     value="${partyName}"
@@ -590,7 +441,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Party Type <span class="text-red-500">*</span></label>
                 <input 
                     type="text" 
-                    name="party_type_${partyCounter}"
+                    name="party_type_${idx}"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
                     placeholder="Type (e.g., Plaintiff, Defendant)..."
                     value="${partyType}"
@@ -600,7 +451,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
             <div>
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Category</label>
                 <select 
-                    name="party_category_${partyCounter}"
+                    name="party_category_${idx}"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm bg-white"
                 >
                     <option value="">— Select —</option>
@@ -613,7 +464,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Firm/Agent</label>
                     <input 
                         type="text" 
-                        name="firm_agent_${partyCounter}"
+                        name="firm_agent_${idx}"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase text-sm"
                         placeholder="Firm or agent name..."
                         value="${firmAgent}"
@@ -621,7 +472,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
                 </div>
                 <button 
                     type="button" 
-                    onclick="removeParty(${partyCounter})"
+                    onclick="removeParty('${isClient ? 'client' : idx}')"
                     class="ml-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm"
                     title="Remove Party"
                 >
@@ -633,7 +484,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Party Phone</label>
                 <input
                     type="text"
-                    name="party_phone_${partyCounter}"
+                    name="party_phone_${idx}"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                     placeholder="Phone number (optional)..."
                     value="${partyPhone || ''}"
@@ -643,7 +494,7 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
                 <label class="block text-xs font-semibold text-gray-700 mb-1">Party Email</label>
                 <input
                     type="text"
-                    name="party_email_${partyCounter}"
+                    name="party_email_${idx}"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                     placeholder="Email address (optional)..."
                     value="${partyEmail || ''}"
@@ -652,23 +503,33 @@ function addParty(partyName = '', partyType = '', partyCategory = '', firmAgent 
         </div>
     `;
     
-    container.appendChild(partyDiv);
+    if (options.prepend && container.firstChild) {
+        container.insertBefore(partyDiv, container.firstChild);
+    } else {
+        container.appendChild(partyDiv);
+    }
     partyCounter++;
 }
 
 function removeParty(id) {
     const partyDiv = document.getElementById(`party-${id}`);
     if (partyDiv) {
+        if (id === 'client' || partyDiv.id === 'party-client') {
+            clientAddedAsParty = false;
+        }
         partyDiv.remove();
     }
 }
 
-// Auto-add client as first party when client is selected
+// Fallback: if client name is set without dropdown pick, still seed first party
 document.getElementById('client_name').addEventListener('change', function() {
-    if (!clientAddedAsParty && this.value.trim()) {
-        addParty(this.value.toUpperCase(), 'CLIENT', '', '', '', '');
-        clientAddedAsParty = true;
-    }
+    if (!this.value.trim() || !document.getElementById('client_id').value) return;
+    ensureClientAsFirstParty({
+        full_name: this.value,
+        phone_number: '',
+        email: '',
+        client_type: ''
+    });
 });
 
 // Form submission
@@ -704,17 +565,15 @@ document.getElementById('caseRegistrationForm').addEventListener('submit', funct
         client_name: document.getElementById('client_name').value,
         court_rank: document.getElementById('court_rank').value,
         court_case_number: document.getElementById('court_case_number').value,
-        case_type: document.getElementById('case_type').value,
+        case_type: resolveSelectValue('case_type'),
         filing_date: document.getElementById('filing_date').value,
-        case_category: document.getElementById('case_category').value,
-        station: document.getElementById('station').value,
-        filled_by_id: document.getElementById('filled_by_id').value,
-        filled_by_name: document.getElementById('filled_by_name').value,
+        case_category: resolveSelectValue('case_category'),
+        station: resolveSelectValue('station'),
         description: document.getElementById('description').value,
         parties: parties
     };
     
-    // Validate required fields
+    // Validate required fields (allocation is done on approval, not at registration)
     if (!formData.client_id) {
         showMessage('Please select a client', 'error');
         return;
@@ -723,8 +582,16 @@ document.getElementById('caseRegistrationForm').addEventListener('submit', funct
         showMessage('Please select a court rank', 'error');
         return;
     }
-    if (!formData.filled_by_id || !formData.filled_by_name) {
-        showMessage('Session expired. Please refresh and try again.', 'error');
+    if (!formData.case_type) {
+        showMessage('Please select or enter a case type', 'error');
+        return;
+    }
+    if (!formData.case_category) {
+        showMessage('Please select or enter a case category', 'error');
+        return;
+    }
+    if (!formData.station) {
+        showMessage('Please select or enter a station', 'error');
         return;
     }
     
@@ -768,13 +635,19 @@ document.getElementById('caseRegistrationForm').addEventListener('submit', funct
 function resetForm() {
     document.getElementById('caseRegistrationForm').reset();
     document.getElementById('client_id').value = '';
-    document.getElementById('filled_by_id').value = '{{ employee_id or '' }}';
-    document.getElementById('filled_by_name').value = '{{ employee_name or '' }}';
     // Clear parties
     document.getElementById('partiesContainer').innerHTML = '';
     partyCounter = 0;
     clientAddedAsParty = false;
-    // Hide all dropdowns
+    // Hide "other" inputs and dropdowns
+    ['case_type', 'case_category', 'station'].forEach(function(fieldId) {
+        const other = document.getElementById(fieldId + '_other');
+        if (other) {
+            other.classList.add('hidden');
+            other.required = false;
+            other.value = '';
+        }
+    });
     document.querySelectorAll('[id$="_dropdown"]').forEach(dropdown => {
         dropdown.classList.add('hidden');
     });

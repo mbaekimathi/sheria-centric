@@ -154,6 +154,242 @@
         .icon-bounce {
             animation: icon-bounce 2s ease-in-out infinite;
         }
+
+        /* Live nav action icons (notifications / tasks / reminders) */
+        .live-nav-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.75rem;
+            height: 2.75rem;
+            border-radius: 0.85rem;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(229, 231, 235, 0.7);
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+            overflow: visible;
+        }
+        .live-nav-btn:hover {
+            transform: translateY(-1px) scale(1.04);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+        }
+        .live-nav-btn.is-active {
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35);
+        }
+        .live-nav-icon {
+            position: relative;
+            width: 1.35rem;
+            height: 1.35rem;
+            display: grid;
+            place-items: center;
+        }
+        .live-nav-icon svg {
+            width: 1.35rem;
+            height: 1.35rem;
+            overflow: visible;
+        }
+        .live-nav-btn--notify { color: #047857; }
+        .live-nav-badge {
+            position: absolute;
+            top: -0.35rem;
+            right: -0.35rem;
+            min-width: 1.25rem;
+            height: 1.25rem;
+            padding: 0 0.35rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            font-size: 0.625rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #fff;
+            box-shadow: 0 0 0 2px #fff;
+            z-index: 2;
+        }
+        .live-nav-badge--notify { background: #059669; }
+        .live-nav-badge--tasks { background: #2563eb; }
+        .live-nav-badge--reminders { background: #ea580c; }
+        .live-nav-btn.is-live .live-nav-badge {
+            animation: liveBadgePulse 1.8s ease-in-out infinite;
+        }
+        .nav-live-icon.is-live .live-nav-badge {
+            animation: liveBadgePulse 1.8s ease-in-out infinite;
+        }
+        @keyframes liveBadgePulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .app-header .live-nav-btn {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.22);
+            box-shadow: 0 2px 8px rgba(15, 13, 46, 0.18);
+        }
+        .app-header .live-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .app-header .live-nav-btn--notify { color: #6ee7b7; }
+        .app-header .live-nav-btn.is-active {
+            box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.45);
+        }
+
+        /* Notification bell — rings when live */
+        .live-nav-icon--bell .bell-body {
+            transform-origin: 50% 0%;
+            transition: transform 0.2s ease;
+        }
+        .live-nav-btn--notify.is-live .bell-body {
+            animation: liveBellRing 1.4s ease-in-out infinite;
+        }
+        .live-nav-icon--bell .bell-wave {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            opacity: 0;
+            transform-origin: center;
+        }
+        .live-nav-btn--notify.is-live .bell-wave {
+            animation: liveBellWave 1.8s ease-out infinite;
+        }
+        .live-nav-btn--notify.is-live .bell-wave-2 {
+            animation-delay: 0.35s;
+        }
+        @keyframes liveBellRing {
+            0%, 100% { transform: rotate(0deg); }
+            12% { transform: rotate(14deg); }
+            24% { transform: rotate(-12deg); }
+            36% { transform: rotate(10deg); }
+            48% { transform: rotate(-6deg); }
+            60% { transform: rotate(3deg); }
+            72% { transform: rotate(0deg); }
+        }
+        @keyframes liveBellWave {
+            0% { opacity: 0.55; transform: scale(0.72); }
+            70% { opacity: 0; transform: scale(1.35); }
+            100% { opacity: 0; transform: scale(1.35); }
+        }
+
+        /* Tasks checklist — check pulses when live */
+        .live-nav-icon--tasks .task-check {
+            stroke-dasharray: 12;
+            stroke-dashoffset: 12;
+            opacity: 0.35;
+        }
+        [data-live-icon="my-tasks"].is-live .task-check,
+        .live-nav-btn--tasks.is-live .task-check {
+            opacity: 1;
+            animation: liveTaskCheck 2.2s ease-in-out infinite;
+        }
+        [data-live-icon="my-tasks"].is-live .task-line-1,
+        [data-live-icon="my-tasks"].is-live .task-line-2,
+        .live-nav-btn--tasks.is-live .task-line-1,
+        .live-nav-btn--tasks.is-live .task-line-2 {
+            animation: liveTaskLine 2.2s ease-in-out infinite;
+        }
+        [data-live-icon="my-tasks"].is-live .task-line-2,
+        .live-nav-btn--tasks.is-live .task-line-2 { animation-delay: 0.15s; }
+        @keyframes liveTaskCheck {
+            0%, 40% { stroke-dashoffset: 12; }
+            55%, 85% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: 12; }
+        }
+        @keyframes liveTaskLine {
+            0%, 100% { opacity: 0.45; }
+            50% { opacity: 1; }
+        }
+
+        /* Reminders alarm — hand ticks + halo when live */
+        .live-nav-icon--reminders .alarm-hand {
+            transform-origin: 12px 13px;
+        }
+        [data-live-icon="reminders"].is-live .alarm-hand,
+        .live-nav-btn--reminders.is-live .alarm-hand {
+            animation: liveAlarmTick 1s steps(2, end) infinite;
+        }
+        .live-nav-icon--reminders .alarm-halo {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.4;
+            opacity: 0;
+            transform-origin: center;
+        }
+        [data-live-icon="reminders"].is-live .alarm-halo,
+        .live-nav-btn--reminders.is-live .alarm-halo {
+            animation: liveAlarmHalo 1.6s ease-out infinite;
+        }
+        [data-live-icon="reminders"].is-live .alarm-bell-l,
+        [data-live-icon="reminders"].is-live .alarm-bell-r,
+        .live-nav-btn--reminders.is-live .alarm-bell-l,
+        .live-nav-btn--reminders.is-live .alarm-bell-r {
+            animation: liveAlarmNudge 1.6s ease-in-out infinite;
+        }
+        [data-live-icon="reminders"].is-live .alarm-bell-r,
+        .live-nav-btn--reminders.is-live .alarm-bell-r { animation-delay: 0.08s; }
+        @keyframes liveAlarmTick {
+            0% { transform: rotate(-18deg); }
+            50% { transform: rotate(18deg); }
+            100% { transform: rotate(-18deg); }
+        }
+        @keyframes liveAlarmHalo {
+            0% { opacity: 0.5; transform: scale(0.85); }
+            100% { opacity: 0; transform: scale(1.4); }
+        }
+        @keyframes liveAlarmNudge {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-0.5px); }
+        }
+
+        /* Sidebar live icon accents */
+        .nav-live-icon {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.25rem;
+            height: 1.25rem;
+            flex-shrink: 0;
+            color: inherit;
+        }
+        .nav-live-icon.live-nav-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+        .nav-live-icon.live-nav-icon svg {
+            width: 1.15rem;
+            height: 1.15rem;
+        }
+        .nav-live-icon--tasks { color: #2563eb; }
+        .nav-live-icon--reminders { color: #ea580c; }
+        .sidebar-link.active .nav-live-icon--tasks,
+        .sidebar-link:hover .nav-live-icon--tasks { color: #1d4ed8; }
+        .sidebar-link.active .nav-live-icon--reminders,
+        .sidebar-link:hover .nav-live-icon--reminders { color: #c2410c; }
+        .nav-live-icon .live-nav-badge {
+            top: -0.45rem;
+            right: -0.55rem;
+            min-width: 1.1rem;
+            height: 1.1rem;
+            font-size: 0.55rem;
+            padding: 0 0.25rem;
+        }
+        @keyframes softNavPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.12); opacity: 0.85; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .live-nav-btn--notify.is-live .bell-body,
+            .live-nav-btn--notify.is-live .bell-wave,
+            [data-live-icon="my-tasks"].is-live .task-check,
+            [data-live-icon="my-tasks"].is-live .task-line-1,
+            [data-live-icon="my-tasks"].is-live .task-line-2,
+            [data-live-icon="reminders"].is-live .alarm-hand,
+            [data-live-icon="reminders"].is-live .alarm-halo,
+            [data-live-icon="reminders"].is-live .alarm-bell-l,
+            [data-live-icon="reminders"].is-live .alarm-bell-r {
+                animation: none !important;
+            }
+        }
         .glass-effect {
             background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(10px);
@@ -893,9 +1129,23 @@
                     {% endif %}
                     
                     {% if session.get('employee_id') %}
-                    <a href="{{ url_for('notifications') }}" class="relative inline-flex items-center justify-center w-11 h-11 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 {% if request.endpoint == 'notifications' %}ring-2 ring-emerald-500/40{% endif %}" title="Notifications">
-                        <i class="fas fa-bell text-green-700"></i>
-                        <span data-live-badge="notifications" class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white {% if not notification_badge_count or notification_badge_count <= 0 %}hidden{% endif %}">
+                    <a href="{{ url_for('notifications') }}"
+                       class="live-nav-btn live-nav-btn--notify {% if notification_badge_count and notification_badge_count > 0 %}is-live{% endif %} {% if request.endpoint == 'notifications' %}is-active{% endif %}"
+                       data-live-icon="notifications"
+                       title="Notifications"
+                       aria-label="Notifications">
+                        <span class="live-nav-icon live-nav-icon--bell" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path class="bell-wave bell-wave-1" d="M4.5 9.5a7.5 7.5 0 0 1 15 0"></path>
+                                <path class="bell-wave bell-wave-2" d="M2.8 8.2a10 10 0 0 1 18.4 0"></path>
+                                <g class="bell-body">
+                                    <path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 5 1.5 6.2 1.5 6.2H5S6.5 15 6.5 10z" fill="currentColor" fill-opacity="0.12"></path>
+                                    <path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 5 1.5 6.2 1.5 6.2H5S6.5 15 6.5 10z"></path>
+                                    <path d="M10 19a2 2 0 0 0 4 0"></path>
+                                </g>
+                            </svg>
+                        </span>
+                        <span data-live-badge="notifications" class="live-nav-badge live-nav-badge--notify {% if not notification_badge_count or notification_badge_count <= 0 %}hidden{% endif %}">
                             {{ notification_badge_count or 0 }}
                         </span>
                     </a>
@@ -940,7 +1190,7 @@
                                 <span>Notifications</span>
                             </a>
                             <a href="{{ url_for('my_tasks') }}" class="dropdown-item">
-                                <i class="fas fa-tasks text-green-600"></i>
+                                <i class="fas fa-list-check text-blue-600"></i>
                                 <span>My Tasks</span>
                             </a>
                             <a href="{{ url_for('profile') }}" class="dropdown-item">
@@ -1382,7 +1632,7 @@
                     {% endif %}
                     <a href="{{ url_for('client_document_type', document_type='CLIENT_OTHER_MATTERS') }}" class="sidebar-link {% if request.endpoint == 'client_document_type' and request.view_args.get('document_type') == 'CLIENT_OTHER_MATTERS' %}active{% endif %}" id="nav-client-other-matters">
                         <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
+                        <span>Non-Litigation Matters</span>
                     </a>
                     <a href="{{ url_for('client_documents') }}" class="sidebar-link {% if request.endpoint in ['client_documents', 'client_document_type'] %}active{% endif %}" id="nav-client-documents">
                         <i class="fas fa-file-alt"></i>
@@ -1410,7 +1660,19 @@
                         <span>Calendar</span>
                     </a>
                     <a href="{{ url_for('client_reminders') }}" class="sidebar-link {% if request.endpoint == 'client_reminders' %}active{% endif %}" id="nav-client-reminders">
-                        <i class="fas fa-bell"></i>
+                        <span class="nav-live-icon nav-live-icon--reminders live-nav-icon live-nav-icon--reminders {% if reminder_badge_count and reminder_badge_count > 0 %}is-live{% endif %}" data-live-icon="reminders" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle class="alarm-halo" cx="12" cy="13" r="8.5"></circle>
+                                <circle cx="12" cy="13" r="6.2" fill="currentColor" fill-opacity="0.1"></circle>
+                                <circle cx="12" cy="13" r="6.2"></circle>
+                                <path class="alarm-hand" d="M12 10.2v3.2l2.2 1.4"></path>
+                                <path class="alarm-bell-l" d="M5.2 6.2l2.4 2"></path>
+                                <path class="alarm-bell-r" d="M18.8 6.2l-2.4 2"></path>
+                                <path d="M9.2 19.6l-1 1.2"></path>
+                                <path d="M14.8 19.6l1 1.2"></path>
+                            </svg>
+                            <span data-live-badge="reminders" class="live-nav-badge live-nav-badge--reminders {% if not reminder_badge_count or reminder_badge_count <= 0 %}hidden{% endif %}">{{ reminder_badge_count or 0 }}</span>
+                        </span>
                         <span>Reminders</span>
                     </a>
                     <a href="#" class="sidebar-link" id="nav-client-billing">
@@ -1420,7 +1682,7 @@
                     {% else %}
                     <!-- Employee Sidebar Links -->
                     {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
-                    {% set matter_mgmt_pages = ['matter_management', 'all_matters', 'case_management', 'case_tracking', 'approve_cases', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'approve_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
+                    {% set matter_mgmt_pages = ['all_matters', 'case_management', 'case_tracking', 'approve_cases', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'approve_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents', 'matter_attendances'] %}
                     <!-- Dashboard (pinned to the top of every employee sidebar) -->
                     {% if not hide_sidebar_nav_links %}
                     <a href="{{ url_for('dashboard', role_slug=current_role_slug) }}"
@@ -1443,8 +1705,8 @@
                     </div>
                     {% endif %}
                     
-                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on matter_management, case pages, and company settings) -->
-                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint not in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section', 'view_client_documents'] %}
+                    <!-- Firm Administrator & Managing Partner: Administration links (hidden on all_matters, case pages, and company settings) -->
+                    {% if user_role in ['Firm Administrator', 'Managing Partner'] and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages and request.endpoint not in ['company_information', 'website_templates_settings', 'company_templates_settings', 'system_settings', 'system_settings_section', 'view_client_documents'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administration</p>
                     </div>
@@ -1452,7 +1714,7 @@
                         <i class="fas fa-users-cog"></i>
                         <span>User Management</span>
                     </a>
-                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint in ['all_matters', 'matter_management'] %}active{% endif %}" id="nav-matter-management">
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint == 'all_matters' %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
@@ -1462,16 +1724,16 @@
                         <span>Document Management</span>
                     </a>
                     {% endif %}
-                    {# Register Case - kept for Associate Advocate and IT Support only #}
-                    {% if user_role in ['Associate Advocate', 'IT Support'] %}
-                    <a href="{{ url_for('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
+                    {# Register Case - Associate Advocate / IT Support (Case Management sidebar covers MP/FA/Clerk on case pages) #}
+                    {% if user_role in ['Associate Advocate', 'IT Support'] and request.endpoint != 'register_case' %}
+                    <a href="{{ role_url('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case">
                         <i class="fas fa-plus-circle"></i>
                         <span>Register Case</span>
                     </a>
                     {% endif %}
-                    {# Register Matter - shown to Firm Admin, Associate Advocate, and IT Support only on the Other Matters listing page #}
+                    {# Register Matter - shown to Firm Admin, Associate Advocate, and IT Support only on the Non-Litigation Matters listing page #}
                     {% if user_role in ['Firm Administrator', 'Associate Advocate', 'IT Support'] %}
-                    <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %} {% if request.endpoint != 'other_matters' %}hidden{% endif %}" id="nav-register-matter">
+                    <a href="{{ role_url('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %} {% if request.endpoint != 'other_matters' %}hidden{% endif %}" id="nav-register-matter">
                         <i class="fas fa-folder-plus"></i>
                         <span>Register Matter</span>
                     </a>
@@ -1488,7 +1750,19 @@
                         <span>Calendar</span>
                     </a>
                     <a href="{{ url_for('reminders') }}" class="sidebar-link {% if request.endpoint == 'reminders' %}active{% endif %}" id="nav-reminders">
-                        <i class="fas fa-bell"></i>
+                        <span class="nav-live-icon nav-live-icon--reminders live-nav-icon live-nav-icon--reminders {% if reminder_badge_count and reminder_badge_count > 0 %}is-live{% endif %}" data-live-icon="reminders" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle class="alarm-halo" cx="12" cy="13" r="8.5"></circle>
+                                <circle cx="12" cy="13" r="6.2" fill="currentColor" fill-opacity="0.1"></circle>
+                                <circle cx="12" cy="13" r="6.2"></circle>
+                                <path class="alarm-hand" d="M12 10.2v3.2l2.2 1.4"></path>
+                                <path class="alarm-bell-l" d="M5.2 6.2l2.4 2"></path>
+                                <path class="alarm-bell-r" d="M18.8 6.2l-2.4 2"></path>
+                                <path d="M9.2 19.6l-1 1.2"></path>
+                                <path d="M14.8 19.6l1 1.2"></path>
+                            </svg>
+                            <span data-live-badge="reminders" class="live-nav-badge live-nav-badge--reminders {% if not reminder_badge_count or reminder_badge_count <= 0 %}hidden{% endif %}">{{ reminder_badge_count or 0 }}</span>
+                        </span>
                         <span>Reminders</span>
                     </a>
                     {% endif %}
@@ -1496,8 +1770,8 @@
                        per request for both Firm Administrator and Managing Partner. #}
                     {% endif %}
 
-                    <!-- Matter Management hub: show on Matter Management and All Matters pages -->
-                    {% if request.endpoint in ['matter_management', 'all_matters'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    <!-- Matter Management hub: show on All Matters page -->
+                    {% if request.endpoint == 'all_matters' and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Management</p>
                     </div>
@@ -1505,34 +1779,24 @@
                         <i class="fas fa-list"></i>
                         <span>All Matters</span>
                     </a>
-                    {% if request.endpoint != 'all_matters' %}
-                    <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-hub">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Matter Management</span>
-                    </a>
-                    {% endif %}
                     <a href="{{ role_url('case_management') }}" class="sidebar-link" id="nav-case-management">
                         <i class="fas fa-gavel"></i>
                         <span>Litigation Matters</span>
                     </a>
                     <a href="{{ role_url('other_matters') }}" class="sidebar-link" id="nav-other-matters">
                         <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
+                        <span>Non-Litigation Matters</span>
                     </a>
                     {% endif %}
 
-                    <!-- Case Management / Case tracking: sidebar quick actions -->
+                    <!-- Case Management / Case tracking / Register: sidebar quick actions -->
                     {% if request.endpoint in ['case_management', 'case_tracking', 'approve_cases', 'register_case'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Management</p>
                     </div>
-                    <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-case-sidebar">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Matter Management</span>
-                    </a>
-                    <a href="{{ role_url('case_management') }}" class="sidebar-link {% if request.endpoint == 'case_management' %}active{% endif %}" id="nav-litigation-matters-sidebar">
-                        <i class="fas fa-gavel"></i>
-                        <span>Litigation Matters</span>
+                    <a href="{{ role_url('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case-case-management">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Register Case</span>
                     </a>
                     {% if user_role in ['Managing Partner', 'Firm Administrator', 'IT Support'] or session.get('original_role') == 'IT Support' %}
                     <a href="{{ role_url('approve_cases') }}" class="sidebar-link {% if request.endpoint == 'approve_cases' %}active{% endif %}" id="nav-approve-cases">
@@ -1546,78 +1810,50 @@
                         {% endif %}
                     </a>
                     {% endif %}
-                    {% if request.endpoint in ['case_management', 'register_case'] %}
-                    <a href="{{ role_url('register_case') }}" class="sidebar-link {% if request.endpoint == 'register_case' %}active{% endif %}" id="nav-register-case-case-management">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Register Case</span>
-                    </a>
-                    {% endif %}
-                    <a href="{{ url_for('case_tracking') }}" class="sidebar-link {% if request.endpoint == 'case_tracking' %}active{% endif %}" id="nav-case-tracking-sidebar">
-                        <i class="fas fa-route"></i>
-                        <span>Case tracking</span>
-                    </a>
-                    <a href="{{ url_for('case_task_management') }}" class="sidebar-link {% if request.endpoint == 'case_task_management' %}active{% endif %}" id="nav-case-task-management">
-                        <i class="fas fa-tasks"></i>
-                        <span>Case Task Management</span>
-                    </a>
                     {% endif %}
 
                     <!-- Case Actions: when viewing a specific case (e.g. /case_management/5) -->
                     {% set current_case_id = request.view_args.get('case_id', 0) %}
-                    {% if current_case_id and request.endpoint in ['case_details', 'case_proceedings', 'case_documents', 'case_edit', 'case_status', 'case_allocate', 'case_reminders', 'case_calendar', 'case_audit_progress'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
+                    {% if current_case_id and request.endpoint in ['case_details', 'case_proceedings', 'case_documents', 'case_edit', 'case_status', 'case_allocate', 'case_reminders', 'case_calendar', 'case_audit_progress', 'case_task_management'] and user_role in ['Managing Partner', 'Associate Advocate', 'Clerk', 'Firm Administrator', 'IT Support'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Case Actions</p>
                     </div>
-                    <a href="{{ url_for('case_task_management', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_task_management' %}active{% endif %}" id="nav-case-create-task">
-                        <i class="fas fa-tasks"></i>
-                        <span>Create task for this case</span>
-                    </a>
-                    <a href="{{ url_for('case_proceedings', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_proceedings' %}active{% endif %}" id="nav-case-proceedings">
+                    <a href="{{ role_url('case_proceedings', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_proceedings' %}active{% endif %}" id="nav-case-proceedings">
                         <i class="fas fa-gavel"></i>
                         <span>Update court attendance</span>
                     </a>
-                    <a href="{{ url_for('case_documents', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_documents' %}active{% endif %}" id="nav-case-documents">
+                    <a href="{{ role_url('case_task_management', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_task_management' %}active{% endif %}" id="nav-case-create-task">
+                        <i class="fas fa-tasks"></i>
+                        <span>Create task</span>
+                    </a>
+                    <a href="{{ role_url('case_documents', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_documents' %}active{% endif %}" id="nav-case-documents">
                         <i class="fas fa-upload"></i>
-                        <span>Upload Documents</span>
+                        <span>Upload documents</span>
                     </a>
-                    <a href="{{ url_for('case_edit', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_edit' %}active{% endif %}" id="nav-case-edit">
+                    <a href="{{ role_url('case_edit', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_edit' %}active{% endif %}" id="nav-case-edit">
                         <i class="fas fa-edit"></i>
-                        <span>Edit Case</span>
+                        <span>Edit case details</span>
                     </a>
-                    <a href="{{ url_for('case_status', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_status' %}active{% endif %}" id="nav-case-status">
+                    <a href="{{ role_url('case_status', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_status' %}active{% endif %}" id="nav-case-status">
                         <i class="fas fa-exchange-alt"></i>
-                        <span>Change Status</span>
+                        <span>Change status</span>
                     </a>
-                    <a href="{{ url_for('case_allocate', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_allocate' %}active{% endif %}" id="nav-case-allocate">
+                    <a href="{{ role_url('case_allocate', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_allocate' %}active{% endif %}" id="nav-case-allocate">
                         <i class="fas fa-user-plus"></i>
-                        <span>Change Allocation</span>
+                        <span>Change allocation</span>
                     </a>
-                    <a href="{{ url_for('case_audit_progress', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_audit_progress' %}active{% endif %}" id="nav-case-audit">
+                    <a href="{{ role_url('case_audit_progress', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_audit_progress' %}active{% endif %}" id="nav-case-audit">
                         <i class="fas fa-history"></i>
-                        <span>Case Audit Progress</span>
+                        <span>Case audit progress</span>
                     </a>
-                    {% if request.endpoint != 'case_documents' %}
-                    <a href="{{ url_for('case_calendar', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_calendar' %}active{% endif %}" id="nav-case-calendar">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Case Calendar</span>
-                    </a>
-                    <a href="{{ url_for('case_reminders', case_id=current_case_id) }}" class="sidebar-link {% if request.endpoint == 'case_reminders' %}active{% endif %}" id="nav-case-reminders">
-                        <i class="fas fa-bell"></i>
-                        <span>Reminders</span>
-                    </a>
-                    {% endif %}
                     {% endif %}
 
                     {# Managing Partner's "Matter Management" panel (Litigation Matters, Case
-                       tracking, Other Matters) removed per request. #}
+                       tracking, Non-Litigation Matters) removed per request. #}
 
-                    
-                    <!-- Associate Advocate: Matter Management + Calendar + Reminders -->
-                    {% if user_role == 'Associate Advocate' and request.endpoint not in user_mgmt_pages and request.endpoint != 'matter_documents' %}
-                    <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Workspace</p>
-                    </div>
-                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                    <!-- Associate Advocate default nav (only when the page has no dedicated sidebar block) -->
+                    {% if user_role == 'Associate Advocate' and request.endpoint not in user_mgmt_pages and request.endpoint not in matter_mgmt_pages %}
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint == 'all_matters' %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
@@ -1626,7 +1862,19 @@
                         <span>Calendar</span>
                     </a>
                     <a href="{{ url_for('reminders') }}" class="sidebar-link {% if request.endpoint == 'reminders' %}active{% endif %}" id="nav-reminders">
-                        <i class="fas fa-bell"></i>
+                        <span class="nav-live-icon nav-live-icon--reminders live-nav-icon live-nav-icon--reminders {% if reminder_badge_count and reminder_badge_count > 0 %}is-live{% endif %}" data-live-icon="reminders" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle class="alarm-halo" cx="12" cy="13" r="8.5"></circle>
+                                <circle cx="12" cy="13" r="6.2" fill="currentColor" fill-opacity="0.1"></circle>
+                                <circle cx="12" cy="13" r="6.2"></circle>
+                                <path class="alarm-hand" d="M12 10.2v3.2l2.2 1.4"></path>
+                                <path class="alarm-bell-l" d="M5.2 6.2l2.4 2"></path>
+                                <path class="alarm-bell-r" d="M18.8 6.2l-2.4 2"></path>
+                                <path d="M9.2 19.6l-1 1.2"></path>
+                                <path d="M14.8 19.6l1 1.2"></path>
+                            </svg>
+                            <span data-live-badge="reminders" class="live-nav-badge live-nav-badge--reminders {% if not reminder_badge_count or reminder_badge_count <= 0 %}hidden{% endif %}">{{ reminder_badge_count or 0 }}</span>
+                        </span>
                         <span>Reminders</span>
                     </a>
                     {% endif %}
@@ -1637,7 +1885,7 @@
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Administrative</p>
                     </div>
                     {% if request.endpoint not in matter_mgmt_pages %}
-                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint == 'all_matters' %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
@@ -1648,7 +1896,19 @@
                         <span>Calendar</span>
                     </a>
                     <a href="{{ url_for('reminders') }}" class="sidebar-link {% if request.endpoint == 'reminders' %}active{% endif %}" id="nav-reminders">
-                        <i class="fas fa-bell"></i>
+                        <span class="nav-live-icon nav-live-icon--reminders live-nav-icon live-nav-icon--reminders {% if reminder_badge_count and reminder_badge_count > 0 %}is-live{% endif %}" data-live-icon="reminders" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle class="alarm-halo" cx="12" cy="13" r="8.5"></circle>
+                                <circle cx="12" cy="13" r="6.2" fill="currentColor" fill-opacity="0.1"></circle>
+                                <circle cx="12" cy="13" r="6.2"></circle>
+                                <path class="alarm-hand" d="M12 10.2v3.2l2.2 1.4"></path>
+                                <path class="alarm-bell-l" d="M5.2 6.2l2.4 2"></path>
+                                <path class="alarm-bell-r" d="M18.8 6.2l-2.4 2"></path>
+                                <path d="M9.2 19.6l-1 1.2"></path>
+                                <path d="M14.8 19.6l1 1.2"></path>
+                            </svg>
+                            <span data-live-badge="reminders" class="live-nav-badge live-nav-badge--reminders {% if not reminder_badge_count or reminder_badge_count <= 0 %}hidden{% endif %}">{{ reminder_badge_count or 0 }}</span>
+                        </span>
                         <span>Reminders</span>
                     </a>
                     {% endif %}
@@ -1720,7 +1980,7 @@
                     {% endif %}
 
                     <!-- Employee Management Section Links -->
-                    {% if request.endpoint in ['employee_management', 'employee_communications', 'onboarding_approvals', 'hr_roles_permissions', 'leave_availability', 'performance_compliance', 'training_certification', 'payroll_expenses', 'audit_offboarding'] %}
+                    {% if request.endpoint in ['employee_management', 'employee_communications', 'onboarding_approvals', 'onboarding_approval_detail', 'hr_roles_permissions', 'leave_availability', 'performance_compliance', 'training_certification', 'payroll_expenses', 'audit_offboarding'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Employee Management</p>
                     </div>
@@ -1728,7 +1988,7 @@
                         <i class="fas fa-user-tie"></i>
                         <span>Employee Records</span>
                     </a>
-                    <a href="{{ url_for('onboarding_approvals') }}" class="sidebar-link {% if request.endpoint == 'onboarding_approvals' %}active{% endif %}" id="nav-onboarding-approvals">
+                    <a href="{{ url_for('onboarding_approvals') }}" class="sidebar-link {% if request.endpoint in ['onboarding_approvals', 'onboarding_approval_detail'] %}active{% endif %}" id="nav-onboarding-approvals">
                         <i class="fas fa-user-check"></i>
                         <span>Onboarding & Approvals</span>
                     </a>
@@ -1740,7 +2000,7 @@
                         <i class="fas fa-graduation-cap"></i>
                         <span>Employee Training</span>
                     </a>
-                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-case-allocation">
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint == 'all_matters' %}active{% endif %}" id="nav-case-allocation">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Allocation & Coverage</span>
                     </a>
@@ -1784,7 +2044,7 @@
                         <span>User Management</span>
                     </a>
                     {% if request.endpoint not in matter_mgmt_pages %}
-                    <a href="{{ url_for('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management">
+                    <a href="{{ role_url('all_matters') }}" class="sidebar-link {% if request.endpoint == 'all_matters' %}active{% endif %}" id="nav-matter-management">
                         <i class="fas fa-briefcase"></i>
                         <span>Matter Management</span>
                     </a>
@@ -1802,14 +2062,26 @@
                         <span>Calendar</span>
                     </a>
                     <a href="{{ url_for('reminders') }}" class="sidebar-link {% if request.endpoint == 'reminders' %}active{% endif %}" id="nav-reminders">
-                        <i class="fas fa-bell"></i>
+                        <span class="nav-live-icon nav-live-icon--reminders live-nav-icon live-nav-icon--reminders {% if reminder_badge_count and reminder_badge_count > 0 %}is-live{% endif %}" data-live-icon="reminders" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle class="alarm-halo" cx="12" cy="13" r="8.5"></circle>
+                                <circle cx="12" cy="13" r="6.2" fill="currentColor" fill-opacity="0.1"></circle>
+                                <circle cx="12" cy="13" r="6.2"></circle>
+                                <path class="alarm-hand" d="M12 10.2v3.2l2.2 1.4"></path>
+                                <path class="alarm-bell-l" d="M5.2 6.2l2.4 2"></path>
+                                <path class="alarm-bell-r" d="M18.8 6.2l-2.4 2"></path>
+                                <path d="M9.2 19.6l-1 1.2"></path>
+                                <path d="M14.8 19.6l1 1.2"></path>
+                            </svg>
+                            <span data-live-badge="reminders" class="live-nav-badge live-nav-badge--reminders {% if not reminder_badge_count or reminder_badge_count <= 0 %}hidden{% endif %}">{{ reminder_badge_count or 0 }}</span>
+                        </span>
                         <span>Reminders</span>
                     </a>
                     {% endif %}
                     {% endif %}
 
                     <!-- Company settings (all firm / company configuration pages) -->
-                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section', 'system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] and not hide_sidebar_nav_links %}
+                    {% if (user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or session.get('original_role') == 'IT Support') and request.endpoint in ['company_information', 'website_templates_settings', 'company_templates_settings', 'system_settings', 'system_settings_section', 'system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] and not hide_sidebar_nav_links %}
                     {% if settings_section_key == 'documents' or request.endpoint in ['system_settings_letterhead', 'system_settings_asset_scan', 'system_settings_asset_capture'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Document Settings</p>
@@ -1838,9 +2110,9 @@
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Company Settings</p>
                     </div>
-                    <a href="{{ url_for('company_templates_settings') }}" class="sidebar-link {% if request.endpoint == 'company_templates_settings' %}active{% endif %}" id="nav-company-templates-settings">
-                        <i class="fas {{ COMPANY_TEMPLATES_SECTION.icon }}"></i>
-                        <span>{{ COMPANY_TEMPLATES_SECTION.label }}</span>
+                    <a href="{{ url_for('website_templates_settings') }}" class="sidebar-link {% if request.endpoint in ['website_templates_settings', 'company_templates_settings'] %}active{% endif %}" id="nav-website-templates-settings">
+                        <i class="fas {{ WEBSITE_TEMPLATES_SECTION.icon }}"></i>
+                        <span>{{ WEBSITE_TEMPLATES_SECTION.label }}</span>
                     </a>
                     <a href="{{ url_for('company_information') }}" class="sidebar-link {% if request.endpoint == 'company_information' %}active{% endif %}" id="nav-company-information">
                         <i class="fas {{ COMPANY_INFORMATION_SECTION.icon }}"></i>
@@ -1915,14 +2187,14 @@
                     </a>
                     <a href="{{ url_for('view_client_document_type', client_id=current_client_id, document_type='CLIENT_OTHER_MATTERS') }}" class="sidebar-link {% if request.endpoint == 'view_client_document_type' and request.view_args.get('document_type') == 'CLIENT_OTHER_MATTERS' %}active{% endif %}" id="nav-client-other-matters">
                         <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
+                        <span>Non-Litigation Matters</span>
                     </a>
                     {% endif %}
 
-                    <!-- Other Matters page: Register Matter (IT Support) then Matter Tracking -->
-                    {% if request.endpoint in ['other_matters', 'matter_task_management', 'approve_matters', 'matter_tracking', 'register_matter'] %}
+                    <!-- Non-Litigation Matters listing page: Register Matter then Approve -->
+                    {% if request.endpoint == 'other_matters' %}
                     <div class="px-4 py-2 mt-4 mb-2">
-                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Other Matters</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Non-Litigation Matters</p>
                     </div>
                     {% if user_role in ['Managing Partner', 'Firm Administrator', 'Associate Advocate', 'IT Support'] or session.get('original_role') == 'IT Support' %}
                     <a href="{{ url_for('register_matter') }}" class="sidebar-link {% if request.endpoint == 'register_matter' %}active{% endif %}" id="nav-register-matter-other-sidebar">
@@ -1930,14 +2202,6 @@
                         <span>Register New Matter</span>
                     </a>
                     {% endif %}
-                    <a href="{{ role_url('matter_management') }}" class="sidebar-link {% if request.endpoint == 'matter_management' %}active{% endif %}" id="nav-matter-management-other-sidebar">
-                        <i class="fas fa-briefcase"></i>
-                        <span>Matter Management</span>
-                    </a>
-                    <a href="{{ role_url('other_matters') }}" class="sidebar-link {% if request.endpoint == 'other_matters' %}active{% endif %}" id="nav-other-matters-listing">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Other Matters</span>
-                    </a>
                     {% if user_role in ['Managing Partner', 'Firm Administrator', 'IT Support'] or session.get('original_role') == 'IT Support' %}
                     <a href="{{ role_url('approve_matters') }}" class="sidebar-link {% if request.endpoint == 'approve_matters' %}active{% endif %}" id="nav-approve-matters">
                         <i class="fas fa-clipboard-check"></i>
@@ -1950,47 +2214,39 @@
                         {% endif %}
                     </a>
                     {% endif %}
-                    <a href="{{ url_for('matter_tracking') }}" class="sidebar-link" id="nav-matter-tracking-other-matters">
-                        <i class="fas fa-route"></i>
-                        <span>Matter Tracking</span>
-                    </a>
-                    <a href="{{ url_for('matter_task_management') }}" class="sidebar-link {% if request.endpoint == 'matter_task_management' %}active{% endif %}" id="nav-matter-task-management">
-                        <i class="fas fa-tasks"></i>
-                        <span>Matter Task Management</span>
-                    </a>
                     {% endif %}
 
                     <!-- Matter Details Section Links -->
-                    {% if request.endpoint in ['matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents'] %}
+                    {% if request.endpoint in ['matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents', 'matter_attendances'] %}
                     <div class="px-4 py-2 mt-4 mb-2">
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">Matter Actions</p>
                     </div>
-                    <a href="{{ url_for('other_matters') }}" class="sidebar-link" id="nav-back-to-matters">
-                        <i class="fas fa-arrow-left"></i>
-                        <span>Back to Matters</span>
-                    </a>
                     {% set current_matter_id = request.view_args.get('matter_id', 0) %}
-                    <a href="{{ url_for('matter_details', matter_id=current_matter_id) }}" class="sidebar-link {% if request.endpoint == 'matter_details' %}active{% endif %}" id="nav-matter-details">
-                        <i class="fas fa-folder-open"></i>
-                        <span>Matter Details</span>
+                    <a href="{{ url_for('matter_attendances', matter_id=current_matter_id) }}" class="sidebar-link {% if request.endpoint == 'matter_attendances' %}active{% endif %}" id="nav-matter-attendances">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Update matter attendance</span>
+                    </a>
+                    <a href="{{ url_for('matter_task_management') }}" class="sidebar-link {% if request.endpoint == 'matter_task_management' %}active{% endif %}" id="nav-matter-task-management">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Create task</span>
                     </a>
                     <a href="{{ url_for('matter_documents', matter_id=current_matter_id) }}" class="sidebar-link {% if request.endpoint == 'matter_documents' %}active{% endif %}" id="nav-matter-documents">
                         <i class="fas fa-upload"></i>
                         <span>Upload Documents</span>
                     </a>
-                    <a href="/other_matters/{{ current_matter_id }}/edit" class="sidebar-link {% if request.endpoint == 'matter_edit' %}active{% endif %}" id="nav-matter-edit">
+                    <a href="/non_litigation_matters/{{ current_matter_id }}/edit" class="sidebar-link {% if request.endpoint == 'matter_edit' %}active{% endif %}" id="nav-matter-edit">
                         <i class="fas fa-edit"></i>
                         <span>Edit Matter Details</span>
                     </a>
-                    <a href="/other_matters/{{ current_matter_id }}/status" class="sidebar-link {% if request.endpoint == 'matter_status' %}active{% endif %}" id="nav-matter-status">
+                    <a href="/non_litigation_matters/{{ current_matter_id }}/status" class="sidebar-link {% if request.endpoint == 'matter_status' %}active{% endif %}" id="nav-matter-status">
                         <i class="fas fa-exchange-alt"></i>
                         <span>Change Status</span>
                     </a>
-                    <a href="/other_matters/{{ current_matter_id }}/allocate" class="sidebar-link {% if request.endpoint == 'matter_allocate' %}active{% endif %}" id="nav-matter-allocate">
+                    <a href="/non_litigation_matters/{{ current_matter_id }}/allocate" class="sidebar-link {% if request.endpoint == 'matter_allocate' %}active{% endif %}" id="nav-matter-allocate">
                         <i class="fas fa-user-plus"></i>
                         <span>Change Allocation</span>
                     </a>
-                    <a href="/other_matters/{{ current_matter_id }}/audit" class="sidebar-link {% if request.endpoint == 'matter_audit_progress' %}active{% endif %}" id="nav-matter-audit">
+                    <a href="/non_litigation_matters/{{ current_matter_id }}/audit" class="sidebar-link {% if request.endpoint == 'matter_audit_progress' %}active{% endif %}" id="nav-matter-audit">
                         <i class="fas fa-history"></i>
                         <span>Matter Audit Progress</span>
                     </a>
@@ -2115,9 +2371,16 @@
                         <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--role-color, #6b7280);">General</p>
                     </div>
                     <a href="{{ url_for('my_tasks') }}" class="sidebar-link {% if request.endpoint == 'my_tasks' %}active{% endif %}" id="nav-tasks">
-                        <span class="relative inline-flex items-center justify-center w-5">
-                            <i class="fas fa-bell"></i>
-                            <span data-live-badge="my-tasks" class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white {% if not my_task_badge_count or my_task_badge_count <= 0 %}hidden{% endif %}">
+                        <span class="nav-live-icon nav-live-icon--tasks live-nav-icon live-nav-icon--tasks relative inline-flex items-center justify-center w-5 {% if my_task_badge_count and my_task_badge_count > 0 %}is-live{% endif %}" data-live-icon="my-tasks">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="4" y="3.5" width="16" height="17" rx="3" fill="currentColor" fill-opacity="0.1"></rect>
+                                <rect x="4" y="3.5" width="16" height="17" rx="3"></rect>
+                                <path class="task-check" d="M7.2 9.2l1.5 1.5 2.6-2.8"></path>
+                                <path class="task-line-1" d="M13 9.5h4.2"></path>
+                                <path class="task-check" d="M7.2 14.2l1.5 1.5 2.6-2.8"></path>
+                                <path class="task-line-2" d="M13 14.5h4.2"></path>
+                            </svg>
+                            <span data-live-badge="my-tasks" class="live-nav-badge live-nav-badge--tasks {% if not my_task_badge_count or my_task_badge_count <= 0 %}hidden{% endif %}">
                                 {{ my_task_badge_count or 0 }}
                             </span>
                         </span>
@@ -2140,20 +2403,29 @@
             <div class="p-4 border-t border-gray-200/50">
                 {% if not hide_sidebar_nav_links %}
                 <a href="{{ url_for('my_tasks') }}" class="sidebar-link {% if request.endpoint == 'my_tasks' %}active{% endif %}" id="nav-my-tasks-footer">
-                    <span class="relative inline-flex items-center justify-center w-5">
-                        <i class="fas fa-bell"></i>
-                        <span data-live-badge="my-tasks" class="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-extrabold leading-none ring-2 ring-white {% if not my_task_badge_count or my_task_badge_count <= 0 %}hidden{% endif %}">
+                    <span class="nav-live-icon nav-live-icon--tasks live-nav-icon live-nav-icon--tasks relative inline-flex items-center justify-center w-5 {% if my_task_badge_count and my_task_badge_count > 0 %}is-live{% endif %}" data-live-icon="my-tasks">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="4" y="3.5" width="16" height="17" rx="3" fill="currentColor" fill-opacity="0.1"></rect>
+                            <rect x="4" y="3.5" width="16" height="17" rx="3"></rect>
+                            <path class="task-check" d="M7.2 9.2l1.5 1.5 2.6-2.8"></path>
+                            <path class="task-line-1" d="M13 9.5h4.2"></path>
+                            <path class="task-check" d="M7.2 14.2l1.5 1.5 2.6-2.8"></path>
+                            <path class="task-line-2" d="M13 14.5h4.2"></path>
+                        </svg>
+                        <span data-live-badge="my-tasks" class="live-nav-badge live-nav-badge--tasks {% if not my_task_badge_count or my_task_badge_count <= 0 %}hidden{% endif %}">
                             {{ my_task_badge_count or 0 }}
                         </span>
                     </span>
                     <span>My Tasks</span>
                 </a>
+                {% if user_role != 'Associate Advocate' %}
                 <a href="{{ url_for('my_tools') }}" class="sidebar-link {% if request.endpoint == 'my_tools' %}active{% endif %}" id="nav-my-tools">
                     <i class="fas fa-tools"></i>
                     <span>My Tools</span>
                 </a>
+                {% endif %}
                 {% if user_role in ['IT Support', 'Firm Administrator', 'Managing Partner'] or (session.get('original_role') == 'IT Support') %}
-                <a href="{{ url_for('company_information') }}" class="sidebar-link {% if request.endpoint in ['company_information', 'company_templates_settings', 'system_settings', 'system_settings_section'] %}active{% endif %}" id="nav-company-footer">
+                <a href="{{ url_for('company_information') }}" class="sidebar-link {% if request.endpoint in ['company_information', 'website_templates_settings', 'company_templates_settings', 'system_settings', 'system_settings_section'] %}active{% endif %}" id="nav-company-footer">
                     <i class="fas fa-building"></i>
                     <span>Company Settings</span>
                 </a>

@@ -1,0 +1,42 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Our people</p>
+    <h1>{{ page_seo.h1_heading or 'Our Team' }}</h1>
+    <p class="firm-page-lead">{{ page_seo.meta_description or 'Meet the advocates and legal professionals at our firm.' }}</p>
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container">
+    {% if attorneys %}
+    <div class="firm-grid-3">
+      {% for emp in attorneys %}
+      <article class="firm-card firm-team-card firm-reveal">
+        {% if emp.profile_picture_url %}
+        <div class="firm-team-photo">
+          <img src="{{ emp.profile_picture_url }}" alt="{{ emp.profile_picture_alt or emp.full_name }}" loading="lazy" width="120" height="120">
+        </div>
+        {% endif %}
+        <h2>{{ emp.full_name }}</h2>
+        <p class="firm-team-role">{{ emp.professional_title or emp.role or 'Attorney' }}</p>
+        {% if emp.practice_areas %}
+        <p class="firm-team-areas">{{ emp.practice_areas.replace('\n', ', ') }}</p>
+        {% endif %}
+        {% if emp.attorney_bio %}
+        <p>{{ emp.attorney_bio | truncate(140) }}</p>
+        {% endif %}
+        <a href="{{ firm_url('team/' ~ (emp.url_slug or emp.id)) }}" class="firm-card-link">View profile</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="firm-empty-state firm-reveal">Team profiles will appear here once configured in settings.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

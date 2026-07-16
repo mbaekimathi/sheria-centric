@@ -153,10 +153,6 @@
                             Upcoming court date
                         </span>
                         <span class="flex items-center gap-2 text-gray-600">
-                            <span class="w-3 h-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 ring-2 ring-blue-100"></span>
-                            Past appearance
-                        </span>
-                        <span class="flex items-center gap-2 text-gray-600">
                             <span class="w-3 h-3 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 ring-2 ring-purple-100"></span>
                             Matter
                         </span>
@@ -607,7 +603,7 @@ function renderUpcomingList() {
             const parts = (item.date_opened || '').split('-');
             const dy = parts[2] || '—', yr = parts[0] || '';
             const moLabel = parts[1] ? monthShort[parseInt(parts[1], 10) - 1] || parts[1] : '';
-            return `<a href="/other_matters/${item.id}" class="upcoming-row group relative block px-4 sm:px-6 py-4 hover:bg-purple-50/40 transition-colors">
+            return `<a href="/non_litigation_matters/${item.id}" class="upcoming-row group relative block px-4 sm:px-6 py-4 hover:bg-purple-50/40 transition-colors">
                 <span class="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-gradient-to-b from-purple-400 to-purple-600 opacity-70 group-hover:opacity-100 transition-opacity"></span>
                 <div class="flex items-start gap-3 sm:gap-4">
                     <div class="shrink-0 text-center w-16 sm:w-20 select-none">
@@ -927,7 +923,7 @@ function showSelectedDay(dateStr) {
         if (ev.type === 'matter') {
             const m = ev.matter || {};
             const card = document.createElement('a');
-            card.href = '/other_matters/' + m.id;
+            card.href = '/non_litigation_matters/' + m.id;
             card.className = theme.matter.container + ' block hover:shadow-md transition-shadow';
             card.innerHTML = `
                 <div class="flex items-start justify-between gap-3 mb-2">

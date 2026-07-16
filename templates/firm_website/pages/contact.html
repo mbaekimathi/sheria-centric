@@ -1,0 +1,51 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Get in touch</p>
+    <h1>{{ page_seo.h1_heading or 'Contact Us' }}</h1>
+    <p class="firm-page-lead">{{ page_seo.meta_description or 'Book a consultation or reach our office during business hours.' }}</p>
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container firm-contact-grid">
+    <div class="firm-reveal">
+      <h2 class="firm-section-title">Office details</h2>
+      <ul class="firm-contact-list">
+        {% if firm_address %}
+        <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>{{ firm_address }}</span></li>
+        {% endif %}
+        {% if firm_phone %}
+        <li><i class="fas fa-phone" aria-hidden="true"></i><a href="tel:{{ firm_phone }}">{{ firm_phone }}</a></li>
+        {% endif %}
+        {% if firm_email %}
+        <li><i class="fas fa-envelope" aria-hidden="true"></i><a href="mailto:{{ firm_email }}">{{ firm_email }}</a></li>
+        {% endif %}
+        {% if business_hours %}
+        <li><i class="fas fa-clock" aria-hidden="true"></i><span>{{ business_hours }}</span></li>
+        {% endif %}
+        {% if firm.get('gbp_service_areas') %}
+        <li><i class="fas fa-location-dot" aria-hidden="true"></i><span>Serving {{ firm.gbp_service_areas.replace('\n', ', ') }}</span></li>
+        {% endif %}
+      </ul>
+      {% if whatsapp_url %}
+      <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-outline" target="_blank" rel="noopener noreferrer" style="margin-top:1rem;">
+        <i class="fab fa-whatsapp" aria-hidden="true"></i> Chat on WhatsApp
+      </a>
+      {% endif %}
+      {% include 'firm_website/_map_embed.html' %}
+    </div>
+    <div class="firm-reveal">
+      <div class="firm-card">
+        <h2>Request a consultation</h2>
+        <p style="color:var(--color-text-muted);margin-bottom:1.25rem;">Tell us about your matter and we will respond during business hours.</p>
+        {% include 'firm_website/_consultation_form.html' %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

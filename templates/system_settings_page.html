@@ -5,35 +5,69 @@
 
 {% block content %}
 {% set cs = company_settings or {} %}
+{% set origin = request.url_root.rstrip('/') %}
+{% set firm_site_on = cs.get('firm_website_enabled') %}
+{% set preview_url = (origin ~ role_url('website_firm_preview')) if firm_site_on else (origin ~ role_url('website_marketing_preview', page_slug='home')) %}
 <div class="max-w-5xl mx-auto">
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-            <i class="fas fa-building text-indigo-600 mr-3"></i>
-            {{ section_meta.label }}
-        </h1>
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div class="flex-1">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center flex-wrap gap-2">
+                    <span class="flex items-center">
+                        <i class="fas fa-building text-indigo-600 mr-3"></i>
+                        {{ section_meta.label }}
+                    </span>
+                    {% if section_completion %}
+                    <span class="inline-flex items-center gap-2 text-sm font-semibold px-3 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-100" title="Launch-critical fields completed">
+                        <span class="seo-section-progress" style="--pct: {{ section_completion.percent }}">{{ section_completion.percent }}% complete</span>
+                    </span>
+                    {% endif %}
+                </h1>
         <p class="text-gray-600">
             {% if page_group == 'company' and settings_section_key == 'company' %}
-            Main identity details of the law firm. Use the sidebar to open other company settings.
+            Official firm profile — name, history, mission, and physical office addresses. Contact details are under Contact Information in the sidebar. Changes save automatically.
+            {% elif page_group == 'company' and settings_section_key == 'contact' %}
+            Phone, email, M-Pesa, Google Business Profile, reviews, business hours, and social links — changes save automatically.
+            {% elif page_group == 'company' and settings_section_key == 'legal' %}
+            Firm-wide legal credentials, practice areas, privacy policy, terms of service, and employee profiles. Changes save automatically.
             {% else %}
-            Company setting — configure this area, then save. Use the sidebar to open other company pages.
+            Configure this area — your changes are saved automatically as you edit.
             {% endif %}
         </p>
+            </div>
+            {% if settings_section_key in ['company', 'contact', 'legal'] %}
+            <button type="button" class="preview-open-link inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-800 font-semibold text-sm hover:bg-indigo-100 transition-colors flex-shrink-0"
+               data-preview-url="{{ preview_url }}" title="Preview public website">
+                <i class="fas fa-eye" aria-hidden="true"></i> Preview as visitor
+            </button>
+            {% endif %}
+        </div>
     </div>
 
-    <form action="{{ role_url('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6" id="systemSettingsForm">
+    {% if settings_section_key in ['company', 'contact', 'legal'] %}
+    {% include 'system_settings/_seo_status_panel.html' %}
+    {% endif %}
+
+    <form action="{{ role_url('update_company_settings') }}" method="post" enctype="multipart/form-data" class="space-y-6 pb-8" id="systemSettingsForm">
         <input type="hidden" name="settings_section" value="{{ settings_section_key }}">
         {% include 'system_settings/sections/' + settings_section_key + '.html' %}
-        <div class="flex justify-end pb-8">
-            <button type="submit" class="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors">
-                <i class="fas fa-save mr-2"></i>Save Settings
-            </button>
-        </div>
     </form>
 </div>
+{% include 'system_settings/_autosave.html' %}
 {% endblock %}
 
 {% block extra_js %}
 {% include 'system_settings/_styles.html' %}
+<script>
+(function () {
+    document.querySelectorAll('.preview-open-link').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var url = btn.getAttribute('data-preview-url');
+            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        });
+    });
+})();
+</script>
 {% if settings_section_key == 'branding' %}
 {% include 'system_settings/_branding_assets.html' %}
 {% endif %}

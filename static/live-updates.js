@@ -1,19 +1,30 @@
 (function () {
-    const POLL_MS = 15000;
+    const DEFAULT_POLL_MS = 15000;
+    const NOTIFICATIONS_POLL_MS = 4000;
+    const MY_TASKS_POLL_MS = 8000;
     let pollTimer = null;
     let lastBadgeKey = '';
     let lastMyTasksKey = '';
     let lastNotificationsKey = '';
     let prevNotificationCount = null;
+    let tickInFlight = false;
 
     function livePage() {
         return (document.body && document.body.dataset.livePage) || '';
+    }
+
+    function currentPollMs() {
+        const page = livePage();
+        if (page === 'notifications') return NOTIFICATIONS_POLL_MS;
+        if (page === 'my_tasks') return MY_TASKS_POLL_MS;
+        return DEFAULT_POLL_MS;
     }
 
     async function fetchJson(url) {
         const response = await fetch(url, {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
+            cache: 'no-store',
         });
         return response.json();
     }
@@ -30,11 +41,23 @@
         }
     }
 
+    function setLiveIconState(kind, count) {
+        const value = Math.max(0, parseInt(count, 10) || 0);
+        document.querySelectorAll(`[data-live-icon="${kind}"]`).forEach((el) => {
+            el.classList.toggle('is-live', value > 0);
+        });
+    }
+
     function updateBadgeCounts(data) {
         const notificationBadges = document.querySelectorAll('[data-live-badge="notifications"]');
         const myTaskBadges = document.querySelectorAll('[data-live-badge="my-tasks"]');
+        const reminderBadges = document.querySelectorAll('[data-live-badge="reminders"]');
         notificationBadges.forEach((el) => setBadgeCount(el, data.notification_badge_count));
         myTaskBadges.forEach((el) => setBadgeCount(el, data.my_task_badge_count));
+        reminderBadges.forEach((el) => setBadgeCount(el, data.reminder_badge_count));
+        setLiveIconState('notifications', data.notification_badge_count);
+        setLiveIconState('my-tasks', data.my_task_badge_count);
+        setLiveIconState('reminders', data.reminder_badge_count);
     }
 
     async function showDeviceNotification(title, body, url) {
@@ -74,6 +97,10 @@
         if (previousCount === null || nextCount <= previousCount) {
             return;
         }
+        // When already on the notifications page, the live list refresh is enough.
+        if (livePage() === 'notifications') {
+            return;
+        }
         try {
             const data = await fetchJson('/api/notifications');
             if (!data.success || !data.notifications || !data.notifications.length) {
@@ -98,22 +125,26 @@
     async function refreshBadges() {
         try {
             const data = await fetchJson('/api/employee/badge-counts');
-            if (!data.success) return;
+            if (!data.success) return false;
 
             const nextCount = parseInt(data.notification_badge_count, 10) || 0;
             const key = [
                 data.my_task_badge_count,
                 data.notification_badge_count,
+                data.reminder_badge_count,
             ].join('|');
 
-            if (key !== lastBadgeKey) {
+            const changed = key !== lastBadgeKey;
+            if (changed) {
                 await maybeAlertOnNewItems(prevNotificationCount, nextCount);
                 prevNotificationCount = nextCount;
                 lastBadgeKey = key;
                 updateBadgeCounts(data);
             }
+            return changed;
         } catch (err) {
             console.debug('Live badge refresh failed:', err);
+            return false;
         }
     }
 
@@ -134,15 +165,15 @@
         }
     }
 
-    async function refreshNotificationsPage() {
+    async function refreshNotificationsPage(force) {
         if (typeof window.SheriaNotificationsRefresh !== 'function') return;
         try {
-            const data = await fetchJson('/api/notifications');
+            const data = await fetchJson('/api/notifications/page');
             if (!data.success) return;
             const key = (data.notifications || []).map((item) => {
-                return `${item.type}:${item.title}:${item.meta}`;
+                return `${item.key || item.type}:${item.title}:${item.meta}`;
             }).join('|');
-            if (key === lastNotificationsKey) return;
+            if (!force && key === lastNotificationsKey) return;
             lastNotificationsKey = key;
             window.SheriaNotificationsRefresh(data);
         } catch (err) {
@@ -150,36 +181,56 @@
         }
     }
 
-    async function tick() {
-        await refreshBadges();
+    async function tick(options) {
+        if (tickInFlight) return;
+        tickInFlight = true;
+        const force = !!(options && options.force);
+        try {
+            const badgesChanged = await refreshBadges();
 
-        if (document.hidden) return;
+            if (document.hidden) return;
 
-        const page = livePage();
-        if (page === 'my_tasks') {
-            await refreshMyTasksPage();
-        } else if (page === 'notifications') {
-            await refreshNotificationsPage();
+            const page = livePage();
+            if (page === 'my_tasks') {
+                await refreshMyTasksPage();
+            } else if (page === 'notifications') {
+                // Refresh the list whenever badges change or on the normal live poll.
+                await refreshNotificationsPage(force || badgesChanged);
+            }
+        } finally {
+            tickInFlight = false;
         }
     }
 
+    function stopPolling() {
+        if (!pollTimer) return;
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
     function startPolling() {
-        if (pollTimer) return;
-        tick();
-        pollTimer = setInterval(tick, POLL_MS);
+        stopPolling();
+        tick({ force: true });
+        pollTimer = setInterval(function () {
+            tick();
+        }, currentPollMs());
     }
 
     document.addEventListener('visibilitychange', function () {
-        if (!document.hidden) tick();
+        if (!document.hidden) {
+            startPolling();
+        }
     });
 
     document.addEventListener('DOMContentLoaded', startPolling);
 
     window.SheriaLiveUpdates = {
-        refreshNow: tick,
+        refreshNow: function () { return tick({ force: true }); },
         resetMyTasksKey: function () { lastMyTasksKey = ''; },
         resetNotificationsKey: function () { lastNotificationsKey = ''; },
         showDeviceNotification: showDeviceNotification,
         showPhoneNotification: showDeviceNotification,
+        startPolling: startPolling,
+        stopPolling: stopPolling,
     };
 })();

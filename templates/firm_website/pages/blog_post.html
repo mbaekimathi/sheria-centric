@@ -1,0 +1,30 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<article class="firm-section">
+  <div class="container firm-article firm-reveal">
+    <header>
+      <p class="firm-eyebrow">Insights</p>
+      <h1>{{ page_seo.h1_heading or blog_post.title }}</h1>
+      <p class="firm-article-meta">
+        {% if blog_post.author_name %}
+        <span>By {% if blog_post.author_slug %}<a href="{{ firm_url('team/' ~ blog_post.author_slug) }}">{{ blog_post.author_name }}</a>{% else %}{{ blog_post.author_name }}{% endif %}</span>
+        {% endif %}
+        {% if blog_post.last_updated_display %}
+        <span>{{ blog_post.last_updated_display }}</span>
+        {% endif %}
+      </p>
+      {% if blog_post.excerpt %}
+      <p class="firm-page-lead">{{ blog_post.excerpt }}</p>
+      {% endif %}
+    </header>
+    <div class="firm-prose">{{ blog_post.body }}</div>
+    <footer class="firm-article-footer">
+      <a href="{{ firm_url('blog') }}" class="firm-card-link"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to insights</a>
+      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">{{ hero_cta_label }}</a>
+    </footer>
+  </div>
+</article>
+{% endblock %}

@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employee.full_name or 'Employee' }} – Onboarding Details - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+{% set role_class_map = {
+    'Firm Administrator': 'bg-purple-100 text-purple-800',
+    'Managing Partner': 'bg-indigo-100 text-indigo-800',
+    'Finance Office': 'bg-blue-100 text-blue-800',
+    'Associate Advocate': 'bg-cyan-100 text-cyan-800',
+    'Clerk': 'bg-teal-100 text-teal-800',
+    'IT Support': 'bg-red-100 text-red-800',
+    'Employee': 'bg-gray-100 text-gray-700'
+} %}
+{% set role_class = role_class_map.get(employee.role, 'bg-gray-100 text-gray-700') %}
+{% set name_parts = (employee.full_name or 'E').split() %}
+{% set initials = (name_parts[0][0] ~ (name_parts[1][0] if name_parts|length > 1 else ''))|upper %}
+{% set payment_label = 'Bank' if employee.payment_method == 'Bank' else ('Mobile Money' if employee.payment_method == 'Mobile Money' else '—') %}
+{% if employee.payment_method == 'Bank' %}
+    {% set payment_detail = ('Bank: ' ~ employee.bank_name) if employee.bank_name else 'Bank (no name provided)' %}
+{% elif employee.payment_method == 'Mobile Money' %}
+    {% set payment_detail = ('Provider: ' ~ employee.mobile_money_company) if employee.mobile_money_company else 'Mobile Money (no provider)' %}
+{% else %}
+    {% set payment_detail = '—' %}
+{% endif %}
+
+<div class="max-w-5xl mx-auto px-3 sm:px-4 lg:px-6 pb-8">
+    <div class="mb-4 sm:mb-5">
+        <a href="{{ role_url('onboarding_approvals') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-emerald-700 transition-colors">
+            <i class="fas fa-arrow-left text-xs"></i>
+            Back to Onboarding & Approvals
+        </a>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+                <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 mb-1">Onboarding review</p>
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">Onboarding Details</h1>
+                <p class="text-gray-500 text-xs sm:text-sm mt-1">Review profile, documents, and approve when ready</p>
+            </div>
+            <div class="flex flex-wrap gap-2 sm:justify-end">
+                <button type="button" id="editOnboardingBtn" onclick="switchToEditMode()" class="btn-touch px-4 py-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-colors font-semibold text-sm shadow-sm">
+                    <i class="fas fa-edit mr-1.5"></i>Edit
+                </button>
+                {% if employee.onboarding_completed %}
+                <button type="button" id="approveFromPageBtn" onclick="openApproveModal({{ employee.id }}, {{ employee.full_name|tojson }})" class="btn-touch px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-semibold text-sm shadow-md">
+                    <i class="fas fa-check mr-1.5"></i>Approve
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div id="detailViewMode" class="details-stack">
+        {% if not employee.onboarding_completed %}
+        <div class="detail-banner detail-banner--warn">
+            <span class="detail-banner-icon"><i class="fas fa-hourglass-half"></i></span>
+            <div>
+                <p class="font-semibold text-amber-900 text-sm">Onboarding not complete</p>
+                <p class="text-xs sm:text-sm text-amber-800/90 mt-0.5 leading-relaxed">Details and documents appear after the employee submits their onboarding form.</p>
+            </div>
+        </div>
+        {% else %}
+        <div class="detail-banner detail-banner--ok">
+            <span class="detail-banner-icon"><i class="fas fa-check-circle"></i></span>
+            <div>
+                <p class="font-semibold text-emerald-900 text-sm">Ready for review</p>
+                <p class="text-xs sm:text-sm text-emerald-800/90 mt-0.5 leading-relaxed">Onboarding is complete. Assign a role and approve when ready.</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <section class="profile-card">
+            <div class="profile-card-main">
+                <div class="profile-avatar">{{ initials }}</div>
+                <div class="profile-identity min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 class="profile-name truncate">{{ employee.full_name or 'Employee' }}</h2>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold {{ role_class }}">{{ employee.role or 'Employee' }}</span>
+                    </div>
+                    <p class="profile-email truncate">{{ employee.personal_email or 'No personal email' }}</p>
+                    <div class="profile-quick-meta">
+                        <span><i class="fas fa-hashtag"></i>{{ employee.employee_code or '—' }}</span>
+                        <span><i class="fas fa-phone"></i>{{ employee.phone_number or '—' }}</span>
+                        <span class="{{ 'text-emerald-600' if employee.onboarding_completed else 'text-amber-600' }}">
+                            <i class="fas {{ 'fa-check-circle' if employee.onboarding_completed else 'fa-clock' }}"></i>
+                            {{ 'Onboarding complete' if employee.onboarding_completed else 'Onboarding pending' }}
+                        </span>
+                    </div>
+                </div>
+                <button type="button" class="profile-toggle" onclick="toggleProfileDetails(this)" aria-expanded="false" aria-controls="profileDetailsPanel">
+                    <span class="profile-toggle-label">Details</span>
+                    <i class="fas fa-chevron-down profile-toggle-icon"></i>
+                </button>
+            </div>
+            <div id="profileDetailsPanel" class="profile-details-panel hidden">
+                <div class="detail-grid">
+                    <div class="detail-field"><p class="detail-label">Full name</p><div class="detail-value">{{ employee.full_name or 'N/A' }}</div></div>
+                    <div class="detail-field"><p class="detail-label">Employee code</p><div class="detail-value">{{ employee.employee_code or 'N/A' }}</div></div>
+                    <div class="detail-field"><p class="detail-label">Personal email</p><div class="detail-value break-all">{{ employee.personal_email or 'N/A' }}</div></div>
+                    <div class="detail-field">
+                        <p class="detail-label">Work email</p>
+                        <div class="detail-value">
+                            {% if employee.work_email %}
+                            <span class="break-all">{{ employee.work_email }}</span>
+                            {% else %}
+                            <span class="text-amber-600 font-semibold"><i class="fas fa-clock mr-1"></i>Pending allocation</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="detail-field"><p class="detail-label">Phone</p><div class="detail-value">{{ employee.phone_number or 'N/A' }}</div></div>
+                    <div class="detail-field"><p class="detail-label">Role</p><div class="detail-value"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {{ role_class }}">{{ employee.role or 'N/A' }}</span></div></div>
+                    <div class="detail-field"><p class="detail-label">Status</p><div class="detail-value"><span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">{{ employee.status or 'N/A' }}</span></div></div>
+                    <div class="detail-field">
+                        <p class="detail-label">Onboarding</p>
+                        <div class="detail-value {{ 'text-emerald-600' if employee.onboarding_completed else 'text-amber-600' }} font-semibold">
+                            <i class="fas {{ 'fa-check-circle' if employee.onboarding_completed else 'fa-clock' }} mr-1"></i>
+                            {{ 'Completed' if employee.onboarding_completed else 'In progress' }}
+                        </div>
+                    </div>
+                    <div class="detail-field"><p class="detail-label">Registered</p><div class="detail-value">{{ employee.created_at or 'N/A' }}</div></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="detail-card">
+            <div class="detail-card-head">
+                <span class="detail-card-icon detail-card-icon--green"><i class="fas fa-money-bill-wave"></i></span>
+                <div>
+                    <h3 class="detail-card-title">Payroll & compensation</h3>
+                    <p class="detail-card-sub">Payment method and account details</p>
+                </div>
+            </div>
+            <div class="detail-grid">
+                <div class="detail-field"><p class="detail-label">Payment method</p><div class="detail-value">{{ payment_label }}</div></div>
+                {% if payment_detail != '—' %}
+                <div class="detail-field sm:col-span-2"><p class="detail-label">Payment details</p><div class="detail-value">{{ payment_detail }}</div></div>
+                {% endif %}
+                <div class="detail-field"><p class="detail-label">Account number</p><div class="detail-value">{{ employee.account_number or 'N/A' }}</div></div>
+                <div class="detail-field"><p class="detail-label">Account name</p><div class="detail-value">{{ employee.account_name or 'N/A' }}</div></div>
+                <div class="detail-field"><p class="detail-label">Pay frequency</p><div class="detail-value">{{ employee.pay_frequency or 'N/A' }}</div></div>
+                {% if employee.salary %}
+                <div class="detail-field"><p class="detail-label">Salary</p><div class="detail-value">{{ employee.salary }}</div></div>
+                {% endif %}
+                {% if employee.salary_components %}
+                <div class="detail-field sm:col-span-2 lg:col-span-3"><p class="detail-label">Salary components</p><div class="detail-value whitespace-pre-wrap font-normal text-gray-700">{{ employee.salary_components }}</div></div>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="detail-card">
+            <div class="detail-card-head">
+                <span class="detail-card-icon detail-card-icon--violet"><i class="fas fa-folder-open"></i></span>
+                <div>
+                    <h3 class="detail-card-title">Uploaded documents</h3>
+                    <p class="detail-card-sub">Opens in a new tab for viewing or download</p>
+                </div>
+            </div>
+            <div class="doc-grid">
+                {% macro doc_tile(title, filename, icon, tone) %}
+                    {% if filename %}
+                    <a href="/static/uploads/profile_pictures/{{ filename }}" target="_blank" rel="noopener noreferrer" class="doc-tile doc-tile--ready group">
+                        <div class="doc-tile-icon doc-tile-icon--{{ tone }}"><i class="fas {{ icon }}"></i></div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-gray-900 leading-snug">{{ title }}</p>
+                            <p class="text-xs text-emerald-700 mt-0.5 font-medium">View / Download</p>
+                        </div>
+                        <i class="fas fa-arrow-up-right-from-square text-gray-300 group-hover:text-emerald-600 flex-shrink-0 text-sm transition-colors"></i>
+                    </a>
+                    {% else %}
+                    <div class="doc-tile doc-tile--empty">
+                        <div class="doc-tile-icon doc-tile-icon--muted"><i class="fas {{ icon }}"></i></div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-gray-500">{{ title }}</p>
+                            <p class="text-xs text-gray-400 mt-0.5">Not uploaded</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endmacro %}
+                {{ doc_tile('Employment Contract', employee.employment_contract, 'fa-file-pdf', 'red') }}
+                {{ doc_tile('National ID or Passport', employee.id_front, 'fa-id-card', 'blue') }}
+                {{ doc_tile('KRA PIN Certificate', employee.kra_pin_document, 'fa-file-invoice', 'amber') }}
+                {% if employee.id_back %}
+                {{ doc_tile('ID Back (legacy)', employee.id_back, 'fa-id-card', 'indigo') }}
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <div id="detailEditMode" class="hidden"></div>
+    <div id="detailEditActions" class="hidden mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+        <button type="button" onclick="cancelEditMode()" class="btn-touch w-full sm:w-auto px-4 sm:px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm shadow-sm">Cancel</button>
+        <button type="button" id="saveOnboardingBtn" onclick="saveOnboardingEdits()" class="btn-touch w-full sm:w-auto px-4 sm:px-5 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-semibold text-sm shadow-md">
+            <i class="fas fa-save mr-1.5"></i>Save changes
+        </button>
+    </div>
+</div>
+
+<!-- Role Assignment & Approval Modal -->
+<div id="approveModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[220] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6">
+            <div class="flex items-center justify-between mb-4 sm:mb-5">
+                <h3 class="text-lg sm:text-xl font-bold text-gray-900">Approve Employee</h3>
+                <button onclick="closeApproveModal()" class="btn-touch p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <p class="text-gray-600 text-sm mb-4">Assign a role and approve <strong id="approve-emp-name" class="text-gray-900"></strong>.</p>
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Assign Role</label>
+                <select id="roleSelect" class="input-modern w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white">
+                    <option value="">Keep current role</option>
+                    <option value="Firm Administrator">Firm Administrator</option>
+                    <option value="Managing Partner">Managing Partner</option>
+                    <option value="Finance Office">Finance Office</option>
+                    <option value="Associate Advocate">Associate Advocate</option>
+                    <option value="Clerk">Clerk</option>
+                    <option value="IT Support">IT Support</option>
+                    <option value="Employee">Employee</option>
+                </select>
+            </div>
+
+            <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-3">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Personal email</p>
+                    <p id="approve-personal-email" class="text-sm font-medium text-gray-900 break-all mt-0.5">—</p>
+                </div>
+
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="allocateWorkEmail" class="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" checked onchange="toggleWorkEmailFields()">
+                    <span class="text-sm text-gray-800">
+                        <span class="font-semibold">Allocate work email</span>
+                        <span class="block text-xs text-gray-500 mt-0.5">Create a firm mailbox on @{{ email_domain }}</span>
+                    </span>
+                </label>
+
+                <div id="workEmailFields" class="space-y-3 pl-7">
+                    <div id="existingWorkEmailNotice" class="hidden text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                        Already has firm work email: <strong id="approve-existing-work-email" class="break-all"></strong>
+                    </div>
+                    <div id="newWorkEmailFields">
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Work email username</label>
+                        <div class="flex items-stretch rounded-xl border border-gray-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-green-500 focus-within:border-transparent">
+                            <input type="text" id="workEmailLocal" autocomplete="off" spellcheck="false"
+                                class="flex-1 min-w-0 px-3 py-2.5 text-sm border-0 focus:outline-none focus:ring-0"
+                                placeholder="first.last">
+                            <span class="inline-flex items-center px-3 text-xs sm:text-sm text-gray-500 bg-gray-50 border-l border-gray-200 whitespace-nowrap">@{{ email_domain }}</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-1.5">Suggested from their name; edit if needed.</p>
+                    </div>
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="linkPersonalEmail" class="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                        <span class="text-sm text-gray-800">
+                            <span class="font-semibold">Link with personal email</span>
+                            <span class="block text-xs text-gray-500 mt-0.5">Forward mail from the work address to their personal inbox</span>
+                        </span>
+                    </label>
+                </div>
+                {% if not email_configured %}
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    Email settings are not configured. Approval will still work, but work email cannot be created until Communication Settings are saved.
+                </p>
+                {% endif %}
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeApproveModal()" class="btn-touch flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors font-semibold text-sm">Cancel</button>
+                <button onclick="confirmApproval()" id="confirmApproveBtn" class="btn-touch flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md">
+                    <i class="fas fa-check mr-2"></i>Approve
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const currentEmployeeId = {{ employee.id|tojson }};
+const currentEmployeeData = {{ employee|tojson }};
+const approvalsListUrl = {{ role_url('onboarding_approvals')|tojson }};
+const emailDomain = {{ email_domain|default('baunilawgroup.com')|tojson }};
+const emailConfigured = {{ email_configured|default(false)|tojson }};
+let approveTargetId = null;
+
+function suggestWorkEmailLocal(fullName) {
+    const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    const slug = (s) => (s || '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    const first = slug(parts[0]);
+    const last = parts.length > 1 ? slug(parts[parts.length - 1]) : '';
+    if (!first) return '';
+    return last && last !== first ? `${first}.${last}` : first;
+}
+
+function firmDomainOf(email) {
+    if (!email || !email.includes('@')) return '';
+    return email.split('@').pop().toLowerCase();
+}
+
+function toggleWorkEmailFields() {
+    const allocate = document.getElementById('allocateWorkEmail').checked;
+    const fields = document.getElementById('workEmailFields');
+    fields.classList.toggle('hidden', !allocate);
+    fields.querySelectorAll('input').forEach((el) => { el.disabled = !allocate; });
+}
+
+function toggleProfileDetails(btn) {
+    const panel = document.getElementById('profileDetailsPanel');
+    if (!panel || !btn) return;
+    const isOpen = !panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', isOpen);
+    btn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    btn.classList.toggle('is-open', !isOpen);
+    const label = btn.querySelector('.profile-toggle-label');
+    if (label) label.textContent = isOpen ? 'Details' : 'Hide';
+}
+
+function openApproveModal(id, name) {
+    const emp = currentEmployeeData || {};
+    approveTargetId = id || emp.id;
+    const fullName = name || emp.full_name || 'Employee';
+    document.getElementById('approve-emp-name').textContent = fullName;
+    document.getElementById('roleSelect').value = '';
+
+    const personal = emp.personal_email || '';
+    document.getElementById('approve-personal-email').textContent = personal || 'No personal email on file';
+
+    const existingWork = (emp.work_email || '').trim();
+    const alreadyFirm = existingWork && firmDomainOf(existingWork) === String(emailDomain || '').toLowerCase();
+    document.getElementById('approve-existing-work-email').textContent = existingWork;
+    document.getElementById('existingWorkEmailNotice').classList.toggle('hidden', !alreadyFirm);
+    document.getElementById('newWorkEmailFields').classList.toggle('hidden', !!alreadyFirm);
+
+    document.getElementById('allocateWorkEmail').checked = true;
+    document.getElementById('allocateWorkEmail').disabled = !emailConfigured && !alreadyFirm;
+    document.getElementById('linkPersonalEmail').checked = !!personal;
+    document.getElementById('workEmailLocal').value = alreadyFirm
+        ? (existingWork.split('@')[0] || '')
+        : suggestWorkEmailLocal(fullName);
+    toggleWorkEmailFields();
+
+    document.getElementById('approveModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeApproveModal() {
+    document.getElementById('approveModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+    approveTargetId = null;
+}
+function confirmApproval() {
+    if (!approveTargetId) return;
+    const role = document.getElementById('roleSelect').value;
+    const allocate = document.getElementById('allocateWorkEmail').checked;
+    const linkPersonal = document.getElementById('linkPersonalEmail').checked;
+    const localPart = (document.getElementById('workEmailLocal').value || '').trim().toLowerCase();
+    const payload = {
+        employee_id: approveTargetId,
+        allocate_work_email: allocate,
+        link_personal_email: allocate && linkPersonal,
+    };
+    if (role) payload.role = role;
+    if (allocate && localPart) payload.work_email_local = localPart;
+
+    const approveBtn = document.getElementById('confirmApproveBtn');
+    if (approveBtn) {
+        approveBtn.disabled = true;
+        approveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Approving…';
+    }
+
+    fetch('{{ url_for("assign_role_and_approve") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        closeApproveModal();
+        if (data.success) {
+            showToast(data.message || 'Employee approved successfully!', 'success');
+            setTimeout(() => { window.location.href = approvalsListUrl; }, 900);
+        } else {
+            showToast(data.error || 'Error approving employee', 'error');
+        }
+    })
+    .catch(() => { closeApproveModal(); showToast('An error occurred while approving.', 'error'); })
+    .finally(() => {
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Approve';
+        }
+    });
+}
+
+function escapeAttr(value) {
+    return (value || '').toString().replace(/"/g, '&quot;');
+}
+
+function switchToEditMode() {
+    const e = currentEmployeeData;
+    if (!e) return;
+    const view = document.getElementById('detailViewMode');
+    const edit = document.getElementById('detailEditMode');
+    const editActions = document.getElementById('detailEditActions');
+    const editBtn = document.getElementById('editOnboardingBtn');
+    const approveBtn = document.getElementById('approveFromPageBtn');
+    view.classList.add('hidden');
+    edit.classList.remove('hidden');
+    editActions.classList.remove('hidden');
+    if (editBtn) editBtn.classList.add('hidden');
+    if (approveBtn) approveBtn.classList.add('hidden');
+
+    const pm = (e.payment_method || '').toString();
+    const showBank = pm === 'Bank';
+    const showMobile = pm === 'Mobile Money';
+    const docLink = (filename) => filename
+        ? `<a href="/static/uploads/profile_pictures/${filename}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-xs font-medium inline-flex items-center gap-1"><i class="fas fa-external-link-alt text-[10px]"></i>View current</a>`
+        : '<span class="text-gray-400 text-xs">None uploaded</span>';
+
+    edit.innerHTML = `
+    <form id="onboardingEditForm" class="edit-popup-form space-y-5 sm:space-y-6">
+        <input type="hidden" name="employee_id" value="${currentEmployeeId}">
+        <input type="hidden" name="role" value="${escapeAttr(e.role || '')}">
+        <input type="hidden" name="status" value="${escapeAttr(e.status || '')}">
+        <div class="edit-section edit-section-basic">
+            <div class="edit-section-header">
+                <span class="edit-section-icon"><i class="fas fa-user"></i></span>
+                <h4 class="edit-section-title">Basic Information</h4>
+            </div>
+            <div class="edit-section-body">
+                <div class="edit-grid">
+                    <div class="edit-field"><label class="edit-label">Full Name <span class="text-red-500">*</span></label><input type="text" name="full_name" value="${escapeAttr(e.full_name || '')}" required class="edit-input"></div>
+                    <div class="edit-field"><label class="edit-label">Employee Code</label><input type="text" name="employee_code" value="${escapeAttr(e.employee_code || '')}" class="edit-input"></div>
+                    <div class="edit-field"><label class="edit-label">Personal Email <span class="text-red-500">*</span></label><input type="email" name="personal_email" value="${escapeAttr(e.personal_email || '')}" required class="edit-input"></div>
+                    <div class="edit-field"><label class="edit-label">Work Email</label><input type="email" name="work_email" value="${escapeAttr(e.work_email || '')}" class="edit-input"></div>
+                    <div class="edit-field"><label class="edit-label">Phone <span class="text-red-500">*</span></label><input type="text" name="phone_number" value="${escapeAttr(e.phone_number || '')}" required class="edit-input"></div>
+                    <div class="edit-field"><label class="edit-label">Role</label><div class="edit-readonly">${escapeAttr(e.role || '—')}</div></div>
+                    <div class="edit-field"><label class="edit-label">Status</label><div class="edit-readonly">${escapeAttr(e.status || '—')}</div></div>
+                </div>
+            </div>
+        </div>
+        <div class="edit-section edit-section-payroll">
+            <div class="edit-section-header">
+                <span class="edit-section-icon edit-section-icon-green"><i class="fas fa-money-bill-wave"></i></span>
+                <h4 class="edit-section-title">Payment & Account</h4>
+            </div>
+            <div class="edit-section-body space-y-4">
+                <div class="edit-field">
+                    <label class="edit-label">Payment Method</label>
+                    <select name="payment_method" onchange="toggleEditPayrollSections(this)" class="edit-input edit-select">
+                        <option value="">— Select method —</option>
+                        <option value="Bank" ${pm === 'Bank' ? 'selected' : ''}>Bank</option>
+                        <option value="Mobile Money" ${pm === 'Mobile Money' ? 'selected' : ''}>Mobile Money</option>
+                    </select>
+                </div>
+                <div id="edit-bank-section" class="edit-subsection edit-subsection-bank ${showBank ? '' : 'hidden'}">
+                    <div class="edit-subsection-title"><i class="fas fa-university mr-2 text-blue-600"></i>Bank Details</div>
+                    <div class="edit-field"><label class="edit-label">Bank Name</label><input type="text" name="bank_name" value="${escapeAttr(e.bank_name || '')}" class="edit-input"></div>
+                </div>
+                <div id="edit-mobile-section" class="edit-subsection edit-subsection-mobile ${showMobile ? '' : 'hidden'}">
+                    <div class="edit-subsection-title"><i class="fas fa-mobile-alt mr-2 text-purple-600"></i>Mobile Money Details</div>
+                    <div class="edit-field"><label class="edit-label">Provider</label><input type="text" name="mobile_money_company" value="${escapeAttr(e.mobile_money_company || '')}" class="edit-input"></div>
+                </div>
+                <div id="edit-account-section" class="edit-subsection edit-subsection-account ${showBank || showMobile ? '' : 'hidden'}">
+                    <div class="edit-subsection-title"><i class="fas fa-wallet mr-2 text-gray-600"></i>Account Details</div>
+                    <div class="edit-grid edit-grid-2">
+                        <div class="edit-field"><label class="edit-label">Account Name</label><input type="text" name="account_name" value="${escapeAttr(e.account_name || '')}" class="edit-input"></div>
+                        <div class="edit-field"><label class="edit-label">Account Number</label><input type="text" name="account_number" value="${escapeAttr(e.account_number || '')}" class="edit-input"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="edit-section edit-section-docs">
+            <div class="edit-section-header">
+                <span class="edit-section-icon edit-section-icon-purple"><i class="fas fa-file-alt"></i></span>
+                <h4 class="edit-section-title">Documents</h4>
+            </div>
+            <div class="edit-section-body">
+                <p class="edit-docs-intro">Upload a new file only to replace; leave empty to keep current.</p>
+                <div class="edit-docs-grid">
+                    <div class="edit-doc-card">
+                        <div class="edit-doc-card-header"><i class="fas fa-file-pdf text-red-500"></i><span class="edit-doc-card-title">Employment Contract</span></div>
+                        <p class="edit-doc-current">Current: ${e.employment_contract ? docLink(e.employment_contract) : '<span class="text-gray-400">None</span>'}</p>
+                        <input type="file" name="employment_contract" accept=".pdf,.doc,.docx" class="edit-file-input">
+                    </div>
+                    <div class="edit-doc-card">
+                        <div class="edit-doc-card-header"><i class="fas fa-id-card text-blue-500"></i><span class="edit-doc-card-title">National ID or Passport</span></div>
+                        <p class="edit-doc-current">Current: ${e.id_front ? docLink(e.id_front) : '<span class="text-gray-400">None</span>'}</p>
+                        <input type="file" name="id_front" accept="image/*,.pdf" class="edit-file-input">
+                    </div>
+                    <div class="edit-doc-card">
+                        <div class="edit-doc-card-header"><i class="fas fa-file-invoice text-amber-500"></i><span class="edit-doc-card-title">KRA PIN Certificate</span></div>
+                        <p class="edit-doc-current">Current: ${e.kra_pin_document ? docLink(e.kra_pin_document) : '<span class="text-gray-400">None</span>'}</p>
+                        <input type="file" name="kra_pin_document" accept="image/*,.pdf,.doc,.docx" class="edit-file-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>`;
+    toggleEditPayrollSections(document.querySelector('#onboardingEditForm select[name="payment_method"]'));
+}
+
+function toggleEditPayrollSections(selectEl) {
+    if (!selectEl) return;
+    const val = (selectEl.value || '').trim();
+    const bankSection = document.getElementById('edit-bank-section');
+    const mobileSection = document.getElementById('edit-mobile-section');
+    const accountSection = document.getElementById('edit-account-section');
+    if (bankSection) bankSection.classList.toggle('hidden', val !== 'Bank');
+    if (mobileSection) mobileSection.classList.toggle('hidden', val !== 'Mobile Money');
+    if (accountSection) accountSection.classList.toggle('hidden', !(val === 'Bank' || val === 'Mobile Money'));
+}
+
+function cancelEditMode() {
+    document.getElementById('detailEditMode').classList.add('hidden');
+    document.getElementById('detailEditMode').innerHTML = '';
+    document.getElementById('detailEditActions').classList.add('hidden');
+    document.getElementById('detailViewMode').classList.remove('hidden');
+    const editBtn = document.getElementById('editOnboardingBtn');
+    const approveBtn = document.getElementById('approveFromPageBtn');
+    if (editBtn) editBtn.classList.remove('hidden');
+    if (approveBtn) approveBtn.classList.remove('hidden');
+}
+
+function saveOnboardingEdits() {
+    const form = document.getElementById('onboardingEditForm');
+    if (!form) return;
+    const btn = document.getElementById('saveOnboardingBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    fetch('{{ url_for("update_employee_onboarding") }}', {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-1.5"></i>Save changes';
+        if (data.success) {
+            showToast(data.message || 'Details updated successfully', 'success');
+            setTimeout(() => window.location.reload(), 700);
+        } else {
+            showToast(data.error || 'Update failed', 'error');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save mr-1.5"></i>Save changes';
+        showToast('An error occurred', 'error');
+    });
+}
+
+function showToast(message, type) {
+    const colors = type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto ${colors} px-5 py-3 rounded-xl shadow-lg z-[9999] flex items-center gap-3 text-sm font-medium`;
+    toast.innerHTML = `<i class="fas ${icon}"></i>${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2500);
+    setTimeout(() => toast.remove(), 2900);
+}
+
+document.addEventListener('click', function(e) {
+    if (e.target === document.getElementById('approveModal')) closeApproveModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !document.getElementById('approveModal').classList.contains('hidden')) closeApproveModal();
+});
+</script>
+
+<style>
+.btn-touch { min-height: 44px; min-width: 44px; }
+.details-stack { display: flex; flex-direction: column; gap: 0.875rem; }
+@media (min-width: 640px) { .details-stack { gap: 1.125rem; } }
+.detail-banner { display: flex; align-items: flex-start; gap: 0.875rem; border-radius: 1rem; padding: 0.95rem 1rem; border: 1px solid transparent; }
+.detail-banner--warn { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fde68a; }
+.detail-banner--ok { background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-color: #a7f3d0; }
+.detail-banner-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.95rem; }
+.detail-banner--warn .detail-banner-icon { background: #f59e0b; color: #fff; }
+.detail-banner--ok .detail-banner-icon { background: #059669; color: #fff; }
+.profile-card { background: #fff; border: 1px solid rgb(226 232 240); border-radius: 1.05rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); overflow: hidden; }
+.profile-card-main { display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1rem 1.05rem; background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); }
+@media (max-width: 639px) { .profile-card-main { flex-wrap: wrap; align-items: flex-start; } .profile-toggle { margin-left: auto; } }
+.profile-avatar { width: 3.25rem; height: 3.25rem; border-radius: 1rem; background: linear-gradient(135deg, #059669, #0d9488); color: #fff; font-weight: 800; font-size: 0.95rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 18px -10px rgba(5, 150, 105, 0.7); }
+.profile-name { margin: 0; font-size: 1rem; font-weight: 800; color: rgb(15 23 42); letter-spacing: -0.02em; }
+.profile-email { margin: 0.2rem 0 0; font-size: 0.8rem; color: rgb(100 116 139); }
+.profile-quick-meta { display: flex; flex-wrap: wrap; gap: 0.45rem 0.85rem; margin-top: 0.45rem; font-size: 0.72rem; font-weight: 600; color: rgb(71 85 105); }
+.profile-quick-meta span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.profile-quick-meta i { font-size: 0.65rem; opacity: 0.75; }
+.profile-toggle { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.5rem; padding: 0.45rem 0.8rem; border-radius: 0.8rem; border: 1px solid rgb(203 213 225); background: #fff; color: rgb(51 65 85); font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+.profile-toggle:hover { background: rgb(241 245 249); }
+.profile-toggle.is-open { background: rgb(15 23 42); border-color: rgb(15 23 42); color: #fff; }
+.profile-toggle-icon { font-size: 0.65rem; transition: transform 0.2s ease; }
+.profile-toggle.is-open .profile-toggle-icon { transform: rotate(180deg); }
+.profile-details-panel { padding: 0.95rem 1rem 1.1rem; border-top: 1px solid rgb(226 232 240); background: #fff; }
+.detail-card { background: #fff; border: 1px solid rgb(226 232 240); border-radius: 1.05rem; padding: 1rem 1rem 1.1rem; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+@media (min-width: 640px) { .detail-card { padding: 1.15rem 1.25rem 1.25rem; } }
+.detail-card-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.95rem; padding-bottom: 0.85rem; border-bottom: 1px solid rgb(241 245 249); }
+.detail-card-icon { width: 2.35rem; height: 2.35rem; border-radius: 0.8rem; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; font-size: 0.9rem; }
+.detail-card-icon--green { background: linear-gradient(135deg, #059669, #0d9488); }
+.detail-card-icon--violet { background: linear-gradient(135deg, #7c3aed, #6366f1); }
+.detail-card-title { margin: 0; font-size: 0.95rem; font-weight: 700; color: rgb(15 23 42); }
+.detail-card-sub { margin: 0.1rem 0 0; font-size: 0.72rem; color: rgb(100 116 139); }
+.detail-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem 1rem; }
+@media (min-width: 640px) { .detail-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .detail-grid { grid-template-columns: repeat(3, 1fr); } }
+.detail-field { min-width: 0; background: rgb(248 250 252); border: 1px solid rgb(241 245 249); border-radius: 0.85rem; padding: 0.7rem 0.8rem; }
+.detail-label { margin: 0 0 0.25rem; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(100 116 139); }
+.detail-value { font-size: 0.875rem; font-weight: 600; color: rgb(15 23 42); line-height: 1.35; word-break: break-word; }
+.doc-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+@media (min-width: 640px) { .doc-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .doc-grid { grid-template-columns: repeat(3, 1fr); } }
+.doc-tile { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 0.95rem; border-radius: 0.95rem; border: 1px solid rgb(226 232 240); background: rgb(248 250 252); min-height: 4.5rem; text-decoration: none; transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s; }
+.doc-tile--ready { background: #fff; }
+.doc-tile--ready:hover { border-color: rgb(52 211 153); background: rgb(236 253 245); box-shadow: 0 8px 18px -12px rgba(16, 185, 129, 0.55); }
+.doc-tile--empty { border-style: dashed; }
+.doc-tile-icon { width: 2.6rem; height: 2.6rem; border-radius: 0.8rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.05rem; }
+.doc-tile-icon--red { background: #fee2e2; color: #dc2626; }
+.doc-tile-icon--blue { background: #dbeafe; color: #2563eb; }
+.doc-tile-icon--amber { background: #fef3c7; color: #d97706; }
+.doc-tile-icon--indigo { background: #e0e7ff; color: #4f46e5; }
+.doc-tile-icon--muted { background: #e2e8f0; color: #94a3b8; }
+.input-modern:focus { outline: none; border-color: rgb(16 185 129); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); }
+.edit-popup-form { max-width: 100%; }
+.edit-section { border-radius: 1rem; overflow: hidden; border: 1px solid rgb(229 231 235); box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.edit-section-basic { background: linear-gradient(135deg, rgb(239 246 255) 0%, rgb(224 231 255) 100%); border-color: rgb(191 219 254); }
+.edit-section-payroll, .edit-section-docs { background: #fff; }
+.edit-section-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem 0.875rem 1.25rem; background: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(0,0,0,0.06); font-weight: 700; color: rgb(17 24 39); font-size: 0.9375rem; }
+.edit-section-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; background: linear-gradient(135deg, rgb(59 130 246), rgb(99 102 241)); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 0.875rem; flex-shrink: 0; }
+.edit-section-icon-green { background: linear-gradient(135deg, rgb(34 197 94), rgb(22 163 74)); }
+.edit-section-icon-purple { background: linear-gradient(135deg, rgb(168 85 247), rgb(124 58 237)); }
+.edit-section-title { margin: 0; }
+.edit-section-body { padding: 1rem 1.25rem 1.25rem; }
+.edit-grid { display: grid; grid-template-columns: 1fr; gap: 1rem 1.25rem; }
+@media (min-width: 640px) { .edit-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .edit-grid { grid-template-columns: repeat(3, 1fr); } }
+.edit-grid-2 { grid-template-columns: 1fr; }
+@media (min-width: 640px) { .edit-grid-2 { grid-template-columns: repeat(2, 1fr); } }
+.edit-label { display: block; font-size: 0.75rem; font-weight: 600; color: rgb(75 85 99); margin-bottom: 0.375rem; }
+.edit-input { width: 100%; padding: 0.625rem 0.875rem; font-size: 0.875rem; border: 1px solid rgb(209 213 219); border-radius: 0.75rem; background: #fff; color: rgb(17 24 39); }
+.edit-input:focus { outline: none; border-color: rgb(59 130 246); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+.edit-readonly { padding: 0.625rem 0.875rem; font-size: 0.875rem; border: 1px solid rgb(229 231 235); border-radius: 0.75rem; background: rgb(243 244 246); color: rgb(75 85 99); font-weight: 500; }
+.edit-subsection { border-radius: 0.75rem; padding: 1rem 1.25rem; margin-top: 0.5rem; }
+.edit-subsection-bank { background: rgb(239 246 255); border: 1px solid rgb(191 219 254); }
+.edit-subsection-mobile { background: rgb(250 245 255); border: 1px solid rgb(233 213 255); }
+.edit-subsection-account { background: rgb(249 250 251); border: 1px solid rgb(229 231 235); }
+.edit-subsection-title { font-size: 0.8125rem; font-weight: 600; color: rgb(55 65 81); margin-bottom: 0.75rem; }
+.edit-docs-intro { font-size: 0.8125rem; color: rgb(107 114 128); margin-bottom: 1rem; }
+.edit-docs-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 640px) { .edit-docs-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .edit-docs-grid { grid-template-columns: repeat(3, 1fr); } }
+.edit-doc-card { border: 1px solid rgb(229 231 235); border-radius: 0.75rem; padding: 1rem; background: rgb(249 250 251); }
+.edit-doc-card-header { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: rgb(55 65 81); margin-bottom: 0.5rem; }
+.edit-doc-current { font-size: 0.75rem; color: rgb(107 114 128); margin-bottom: 0.5rem; }
+.edit-file-input { width: 100%; font-size: 0.75rem; padding: 0.5rem 0; color: rgb(107 114 128); }
+.edit-file-input::file-selector-button { padding: 0.375rem 0.75rem; border-radius: 0.5rem; border: 0; background: rgb(239 246 255); color: rgb(37 99 235); font-weight: 600; font-size: 0.75rem; margin-right: 0.5rem; cursor: pointer; }
+</style>
+{% endblock %}

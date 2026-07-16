@@ -1,0 +1,24 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Join us</p>
+    <h1>{{ page_seo.h1_heading or 'Careers' }}</h1>
+    {% if page_seo.meta_description %}
+    <p class="firm-page-lead">{{ page_seo.meta_description }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container firm-reveal">
+    <div class="firm-prose">{{ careers_content | safe }}</div>
+    <p style="margin-top:2rem;">
+      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">Get in touch</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

@@ -1,27 +1,1009 @@
-<div id="section-6" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="settings-section-header">
-                <h2 class="settings-section-title">
-                    <i class="fas fa-balance-scale settings-section-icon"></i>
-                    6. Legal & Professional Information
-                </h2>
-                <p class="settings-section-subtitle">Important for law firms.</p>
+{% set firm_employees = firm_employees or [] %}
+{% from 'system_settings/_field_helpers.html' import req, tip %}
+{% set firm_practice_areas = firm_practice_areas or [] %}
+{% set public_site_base_url = public_site_base_url or '' %}
+{% set attorney_education = attorney_education or {} %}
+{% set firm_case_outcomes = firm_case_outcomes or [] %}
+{% set firm_media_mentions = firm_media_mentions or [] %}
+{% set attorney_notable_cases = attorney_notable_cases or {} %}
+{% set firm_faqs = firm_faqs or [] %}
+
+{# 1. Firm-wide legal credentials #}
+<div id="section-legal-firm" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-balance-scale settings-section-icon"></i>
+            1. Firm Legal Credentials
+        </h2>
+        <p class="settings-section-subtitle">Firm-wide registration and professional standing.</p>
+    </div>
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Law Society Registration Number</label>
+            <input type="text" name="law_society_reg_number" value="{{ cs.get('law_society_reg_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Practicing Certificate Number</label>
+            <input type="text" name="practicing_certificate_number" value="{{ cs.get('practicing_certificate_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Lead Advocate / Managing Partner</label>
+            <input type="text" name="lead_advocate_name" value="{{ cs.get('lead_advocate_name') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Bar Association Membership</label>
+            <input type="text" name="bar_association_membership" value="{{ cs.get('bar_association_membership') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+        </div>
+    </div>
+</div>
+
+{# 2. Firm practice areas #}
+<div id="section-practice-areas" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-briefcase settings-section-icon"></i>
+            2. Practice Areas
+        </h2>
+        <p class="settings-section-subtitle">
+            SEO-ready content per practice area — keywords, listing blurbs, and dedicated landing-page copy.
+        </p>
+    </div>
+    <div class="p-6 space-y-4">
+        <div id="practice-areas-list" class="space-y-4">
+            {% for pa in firm_practice_areas %}
+            <div class="practice-area-row border border-gray-200 rounded-xl p-5 space-y-4 bg-white">
+                <div class="flex items-start justify-between gap-3">
+                    <p class="text-sm font-semibold text-gray-800">Practice area {{ loop.index }}</p>
+                    <button type="button" class="remove-practice-area-btn text-sm text-red-600 hover:text-red-800 font-medium">
+                        <i class="fas fa-trash-alt mr-1"></i>Remove
+                    </button>
+                </div>
+                <input type="hidden" name="practice_area_id_{{ loop.index0 }}" value="{{ pa.id }}">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Name {{ req() }}</label>
+                    <input type="text" name="practice_area_name_{{ loop.index0 }}" value="{{ pa.name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law, Criminal Defense, Real Estate, Corporate">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Target Keyword(s)</label>
+                    <p class="text-xs text-gray-500 mb-2">Primary search phrases for this practice area page (comma-separated).</p>
+                    <input type="text" name="practice_area_target_keywords_{{ loop.index0 }}" value="{{ pa.target_keywords or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. family lawyer Kiserian, divorce attorney Kajiado">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sub-specialties</label>
+                    <p class="text-xs text-gray-500 mb-2">One per line (e.g. divorce &amp; custody, child support under Family Law).</p>
+                    <textarea name="practice_area_sub_specialties_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Divorce &amp; separation&#10;Child custody &amp; support&#10;Adoption">{{ pa.sub_specialties or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+                    <p class="text-xs text-gray-500 mb-2">For the practice areas listing page (1–2 sentences).</p>
+                    <textarea name="practice_area_short_description_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief overview for cards and search snippets.">{{ pa.short_description or pa.description or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Long Description</label>
+                    <p class="text-xs text-gray-500 mb-2">For the dedicated landing page for this practice area.</p>
+                    <textarea name="practice_area_long_description_{{ loop.index0 }}" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Full page content: who you help, process, why choose your firm, local relevance…">{{ pa.long_description or '' }}</textarea>
+                </div>
+                <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                        <p class="text-xs text-gray-500 mb-1">Search result title (max 60 characters).</p>
+                        <input type="text" name="practice_area_meta_title_{{ loop.index0 }}" maxlength="60" value="{{ pa.meta_title or '' }}" class="pa-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="pa-meta-title-count-{{ loop.index0 }}">
+                        <p class="text-xs text-gray-400 mt-1"><span id="pa-meta-title-count-{{ loop.index0 }}">{{ (pa.meta_title or '')|length }}</span> / 60</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+                        <p class="text-xs text-gray-500 mb-1">Auto-generated from name if empty (e.g. family-law).</p>
+                        <input type="text" name="practice_area_url_slug_{{ loop.index0 }}" value="{{ pa.url_slug or '' }}" class="practice-area-slug w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="family-law">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                        <p class="text-xs text-gray-500 mb-1">Search snippet (max 155 characters).</p>
+                        <textarea name="practice_area_meta_description_{{ loop.index0 }}" maxlength="155" rows="2" class="pa-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="pa-meta-desc-count-{{ loop.index0 }}">{{ pa.meta_description or '' }}</textarea>
+                        <p class="text-xs text-gray-400 mt-1"><span id="pa-meta-desc-count-{{ loop.index0 }}">{{ (pa.meta_description or '')|length }}</span> / 155</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>
+                        <input type="text" name="practice_area_h1_heading_{{ loop.index0 }}" value="{{ pa.h1_heading or pa.name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ pa.name or 'Practice area title' }}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
+                        <input type="url" name="practice_area_canonical_url_{{ loop.index0 }}" value="{{ pa.canonical_url or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (public_site_base_url or '') ~ '/#' ~ (pa.url_slug or 'practice-area') }}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Image</label>
+                        <input type="file" name="practice_area_image_{{ loop.index0 }}" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if pa.image_path %}<p class="mt-1 text-xs text-gray-500">Current: {{ pa.image_path }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Image Alt Text <span class="text-red-500">*</span></label>
+                        <p class="text-xs text-gray-500 mb-1">Required when uploading a new image.</p>
+                        <input type="text" name="practice_area_image_alt_{{ loop.index0 }}" value="{{ pa.image_alt or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. {{ pa.name }} legal services illustration">
+                    </div>
+                    {% if pa.updated_at %}
+                    <div class="md:col-span-2">
+                        <p class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i> Last updated: {{ pa.updated_at }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <p class="md:col-span-2 text-sm font-semibold text-gray-800">Conversion &amp; consultation</p>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Custom CTA text</label>
+                        <input type="text" name="practice_area_cta_label_{{ loop.index0 }}" maxlength="120" value="{{ pa.cta_label or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Book a Consultation">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Consultation fee</label>
+                        <input type="text" name="practice_area_consultation_fee_{{ loop.index0 }}" maxlength="120" value="{{ pa.consultation_fee or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Uses site default if empty">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Response time</label>
+                        <input type="text" name="practice_area_response_time_{{ loop.index0 }}" maxlength="120" value="{{ pa.response_time_commitment or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. We respond within 24 hours">
+                    </div>
+                    <div class="flex items-end">
+                        <label class="inline-flex items-center gap-2 cursor-pointer pb-2">
+                            <input type="checkbox" name="practice_area_free_consultation_{{ loop.index0 }}" value="on" {% if pa.free_consultation %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                            <span class="text-sm text-gray-700">Free consultation for this area</span>
+                        </label>
+                    </div>
+                </div>
             </div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% endfor %}
+        </div>
+        <button type="button" id="add-practice-area-btn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+            <i class="fas fa-plus"></i> Add practice area
+        </button>
+        {% if not firm_practice_areas %}
+        <p class="text-sm text-gray-500">No practice areas yet. Click <strong>Add practice area</strong> to create your first entry.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# 3. Case results & credibility #}
+<div id="section-case-results" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-trophy settings-section-icon"></i>
+            3. Case Results &amp; Credibility
+        </h2>
+        <p class="settings-section-subtitle">
+            Showcase outcomes, rankings, and media coverage — only publish case details with confirmed consent.
+        </p>
+    </div>
+    <div class="p-6 space-y-8">
+        <div>
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Notable Case Outcomes</h3>
+            <div id="case-outcomes-list" class="space-y-4">
+                {% for outcome in firm_case_outcomes %}
+                <div class="case-outcome-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">
+                    <div class="flex items-start justify-between gap-3">
+                        <p class="text-sm font-medium text-gray-700">Outcome {{ loop.index }}</p>
+                        <button type="button" class="remove-case-outcome-btn text-sm text-red-600 hover:text-red-800 font-medium">
+                            <i class="fas fa-trash-alt mr-1"></i>Remove
+                        </button>
+                    </div>
+                    <input type="hidden" name="case_outcome_id_{{ loop.index0 }}" value="{{ outcome.id }}">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea name="case_outcome_description_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief, anonymized outcome summary…">{{ outcome.description or '' }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area</label>
+                        <input type="text" name="case_outcome_practice_area_{{ loop.index0 }}" value="{{ outcome.practice_area or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Commercial Litigation">
+                    </div>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="case_outcome_consent_{{ loop.index0 }}" value="on" {% if outcome.consent_confirmed %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="text-sm text-gray-700">Consent confirmed to publish this outcome</span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-case-outcome-btn" class="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <i class="fas fa-plus"></i> Add case outcome
+            </button>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Awards / Rankings</h3>
+            <div id="awards-list" class="space-y-3">
+                {% set firm_awards = firm_awards or [] %}
+                {% for award in firm_awards %}
+                <div class="award-row border border-gray-200 rounded-xl p-4 bg-white grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Award / Ranking</label>
+                        <input type="hidden" name="award_id_{{ loop.index0 }}" value="{{ award.id }}">
+                        <input type="text" name="award_title_{{ loop.index0 }}" value="{{ award.title or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Chambers &amp; Partners — Band 2 Litigation">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Year</label>
+                        <input type="text" name="award_year_{{ loop.index0 }}" value="{{ award.year or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="2025">
+                    </div>
+                    <button type="button" class="remove-award-btn text-sm text-red-600 hover:text-red-800 font-medium px-2 py-2">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-award-btn" class="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <i class="fas fa-plus"></i> Add award
+            </button>
+        </div>
+
+        <div>
+            <h3 class="text-sm font-semibold text-gray-800 mb-3">Media Mentions</h3>
+            <div id="media-mentions-list" class="space-y-4">
+                {% for mention in firm_media_mentions %}
+                <div class="media-mention-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">
+                    <div class="flex items-start justify-between gap-3">
+                        <p class="text-sm font-medium text-gray-700">Mention {{ loop.index }}</p>
+                        <button type="button" class="remove-media-mention-btn text-sm text-red-600 hover:text-red-800 font-medium">
+                            <i class="fas fa-trash-alt mr-1"></i>Remove
+                        </button>
+                    </div>
+                    <input type="hidden" name="media_mention_id_{{ loop.index0 }}" value="{{ mention.id }}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Publication</label>
+                            <input type="text" name="media_mention_publication_{{ loop.index0 }}" value="{{ mention.publication or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Daily Nation">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                            <input type="text" name="media_mention_date_{{ loop.index0 }}" value="{{ mention.mention_date or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Mar 2025">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Link</label>
+                        <input type="url" name="media_mention_link_{{ loop.index0 }}" value="{{ mention.link or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://…">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-media-mention-btn" class="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                <i class="fas fa-plus"></i> Add media mention
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Years of Collective Firm Experience</label>
+                <input type="text" name="years_collective_experience" value="{{ cs.get('years_collective_experience') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 45+ years">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Number of Cases Handled <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input type="number" name="cases_handled_count" min="0" value="{{ cs.get('cases_handled_count') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 2500">
+            </div>
+        </div>
+    </div>
+</div>
+
+{# 4. Attorney directory — all employees from DB #}
+<div id="section-attorney-directory" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-user-tie settings-section-icon"></i>
+            4. Attorney &amp; Staff Profiles
+        </h2>
+        <p class="settings-section-subtitle">
+            Every employee in the system is listed below. Add credentials, bios, specializations, and optional public contact details.
+        </p>
+    </div>
+    <div class="p-6 space-y-6">
+        <input type="hidden" name="employee_ids" value="{{ firm_employees | map(attribute='id') | join(',') }}">
+
+        {% if firm_employees %}
+        {% for emp in firm_employees %}
+        {% set emp_cases = attorney_notable_cases.get(emp.id, []) %}
+        {% set emp_education = attorney_education.get(emp.id, []) %}
+        <div class="border border-gray-200 rounded-xl overflow-hidden attorney-profile-card" data-employee-id="{{ emp.id }}">
+            <div class="bg-gray-50 px-5 py-4 border-b border-gray-200 flex flex-wrap items-center gap-4">
+                <div class="flex-shrink-0">
+                    {% if emp.profile_picture %}
+                        {% if emp.profile_picture.startswith('http') %}
+                        <img src="{{ emp.profile_picture }}" alt="{{ emp.full_name }}" class="w-16 h-16 rounded-full object-cover border-2 border-white shadow">
+                        {% else %}
+                        <img src="{{ url_for('static', filename='uploads/profile_pictures/' + emp.profile_picture) }}" alt="{{ emp.full_name }}" class="w-16 h-16 rounded-full object-cover border-2 border-white shadow">
+                        {% endif %}
+                    {% else %}
+                    <div class="w-16 h-16 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl font-bold border-2 border-white shadow">
+                        {{ (emp.full_name or '?')[:1] | upper }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-lg font-semibold text-gray-900">{{ emp.full_name }}</h3>
+                    <p class="text-sm text-gray-600">{{ emp.role }}{% if emp.status and emp.status != 'Active' %} · <span class="text-amber-700">{{ emp.status }}</span>{% endif %}</p>
+                    {% if emp.work_email or emp.phone_number %}
+                    <p class="text-xs text-gray-500 mt-1">
+                        {% if emp.work_email %}{{ emp.work_email }}{% endif %}
+                        {% if emp.work_email and emp.phone_number %} · {% endif %}
+                        {% if emp.phone_number %}{{ emp.phone_number }}{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Law Society Registration Number</label>
-                    <input type="text" name="law_society_reg_number" value="{{ cs.get('law_society_reg_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Professional Title</label>
+                    <input type="text" name="professional_title_{{ emp.id }}" value="{{ emp.professional_title or emp.role or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Senior Partner, Litigation Counsel">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Practicing Certificate Number</label>
-                    <input type="text" name="practicing_certificate_number" value="{{ cs.get('practicing_certificate_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Profile Photo</label>
+                    <input type="file" name="profile_picture_{{ emp.id }}" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                    {% if emp.profile_picture and not emp.profile_picture.startswith('http') %}
+                    <p class="mt-1 text-xs text-gray-500">Current: {{ emp.profile_picture }}</p>
+                    {% endif %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Lead Advocate / Managing Partner</label>
-                    <input type="text" name="lead_advocate_name" value="{{ cs.get('lead_advocate_name') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Photo Alt Text <span class="text-red-500">*</span></label>
+                    <p class="text-xs text-gray-500 mb-1">Required when uploading a new photo.</p>
+                    <input type="text" name="profile_picture_alt_{{ emp.id }}" value="{{ emp.profile_picture_alt or emp.full_name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Portrait of {{ emp.full_name }}">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Bar Association Membership</label>
-                    <input type="text" name="bar_association_membership" value="{{ cs.get('bar_association_membership') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">LSK Practicing Certificate Number</label>
+                    <input type="text" name="lsk_practicing_certificate_number_{{ emp.id }}" value="{{ emp.lsk_practicing_certificate_number or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Individual LSK practicing certificate">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Year Called to the Bar</label>
+                    <input type="text" name="year_called_to_bar_{{ emp.id }}" value="{{ emp.year_called_to_bar or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 2012">
+                </div>
+                <div class="md:col-span-2">
+                    <h4 class="text-sm font-semibold text-gray-800 mb-3">Education</h4>
+                    <div class="attorney-education-list space-y-3" data-employee-id="{{ emp.id }}">
+                        {% for edu in emp_education %}
+                        <div class="education-row border border-gray-200 rounded-lg p-4 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input type="hidden" name="attorney_education_id_{{ emp.id }}_{{ loop.index0 }}" value="{{ edu.id }}">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Degree / Qualification</label>
+                                <input type="text" name="attorney_education_degree_{{ emp.id }}_{{ loop.index0 }}" value="{{ edu.degree or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="LL.B">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Institution</label>
+                                <input type="text" name="attorney_education_institution_{{ emp.id }}_{{ loop.index0 }}" value="{{ edu.institution or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="University of Nairobi">
+                            </div>
+                            <div class="flex gap-2 items-end">
+                                <div class="flex-1">
+                                    <label class="block text-xs font-medium text-gray-600 mb-1">Year</label>
+                                    <input type="text" name="attorney_education_year_{{ emp.id }}_{{ loop.index0 }}" value="{{ edu.year or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="2010">
+                                </div>
+                                <button type="button" class="remove-education-btn text-red-600 hover:text-red-800 px-2 py-2" title="Remove"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="add-education-btn mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100" data-employee-id="{{ emp.id }}">
+                        <i class="fas fa-plus"></i> Add education
+                    </button>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bio {{ tip('A substantive bio builds E-E-A-T trust signals for Google and prospective clients.') }}</label>
+                    <p class="text-xs text-gray-500 mb-2">Professional background, experience, and areas of focus.</p>
+                    <textarea name="attorney_bio_{{ emp.id }}" rows="4" maxlength="4000" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Senior litigation counsel with 12+ years of experience…">{{ emp.attorney_bio or '' }}</textarea>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Introduction video URL {{ tip('Optional YouTube or Vimeo link shown on this attorney profile page.') }}</label>
+                    <input type="url" name="video_intro_url_{{ emp.id }}" maxlength="500" value="{{ emp.video_intro_url or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://www.youtube.com/watch?v=…">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Areas of Specialization</label>
+                    <textarea name="practice_areas_{{ emp.id }}" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Commercial litigation, family law, conveyancing">{{ emp.practice_areas or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Direct Contact Email <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input type="email" name="public_contact_email_{{ emp.id }}" value="{{ emp.public_contact_email or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Public-facing email, if different">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Direct Contact Phone <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input type="text" name="public_contact_phone_{{ emp.id }}" value="{{ emp.public_contact_phone or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Public-facing phone, if different">
+                </div>
+                <div class="md:col-span-2 border-t border-gray-100 pt-4">
+                    <h4 class="text-sm font-semibold text-gray-800 mb-3">Page SEO</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>
+                            <input type="text" name="attorney_h1_heading_{{ emp.id }}" value="{{ emp.h1_heading or emp.full_name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                            <input type="text" name="attorney_meta_title_{{ emp.id }}" maxlength="60" value="{{ emp.meta_title or '' }}" class="attorney-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="attorney-meta-title-count-{{ emp.id }}">
+                            <p class="text-xs text-gray-400 mt-1"><span id="attorney-meta-title-count-{{ emp.id }}">{{ (emp.meta_title or '')|length }}</span> / 60</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+                            <input type="text" name="attorney_url_slug_{{ emp.id }}" value="{{ emp.url_slug or '' }}" class="attorney-url-slug w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="jane-doe">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                            <textarea name="attorney_meta_description_{{ emp.id }}" maxlength="155" rows="2" class="attorney-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="attorney-meta-desc-count-{{ emp.id }}">{{ emp.meta_description or '' }}</textarea>
+                            <p class="text-xs text-gray-400 mt-1"><span id="attorney-meta-desc-count-{{ emp.id }}">{{ (emp.meta_description or '')|length }}</span> / 155</p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
+                            <input type="url" name="attorney_canonical_url_{{ emp.id }}" value="{{ emp.canonical_url or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (public_site_base_url or '') ~ '/#' ~ (emp.url_slug or 'attorney') }}">
+                        </div>
+                        {% if emp.updated_at %}
+                        <div class="md:col-span-2">
+                            <p class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i> Last updated: {{ emp.updated_at }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="md:col-span-2 border-t border-gray-100 pt-4 mt-2">
+                    <h4 class="text-sm font-semibold text-gray-800 mb-3">Notable Cases</h4>
+                    <div class="attorney-cases-list space-y-3" data-employee-id="{{ emp.id }}">
+                        {% for case in emp_cases %}
+                        <div class="attorney-case-row border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="text-xs font-medium text-gray-600">Case {{ loop.index }}</p>
+                                <button type="button" class="remove-attorney-case-btn text-xs text-red-600 hover:text-red-800 font-medium">
+                                    <i class="fas fa-trash-alt mr-1"></i>Remove
+                                </button>
+                            </div>
+                            <input type="hidden" name="attorney_notable_case_id_{{ emp.id }}_{{ loop.index0 }}" value="{{ case.id }}">
+                            <textarea name="attorney_notable_case_description_{{ emp.id }}_{{ loop.index0 }}" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Anonymized case summary…">{{ case.description or '' }}</textarea>
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="attorney_notable_case_consent_{{ emp.id }}_{{ loop.index0 }}" value="on" {% if case.consent_confirmed %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">Consent confirmed to publish this case</span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="add-attorney-case-btn mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors" data-employee-id="{{ emp.id }}">
+                        <i class="fas fa-plus"></i> Add notable case
+                    </button>
                 </div>
             </div>
         </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-10 text-gray-500">
+            <i class="fas fa-users text-4xl text-gray-300 mb-3"></i>
+            <p>No employees found. Add staff under User Management first.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# 5. Website FAQs (structured data) #}
+<div id="section-faqs" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-question-circle settings-section-icon"></i>
+            5. Website FAQs
+        </h2>
+        <p class="settings-section-subtitle">
+            Common questions and answers for visitors. Published entries appear on your firm website and in Google FAQ rich results (FAQPage structured data).
+        </p>
+    </div>
+    <div class="p-6">
+        <div id="faqs-list" class="space-y-4">
+            {% for faq in firm_faqs %}
+            <div class="faq-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">
+                <div class="flex items-start justify-between gap-3">
+                    <p class="text-sm font-semibold text-gray-800">FAQ {{ loop.index }}</p>
+                    <button type="button" class="remove-faq-btn text-sm text-red-600 hover:text-red-800 font-medium">
+                        <i class="fas fa-trash-alt mr-1"></i>Remove
+                    </button>
+                </div>
+                <input type="hidden" name="faq_id_{{ loop.index0 }}" value="{{ faq.id }}">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                    <input type="text" name="faq_question_{{ loop.index0 }}" value="{{ faq.question or '' }}" maxlength="500" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Do you offer free initial consultations?">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Answer</label>
+                    <textarea name="faq_answer_{{ loop.index0 }}" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Clear, helpful answer for potential clients…">{{ faq.answer or '' }}</textarea>
+                </div>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="faq_publish_{{ loop.index0 }}" value="on" {% if faq.publish_confirmed %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm text-gray-700">Publish on website and include in FAQ structured data</span>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" id="add-faq-btn" class="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+            <i class="fas fa-plus"></i> Add FAQ
+        </button>
+        {% if not firm_faqs %}
+        <p class="text-sm text-gray-500 mt-3">No FAQs yet. Add questions clients often ask — e.g. consultation fees, areas served, office hours, or how to book an appointment.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# 6. Blog / Insights #}
+{% set firm_blog_posts = firm_blog_posts or [] %}
+<div id="section-blog" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-newspaper settings-section-icon"></i>
+            6. Insights &amp; Blog
+        </h2>
+        <p class="settings-section-subtitle">Articles for your public Insights page. Only published posts appear on the website.</p>
+    </div>
+    <div class="p-6">
+        <div id="blog-posts-list" class="space-y-4">
+            {% for post in firm_blog_posts %}
+            <div class="blog-post-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">
+                <div class="flex items-start justify-between gap-3">
+                    <p class="text-sm font-semibold text-gray-800">Article {{ loop.index }}</p>
+                    <button type="button" class="remove-blog-btn text-sm text-red-600 hover:text-red-800 font-medium">
+                        <i class="fas fa-trash-alt mr-1"></i>Remove
+                    </button>
+                </div>
+                <input type="hidden" name="blog_id_{{ loop.index0 }}" value="{{ post.id }}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+                        <input type="text" name="blog_title_{{ loop.index0 }}" value="{{ post.title or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">URL slug</label>
+                        <input type="text" name="blog_slug_{{ loop.index0 }}" value="{{ post.slug or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="auto-from-title">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
+                        <select name="blog_author_{{ loop.index0 }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            <option value="">— Select —</option>
+                            {% for emp in firm_employees %}
+                            <option value="{{ emp.id }}" {% if post.author_employee_id == emp.id %}selected{% endif %}>{{ emp.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>
+                        <textarea name="blog_excerpt_{{ loop.index0 }}" rows="2" maxlength="300" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ post.excerpt or '' }}</textarea>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Article body</label>
+                        <textarea name="blog_body_{{ loop.index0 }}" rows="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm">{{ post.body or '' }}</textarea>
+                    </div>
+                </div>
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="blog_published_{{ loop.index0 }}" value="on" {% if post.published %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="text-sm text-gray-700">Publish on website</span>
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" id="add-blog-btn" class="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+            <i class="fas fa-plus"></i> Add article
+        </button>
+    </div>
+</div>
+
+{# 7. Compliance & data #}
+<div id="section-legal-compliance" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-shield-alt settings-section-icon"></i>
+            7. Compliance &amp; Data
+        </h2>
+        <p class="settings-section-subtitle">
+            Regulatory registration, published policies, and website disclaimers.
+        </p>
+    </div>
+    <div class="p-6 space-y-6">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Data Protection Act (Kenya) Registration Number</label>
+            <input type="text" name="data_protection_registration_number" value="{{ cs.get('data_protection_registration_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="ODPC registration number">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Privacy Policy</label>
+            <p class="text-xs text-gray-500 mb-2">How the firm collects, uses, stores, and protects client and visitor data.</p>
+            <textarea name="privacy_policy" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="Enter your firm's privacy policy…">{{ cs.get('privacy_policy') or '' }}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Terms of Service</label>
+            <p class="text-xs text-gray-500 mb-2">Rules and conditions for using your services, website, and client portal.</p>
+            <textarea name="terms_of_service" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="Enter your firm's terms of service…">{{ cs.get('terms_of_service') or '' }}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Website Disclaimer</label>
+            <p class="text-xs text-gray-500 mb-2">Attorney–client relationship notice and that site content is not legal advice.</p>
+            <textarea name="website_disclaimer" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="The information on this website is for general purposes only and does not create an attorney-client relationship…">{{ cs.get('website_disclaimer') or '' }}</textarea>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function bindRemove(btn, rowSelector) {
+        if (!btn || btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', function() {
+            var row = btn.closest(rowSelector);
+            if (row) row.remove();
+        });
+    }
+
+    function bindRemoveAll(container, btnClass, rowSelector) {
+        if (!container) return;
+        container.querySelectorAll('.' + btnClass).forEach(function(btn) {
+            bindRemove(btn, rowSelector);
+        });
+    }
+
+    // Practice areas
+    var paList = document.getElementById('practice-areas-list');
+    var addPaBtn = document.getElementById('add-practice-area-btn');
+    var paNextIndex = paList ? paList.querySelectorAll('.practice-area-row').length : 0;
+
+    function practiceAreaRowHtml(idx) {
+        return ''
+            + '<div class="practice-area-row border border-gray-200 rounded-xl p-5 space-y-4 bg-white">'
+            + '  <div class="flex items-start justify-between gap-3">'
+            + '    <p class="text-sm font-semibold text-gray-800">Practice area</p>'
+            + '    <button type="button" class="remove-practice-area-btn text-sm text-red-600 hover:text-red-800 font-medium">'
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+            + '    </button>'
+            + '  </div>'
+            + '  <input type="hidden" name="practice_area_id_' + idx + '" value="">'
+            + '  <div>'
+            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Name</label>'
+            + '    <input type="text" name="practice_area_name_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law, Criminal Defense">'
+            + '  </div>'
+            + '  <div>'
+            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Target Keyword(s)</label>'
+            + '    <input type="text" name="practice_area_target_keywords_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">'
+            + '  </div>'
+            + '  <div>'
+            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Sub-specialties</label>'
+            + '    <textarea name="practice_area_sub_specialties_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
+            + '  </div>'
+            + '  <div>'
+            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>'
+            + '    <textarea name="practice_area_short_description_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
+            + '  </div>'
+            + '  <div>'
+            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Long Description</label>'
+            + '    <textarea name="practice_area_long_description_' + idx + '" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
+            + '  </div>'
+            + '  <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>'
+            + '    <input type="text" name="practice_area_meta_title_' + idx + '" maxlength="60" class="pa-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>'
+            + '    <input type="text" name="practice_area_url_slug_' + idx + '" class="practice-area-slug w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>'
+            + '    <textarea name="practice_area_meta_description_' + idx + '" maxlength="155" rows="2" class="pa-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>'
+            + '    <input type="text" name="practice_area_h1_heading_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>'
+            + '    <input type="url" name="practice_area_canonical_url_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Image</label>'
+            + '    <input type="file" name="practice_area_image_' + idx + '" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Image Alt Text</label>'
+            + '    <input type="text" name="practice_area_image_alt_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '  </div>'
+            + '  <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">'
+            + '    <p class="md:col-span-2 text-sm font-semibold text-gray-800">Conversion &amp; consultation</p>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Custom CTA text</label>'
+            + '    <input type="text" name="practice_area_cta_label_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Consultation fee</label>'
+            + '    <input type="text" name="practice_area_consultation_fee_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Response time</label>'
+            + '    <input type="text" name="practice_area_response_time_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    <div class="flex items-end"><label class="inline-flex items-center gap-2 cursor-pointer pb-2">'
+            + '    <input type="checkbox" name="practice_area_free_consultation_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600">'
+            + '    <span class="text-sm text-gray-700">Free consultation</span></label></div>'
+            + '  </div>'
+            + '</div>';
+    }
+
+    function slugifyText(text) {
+        return (text || '').toLowerCase().trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/[\s_]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 120);
+    }
+
+    function wirePracticeAreaRow(row) {
+        if (!row) return;
+        var nameInput = row.querySelector('input[name^="practice_area_name_"]');
+        var slugInput = row.querySelector('.practice-area-slug');
+        if (nameInput && slugInput) {
+            nameInput.addEventListener('input', function() {
+                if (!slugInput.dataset.touched) {
+                    slugInput.value = slugifyText(nameInput.value);
+                }
+            });
+            slugInput.addEventListener('input', function() {
+                slugInput.dataset.touched = slugInput.value ? '1' : '';
+            });
+        }
+        row.querySelectorAll('[data-counter]').forEach(function(el) {
+            var counter = document.getElementById(el.getAttribute('data-counter'));
+            if (!counter) return;
+            function upd() { counter.textContent = (el.value || '').length; }
+            el.addEventListener('input', upd);
+            upd();
+        });
+        row.querySelectorAll('.pa-meta-title, .pa-meta-desc').forEach(function(el) {
+            el.addEventListener('input', function() {
+                var max = el.getAttribute('maxlength');
+                if (max && el.value.length > max) el.value = el.value.slice(0, max);
+            });
+        });
+    }
+
+    document.querySelectorAll('.practice-area-row').forEach(wirePracticeAreaRow);
+    document.querySelectorAll('[data-counter]').forEach(function(el) {
+        var counter = document.getElementById(el.getAttribute('data-counter'));
+        if (!counter) return;
+        function upd() { counter.textContent = (el.value || '').length; }
+        el.addEventListener('input', upd);
+        upd();
+    });
+
+    if (paList && addPaBtn) {
+        bindRemoveAll(paList, 'remove-practice-area-btn', '.practice-area-row');
+        addPaBtn.addEventListener('click', function() {
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = practiceAreaRowHtml(paNextIndex);
+            var row = wrapper.firstElementChild;
+            paList.appendChild(row);
+            bindRemove(row.querySelector('.remove-practice-area-btn'), '.practice-area-row');
+            wirePracticeAreaRow(row);
+            paNextIndex += 1;
+        });
+    }
+
+    // Case outcomes
+    var outcomeList = document.getElementById('case-outcomes-list');
+    var addOutcomeBtn = document.getElementById('add-case-outcome-btn');
+    var outcomeNextIndex = outcomeList ? outcomeList.querySelectorAll('.case-outcome-row').length : 0;
+
+    function caseOutcomeRowHtml(idx) {
+        return ''
+            + '<div class="case-outcome-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">'
+            + '  <div class="flex items-start justify-between gap-3">'
+            + '    <p class="text-sm font-medium text-gray-700">Outcome</p>'
+            + '    <button type="button" class="remove-case-outcome-btn text-sm text-red-600 hover:text-red-800 font-medium">'
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+            + '    </button>'
+            + '  </div>'
+            + '  <input type="hidden" name="case_outcome_id_' + idx + '" value="">'
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Description</label>'
+            + '  <textarea name="case_outcome_description_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea></div>'
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Practice Area</label>'
+            + '  <input type="text" name="case_outcome_practice_area_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '  <label class="inline-flex items-center gap-2 cursor-pointer">'
+            + '    <input type="checkbox" name="case_outcome_consent_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">'
+            + '    <span class="text-sm text-gray-700">Consent confirmed to publish this outcome</span>'
+            + '  </label>'
+            + '</div>';
+    }
+
+    if (outcomeList && addOutcomeBtn) {
+        bindRemoveAll(outcomeList, 'remove-case-outcome-btn', '.case-outcome-row');
+        addOutcomeBtn.addEventListener('click', function() {
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = caseOutcomeRowHtml(outcomeNextIndex);
+            var row = wrapper.firstElementChild;
+            outcomeList.appendChild(row);
+            bindRemove(row.querySelector('.remove-case-outcome-btn'), '.case-outcome-row');
+            outcomeNextIndex += 1;
+        });
+    }
+
+    // Media mentions
+    var mentionList = document.getElementById('media-mentions-list');
+    var addMentionBtn = document.getElementById('add-media-mention-btn');
+    var mentionNextIndex = mentionList ? mentionList.querySelectorAll('.media-mention-row').length : 0;
+
+    function mediaMentionRowHtml(idx) {
+        return ''
+            + '<div class="media-mention-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">'
+            + '  <div class="flex items-start justify-between gap-3">'
+            + '    <p class="text-sm font-medium text-gray-700">Mention</p>'
+            + '    <button type="button" class="remove-media-mention-btn text-sm text-red-600 hover:text-red-800 font-medium">'
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+            + '    </button>'
+            + '  </div>'
+            + '  <input type="hidden" name="media_mention_id_' + idx + '" value="">'
+            + '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Publication</label>'
+            + '    <input type="text" name="media_mention_publication_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label>'
+            + '    <input type="text" name="media_mention_date_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '  </div>'
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Link</label>'
+            + '  <input type="url" name="media_mention_link_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '</div>';
+    }
+
+    if (mentionList && addMentionBtn) {
+        bindRemoveAll(mentionList, 'remove-media-mention-btn', '.media-mention-row');
+        addMentionBtn.addEventListener('click', function() {
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = mediaMentionRowHtml(mentionNextIndex);
+            var row = wrapper.firstElementChild;
+            mentionList.appendChild(row);
+            bindRemove(row.querySelector('.remove-media-mention-btn'), '.media-mention-row');
+            mentionNextIndex += 1;
+        });
+    }
+
+    // Per-attorney notable cases
+    function attorneyCaseRowHtml(empId, idx) {
+        return ''
+            + '<div class="attorney-case-row border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">'
+            + '  <div class="flex items-start justify-between gap-3">'
+            + '    <p class="text-xs font-medium text-gray-600">Case</p>'
+            + '    <button type="button" class="remove-attorney-case-btn text-xs text-red-600 hover:text-red-800 font-medium">'
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+            + '    </button>'
+            + '  </div>'
+            + '  <input type="hidden" name="attorney_notable_case_id_' + empId + '_' + idx + '" value="">'
+            + '  <textarea name="attorney_notable_case_description_' + empId + '_' + idx + '" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"></textarea>'
+            + '  <label class="inline-flex items-center gap-2 cursor-pointer">'
+            + '    <input type="checkbox" name="attorney_notable_case_consent_' + empId + '_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">'
+            + '    <span class="text-sm text-gray-700">Consent confirmed to publish this case</span>'
+            + '  </label>'
+            + '</div>';
+    }
+
+    document.querySelectorAll('.attorney-cases-list').forEach(function(list) {
+        var empId = list.getAttribute('data-employee-id');
+        bindRemoveAll(list, 'remove-attorney-case-btn', '.attorney-case-row');
+        list._nextCaseIndex = list.querySelectorAll('.attorney-case-row').length;
+    });
+
+    document.querySelectorAll('.add-attorney-case-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var empId = btn.getAttribute('data-employee-id');
+            var list = document.querySelector('.attorney-cases-list[data-employee-id="' + empId + '"]');
+            if (!list) return;
+            var idx = list._nextCaseIndex || 0;
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = attorneyCaseRowHtml(empId, idx);
+            var row = wrapper.firstElementChild;
+            list.appendChild(row);
+            bindRemove(row.querySelector('.remove-attorney-case-btn'), '.attorney-case-row');
+            list._nextCaseIndex = idx + 1;
+        });
+    });
+
+    // Awards
+    var awardsList = document.getElementById('awards-list');
+    var addAwardBtn = document.getElementById('add-award-btn');
+    var awardNextIndex = awardsList ? awardsList.querySelectorAll('.award-row').length : 0;
+    function awardRowHtml(idx) {
+        return ''
+            + '<div class="award-row border border-gray-200 rounded-xl p-4 bg-white grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end">'
+            + '<div><input type="hidden" name="award_id_' + idx + '" value="">'
+            + '<label class="block text-xs font-medium text-gray-600 mb-1">Award / Ranking</label>'
+            + '<input type="text" name="award_title_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '<div><label class="block text-xs font-medium text-gray-600 mb-1">Year</label>'
+            + '<input type="text" name="award_year_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '<button type="button" class="remove-award-btn text-sm text-red-600 px-2 py-2"><i class="fas fa-trash-alt"></i></button>'
+            + '</div>';
+    }
+    if (awardsList && addAwardBtn) {
+        bindRemoveAll(awardsList, 'remove-award-btn', '.award-row');
+        addAwardBtn.addEventListener('click', function() {
+            var wrap = document.createElement('div');
+            wrap.innerHTML = awardRowHtml(awardNextIndex);
+            var row = wrap.firstElementChild;
+            awardsList.appendChild(row);
+            bindRemove(row.querySelector('.remove-award-btn'), '.award-row');
+            awardNextIndex += 1;
+        });
+    }
+
+    // Attorney education
+    function educationRowHtml(empId, idx) {
+        return ''
+            + '<div class="education-row border border-gray-200 rounded-lg p-4 bg-gray-50 grid grid-cols-1 md:grid-cols-3 gap-3">'
+            + '<input type="hidden" name="attorney_education_id_' + empId + '_' + idx + '" value="">'
+            + '<div><label class="block text-xs font-medium text-gray-600 mb-1">Degree</label>'
+            + '<input type="text" name="attorney_education_degree_' + empId + '_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>'
+            + '<div><label class="block text-xs font-medium text-gray-600 mb-1">Institution</label>'
+            + '<input type="text" name="attorney_education_institution_' + empId + '_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>'
+            + '<div class="flex gap-2 items-end"><div class="flex-1"><label class="block text-xs font-medium text-gray-600 mb-1">Year</label>'
+            + '<input type="text" name="attorney_education_year_' + empId + '_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>'
+            + '<button type="button" class="remove-education-btn text-red-600 px-2 py-2"><i class="fas fa-trash-alt"></i></button></div>'
+            + '</div>';
+    }
+    document.querySelectorAll('.attorney-education-list').forEach(function(list) {
+        bindRemoveAll(list, 'remove-education-btn', '.education-row');
+        list._nextEduIndex = list.querySelectorAll('.education-row').length;
+    });
+    document.querySelectorAll('.add-education-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var empId = btn.getAttribute('data-employee-id');
+            var list = document.querySelector('.attorney-education-list[data-employee-id="' + empId + '"]');
+            if (!list) return;
+            var idx = list._nextEduIndex || 0;
+            var wrap = document.createElement('div');
+            wrap.innerHTML = educationRowHtml(empId, idx);
+            var row = wrap.firstElementChild;
+            list.appendChild(row);
+            bindRemove(row.querySelector('.remove-education-btn'), '.education-row');
+            list._nextEduIndex = idx + 1;
+        });
+    });
+
+    // FAQs
+    var faqList = document.getElementById('faqs-list');
+    var addFaqBtn = document.getElementById('add-faq-btn');
+    var faqNextIndex = faqList ? faqList.querySelectorAll('.faq-row').length : 0;
+    function faqRowHtml(idx) {
+        return ''
+            + '<div class="faq-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">'
+            + '  <div class="flex items-start justify-between gap-3">'
+            + '    <p class="text-sm font-semibold text-gray-800">FAQ</p>'
+            + '    <button type="button" class="remove-faq-btn text-sm text-red-600 hover:text-red-800 font-medium">'
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+            + '    </button>'
+            + '  </div>'
+            + '  <input type="hidden" name="faq_id_' + idx + '" value="">'
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Question</label>'
+            + '  <input type="text" name="faq_question_' + idx + '" maxlength="500" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Answer</label>'
+            + '  <textarea name="faq_answer_' + idx + '" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea></div>'
+            + '  <label class="inline-flex items-center gap-2 cursor-pointer">'
+            + '    <input type="checkbox" name="faq_publish_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">'
+            + '    <span class="text-sm text-gray-700">Publish on website and include in FAQ structured data</span>'
+            + '  </label>'
+            + '</div>';
+    }
+    if (faqList && addFaqBtn) {
+        bindRemoveAll(faqList, 'remove-faq-btn', '.faq-row');
+        addFaqBtn.addEventListener('click', function() {
+            var wrap = document.createElement('div');
+            wrap.innerHTML = faqRowHtml(faqNextIndex);
+            var row = wrap.firstElementChild;
+            faqList.appendChild(row);
+            bindRemove(row.querySelector('.remove-faq-btn'), '.faq-row');
+            faqNextIndex += 1;
+        });
+    }
+
+    // Blog posts
+    var blogList = document.getElementById('blog-posts-list');
+    var addBlogBtn = document.getElementById('add-blog-btn');
+    var blogNextIndex = blogList ? blogList.querySelectorAll('.blog-post-row').length : 0;
+    function authorOptionsHtml() {
+        var sel = blogList && blogList.querySelector('select[name^="blog_author_"]');
+        return sel ? sel.innerHTML : '<option value="">— Select —</option>';
+    }
+    function blogRowHtml(idx) {
+        return ''
+            + '<div class="blog-post-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">'
+            + '  <div class="flex items-start justify-between gap-3">'
+            + '    <p class="text-sm font-semibold text-gray-800">Article</p>'
+            + '    <button type="button" class="remove-blog-btn text-sm text-red-600 hover:text-red-800 font-medium">'
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+            + '    </button>'
+            + '  </div>'
+            + '  <input type="hidden" name="blog_id_' + idx + '" value="">'
+            + '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">'
+            + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Title</label>'
+            + '    <input type="text" name="blog_title_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">URL slug</label>'
+            + '    <input type="text" name="blog_slug_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Author</label>'
+            + '    <select name="blog_author_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">' + authorOptionsHtml() + '</select></div>'
+            + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>'
+            + '    <textarea name="blog_excerpt_' + idx + '" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea></div>'
+            + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Article body</label>'
+            + '    <textarea name="blog_body_' + idx + '" rows="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"></textarea></div>'
+            + '  </div>'
+            + '  <label class="inline-flex items-center gap-2 cursor-pointer">'
+            + '    <input type="checkbox" name="blog_published_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">'
+            + '    <span class="text-sm text-gray-700">Publish on website</span>'
+            + '  </label>'
+            + '</div>';
+    }
+    if (blogList && addBlogBtn) {
+        bindRemoveAll(blogList, 'remove-blog-btn', '.blog-post-row');
+        addBlogBtn.addEventListener('click', function() {
+            var wrap = document.createElement('div');
+            wrap.innerHTML = blogRowHtml(blogNextIndex);
+            var row = wrap.firstElementChild;
+            blogList.appendChild(row);
+            bindRemove(row.querySelector('.remove-blog-btn'), '.blog-post-row');
+            blogNextIndex += 1;
+        });
+    }
+})();
+</script>

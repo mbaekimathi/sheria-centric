@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ seo_home.meta_title or (firm_name ~ (' | ' ~ firm_tagline if firm_tagline else '')) }}</title>
+  <meta name="description" content="{{ seo_home.meta_description or firm_tagline or ('Welcome to ' ~ firm_name) }}">
+  {% if seo_home.canonical_url %}<link rel="canonical" href="{{ seo_home.canonical_url }}">{% endif %}
+  {% for script in json_ld_scripts or [] %}
+  <script type="application/ld+json">{{ script | safe }}</script>
+  {% endfor %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root {
+      --navy: #1e1a4e;
+      --indigo: #4f46e5;
+      --indigo-light: #eef2ff;
+      --gold: #c9a227;
+      --text: #374151;
+      --muted: #6b7280;
+      --bg: #fafafa;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Inter', sans-serif; color: var(--text); background: var(--bg); line-height: 1.6; }
+    h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--navy); line-height: 1.2; }
+    a { color: var(--indigo); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 1.25rem; }
+    .site-header {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .nav-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      min-height: 72px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.15rem;
+      color: var(--navy);
+      text-decoration: none;
+    }
+    .brand img { height: 44px; width: auto; object-fit: contain; }
+    .nav-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .nav-links a { color: var(--text); font-weight: 500; font-size: 0.95rem; text-decoration: none; }
+    .nav-links a:hover { color: var(--indigo); }
+    .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 1.1rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary { background: var(--indigo); color: #fff; }
+    .btn-primary:hover { background: #4338ca; text-decoration: none; }
+    .btn-outline { background: #fff; color: var(--navy); border: 1px solid #d1d5db; }
+    .hero {
+      background: linear-gradient(135deg, var(--navy) 0%, #312e81 55%, var(--indigo) 100%);
+      color: #fff;
+      padding: 4.5rem 0 5rem;
+    }
+    .hero h1 { color: #fff; font-size: clamp(2rem, 5vw, 3.25rem); margin: 0 0 1rem; }
+    .hero .tagline { font-size: 1.15rem; opacity: 0.92; max-width: 36rem; margin-bottom: 2rem; }
+    .section { padding: 4rem 0; }
+    .section-alt { background: #fff; }
+    .section-title { font-size: 1.85rem; margin: 0 0 0.5rem; }
+    .section-lead { color: var(--muted); margin: 0 0 2rem; max-width: 40rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; }
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card h3 { margin: 0 0 0.5rem; font-size: 1.15rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    .card .subs { margin-top: 0.75rem; font-size: 0.85rem; color: var(--text); white-space: pre-line; }
+    .attorney-card { text-align: center; }
+    .attorney-card img, .attorney-avatar {
+      width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
+      margin: 0 auto 1rem; display: block; border: 3px solid var(--indigo-light);
+    }
+    .attorney-avatar {
+      background: var(--indigo-light); color: var(--indigo);
+      font-size: 2rem; font-weight: 700; line-height: 96px; text-align: center;
+    }
+    .attorney-role { color: var(--indigo); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .contact-list { list-style: none; padding: 0; margin: 0; }
+    .contact-list li { display: flex; gap: 0.75rem; margin-bottom: 0.85rem; align-items: flex-start; }
+    .contact-list i { color: var(--indigo); margin-top: 0.2rem; width: 1.1rem; }
+    .site-footer {
+      background: var(--navy);
+      color: rgba(255,255,255,0.85);
+      padding: 2.5rem 0;
+      font-size: 0.9rem;
+    }
+    .site-footer a { color: #c7d2fe; }
+    .policy-block { white-space: pre-wrap; font-size: 0.9rem; color: var(--muted); max-height: 12rem; overflow: auto; }
+    .faq-item { border: 1px solid #e5e7eb; border-radius: 0.75rem; background: #fff; overflow: hidden; }
+    .faq-item + .faq-item { margin-top: 0.75rem; }
+    .faq-question {
+      width: 100%; text-align: left; padding: 1rem 1.15rem; background: #fff; border: 0;
+      font-weight: 600; color: var(--navy); cursor: pointer; display: flex; justify-content: space-between; gap: 1rem;
+      font-family: 'Inter', sans-serif; font-size: 0.95rem;
+    }
+    .faq-question:hover { background: var(--indigo-light); }
+    .faq-answer { padding: 0 1.15rem 1rem; color: var(--text); font-size: 0.92rem; white-space: pre-line; }
+    .faq-item:not(.open) .faq-answer { display: none; }
+    .preview-banner {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #fef3c7;
+      color: #92400e;
+      text-align: center;
+      padding: 0.55rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-bottom: 1px solid #fcd34d;
+    }
+    .preview-banner i { margin-right: 0.35rem; }
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body{% if preview_mode %} class="preview-mode"{% endif %}>
+  {% if preview_mode %}
+  <div class="preview-banner" role="status">
+    <i class="fas fa-eye" aria-hidden="true"></i>
+    Website preview — visitors will see this when <strong>Use law firm website</strong> is turned on.
+  </div>
+  {% endif %}
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="/" class="brand">
+        {% if firm_logo_url %}
+        <img src="{{ firm_logo_url }}" alt="{{ firm_logo_alt or firm_name }}">
+        {% else %}
+        <i class="fas fa-scale-balanced" style="font-size:1.5rem;color:var(--indigo);"></i>
+        {% endif %}
+        <span>{{ firm_name }}</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#about">About</a>
+        {% if practice_areas %}<a href="#practice-areas">Practice Areas</a>{% endif %}
+        {% if attorneys %}<a href="#team">Our Team</a>{% endif %}
+        {% if faqs %}<a href="#faq">FAQ</a>{% endif %}
+        <a href="#contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/client_login" class="btn btn-outline">Client Login</a>
+        <a href="/login" class="btn btn-primary">Staff Login</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>{{ seo_home.h1_heading or firm_name }}</h1>
+      {% if firm_tagline %}
+      <p class="tagline">{{ firm_tagline }}</p>
+      {% endif %}
+      <a href="#contact" class="btn btn-primary" style="background:#fff;color:var(--navy);">Get in touch</a>
+    </div>
+  </section>
+
+  <section class="section section-alt" id="about">
+    <div class="container">
+      <h2 class="section-title">{{ seo_about.h1_heading or 'About Us' }}</h2>
+      <p class="section-lead">Learn more about our firm, our mission, and the values that guide our work.</p>
+      <div class="grid-2">
+        {% if firm.get('firm_history') %}
+        <div class="card">
+          <h3><i class="fas fa-landmark" style="color:var(--indigo);margin-right:0.4rem;"></i> Our History</h3>
+          <p style="white-space:pre-line;">{{ firm.firm_history }}</p>
+          {% if firm.get('year_established') %}
+          <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted);">Established {{ firm.year_established }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% if firm.get('mission_statement') %}
+        <div class="card">
+          <h3><i class="fas fa-bullseye" style="color:var(--indigo);margin-right:0.4rem;"></i> Mission</h3>
+          <p style="white-space:pre-line;">{{ firm.mission_statement }}</p>
+        </div>
+        {% endif %}
+        {% if firm.get('core_values') %}
+        <div class="card">
+          <h3><i class="fas fa-heart" style="color:var(--indigo);margin-right:0.4rem;"></i> Core Values</h3>
+          <p style="white-space:pre-line;">{{ firm.core_values }}</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if practice_areas %}
+  <section class="section" id="practice-areas">
+    <div class="container">
+      <h2 class="section-title">Practice Areas</h2>
+      <p class="section-lead">Legal services and expertise we provide to our clients.</p>
+      <div class="grid-3">
+        {% for pa in practice_areas %}
+        <div class="card" id="{{ pa.url_slug or ('practice-' ~ loop.index) }}">
+          {% if pa.image_url %}
+          <img src="{{ pa.image_url }}" alt="{{ pa.image_alt or pa.name }}" style="width:100%;max-height:140px;object-fit:cover;border-radius:0.5rem;margin-bottom:0.75rem;">
+          {% endif %}
+          <h3>{{ pa.h1_heading or pa.name }}</h3>
+          {% set pa_blurb = pa.short_description or pa.description %}
+          {% if pa_blurb %}<p>{{ pa_blurb }}</p>{% endif %}
+          {% if pa.sub_specialties %}
+          <div class="subs"><strong>Sub-specialties:</strong><br>{{ pa.sub_specialties }}</div>
+          {% endif %}
+          {% if pa.last_updated_display %}
+          <p style="font-size:0.75rem;color:var(--muted);margin-top:0.75rem;">Last updated: {{ pa.last_updated_display }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if attorneys %}
+  <section class="section section-alt" id="team">
+    <div class="container">
+      <h2 class="section-title">Our Team</h2>
+      <p class="section-lead">Meet the advocates and professionals who serve our clients.</p>
+      <div class="grid-3">
+        {% for emp in attorneys %}
+        <div class="card attorney-card" id="{{ emp.url_slug or ('team-' ~ emp.id) }}">
+          {% set pic = firm_public_asset_url(emp.profile_picture) %}
+          {% if pic %}
+          <img src="{{ pic }}" alt="{{ emp.profile_picture_alt or emp.full_name }}">
+          {% else %}
+          <div class="attorney-avatar">{{ (emp.full_name or '?')[:1] | upper }}</div>
+          {% endif %}
+          <h3 style="margin-bottom:0.25rem;">{{ emp.h1_heading or emp.full_name }}</h3>
+          <p class="attorney-role">{{ emp.professional_title or emp.role }}</p>
+          {% if emp.attorney_bio %}
+          <p style="text-align:left;font-size:0.9rem;white-space:pre-line;">{{ emp.attorney_bio }}</p>
+          {% endif %}
+          {% if emp.practice_areas %}
+          <p style="text-align:left;font-size:0.85rem;margin-top:0.75rem;"><strong>Focus:</strong> {{ emp.practice_areas }}</p>
+          {% endif %}
+          {% if emp.public_contact_email or emp.public_contact_phone %}
+          <p style="text-align:left;font-size:0.85rem;margin-top:0.5rem;">
+            {% if emp.public_contact_email %}<a href="mailto:{{ emp.public_contact_email }}">{{ emp.public_contact_email }}</a>{% endif %}
+            {% if emp.public_contact_email and emp.public_contact_phone %} · {% endif %}
+            {% if emp.public_contact_phone %}{{ emp.public_contact_phone }}{% endif %}
+          </p>
+          {% endif %}
+          {% if emp.last_updated_display %}
+          <p style="text-align:left;font-size:0.75rem;color:var(--muted);margin-top:0.5rem;">Last updated: {{ emp.last_updated_display }}</p>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if faqs %}
+  <section class="section" id="faq">
+    <div class="container">
+      <h2 class="section-title">Frequently Asked Questions</h2>
+      <p class="section-lead">Quick answers to common questions about our firm and legal services.</p>
+      <div class="faq-list">
+        {% for faq in faqs %}
+        <div class="faq-item{% if loop.first %} open{% endif %}">
+          <button type="button" class="faq-question" aria-expanded="{% if loop.first %}true{% else %}false{% endif %}">
+            <span>{{ faq.question }}</span>
+            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+          </button>
+          <div class="faq-answer">{{ faq.answer }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="section" id="contact">
+    <div class="container">
+      <h2 class="section-title">Contact Us</h2>
+      <p class="section-lead">Reach our office for consultations and enquiries.</p>
+      <div class="grid-2">
+        <div class="card">
+          <ul class="contact-list">
+            {% if firm_address %}
+            <li><i class="fas fa-map-marker-alt"></i><span>{{ firm_address }}</span></li>
+            {% endif %}
+            {% if firm.get('additional_office_locations') %}
+            <li><i class="fas fa-building"></i><span style="white-space:pre-line;">{{ firm.additional_office_locations }}</span></li>
+            {% endif %}
+            {% if firm_email %}
+            <li><i class="fas fa-envelope"></i><a href="mailto:{{ firm_email }}">{{ firm_email }}</a></li>
+            {% endif %}
+            {% if firm_phone %}
+            <li><i class="fas fa-phone"></i><a href="tel:{{ firm_phone }}">{{ firm_phone }}</a></li>
+            {% endif %}
+            {% if firm_whatsapp %}
+            <li><i class="fab fa-whatsapp"></i><span>WhatsApp: {{ firm_whatsapp }}</span></li>
+            {% endif %}
+            {% if firm_whatsapp_business %}
+            <li><i class="fab fa-whatsapp"></i><span>WhatsApp Business: {{ firm_whatsapp_business }}</span></li>
+            {% endif %}
+            {% if business_hours %}
+            <li><i class="fas fa-clock"></i><span>{{ business_hours }}</span></li>
+            {% endif %}
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Client &amp; staff access</h3>
+          <p style="margin-bottom:1rem;">Existing clients and firm members can sign in to the secure portal.</p>
+          <a href="/client_login" class="btn btn-outline" style="margin-right:0.5rem;">Client Login</a>
+          <a href="/login" class="btn btn-primary">Staff Login</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p style="margin:0 0 0.5rem;font-weight:600;color:#fff;">{{ firm_name }}</p>
+      <p style="margin:0 0 1rem;opacity:0.8;">&copy; {{ firm_name }}. All rights reserved.</p>
+      {% if site_last_updated %}
+      <p style="margin:0 0 1rem;opacity:0.7;font-size:0.85rem;">Last updated: {{ site_last_updated }}</p>
+      {% endif %}
+      {% if firm.get('privacy_policy') or firm.get('terms_of_service') %}
+      <div class="grid-2" style="gap:1rem;margin-top:1.5rem;">
+        {% if firm.get('privacy_policy') %}
+        <div>
+          <p style="font-weight:600;color:#fff;margin-bottom:0.35rem;">Privacy Policy</p>
+          <div class="policy-block">{{ firm.privacy_policy }}</div>
+        </div>
+        {% endif %}
+        {% if firm.get('terms_of_service') %}
+        <div>
+          <p style="font-weight:600;color:#fff;margin-bottom:0.35rem;">Terms of Service</p>
+          <div class="policy-block">{{ firm.terms_of_service }}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+      <p style="margin-top:1.5rem;font-size:0.75rem;opacity:0.55;">Powered by SHERIA CENTRIC</p>
+    </div>
+  </footer>
+  <script>
+  (function() {
+    document.querySelectorAll('.faq-question').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var item = btn.closest('.faq-item');
+        if (!item) return;
+        var open = item.classList.contains('open');
+        document.querySelectorAll('.faq-item.open').forEach(function(el) {
+          el.classList.remove('open');
+          var q = el.querySelector('.faq-question');
+          if (q) q.setAttribute('aria-expanded', 'false');
+        });
+        if (!open) {
+          item.classList.add('open');
+          btn.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

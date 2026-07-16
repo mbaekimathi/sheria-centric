@@ -1,121 +1,151 @@
 {% extends "base.html" %}
 
-{% block title %}Other Matters - SHERIA CENTRIC{% endblock %}
+{% block title %}Non-Litigation Matters - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<!-- Page Header -->
-<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-                <i class="fas fa-folder-open text-blue-600 mr-3"></i>
-                Other Matters
-            </h1>
-            <p class="text-gray-600">
-                {% if user_role == 'Managing Partner' %}
-                Your active allocated matters (Pending Approval, Closed and Completed are hidden).
-                {% else %}
-                Matters allocated to you. Pending matters are approved with allocation details before work starts.
-                {% endif %}
-            </p>
-        </div>
-        {% if user_role in ['Firm Administrator', 'Managing Partner', 'Associate Advocate', 'Clerk'] %}
-        <a href="{{ url_for('register_matter') }}" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center">
-            <i class="fas fa-plus-circle mr-2"></i>
-            Register New Matter
-        </a>
-        {% endif %}
-    </div>
-</div>
+<style>
+  .om-card {
+    animation: omFadeInUp 0.35s ease both;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .om-card:hover {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    border-color: #c7d2fe;
+  }
+  .om-card .om-chevron { transition: transform 0.25s ease; }
+  .om-card.is-open .om-chevron { transform: rotate(180deg); }
+  .om-card.is-open > .om-summary {
+    background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+  }
+  .om-summary { transition: background-color 0.2s ease; }
+  .om-summary:hover { background-color: #f8fafc; }
+  .om-avatar { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+  .om-card:hover .om-avatar {
+    transform: scale(1.06);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  }
+  .om-count { transition: transform 0.2s ease; }
+  .om-card:hover .om-count { transform: scale(1.05); }
+  .om-panel { animation: omPanelIn 0.28s ease both; }
+  @keyframes omFadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes omPanelIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .om-card, .om-panel, .om-avatar, .om-count, .om-chevron {
+      animation: none !important; transition: none !important;
+    }
+  }
+</style>
 
-<!-- View Toggle -->
-<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-    <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-gray-700">View By:</h2>
-        <div class="flex space-x-2">
-            <button 
-                id="viewByClientBtn"
-                onclick="switchView('client')"
-                class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold flex items-center"
-            >
-                <i class="fas fa-users mr-2"></i>Client
-            </button>
-            <button 
-                id="viewByCategoryBtn"
-                onclick="switchView('category')"
-                class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold flex items-center"
-            >
-                <i class="fas fa-tags mr-2"></i>Category
-            </button>
+<!-- Header + filters (single card) -->
+<div class="bg-white rounded-xl shadow border border-gray-100 px-4 py-3.5 sm:px-5 sm:py-4 mb-4">
+    <div class="flex flex-col gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-folder-open text-blue-600"></i>
+                    Non-Litigation Matters
+                </h1>
+                <p class="text-sm text-gray-500 mt-0.5 hidden sm:block">
+                    {% if user_role == 'Managing Partner' %}
+                    Your active allocated matters (Pending Approval, Closed and Completed are hidden).
+                    {% else %}
+                    Matters allocated to you. Pending matters are approved with allocation details before work starts.
+                    {% endif %}
+                </p>
+            </div>
+            {% if user_role in ['Firm Administrator', 'Managing Partner', 'Associate Advocate', 'Clerk'] %}
+            <a href="{{ url_for('register_matter') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shrink-0">
+                <i class="fas fa-plus-circle"></i>
+                Register New Matter
+            </a>
+            {% endif %}
         </div>
-    </div>
-</div>
 
-<!-- Search Bar -->
-<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-    <div class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4">
-        <div class="flex-1 w-full">
-            <label for="searchInput" class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="fas fa-search text-blue-600 mr-2"></i><span id="searchLabel">Search Clients</span>
-            </label>
-            <div class="relative">
-                <input 
-                    type="text" 
-                    id="searchInput" 
-                    class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Search by client name or phone number..."
-                    autocomplete="off"
-                />
-                <i class="fas fa-search absolute left-3 top-4 text-gray-400"></i>
-                <button 
-                    id="clearSearch"
-                    onclick="clearSearch()"
-                    class="hidden absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+        <div class="border-t border-gray-100 pt-3 flex flex-col lg:flex-row lg:items-center gap-2.5 lg:gap-3">
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap">View</span>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
+                    <button type="button" id="viewByClientBtn" onclick="switchView('client')"
+                        class="om-view-btn px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center">
+                        <i class="fas fa-users mr-1.5"></i>Client
+                    </button>
+                    <button type="button" id="viewByCategoryBtn" onclick="switchView('category')"
+                        class="om-view-btn px-3 py-1.5 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-semibold flex items-center">
+                        <i class="fas fa-tags mr-1.5"></i>Category
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 min-w-0 flex items-center gap-2">
+                <label for="searchInput" class="sr-only"><span id="searchLabel">Search Clients</span></label>
+                <div class="relative flex-1 min-w-0">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                    <input
+                        type="text"
+                        id="searchInput"
+                        class="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 bg-gray-50 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                        placeholder="Search by client name or phone…"
+                        autocomplete="off"
+                    />
+                    <button
+                        type="button"
+                        id="clearSearch"
+                        onclick="clearSearch()"
+                        class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                        title="Clear search"
+                        aria-label="Clear search"
+                    >
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    id="refreshBtn"
+                    onclick="refreshView()"
+                    class="inline-flex items-center justify-center w-9 h-9 sm:w-auto sm:px-3 sm:h-9 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-800 transition-colors text-sm font-semibold shrink-0"
+                    title="Refresh"
                 >
-                    <i class="fas fa-times"></i>
+                    <i class="fas fa-sync-alt"></i>
+                    <span class="hidden sm:inline ml-1.5">Refresh</span>
                 </button>
             </div>
-        </div>
-        <div class="flex items-end">
-            <button 
-                id="refreshBtn"
-                onclick="refreshView()"
-                class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold"
-            >
-                <i class="fas fa-refresh mr-2"></i>Refresh
-            </button>
         </div>
     </div>
 </div>
 
 <!-- Loading Indicator -->
-<div id="loadingIndicator" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+<div id="loadingIndicator" class="hidden bg-white rounded-xl shadow border border-gray-100 p-6 mb-4 text-center">
     <div class="flex items-center justify-center">
-        <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mr-3"></i>
-        <span class="text-gray-700">Loading clients...</span>
+        <i class="fas fa-spinner fa-spin text-blue-600 text-xl mr-3"></i>
+        <span class="text-gray-700 text-sm font-medium">Loading…</span>
     </div>
 </div>
 
-<!-- Clients with Matters -->
-<div id="clientsContainer" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-    <div class="flex flex-col md:flex-row items-center justify-between mb-4">
-        <h3 class="text-xl font-bold text-gray-900 flex items-center">
-            <i class="fas fa-users text-blue-600 mr-2"></i>
-            <span id="containerTitle">Clients with Matters:</span> <span id="itemsCount" class="ml-2 text-green-600">0</span>
+<!-- Clients / Categories with Matters -->
+<div id="clientsContainer" class="bg-white rounded-xl shadow border border-gray-100 p-4 sm:p-5 mb-4">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-1">
+        <h3 class="text-lg font-bold text-gray-900 flex items-center flex-wrap gap-2">
+            <span id="containerTitle"><i class="fas fa-users text-blue-600 mr-1"></i>Clients with Matters:</span>
+            <span id="itemsCount" class="text-green-600">0</span>
         </h3>
     </div>
-    
-    <div id="itemsList" class="space-y-4">
+
+    <div id="itemsList" class="space-y-3">
         <!-- Items will be populated here -->
     </div>
 </div>
 
 <!-- No Results Message -->
-<div id="noResults" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+<div id="noResults" class="hidden bg-white rounded-xl shadow border border-gray-100 p-8 mb-4 text-center">
     <div class="max-w-md mx-auto">
-        <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
-        <h3 class="text-xl font-bold text-gray-900 mb-2">No Matters Found</h3>
-        <p class="text-gray-600" id="noResultsMessage">No matters found.</p>
+        <i class="fas fa-inbox text-gray-400 text-4xl mb-3"></i>
+        <h3 class="text-lg font-bold text-gray-900 mb-1">No Matters Found</h3>
+        <p class="text-gray-600 text-sm" id="noResultsMessage">No matters found.</p>
     </div>
 </div>
 
@@ -205,35 +235,111 @@ let approveSearchTimeout;
 let currentApproveMatterId = null;
 const canApprovePending = {{ 'true' if can_approve_matters else 'false' }};
 
+const CLIENT_PALETTES = [
+    { bg: 'bg-blue-100', text: 'text-blue-700', count: 'text-blue-600', icon: 'fa-user', ring: 'ring-blue-200' },
+    { bg: 'bg-emerald-100', text: 'text-emerald-700', count: 'text-emerald-600', icon: 'fa-user-tie', ring: 'ring-emerald-200' },
+    { bg: 'bg-violet-100', text: 'text-violet-700', count: 'text-violet-600', icon: 'fa-id-card', ring: 'ring-violet-200' },
+    { bg: 'bg-amber-100', text: 'text-amber-700', count: 'text-amber-600', icon: 'fa-user-graduate', ring: 'ring-amber-200' },
+    { bg: 'bg-rose-100', text: 'text-rose-700', count: 'text-rose-600', icon: 'fa-user-circle', ring: 'ring-rose-200' },
+    { bg: 'bg-sky-100', text: 'text-sky-700', count: 'text-sky-600', icon: 'fa-address-card', ring: 'ring-sky-200' },
+    { bg: 'bg-teal-100', text: 'text-teal-700', count: 'text-teal-600', icon: 'fa-user-check', ring: 'ring-teal-200' },
+    { bg: 'bg-orange-100', text: 'text-orange-700', count: 'text-orange-600', icon: 'fa-user-tag', ring: 'ring-orange-200' },
+    { bg: 'bg-indigo-100', text: 'text-indigo-700', count: 'text-indigo-600', icon: 'fa-briefcase', ring: 'ring-indigo-200' },
+    { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', count: 'text-fuchsia-600', icon: 'fa-building', ring: 'ring-fuchsia-200' },
+];
+
+const CATEGORY_PALETTES = [
+    { bg: 'bg-violet-100', text: 'text-violet-700', count: 'text-violet-600', icon: 'fa-tag', ring: 'ring-violet-200' },
+    { bg: 'bg-indigo-100', text: 'text-indigo-700', count: 'text-indigo-600', icon: 'fa-folder', ring: 'ring-indigo-200' },
+    { bg: 'bg-emerald-100', text: 'text-emerald-700', count: 'text-emerald-600', icon: 'fa-leaf', ring: 'ring-emerald-200' },
+    { bg: 'bg-amber-100', text: 'text-amber-700', count: 'text-amber-600', icon: 'fa-stamp', ring: 'ring-amber-200' },
+    { bg: 'bg-sky-100', text: 'text-sky-700', count: 'text-sky-600', icon: 'fa-handshake', ring: 'ring-sky-200' },
+    { bg: 'bg-rose-100', text: 'text-rose-700', count: 'text-rose-600', icon: 'fa-file-contract', ring: 'ring-rose-200' },
+    { bg: 'bg-teal-100', text: 'text-teal-700', count: 'text-teal-600', icon: 'fa-balance-scale', ring: 'ring-teal-200' },
+    { bg: 'bg-orange-100', text: 'text-orange-700', count: 'text-orange-600', icon: 'fa-briefcase', ring: 'ring-orange-200' },
+    { bg: 'bg-blue-100', text: 'text-blue-700', count: 'text-blue-600', icon: 'fa-bookmark', ring: 'ring-blue-200' },
+    { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', count: 'text-fuchsia-600', icon: 'fa-layer-group', ring: 'ring-fuchsia-200' },
+];
+
+function hashString(str) {
+    let h = 0;
+    const s = String(str || '');
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+    return Math.abs(h);
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function getClientPalette(key, clientType) {
+    const type = String(clientType || '').toLowerCase();
+    if (type.includes('corporate') || type.includes('company') || type.includes('organisation') || type.includes('organization')) {
+        return { bg: 'bg-slate-200', text: 'text-slate-700', count: 'text-slate-600', icon: 'fa-building', ring: 'ring-slate-300' };
+    }
+    return CLIENT_PALETTES[hashString(key) % CLIENT_PALETTES.length];
+}
+
+function getCategoryPalette(name) {
+    return CATEGORY_PALETTES[hashString(name) % CATEGORY_PALETTES.length];
+}
+
+function profilePictureSrc(pic) {
+    const value = (pic || '').toString().trim();
+    if (!value) return '';
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) return value;
+    if (value.startsWith('/static/')) return value;
+    if (value.startsWith('static/')) return '/' + value;
+    if (value.startsWith('uploads/')) return '/static/' + value;
+    return '/static/uploads/profile_pictures/' + value.replace(/^\/+/, '');
+}
+
+function clientAvatarHtml(pic, name, palette) {
+    const src = profilePictureSrc(pic);
+    const ring = palette.ring || 'ring-blue-200';
+    const fallback = `<div class="om-avatar h-12 w-12 rounded-full ${palette.bg} flex items-center justify-center ring-2 ring-offset-1 ${ring}">
+                <i class="fas ${palette.icon} ${palette.text} text-xl"></i>
+            </div>`;
+    if (!src) return fallback;
+    const safeSrc = String(src).replace(/"/g, '&quot;');
+    return `<span class="relative inline-flex flex-shrink-0">
+                <img class="om-avatar h-12 w-12 rounded-full object-cover ring-2 ring-offset-1 ${ring}" src="${safeSrc}" alt="${escapeHtml(name || 'Client')}"
+                    onerror="this.classList.add('hidden');var fb=this.nextElementSibling;if(fb)fb.classList.remove('hidden');">
+                <div class="om-avatar h-12 w-12 rounded-full ${palette.bg} hidden flex items-center justify-center ring-2 ring-offset-1 ${ring}">
+                    <i class="fas ${palette.icon} ${palette.text} text-xl"></i>
+                </div>
+            </span>`;
+}
+
+const VIEW_ACTIVE = 'om-view-btn px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center';
+const VIEW_IDLE = 'om-view-btn px-3 py-1.5 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-semibold flex items-center';
+
 // Load data on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadView();
-    
-    // Setup live search
+
     const searchInput = document.getElementById('searchInput');
     const clearButton = document.getElementById('clearSearch');
-    
+
     searchInput.addEventListener('input', function() {
         const query = this.value.trim();
         currentSearchQuery = query;
-        
-        // Show/hide clear button
+
         if (query.length > 0) {
             clearButton.classList.remove('hidden');
         } else {
             clearButton.classList.add('hidden');
         }
-        
-        // Clear previous timeout
+
         clearTimeout(searchTimeout);
-        
-        // Debounce search
         searchTimeout = setTimeout(() => {
             searchView(query);
         }, 300);
     });
-    
-    // Handle Enter key
+
     searchInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -248,25 +354,24 @@ function switchView(view) {
     currentSearchQuery = '';
     document.getElementById('searchInput').value = '';
     document.getElementById('clearSearch').classList.add('hidden');
-    
-    // Update button styles
+
     const clientBtn = document.getElementById('viewByClientBtn');
     const categoryBtn = document.getElementById('viewByCategoryBtn');
-    
+
     if (view === 'client') {
-        clientBtn.className = 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold flex items-center';
-        categoryBtn.className = 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold flex items-center';
+        clientBtn.className = VIEW_ACTIVE;
+        categoryBtn.className = VIEW_IDLE;
         document.getElementById('searchLabel').textContent = 'Search Clients';
-        document.getElementById('searchInput').placeholder = 'Search by client name or phone number...';
-        document.getElementById('containerTitle').innerHTML = '<i class="fas fa-users text-blue-600 mr-2"></i>Clients with Matters:';
+        document.getElementById('searchInput').placeholder = 'Search by client name or phone…';
+        document.getElementById('containerTitle').innerHTML = '<i class="fas fa-users text-blue-600 mr-1"></i>Clients with Matters:';
     } else {
-        clientBtn.className = 'px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-semibold flex items-center';
-        categoryBtn.className = 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-semibold flex items-center';
+        clientBtn.className = VIEW_IDLE;
+        categoryBtn.className = VIEW_ACTIVE;
         document.getElementById('searchLabel').textContent = 'Search Categories';
-        document.getElementById('searchInput').placeholder = 'Search by category name...';
-        document.getElementById('containerTitle').innerHTML = '<i class="fas fa-tags text-blue-600 mr-2"></i>Categories with Matters:';
+        document.getElementById('searchInput').placeholder = 'Search by category name…';
+        document.getElementById('containerTitle').innerHTML = '<i class="fas fa-tags text-blue-600 mr-1"></i>Categories with Matters:';
     }
-    
+
     loadView();
 }
 
@@ -383,49 +488,44 @@ function loadClients() {
 function displayClients(clients) {
     const itemsList = document.getElementById('itemsList');
     itemsList.innerHTML = '';
-    
+
     if (clients.length === 0) {
         itemsList.innerHTML = '<div class="text-center text-gray-500 py-8">No clients with matters found</div>';
         return;
     }
-    
-    function profilePictureSrc(pic) {
-        const value = (pic || '').toString().trim();
-        if (!value) return '';
-        if (value.startsWith('http://') || value.startsWith('https://')) return value;
-        return `/static/uploads/profile_pictures/${value}`;
-    }
 
-    clients.forEach(client => {
+    const sorted = [...clients].sort((a, b) =>
+        String(a.full_name || '').localeCompare(String(b.full_name || ''), undefined, { sensitivity: 'base' })
+    );
+
+    sorted.forEach((client, idx) => {
         const clientCard = document.createElement('div');
-        clientCard.className = 'border border-gray-200 rounded-lg hover:shadow-md transition-shadow';
+        clientCard.className = 'om-card border border-gray-200 rounded-xl bg-white overflow-hidden';
+        clientCard.style.animationDelay = `${Math.min(idx, 12) * 0.045}s`;
+        const palette = getClientPalette(client.id || client.full_name, client.client_type);
+        const name = client.full_name || 'N/A';
+        const avatar = clientAvatarHtml(client.profile_picture, name, palette);
+
         clientCard.innerHTML = `
-            <div class="p-4 cursor-pointer" onclick="toggleClientMatters(${client.id}, this)">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
-                        <div class="flex-shrink-0">
-                            ${client.profile_picture ? 
-                                `<img class="h-12 w-12 rounded-full" src="${profilePictureSrc(client.profile_picture)}" alt="${client.full_name || 'Client'}">` :
-                                `<div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <i class="fas fa-user text-blue-600 text-xl"></i>
-                                </div>`
-                            }
-                        </div>
-                        <div>
-                            <div class="text-lg font-semibold text-gray-900">${client.full_name || 'N/A'}</div>
-                            <div class="text-sm text-gray-500">${client.phone_number || 'No phone'} ${client.email ? '• ' + client.email : ''}</div>
+            <div class="om-summary p-4 cursor-pointer" onclick="toggleClientMatters(${client.id}, this)">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center space-x-4 min-w-0 flex-1">
+                        <div class="flex-shrink-0">${avatar}</div>
+                        <div class="min-w-0">
+                            <div class="text-lg font-semibold text-gray-900 truncate">${escapeHtml(name)}</div>
+                            <div class="text-sm text-gray-500 truncate">${escapeHtml(client.phone_number || 'No phone')}${client.email ? ' • ' + escapeHtml(client.email) : ''}</div>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-4 flex-shrink-0">
                         <div class="text-right">
                             <div class="text-sm text-gray-500">Matters</div>
-                            <div class="text-2xl font-bold text-blue-600">${client.matter_count || 0}</div>
+                            <div class="om-count text-2xl font-bold ${palette.count}">${client.matter_count || 0}</div>
                         </div>
-                        <i class="fas fa-chevron-down text-gray-400 transition-transform" id="chevron-${client.id}"></i>
+                        <i class="fas fa-chevron-down om-chevron text-gray-400" id="chevron-${client.id}"></i>
                     </div>
                 </div>
             </div>
-            <div id="matters-${client.id}" class="hidden border-t border-gray-200 bg-gray-50">
+            <div id="matters-${client.id}" class="om-panel hidden border-t border-gray-200 bg-gray-50">
                 <div class="p-4">
                     <div class="flex items-center justify-center py-4">
                         <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
@@ -441,40 +541,47 @@ function displayClients(clients) {
 function displayCategories(categories) {
     const itemsList = document.getElementById('itemsList');
     itemsList.innerHTML = '';
-    
+
     if (categories.length === 0) {
         itemsList.innerHTML = '<div class="text-center text-gray-500 py-8">No categories with matters found</div>';
         return;
     }
-    
-    categories.forEach(category => {
+
+    const sorted = [...categories].sort((a, b) =>
+        String(a.category_name || '').localeCompare(String(b.category_name || ''), undefined, { sensitivity: 'base' })
+    );
+
+    sorted.forEach((category, idx) => {
         const categoryCard = document.createElement('div');
         const categoryId = category.category_name.replace(/[^a-zA-Z0-9]/g, '_');
-        categoryCard.className = 'border border-gray-200 rounded-lg hover:shadow-md transition-shadow';
+        const palette = getCategoryPalette(category.category_name || categoryId);
+        categoryCard.className = 'om-card border border-gray-200 rounded-xl bg-white overflow-hidden';
+        categoryCard.style.animationDelay = `${Math.min(idx, 12) * 0.045}s`;
+
         categoryCard.innerHTML = `
-            <div class="p-4 cursor-pointer" onclick="toggleCategoryMatters('${category.category_name}', this)">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
+            <div class="om-summary p-4 cursor-pointer" onclick="toggleCategoryMatters('${String(category.category_name).replace(/'/g, "\\'")}', this)">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center space-x-4 min-w-0 flex-1">
                         <div class="flex-shrink-0">
-                            <div class="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
-                                <i class="fas fa-tag text-purple-600 text-xl"></i>
+                            <div class="om-avatar h-12 w-12 rounded-full ${palette.bg} flex items-center justify-center ring-2 ring-offset-1 ${palette.ring}">
+                                <i class="fas ${palette.icon} ${palette.text} text-xl"></i>
                             </div>
                         </div>
-                        <div>
-                            <div class="text-lg font-semibold text-gray-900">${category.category_name || 'N/A'}</div>
+                        <div class="min-w-0">
+                            <div class="text-lg font-semibold text-gray-900 truncate">${escapeHtml(category.category_name || 'N/A')}</div>
                             <div class="text-sm text-gray-500">Category</div>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-4 flex-shrink-0">
                         <div class="text-right">
                             <div class="text-sm text-gray-500">Matters</div>
-                            <div class="text-2xl font-bold text-purple-600">${category.matter_count || 0}</div>
+                            <div class="om-count text-2xl font-bold ${palette.count}">${category.matter_count || 0}</div>
                         </div>
-                        <i class="fas fa-chevron-down text-gray-400 transition-transform" id="chevron-cat-${categoryId}"></i>
+                        <i class="fas fa-chevron-down om-chevron text-gray-400" id="chevron-cat-${categoryId}"></i>
                     </div>
                 </div>
             </div>
-            <div id="matters-cat-${categoryId}" class="hidden border-t border-gray-200 bg-gray-50">
+            <div id="matters-cat-${categoryId}" class="om-panel hidden border-t border-gray-200 bg-gray-50">
                 <div class="p-4">
                     <div class="flex items-center justify-center py-4">
                         <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
@@ -490,18 +597,18 @@ function displayCategories(categories) {
 function toggleClientMatters(clientId, element) {
     const mattersDiv = document.getElementById(`matters-${clientId}`);
     const chevron = document.getElementById(`chevron-${clientId}`);
+    const card = element && element.closest ? element.closest('.om-card') : null;
     const isExpanded = !mattersDiv.classList.contains('hidden');
-    
+
     if (isExpanded) {
-        // Collapse
         mattersDiv.classList.add('hidden');
-        chevron.classList.remove('rotate-180');
+        if (chevron) chevron.classList.remove('rotate-180');
+        if (card) card.classList.remove('is-open');
     } else {
-        // Expand
         mattersDiv.classList.remove('hidden');
-        chevron.classList.add('rotate-180');
-        
-        // Check if matters are already loaded
+        if (chevron) chevron.classList.add('rotate-180');
+        if (card) card.classList.add('is-open');
+
         const mattersTable = document.getElementById(`matters-table-${clientId}`);
         if (!mattersTable) {
             loadClientMatters(clientId);
@@ -562,25 +669,25 @@ function loadClientMatters(clientId) {
                                         return `
                                             <tr class="hover:bg-gray-50">
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_reference_number || 'N/A'}</div>
+                                                    <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.matter_reference_number || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_title || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.matter_title || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_category || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.matter_category || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.client_full_name || matter.client_name || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.client_full_name || matter.client_name || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.assigned_employee_name || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.assigned_employee_name || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${dateOpened}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${dateOpened}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor} cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor} cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">
                                                         ${matter.status || 'N/A'}
                                                     </span>
                                                 </td>
@@ -590,7 +697,7 @@ function loadClientMatters(clientId) {
                                                         <i class="fas fa-check-circle mr-1"></i>Approve
                                                     </button>
                                                     ` : `
-                                                    <a href="/other_matters/${matter.id}" class="text-blue-600 hover:text-blue-800" title="View matter"><i class="fas fa-eye"></i> View</a>
+                                                    <a href="/non_litigation_matters/${matter.id}" class="text-blue-600 hover:text-blue-800" title="View matter"><i class="fas fa-eye"></i> View</a>
                                                     `}
                                                 </td>
                                             </tr>
@@ -706,18 +813,18 @@ function toggleCategoryMatters(categoryName, element) {
     const categoryId = categoryName.replace(/[^a-zA-Z0-9]/g, '_');
     const mattersDiv = document.getElementById(`matters-cat-${categoryId}`);
     const chevron = document.getElementById(`chevron-cat-${categoryId}`);
+    const card = element && element.closest ? element.closest('.om-card') : null;
     const isExpanded = !mattersDiv.classList.contains('hidden');
-    
+
     if (isExpanded) {
-        // Collapse
         mattersDiv.classList.add('hidden');
-        chevron.classList.remove('rotate-180');
+        if (chevron) chevron.classList.remove('rotate-180');
+        if (card) card.classList.remove('is-open');
     } else {
-        // Expand
         mattersDiv.classList.remove('hidden');
-        chevron.classList.add('rotate-180');
-        
-        // Check if matters are already loaded
+        if (chevron) chevron.classList.add('rotate-180');
+        if (card) card.classList.add('is-open');
+
         const mattersTable = document.getElementById(`matters-table-cat-${categoryId}`);
         if (!mattersTable) {
             loadCategoryMatters(categoryName, categoryId);
@@ -777,22 +884,22 @@ function loadCategoryMatters(categoryName, categoryId) {
                                         return `
                                             <tr class="hover:bg-gray-50">
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_reference_number || 'N/A'}</div>
+                                                    <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.matter_reference_number || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.matter_title || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.matter_title || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.client_full_name || matter.client_name || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.client_full_name || matter.client_name || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${matter.assigned_employee_name || 'N/A'}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${matter.assigned_employee_name || 'N/A'}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">${dateOpened}</div>
+                                                    <div class="text-sm text-gray-900 cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">${dateOpened}</div>
                                                 </td>
                                                 <td class="px-4 py-3 whitespace-nowrap">
-                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor} cursor-pointer" onclick="window.location.href='/other_matters/${matter.id}'">
+                                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor} cursor-pointer" onclick="window.location.href='/non_litigation_matters/${matter.id}'">
                                                         ${matter.status || 'N/A'}
                                                     </span>
                                                 </td>
@@ -800,7 +907,7 @@ function loadCategoryMatters(categoryName, categoryId) {
                                                     ${isPendingApproval ? `
                                                     <button type="button" onclick="event.stopPropagation(); openApproveModal(${matter.id})" class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm" title="Approve and allocate matter"><i class="fas fa-check-circle mr-1"></i>Approve</button>
                                                     ` : `
-                                                    <a href="/other_matters/${matter.id}" class="text-blue-600 hover:text-blue-800" title="View matter"><i class="fas fa-eye"></i> View</a>
+                                                    <a href="/non_litigation_matters/${matter.id}" class="text-blue-600 hover:text-blue-800" title="View matter"><i class="fas fa-eye"></i> View</a>
                                                     `}
                                                 </td>
                                             </tr>

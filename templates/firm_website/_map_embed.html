@@ -1,0 +1,11 @@
+{% if map_embed_url %}
+<div class="firm-map-embed">
+  <iframe
+    src="{{ map_embed_url }}"
+    title="Map showing {{ firm_name }} location"
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+    allowfullscreen>
+  </iframe>
+</div>
+{% endif %}

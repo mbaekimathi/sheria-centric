@@ -1,0 +1,32 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Insights</p>
+    <h1>{{ page_seo.h1_heading or 'Insights & Articles' }}</h1>
+    <p class="firm-page-lead">{{ page_seo.meta_description or 'Legal insights and articles from our advocates.' }}</p>
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container">
+    {% if blog_posts %}
+    <div class="firm-grid-3">
+      {% for post in blog_posts %}
+      <article class="firm-card firm-reveal">
+        <p class="firm-quote-date">{% if post.last_updated_display %}{{ post.last_updated_display }}{% endif %}</p>
+        <h2>{{ post.title }}</h2>
+        {% if post.excerpt %}<p>{{ post.excerpt }}</p>{% endif %}
+        <a href="{{ firm_url('blog/' ~ post.slug) }}" class="firm-card-link">Read article <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="firm-empty-state firm-reveal">Articles will appear here once published.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

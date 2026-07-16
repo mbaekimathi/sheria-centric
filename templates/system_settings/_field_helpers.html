@@ -1,0 +1,14 @@
+{% macro req() %}<span class="settings-required" title="Required for launch">*</span>{% endmacro %}
+
+{% macro tip(text) %}
+<span class="settings-tip" tabindex="0">
+  <i class="fas fa-circle-info" aria-hidden="true"></i>
+  <span class="settings-tip-text" role="tooltip">{{ text }}</span>
+</span>
+{% endmacro %}
+
+{% macro section_pct(percent) %}
+{% if percent is not none %}
+<span class="settings-section-pct" title="Section completion">{{ percent }}%</span>
+{% endif %}
+{% endmacro %}

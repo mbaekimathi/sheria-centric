@@ -4,27 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pricing | SHERIA CENTRIC</title>
-  <meta name="description" content="Simple pricing for solo advocates, growing firms, and enterprise legal teams using SHERIA CENTRIC.">
-  {# PWA: manifest, icons, theme-color, service worker registration. #}
+  <meta name="description" content="Simple, transparent pricing for solo advocates, growing firms, and enterprise legal teams using SHERIA CENTRIC.">
   {% include "_pwa_head.html" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <style>
+    body { margin: 0; }
+    .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
+    .skip-link:focus { top: 16px; }
+  </style>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+<body class="pricing-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" id="site-header" x-data="{open:false}">
     <div class="container nav-wrap">
       <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
           <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
         </svg>
         <span>SHERIA CENTRIC</span>
       </a>
-      <nav class="desktop-nav"><a href="/platform" class="nav-link">Platform</a><a href="/features" class="nav-link">Features</a><a href="/pricing" class="nav-link">Pricing</a><a href="/security" class="nav-link">Security</a><a href="/contact" class="nav-link">Contact</a></nav>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="/platform" class="nav-link">Platform</a>
+        <a href="/features" class="nav-link">Features</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        <a href="/security" class="nav-link">Security</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </nav>
       <div class="nav-actions">
         <details class="login-dropdown">
           <summary class="login-summary" aria-label="Login menu">
@@ -37,14 +52,14 @@
             <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
           </div>
         </details>
-        <a href="/contact" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-label="Toggle navigation">
+        <a href="#plans" class="btn btn-demo">Request Demo</a>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
           <i class="ph ph-list" x-show="!open"></i>
           <i class="ph ph-x" x-show="open" style="display:none"></i>
         </button>
       </div>
     </div>
-    <div class="mobile-menu" x-show="open" x-transition.origin.top>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
       <span class="mobile-section-label">Navigate</span>
       <a href="/platform" @click="open=false">Platform</a>
       <a href="/features" @click="open=false">Features</a>
@@ -54,144 +69,235 @@
       <span class="mobile-section-label">Account</span>
       <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
       <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-      <a href="/contact" @click="open=false" class="btn btn-demo">Request Demo</a>
+      <a href="#plans" @click="open=false" class="btn btn-demo">Request Demo</a>
     </div>
   </header>
 
-  <main class="inner-page pricing" x-data="{annual:false, users:8, hours:18, rate:3500}">
-    <section class="page-hero section">
-      <div class="container hero-split">
-        <div>
-          <p class="eyebrow">PRICING</p>
-          <h1>Transparent plans that grow with your practice</h1>
-          <p>No hidden fees. Start with the right package and scale as your legal operations expand.</p>
+  <main id="main-content" x-data="{ annual: false, users: 8, hours: 18, rate: 3500 }">
+    <!-- Dark pricing plans (reference layout) -->
+    <section class="section pricing-plans-section" id="plans">
+      <div class="container">
+        <div class="dark-pricing-head" data-aos="fade-up">
+          <h1>Our Pricing Plan</h1>
+          <p>Run your entire legal practice on one platform with a 30-day free trial. No credit card required.</p>
         </div>
-        <div class="hero-split-media">
-          <img src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=1000&auto=format&q=80" alt="Financial planning and legal billing analytics">
-          <span class="hero-chip chip-a">Predictable monthly costs</span>
-          <span class="hero-chip chip-b">14-day free trial</span>
+
+        <div class="billing-toggle dark-billing-toggle" data-aos="fade-up">
+          <span :class="{ active: !annual }">Monthly</span>
+          <button type="button" @click="annual = !annual" class="switch" aria-label="Toggle annual billing">
+            <span :class="{ on: annual }"></span>
+          </button>
+          <span :class="{ active: annual }">Annual</span>
+          <small x-show="annual" x-transition>Save 2 months</small>
+        </div>
+
+        <div class="dark-pricing-grid">
+          <article class="dark-plan-card plan-theme-purple" data-aos="fade-up">
+            <div class="dark-plan-head">
+              <h3>Starter</h3>
+              <span class="dark-plan-price" x-text="annual ? 'KES 49K/yr' : 'KES 4,900/mo'">KES 4,900/mo</span>
+            </div>
+            <p class="dark-plan-desc">Built for solo practitioners looking to streamline their workflow.</p>
+            <a href="/contact" class="dark-plan-btn">Get Started</a>
+            <div class="dark-plan-includes">
+              <h4>Includes</h4>
+              <ul>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Up to 3 users</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Matter &amp; document core</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Court calendar &amp; reminders</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Basic invoicing</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Email support</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="dark-plan-card plan-theme-blue" data-aos="fade-up" data-aos-delay="80">
+            <div class="dark-plan-head">
+              <h3>Professional</h3>
+              <span class="dark-plan-price" x-text="annual ? 'KES 99K/yr' : 'KES 9,900/mo'">KES 9,900/mo</span>
+            </div>
+            <p class="dark-plan-desc">Built for growing firms looking for more control, billing, and client transparency.</p>
+            <a href="/contact" class="dark-plan-btn">Get Started</a>
+            <div class="dark-plan-includes">
+              <h4>Includes</h4>
+              <ul>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Up to 25 users</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Everything in Starter</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Billing engine &amp; client portal</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Analytics dashboards</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Audit trail &amp; access control</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Priority support</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="dark-plan-card plan-theme-teal" data-aos="fade-up" data-aos-delay="160">
+            <div class="dark-plan-head">
+              <h3>Firm</h3>
+              <span class="dark-plan-price">Custom</span>
+            </div>
+            <p class="dark-plan-desc">Built for large firms looking for enterprise security, scale, and customization.</p>
+            <a href="/contact" class="dark-plan-btn">Get Started</a>
+            <div class="dark-plan-includes">
+              <h4>Includes</h4>
+              <ul>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Unlimited users</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Everything in Professional</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> SSO &amp; advanced audit</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Custom integrations</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Dedicated success manager</li>
+                <li><i class="ph ph-check" aria-hidden="true"></i> Premium support &amp; SLAs</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+
+        <p class="dark-pricing-note">All plans include 256-bit encryption, daily backups, and LSK-aligned compliance controls.</p>
+      </div>
+    </section>
+
+    <!-- Always included -->
+    <section class="section pricing-included">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Every plan includes</p>
+          <h2>No nickel-and-diming</h2>
+          <p>Core platform capabilities come standard &mdash; you pay for scale, not basic features held hostage.</p>
+        </div>
+        <div class="included-grid">
+          <article class="included-card" data-aos="fade-up">
+            <i class="ph ph-graduation-cap"></i>
+            <div>
+              <h3>Guided onboarding</h3>
+              <p>Workflow mapping, role setup, and matter templates to get your team live in weeks, not months.</p>
+            </div>
+          </article>
+          <article class="included-card" data-aos="fade-up" data-aos-delay="60">
+            <i class="ph ph-shield-check"></i>
+            <div>
+              <h3>Enterprise security</h3>
+              <p>TLS 1.2+ in transit, AES-256 at rest, daily backups, and role-based access on every plan.</p>
+            </div>
+          </article>
+          <article class="included-card" data-aos="fade-up" data-aos-delay="120">
+            <i class="ph ph-device-mobile"></i>
+            <div>
+              <h3>Mobile-ready access</h3>
+              <p>Full responsive web app for advocates checking matters in court or on the move.</p>
+            </div>
+          </article>
+          <article class="included-card" data-aos="fade-up">
+            <i class="ph ph-arrows-clockwise"></i>
+            <div>
+              <h3>Free plan upgrades</h3>
+              <p>Move between Starter and Professional anytime. Pay only the difference, prorated fairly.</p>
+            </div>
+          </article>
+          <article class="included-card" data-aos="fade-up" data-aos-delay="60">
+            <i class="ph ph-export"></i>
+            <div>
+              <h3>Data portability</h3>
+              <p>Export all your matters, clients, and documents if you ever leave. Your data stays yours.</p>
+            </div>
+          </article>
+          <article class="included-card" data-aos="fade-up" data-aos-delay="120">
+            <i class="ph ph-headset"></i>
+            <div>
+              <h3>Human support</h3>
+              <p>Real people who understand legal workflows &mdash; not chatbots reading from a script.</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
-    <section class="section">
-      <div class="container">
-        <div class="finance-kpi-strip">
-          <article><p>Average billing cycle improvement</p><strong>+32%</strong></article>
-          <article><p>Reduction in invoice disputes</p><strong>-41%</strong></article>
-          <article><p>Collection time saved monthly</p><strong>18 hrs</strong></article>
-          <article><p>Firms on annual plan</p><strong>64%</strong></article>
-        </div>
 
-        <div class="billing-toggle">
-          <span :class="{active: !annual}">Monthly</span>
-          <button @click="annual=!annual" class="switch" aria-label="Toggle annual billing"><span :class="{on: annual}"></span></button>
-          <span :class="{active: annual}">Annual</span>
-          <small x-show="annual">Save 2 months</small>
-        </div>
-        <div class="pricing-grid">
-          <article class="price-card">
-            <p class="plan-chip">SOLO</p>
-            <h3>Solo practitioners</h3>
-            <p class="for">Lean setup for independent advocates</p>
-            <p class="price" data-price x-text="annual ? 'KES 45,000/yr' : 'KES 4,500/mo'">KES 4,500/mo</p>
-            <p class="price-sub">Approx. KES 150/day for full legal ops control</p>
-            <ul><li>1 user</li><li>10GB storage</li><li>Matter tracking</li><li>Document vault</li><li>Basic invoices</li></ul>
-            <a class="btn btn-outline" href="/contact">Get Started</a>
-          </article>
-          <article class="price-card featured">
-            <p class="popular">Most Popular</p>
-            <p class="plan-chip">FIRM</p>
-            <h3>Growing firms (up to 10 users)</h3>
-            <p class="for">Best value for collaborative legal teams</p>
-            <p class="price" data-price x-text="annual ? 'KES 140,000/yr' : 'KES 14,000/mo'">KES 14,000/mo</p>
-            <p class="price-sub">Approx. KES 47/day per user at full team capacity</p>
-            <ul><li>Everything in Solo</li><li>Client portal</li><li>Audit trail</li><li>Role access control</li><li>100GB storage</li><li>Priority support</li></ul>
-            <a class="btn btn-primary" href="/contact">Get Started</a>
-          </article>
-          <article class="price-card">
-            <p class="plan-chip">ENTERPRISE</p>
-            <h3>Large firms & legal departments</h3>
-            <p class="for">Custom architecture for scale and governance</p>
-            <p class="price">Custom</p>
-            <p class="price-sub">Tailored pricing based on users, data, and integration scope</p>
-            <ul><li>Unlimited users</li><li>SLA guarantee</li><li>Custom integrations</li><li>Dedicated onboarding</li><li>Data migration</li></ul>
-            <a class="btn btn-outline" href="/contact">Contact Sales</a>
-          </article>
-        </div>
-        <div class="feature-detail">
-          <article>
-            <h3>Implementation included</h3>
-            <p>Every paid plan includes guided onboarding with workflow mapping so your team adopts the platform quickly and confidently.</p>
-            <ul>
-              <li>Migration checklist and setup plan</li>
-              <li>Role mapping for legal and support teams</li>
-              <li>Best-practice templates for common matter types</li>
-            </ul>
-          </article>
-          <article>
-            <h3>Designed for legal ROI</h3>
-            <p>The value is not just software access; it is faster legal delivery, cleaner records, and stronger billing discipline firm-wide.</p>
-            <ul>
-              <li>Reduced admin overhead and duplicated effort</li>
-              <li>Improved collection cycle and invoice accuracy</li>
-              <li>Better client transparency and responsiveness</li>
-            </ul>
-          </article>
-        </div>
-        <p class="pricing-note">All plans include 14-day trial access, implementation guidance, and transparent upgrade paths.</p>
-      </div>
-    </section>
-
-    <section class="section section-alt">
+    <!-- Comparison matrix -->
+    <section class="section pricing-matrix-section">
       <div class="container">
-        <div class="section-head">
-          <p class="eyebrow">PLAN COMPARISON</p>
-          <h2>Compare capabilities before you commit</h2>
-          <p>A quick matrix to evaluate legal operations depth, finance controls, and governance readiness across all plans.</p>
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Compare plans</p>
+          <h2>Capability breakdown</h2>
+          <p>See exactly what each tier unlocks before you commit.</p>
         </div>
-        <div class="pricing-matrix-wrap">
+        <div class="pricing-matrix-wrap" data-aos="fade-up">
           <table class="pricing-matrix">
             <thead>
               <tr>
-                <th>Capability</th>
-                <th>Solo</th>
-                <th>Firm</th>
-                <th>Enterprise</th>
+                <th scope="col">Capability</th>
+                <th scope="col">Starter</th>
+                <th scope="col">Professional</th>
+                <th scope="col">Firm</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td>Matter lifecycle tracking</td><td>Basic</td><td>Advanced</td><td>Advanced + custom workflows</td></tr>
-              <tr><td>Document version control</td><td>Standard</td><td>Full controls</td><td>Full + policy templates</td></tr>
-              <tr><td>Client portal access</td><td>-</td><td>Included</td><td>Included + white-label options</td></tr>
-              <tr><td>Billing + aging analytics</td><td>Basic invoices</td><td>Full billing engine</td><td>Enterprise finance insights</td></tr>
-              <tr><td>Role-based permissions</td><td>Limited</td><td>Role-level controls</td><td>Granular governance model</td></tr>
-              <tr><td>Onboarding support</td><td>Guided setup</td><td>Priority onboarding</td><td>Dedicated implementation team</td></tr>
-              <tr><td>Support SLA</td><td>Business hours</td><td>Priority support</td><td>Custom SLA guarantees</td></tr>
+              <tr>
+                <td>Matter lifecycle tracking</td>
+                <td>Core workflows</td>
+                <td>Advanced + templates</td>
+                <td>Custom workflows</td>
+              </tr>
+              <tr>
+                <td>Document version control</td>
+                <td><span class="matrix-check">✓</span> Standard</td>
+                <td><span class="matrix-check">✓</span> Full controls</td>
+                <td><span class="matrix-check">✓</span> Policy templates</td>
+              </tr>
+              <tr>
+                <td>Client portal</td>
+                <td><span class="matrix-dash">—</span></td>
+                <td><span class="matrix-check">✓</span> Included</td>
+                <td><span class="matrix-check">✓</span> White-label</td>
+              </tr>
+              <tr>
+                <td>Billing &amp; aging analytics</td>
+                <td>Basic invoices</td>
+                <td>Full billing engine</td>
+                <td>Enterprise finance</td>
+              </tr>
+              <tr>
+                <td>Role-based permissions</td>
+                <td>Basic roles</td>
+                <td>Full RBAC</td>
+                <td>Granular governance</td>
+              </tr>
+              <tr>
+                <td>Analytics dashboards</td>
+                <td><span class="matrix-dash">—</span></td>
+                <td><span class="matrix-check">✓</span></td>
+                <td><span class="matrix-check">✓</span> Custom reports</td>
+              </tr>
+              <tr>
+                <td>Support SLA</td>
+                <td>Business hours</td>
+                <td>Priority</td>
+                <td>Custom guarantee</td>
+              </tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <section class="section">
+    <!-- ROI calculator -->
+    <section class="section roi-section" id="roi-calculator">
       <div class="container roi-wrap">
-        <div class="section-head">
-          <p class="eyebrow">ROI CALCULATOR</p>
-          <h2>Estimate monthly value from reduced admin time</h2>
-          <p>Use your team assumptions to estimate the financial impact of workflow automation and cleaner legal operations.</p>
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">ROI Calculator</p>
+          <h2>What is your admin time worth?</h2>
+          <p>Slide the assumptions to estimate how much billable value your firm recovers each month.</p>
         </div>
-        <div class="roi-grid">
+        <div class="roi-grid" data-aos="fade-up">
           <article class="roi-card">
             <label>Team users
-              <input type="range" min="1" max="40" x-model.number="users">
+              <input type="range" min="1" max="40" x-model.number="users" aria-label="Number of team users">
               <strong><span x-text="users"></span> users</strong>
             </label>
-            <label>Hours saved per user/month
-              <input type="range" min="4" max="40" x-model.number="hours">
+            <label>Hours saved per user / month
+              <input type="range" min="4" max="40" x-model.number="hours" aria-label="Hours saved per user per month">
               <strong><span x-text="hours"></span> hrs</strong>
             </label>
             <label>Average billable value per hour (KES)
-              <input type="range" min="1000" max="10000" step="500" x-model.number="rate">
+              <input type="range" min="1000" max="10000" step="500" x-model.number="rate" aria-label="Billable rate per hour in KES">
               <strong>KES <span x-text="rate.toLocaleString()"></span></strong>
             </label>
           </article>
@@ -202,15 +308,105 @@
             <ul>
               <li>Less manual follow-up on hearings and documents</li>
               <li>Faster billing cycles and cleaner collections</li>
-              <li>More advocate time available for billable legal work</li>
+              <li>More advocate time for billable legal work</li>
             </ul>
           </article>
         </div>
       </div>
     </section>
+
+    <!-- Pricing FAQ -->
+    <section class="section pricing-faq" id="pricing-faq">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Pricing FAQ</p>
+          <h2>Common billing questions</h2>
+        </div>
+        <div class="faq-list" data-aos="fade-up">
+          <details>
+            <summary>Is there really a free trial? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Yes. Every plan includes a 30-day free trial with full access to the features in your chosen tier. No credit card required to start.</p>
+          </details>
+          <details>
+            <summary>Can I switch between monthly and annual billing? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Absolutely. Switch anytime from your billing settings. Annual plans save the equivalent of two months compared to monthly billing.</p>
+          </details>
+          <details>
+            <summary>What happens when I add more users? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Additional users are charged at your plan&rsquo;s per-user rate, prorated for the remainder of your billing period. If you outgrow a tier, we&rsquo;ll help you upgrade smoothly.</p>
+          </details>
+          <details>
+            <summary>Do you charge for data migration? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Starter and Professional plans include guided onboarding. Enterprise Firm plans include a dedicated migration team for bulk matter, client, and document imports.</p>
+          </details>
+          <details>
+            <summary>What if I need to cancel? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Cancel anytime. You keep access until the end of your billing period and can export all your data before your account closes.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="pricing-cta section" id="pricing-cta">
+      <div class="container" data-aos="fade-up">
+        <h2>Ready to run a tighter ship?</h2>
+        <p>Start your free trial today or book a walkthrough with our team to find the right plan for your firm.</p>
+        <div class="hero-ctas">
+          <a href="/contact" class="btn btn-primary">Start free trial</a>
+          <a href="/features" class="btn btn-secondary">Explore features</a>
+        </div>
+        <small>No credit card &middot; No setup fee &middot; Cancel anytime</small>
+      </div>
+    </section>
   </main>
-  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/features">Features</a><a href="/security">Security</a><a href="/contact">Contact</a></div></div></footer>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
+        <p>Building the future of legal practice in Africa.</p>
+        <div class="socials">
+          <a href="#" aria-label="LinkedIn"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="#" aria-label="X / Twitter"><i class="ph ph-x-logo"></i></a>
+          <a href="#" aria-label="Facebook"><i class="ph ph-facebook-logo"></i></a>
+        </div>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <a href="/platform">Platform</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/security">Security</a>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <a href="/contact">Contact</a>
+        <a href="#pricing-faq">Pricing FAQ</a>
+        <a href="/client_login">Client Login</a>
+        <a href="/login">Employee Login</a>
+      </div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <p>Monthly product updates &amp; legal-tech insights for East African firms.</p>
+        <form class="newsletter" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';">
+          <label for="newsletter-email" class="skip-link">Email address</label>
+          <input id="newsletter-email" type="email" placeholder="you@firm.co.ke" required>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container bottom-wrap">
+        <p>&copy; 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <div>
+          <a href="/security">Privacy</a>
+          <a href="/security">Terms</a>
+          <a href="/contact">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
   <script type="module" src="/static/main.js"></script>
 </body>
 </html>
-

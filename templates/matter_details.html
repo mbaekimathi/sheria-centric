@@ -5,11 +5,152 @@
 {% block content %}
 <style>
     .matter-page { background: linear-gradient(160deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%); min-height: 100%; }
-    .matter-header-card {
-        background: linear-gradient(135deg, #2563eb 0%, #4f46e5 50%, #6366f1 100%);
-        border-radius: 1rem; box-shadow: 0 10px 40px rgba(37, 99, 235, 0.25);
-        border-left: 4px solid rgba(255,255,255,0.3);
+    .matter-hero-card {
+        position: relative;
+        border-radius: 0.875rem;
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.22);
+        overflow: hidden;
+        background: linear-gradient(135deg, #1d4ed8 0%, #4f46e5 45%, #6366f1 100%);
+        color: #ffffff;
+        animation: matterHeroIn 0.4s ease both;
     }
+    .matter-hero-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+            radial-gradient(circle at 85% 15%, rgba(255,255,255,0.16) 0, transparent 30%),
+            radial-gradient(circle at 10% 90%, rgba(255,255,255,0.08) 0, transparent 35%);
+        pointer-events: none;
+    }
+    .matter-hero-card > * { position: relative; z-index: 1; }
+    .matter-hero-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        align-items: center;
+    }
+    @media (min-width: 900px) {
+        .matter-hero-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; }
+    }
+    .hero-back-btn {
+        flex-shrink: 0;
+        width: 1.875rem; height: 1.875rem;
+        border-radius: 0.5rem;
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(8px);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff;
+        transition: background 0.18s ease, transform 0.18s ease;
+        border: 1px solid rgba(255,255,255,0.18);
+    }
+    .hero-back-btn:hover { background: rgba(255,255,255,0.28); transform: translateX(-2px); }
+    .hero-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        line-height: 1.15;
+        letter-spacing: -0.01em;
+        display: flex; align-items: center; gap: 0.45rem;
+    }
+    @media (min-width: 640px) { .hero-title { font-size: 1.35rem; } }
+    .hero-meta-list {
+        display: flex; flex-wrap: wrap; align-items: center;
+        gap: 0.35rem 0.65rem;
+        margin-top: 0.4rem;
+    }
+    .hero-meta-row {
+        display: inline-flex; align-items: center; gap: 0.35rem;
+        font-size: 0.75rem;
+    }
+    .hero-meta-label {
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.65);
+    }
+    .hero-meta-value {
+        font-weight: 600;
+        color: #ffffff;
+        font-size: 0.8125rem;
+    }
+    .hero-meta-sep {
+        width: 3px; height: 3px; border-radius: 9999px;
+        background: rgba(255,255,255,0.35);
+    }
+    .hero-status-pill {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.6875rem; font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #ffffff;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    }
+    .hero-status-dot {
+        width: 6px; height: 6px; border-radius: 9999px;
+        background: rgba(255,255,255,0.9);
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+        animation: matterPulse 1.8s ease infinite;
+    }
+    .hero-client-panel {
+        background: #ffffff;
+        color: #1e293b;
+        border-radius: 0.75rem;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+        border: 1px solid rgba(255,255,255,0.6);
+        animation: matterPanelIn 0.45s ease 0.08s both;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .hero-client-panel:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18);
+    }
+    .hero-eyebrow-dark {
+        font-size: 0.625rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #4f46e5;
+    }
+    .hero-avatar-ring {
+        padding: 2px;
+        border-radius: 9999px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+        display: inline-flex;
+        flex-shrink: 0;
+        box-shadow: 0 3px 8px rgba(99, 102, 241, 0.22);
+        transition: transform 0.25s ease;
+    }
+    .hero-client-panel:hover .hero-avatar-ring { transform: scale(1.05); }
+    .hero-avatar {
+        width: 2.75rem; height: 2.75rem;
+        border-radius: 9999px;
+        object-fit: cover;
+        border: 2px solid #ffffff;
+        background: #ffffff;
+    }
+    .hero-avatar-fallback {
+        width: 2.75rem; height: 2.75rem;
+        border-radius: 9999px;
+        display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%);
+        color: #fff; font-size: 0.9375rem; font-weight: 700;
+        border: 2px solid #fff;
+    }
+    .hero-contact-chip {
+        display: inline-flex; align-items: center; gap: 0.375rem;
+        padding: 0.25rem 0.5rem;
+        background: #f8fafc;
+        border: 1px solid #eef2f7;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        color: #334155;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        max-width: 100%;
+    }
+    .hero-contact-chip:hover { background: #f1f5ff; border-color: #c7d2fe; }
+    .hero-contact-chip i { color: #6366f1; font-size: 0.6875rem; }
     .matter-card {
         background: #ffffff;
         border-radius: 1rem;
@@ -17,16 +158,32 @@
         border: 1px solid rgba(226, 232, 240, 0.8);
         border-left: 4px solid #4f46e5;
     }
-    .matter-card.client-card { border-left-color: #8b5cf6; }
     .matter-card.info-card { border-left-color: #3b82f6; }
     .matter-card.instructions-card { border-left-color: #06b6d4; }
     .matter-card.documents-card { border-left-color: #f59e0b; }
     .matter-label { color: #64748b; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
     .matter-value { color: #1e293b; font-size: 0.9375rem; font-weight: 600; }
     .doc-row:hover { background: #fffbeb !important; }
+    @keyframes matterHeroIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes matterPanelIn {
+        from { opacity: 0; transform: translateY(6px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes matterPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .matter-hero-card, .hero-client-panel, .hero-status-dot, .hero-avatar-ring {
+            animation: none !important; transition: none !important;
+        }
+    }
 </style>
 
-<div class="matter-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+<div class="matter-page max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
     {% if pending_accept %}
     <!-- Pending Accept: user must accept before viewing full matter -->
     <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl border border-blue-200 p-6 mb-6 text-white">
@@ -62,7 +219,7 @@
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.success) {
-                    window.location.href = '/other_matters/' + matterId;
+                    window.location.href = '/non_litigation_matters/' + matterId;
                 } else {
                     scAlert(data.error || 'Failed to accept matter');
                     btn.disabled = false;
@@ -77,88 +234,112 @@
     }
     </script>
     {% else %}
-    <!-- Page Header -->
-    <div class="matter-header-card p-5 sm:p-6 mb-6 text-white">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div class="flex items-center gap-4">
-                {% if is_client %}
-                <a href="{{ url_for('client_document_type', document_type='CLIENT_OTHER_MATTERS') }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back">
-                    <i class="fas fa-arrow-left"></i>
-                </a>
-                {% else %}
-                <a href="{{ url_for('other_matters') }}" class="flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors" title="Back to matters">
-                    <i class="fas fa-arrow-left"></i>
-                </a>
-                {% endif %}
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold mb-1 flex items-center gap-2">
-                        <i class="fas fa-folder-open opacity-90"></i>
+    {% set status_colors = {
+        'Open': 'bg-emerald-500',
+        'In Progress': 'bg-blue-500',
+        'Pending Client': 'bg-amber-500',
+        'Completed': 'bg-slate-500',
+        'On Hold': 'bg-orange-500',
+        'Closed': 'bg-red-500',
+        'Pending Approval': 'bg-purple-500'
+    } %}
+
+    <!-- Combined Matter + Client profile -->
+    <div class="matter-hero-card px-4 py-3 sm:px-5 sm:py-3.5 mb-4">
+        <div class="matter-hero-grid">
+            <div class="flex flex-col min-w-0">
+                <div class="flex items-center gap-2.5">
+                    {% if is_client %}
+                    <a href="{{ url_for('client_document_type', document_type='CLIENT_OTHER_MATTERS') }}" class="hero-back-btn" title="Back" aria-label="Back">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('other_matters') }}" class="hero-back-btn" title="Back to matters" aria-label="Back to matters">
+                        <i class="fas fa-arrow-left text-xs"></i>
+                    </a>
+                    {% endif %}
+                    <h1 class="hero-title">
+                        <i class="fas fa-folder-open opacity-90 text-base"></i>
                         Matter Details
                     </h1>
-                    <p class="text-white/90 text-sm sm:text-base">Reference: <span class="font-semibold">{{ matter_data.matter_reference_number }}</span></p>
+                </div>
+                <div class="hero-meta-list">
+                    <span class="hero-meta-row">
+                        <span class="hero-meta-label">Reference</span>
+                        <span class="hero-meta-value">{{ matter_data.matter_reference_number or '—' }}</span>
+                    </span>
+                    {% if matter_data.matter_title %}
+                    <span class="hero-meta-sep"></span>
+                    <span class="hero-meta-row min-w-0">
+                        <span class="hero-meta-label">Title</span>
+                        <span class="hero-meta-value truncate max-w-[14rem] sm:max-w-xs">{{ matter_data.matter_title }}</span>
+                    </span>
+                    {% endif %}
+                    <span class="hero-meta-sep"></span>
+                    <span class="hero-status-pill {{ status_colors.get(matter_data.status, 'bg-slate-500') }}">
+                        <span class="hero-status-dot"></span>
+                        {{ matter_data.status or 'N/A' }}
+                    </span>
                 </div>
             </div>
-            {% set status_colors = {
-                'Open': 'bg-emerald-500/90',
-                'In Progress': 'bg-blue-500/90',
-                'Pending Client': 'bg-amber-500/90',
-                'Completed': 'bg-slate-500/90',
-                'On Hold': 'bg-orange-500/90',
-                'Closed': 'bg-red-500/90',
-                'Pending Approval': 'bg-purple-500/90'
-            } %}
-            <span class="px-4 py-2 rounded-lg text-white text-sm font-semibold {{ status_colors.get(matter_data.status, 'bg-slate-500/90') }} sm:self-center">
-                {{ matter_data.status or 'N/A' }}
-            </span>
-        </div>
-    </div>
 
-    <!-- Client Profile Card -->
-    {% if matter_data.client_table_id %}
-    <div class="matter-card client-card p-5 sm:p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
-            <div class="flex-shrink-0">
-                {% if matter_data.client_profile_picture %}
-                    {% set _client_pic = (matter_data.client_profile_picture or '')|trim %}
-                    {% if _client_pic.startswith('http://') or _client_pic.startswith('https://') %}
-                    <img src="{{ _client_pic }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='uploads/profile_pictures/' + _client_pic) }}" alt="Client" class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-indigo-100 shadow-md">
-                    {% endif %}
-                {% else %}
-                <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl sm:text-3xl font-bold border-2 border-indigo-100 shadow-md">
-                    {{ (matter_data.client_full_name or matter_data.client_name or 'C')[0] }}
+            {% if matter_data.client_table_id %}
+            <div class="hero-client-panel px-3.5 py-3 sm:px-4 sm:py-3">
+                <div class="flex items-center gap-3">
+                    <div class="hero-avatar-ring">
+                        {% if matter_data.client_profile_picture %}
+                            {% set _client_pic = (matter_data.client_profile_picture or '')|trim %}
+                            {% if _client_pic.startswith('http://') or _client_pic.startswith('https://') %}
+                            <img src="{{ _client_pic }}" alt="{{ matter_data.client_full_name or matter_data.client_name }}" class="hero-avatar">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + _client_pic) }}" alt="{{ matter_data.client_full_name or matter_data.client_name }}" class="hero-avatar">
+                            {% endif %}
+                        {% else %}
+                        <div class="hero-avatar-fallback">
+                            {{ (matter_data.client_full_name or matter_data.client_name or 'C')[0]|upper }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                            <span class="hero-eyebrow-dark">Client</span>
+                            {% if matter_data.client_status %}
+                            <span class="inline-flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider
+                                {% if matter_data.client_status == 'Active' %}text-emerald-600{% else %}text-slate-500{% endif %}">
+                                <i class="fas fa-circle text-[5px]"></i>{{ matter_data.client_status }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <h2 class="text-sm sm:text-base font-bold text-gray-900 truncate leading-tight">{{ matter_data.client_full_name or matter_data.client_name or 'N/A' }}</h2>
+                        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span class="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9.5px] font-bold uppercase tracking-wider">{{ matter_data.client_type or 'N/A' }}</span>
+                            {% if matter_data.client_phone_number or matter_data.client_phone %}
+                            <a href="tel:{{ matter_data.client_phone_number or matter_data.client_phone }}" class="hero-contact-chip hover:no-underline">
+                                <i class="fas fa-phone"></i><span class="truncate">{{ matter_data.client_phone_number or matter_data.client_phone }}</span>
+                            </a>
+                            {% endif %}
+                            {% if matter_data.client_email %}
+                            <a href="mailto:{{ matter_data.client_email }}" class="hero-contact-chip hover:no-underline">
+                                <i class="fas fa-envelope"></i><span class="truncate">{{ matter_data.client_email }}</span>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
             </div>
-            <div class="flex-1 min-w-0">
-                <h2 class="text-xl font-bold text-gray-900 mb-1">{{ matter_data.client_full_name or matter_data.client_name or 'N/A' }}</h2>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-                    {% if matter_data.client_phone_number or matter_data.client_phone %}
-                    <span class="flex items-center gap-1.5"><i class="fas fa-phone text-indigo-500 text-xs"></i>{{ matter_data.client_phone_number or matter_data.client_phone }}</span>
-                    {% endif %}
-                    {% if matter_data.client_email %}
-                    <span class="flex items-center gap-1.5 truncate"><i class="fas fa-envelope text-indigo-500 text-xs"></i>{{ matter_data.client_email }}</span>
-                    {% endif %}
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                    <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-xs font-semibold">{{ matter_data.client_type or 'N/A' }} Client</span>
-                    {% if matter_data.client_status %}
-                    <span class="px-3 py-1 rounded-lg text-xs font-medium {{ 'bg-emerald-100 text-emerald-800' if matter_data.client_status == 'Active' else 'bg-slate-100 text-slate-700' }}">{{ matter_data.client_status }}</span>
-                    {% endif %}
+            {% else %}
+            <div class="hero-client-panel px-3.5 py-3 sm:px-4 sm:py-3">
+                <div class="flex items-center gap-2.5 text-slate-500">
+                    <i class="fas fa-user-slash text-slate-300 text-lg"></i>
+                    <div class="min-w-0">
+                        <p class="hero-eyebrow-dark">Client</p>
+                        <p class="text-xs text-gray-600">Not linked to this matter.</p>
+                    </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
-    {% else %}
-    <div class="matter-card p-5 sm:p-6 mb-6">
-        <div class="text-center py-8">
-            <i class="fas fa-user-slash text-slate-300 text-4xl mb-3 block"></i>
-            <p class="text-gray-600 font-semibold">Client information not available</p>
-            <p class="text-gray-500 text-sm mt-1">No client linked to this matter.</p>
-        </div>
-    </div>
-    {% endif %}
 
     <!-- Matter Information -->
     <div class="matter-card info-card p-5 sm:p-6 mb-6">
@@ -259,7 +440,7 @@
     const matterDocVerify = createDocumentActionVerify({
         apiBase: '/api/matter/' + matterId + '/document',
         downloadUrlBuilder: function (fileId, token) {
-            return '/other_matters/' + matterId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
+            return '/non_litigation_matters/' + matterId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
         },
         deleteUrlBuilder: function (fileId) {
             return '/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete';

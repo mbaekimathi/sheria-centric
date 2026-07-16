@@ -1,0 +1,934 @@
+{% extends "base.html" %}
+
+{% block title %}Matter Attendance - SHERIA CENTRIC{% endblock %}
+
+{% block content %}
+<style>
+.proceedings-page {
+    width: 100%;
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0.5rem;
+    min-height: 100vh;
+    background: linear-gradient(160deg, #f1f5f9 0%, #e2e8f0 50%, #f8fafc 100%);
+    box-sizing: border-box;
+}
+@media (min-width: 640px) { .proceedings-page { padding: 0.875rem; } }
+@media (min-width: 1024px) { .proceedings-page { padding: 1.125rem; } }
+@media (min-width: 1280px) { .proceedings-page { padding: 1.25rem; max-width: 84rem; } }
+
+.proc-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 4px -1px rgba(0,0,0,.05), 0 1px 2px -1px rgba(0,0,0,.04);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+.proc-form-card {
+    background: linear-gradient(to bottom, #ffffff 0%, #fafbfc 100%);
+    border-radius: 0.75rem;
+    box-shadow: 0 6px 14px -4px rgba(30, 41, 59, .08), 0 3px 6px -4px rgba(15, 23, 42, .06);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+}
+.proc-primary-grid {
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 65%);
+    border: 1px solid #cbd5e1;
+    border-radius: 0.625rem;
+    padding: 0.625rem;
+}
+@media (min-width: 640px) { .proc-primary-grid { padding: 0.75rem; border-radius: 0.75rem; } }
+
+.proc-section-card {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.625rem;
+    padding: 0.625rem;
+}
+@media (min-width: 640px) { .proc-section-card { padding: 0.75rem; border-radius: 0.75rem; } }
+@media (min-width: 1024px) { .proc-section-card { padding: 0.875rem; } }
+
+.proc-auto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 0.5rem;
+}
+@media (min-width: 640px) { .proc-auto-grid { gap: 0.625rem; } }
+
+.proc-grid-full { grid-column: 1 / -1; }
+
+.proc-row-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+}
+@media (min-width: 640px) { .proc-row-grid { grid-template-columns: 1fr 1fr; gap: 0.625rem; } }
+@media (min-width: 1024px) { .proc-row-grid { grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; } }
+
+.proc-no-overflow { min-width: 0; }
+
+.proc-input,
+input.proc-input,
+select.proc-input,
+textarea.proc-input {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.4375rem 0.625rem;
+    border: 1px solid #64748b;
+    border-radius: 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    background: #fefefe !important;
+    color: #1e293b !important;
+    box-shadow: inset 0 1px 1px rgba(148, 163, 184, 0.18);
+    box-sizing: border-box;
+}
+@media (min-width: 640px) {
+    .proc-input,
+    input.proc-input,
+    select.proc-input,
+    textarea.proc-input {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+}
+textarea.proc-input { resize: vertical; min-height: 3.75rem; }
+select.proc-input {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+    padding-right: 1.875rem;
+    -webkit-appearance: none;
+    appearance: none;
+}
+.proc-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), inset 0 1px 1px rgba(148, 163, 184, 0.1);
+}
+.proc-label {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.25rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+@media (min-width: 640px) {
+    .proc-label { font-size: 0.75rem; margin-bottom: 0.3125rem; }
+}
+
+.proc-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.proc-header-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-left: 3px solid #6366f1;
+}
+.proc-h1 { font-size: clamp(1rem, 1.8vw, 1.375rem); line-height: 1.2; }
+.proc-h2 { font-size: clamp(0.9375rem, 1.4vw, 1.125rem); line-height: 1.25; }
+.proc-h3 { font-size: clamp(0.875rem, 1.2vw, 1rem); line-height: 1.3; }
+.proc-dropdown { max-height: 12rem; }
+.proc-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.proc-actions > button { flex: 1 1 100%; }
+@media (min-width: 480px) {
+    .proc-actions > button { flex: 0 1 auto; min-width: 8rem; }
+}
+.proc-btn-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 0.4375rem;
+    line-height: 1;
+}
+
+@media (max-width: 767px) {
+    .proc-table-wrap table { display: none !important; }
+    .proc-mobile-cards .proc-mobile-card {
+        background: #fff;
+        border-radius: 0.625rem;
+        border: 1px solid #e2e8f0;
+        padding: 0.625rem;
+        margin-bottom: 0.5rem;
+    }
+    .proc-mobile-cards .proc-mobile-card .proc-mobile-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.375rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .proc-mobile-cards .proc-mobile-card .proc-mobile-row:last-child { border-bottom: none; }
+}
+@media (min-width: 768px) { .proc-mobile-cards { display: none !important; } }
+</style>
+
+<div class="proceedings-page">
+    <div class="proc-card proc-form-card proc-header-card p-2.5 sm:p-4 md:p-5 mb-2.5 sm:mb-4">
+        <div class="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-gray-100">
+            <a href="{{ url_for('matter_details', matter_id=matter_id) }}"
+               class="flex-shrink-0 inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+               aria-label="Back">
+                <i class="fas fa-arrow-left text-sm"></i>
+            </a>
+            <div class="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3">
+                <h1 class="proc-h1 font-bold text-gray-900 flex items-center gap-1.5 min-w-0">
+                    <i class="fas fa-clipboard-check text-indigo-600 text-sm flex-shrink-0"></i>
+                    <span class="truncate">UPDATE MATTER ATTENDANCE</span>
+                </h1>
+                <p class="text-[11px] sm:text-xs text-gray-600 truncate sm:text-right flex-shrink-0">
+                    Ref: <span class="font-semibold text-gray-800">{{ matter_data.matter_reference_number }}</span>
+                </p>
+            </div>
+        </div>
+
+        <p class="text-[11px] sm:text-xs text-gray-500 mb-2.5 sm:mb-3 flex items-start gap-1.5">
+            <i class="fas fa-info-circle text-indigo-400 mt-0.5"></i>
+            <span>
+            {% if attendances and attendances|length > 0 %}
+            Form may be pre-filled from the latest attendance. Saving always adds a new record — past rows stay for reference.
+            {% else %}
+            Add your first matter attendance for this matter.
+            {% endif %}
+            </span>
+        </p>
+
+        <form id="attendanceForm" class="space-y-2.5 sm:space-y-3.5">
+            <div class="proc-primary-grid space-y-2.5 sm:space-y-3">
+                <div class="proc-auto-grid">
+                    <div class="proc-no-overflow">
+                        <label for="activity_type" class="proc-label">Activity Type</label>
+                        <input type="text" id="activity_type" name="activity_type" class="proc-input" placeholder="e.g. Client meeting, Filing, Follow-up" autocomplete="off" />
+                    </div>
+                    <div class="proc-no-overflow">
+                        <label for="date_of_attendance" class="proc-label">Date of Attendance</label>
+                        <input type="date" id="date_of_attendance" name="date_of_attendance" class="proc-input" required />
+                    </div>
+                </div>
+
+                <div class="border-t border-indigo-200/70"></div>
+
+                <div class="proc-auto-grid">
+                    <div class="proc-no-overflow">
+                        <label for="description" class="proc-label">Description</label>
+                        <textarea id="description" name="description" rows="3" class="proc-input" placeholder="Enter attendance description..."></textarea>
+                    </div>
+                    <div class="proc-no-overflow">
+                        <label for="next_action" class="proc-label">Next Action</label>
+                        <textarea id="next_action" name="next_action" rows="3" class="proc-input" placeholder="Enter next action..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next Attendance Section -->
+            <div class="proc-section-card" style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 60%, #f8fafc 100%); border-color: #6ee7b7;">
+                <div class="flex items-baseline gap-2 mb-2 sm:mb-2.5 flex-wrap">
+                    <h3 class="proc-h3 font-bold text-gray-900 flex items-center gap-1.5">
+                        <i class="fas fa-calendar-plus text-emerald-600 text-xs"></i>
+                        Next Attendance
+                    </h3>
+                    <span class="text-[10px] sm:text-[11px] text-gray-500">— schedule the next matter attendance</span>
+                </div>
+                <div class="proc-auto-grid">
+                    <div class="proc-no-overflow">
+                        <label for="next_activity_type" class="proc-label">Next Activity Type</label>
+                        <input type="text" id="next_activity_type" name="next_activity_type" class="proc-input uppercase"
+                            placeholder="e.g. Client meeting, Follow-up"
+                            autocomplete="off" />
+                    </div>
+                    <div class="proc-no-overflow">
+                        <label for="next_attendance_date" class="proc-label">Next Attendance Date</label>
+                        <input type="date" id="next_attendance_date" name="next_attendance_date" class="proc-input" />
+                    </div>
+                    <div class="proc-no-overflow">
+                        <label for="next_attendance" class="proc-label">Next Client Attendance</label>
+                        <select id="next_attendance" name="next_attendance" class="proc-input">
+                            <option value="">Select attendance...</option>
+                            <option value="Present">Present</option>
+                            <option value="Absent">Absent</option>
+                            <option value="Represented">Represented</option>
+                            <option value="Not Required">Not Required</option>
+                            <option value="Virtual (Represented)">Virtual (Represented)</option>
+                            <option value="Virtual (Client to Attend)">Virtual (Client to Attend)</option>
+                        </select>
+                    </div>
+                    <div id="next_attendance_link_wrap" class="proc-grid-full proc-no-overflow hidden">
+                        <label for="virtual_link" class="proc-label">
+                            Meeting Link
+                            <span id="next_attendance_link_hint" class="ml-1 text-[10px] font-normal normal-case text-emerald-700"></span>
+                        </label>
+                        <input type="url" id="virtual_link" name="virtual_link" class="proc-input" placeholder="https://meet.google.com/... or https://zoom.us/..." />
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-50/60 rounded-lg p-2.5 sm:p-3 border border-gray-200">
+                <label class="flex items-center cursor-pointer">
+                    <input
+                        type="checkbox"
+                        id="materials_required"
+                        class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 flex-shrink-0"
+                        onchange="toggleMaterialsSection()"
+                    />
+                    <span class="ml-2 text-xs sm:text-sm font-semibold text-gray-900">Bring Update</span>
+                </label>
+
+                <div id="materialsSection" class="hidden mt-2.5 space-y-2">
+                    <div id="materialsContainer"></div>
+                    <button
+                        type="button"
+                        onclick="addMaterialRow()"
+                        class="proc-btn-sm bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                    >
+                        <i class="fas fa-plus"></i>Add Item
+                    </button>
+                </div>
+            </div>
+
+            <div class="proc-actions pt-2.5 sm:pt-3 border-t border-gray-100">
+                <button
+                    type="button"
+                    onclick="resetForm()"
+                    class="px-3.5 py-2 sm:px-4 sm:py-2 bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs sm:text-sm font-semibold shadow-sm"
+                >
+                    <i class="fas fa-redo mr-1.5"></i>Reset
+                </button>
+                <button
+                    type="submit"
+                    class="px-3.5 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-md hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 text-xs sm:text-sm font-semibold shadow-sm hover:shadow"
+                >
+                    <i class="fas fa-save mr-1.5"></i>Save
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div id="previous-matter-attendances" class="proc-card p-2.5 sm:p-4 mb-2.5 sm:mb-4 scroll-mt-24 md:scroll-mt-28" tabindex="-1">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 mb-2.5 sm:mb-3.5">
+            <h2 class="proc-h2 font-bold text-gray-900 flex items-center gap-1.5 flex-wrap min-w-0">
+                <i class="fas fa-list text-indigo-600 text-xs flex-shrink-0"></i>
+                <span class="truncate">PREVIOUS MATTER ATTENDANCES</span>
+                <span class="text-green-600 text-xs">({{ attendances|length }})</span>
+            </h2>
+            <p class="text-[10px] sm:text-xs text-gray-500">Latest at the top · All records listed</p>
+        </div>
+
+        {% if attendances and attendances|length > 0 %}
+        <div class="proc-table-wrap">
+            <table class="min-w-full divide-y divide-gray-200 text-xs sm:text-[13px]">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Activity</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Description</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Next Action</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Next Date</th>
+                        <th class="px-2 py-1.5 sm:px-3 sm:py-2 text-left text-[10px] sm:text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for attendance in attendances %}
+                    <tr class="hover:bg-gray-50 transition-colors {% if attendance.is_latest == 0 %}opacity-60{% endif %}">
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
+                            {% if attendance.is_latest == 1 %}
+                            <span class="px-1.5 py-0.5 inline-flex text-[10px] font-semibold rounded-full bg-green-100 text-green-800">Current</span>
+                            {% else %}
+                            <span class="px-1.5 py-0.5 inline-flex text-[10px] font-semibold rounded-full bg-gray-100 text-gray-600">Previous</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 text-gray-900">{{ attendance.activity_type or '-' }}</td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
+                            <div class="font-semibold text-gray-900">{{ attendance.date_of_attendance or 'N/A' }}</div>
+                            <div class="text-[10px] text-gray-500">{{ attendance.created_at.split(' ')[0] if attendance.created_at else '' }}</div>
+                        </td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2">
+                            {% if attendance.description %}
+                            <div class="text-gray-900 max-w-[14rem] truncate" title="{{ attendance.description }}">{{ attendance.description }}</div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2">
+                            {% if attendance.next_action %}
+                            <div class="text-gray-900 max-w-[14rem] truncate" title="{{ attendance.next_action }}">{{ attendance.next_action }}</div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
+                            {% if attendance.next_attendance_date %}
+                            <div class="font-semibold text-emerald-700">{{ attendance.next_attendance_date }}</div>
+                            {% if attendance.next_activity_type %}
+                            <div class="text-[10px] text-gray-500 truncate max-w-[10rem]" title="{{ attendance.next_activity_type }}">{{ attendance.next_activity_type }}</div>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-2 py-1.5 sm:px-3 sm:py-2 whitespace-nowrap">
+                            <div class="flex flex-wrap items-center gap-1">
+                                <button onclick="viewAttendanceDetails({{ attendance.id }})" class="proc-btn-sm bg-blue-600 hover:bg-blue-700 text-white" title="View"><i class="fas fa-eye"></i>View</button>
+                                {% if attendance.is_latest == 1 %}
+                                <button onclick="editAttendance({{ attendance.id }})" class="proc-btn-sm bg-amber-600 hover:bg-amber-700 text-white" title="Edit this current attendance in place"><i class="fas fa-pen"></i>Edit</button>
+                                <button onclick="newFromAttendance({{ attendance.id }})" class="proc-btn-sm bg-indigo-600 hover:bg-indigo-700 text-white" title="Load into form; save adds a new row (history kept)"><i class="fas fa-copy"></i>New</button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="proc-mobile-cards mt-2 md:mt-0">
+            {% for attendance in attendances %}
+            <div class="proc-mobile-card {% if attendance.is_latest == 0 %}opacity-75{% endif %}">
+                <div class="proc-mobile-row">
+                    <span class="text-[10px] text-gray-500">Status</span>
+                    {% if attendance.is_latest == 1 %}
+                    <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-800">Current</span>
+                    {% else %}
+                    <span class="px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-gray-100 text-gray-600">Previous</span>
+                    {% endif %}
+                </div>
+                <div class="proc-mobile-row">
+                    <span class="text-[10px] text-gray-500">Activity</span>
+                    <span class="text-xs font-medium text-gray-900 text-right">{{ attendance.activity_type or '-' }}</span>
+                </div>
+                <div class="proc-mobile-row">
+                    <span class="text-[10px] text-gray-500">Date</span>
+                    <span class="text-xs font-semibold text-gray-900">{{ attendance.date_of_attendance or 'N/A' }}</span>
+                </div>
+                <div class="proc-mobile-row">
+                    <span class="text-[10px] text-gray-500">Next Date</span>
+                    <span class="text-xs font-semibold text-emerald-700">{{ attendance.next_attendance_date or '-' }}</span>
+                </div>
+                <div class="proc-mobile-row flex-wrap">
+                    <span class="text-[10px] text-gray-500 w-full mb-1">Actions</span>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button onclick="viewAttendanceDetails({{ attendance.id }})" class="proc-btn-sm bg-blue-600 hover:bg-blue-700 text-white"><i class="fas fa-eye"></i>View</button>
+                        {% if attendance.is_latest == 1 %}
+                        <button onclick="editAttendance({{ attendance.id }})" class="proc-btn-sm bg-amber-600 hover:bg-amber-700 text-white"><i class="fas fa-pen"></i>Edit</button>
+                        <button onclick="newFromAttendance({{ attendance.id }})" class="proc-btn-sm bg-indigo-600 hover:bg-indigo-700 text-white"><i class="fas fa-copy"></i>New</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 sm:py-8">
+            <i class="fas fa-inbox text-gray-300 text-3xl sm:text-4xl mb-2"></i>
+            <p class="text-gray-600 text-xs sm:text-sm">No attendances yet. Add your first attendance above.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="messageContainer" class="hidden fixed top-16 sm:top-20 right-2 left-2 sm:left-auto sm:right-4 z-50 sm:max-w-md"></div>
+
+    <div id="attendanceModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 overflow-y-auto p-2 sm:p-4 md:p-6">
+        <div class="relative mx-auto my-2 sm:my-6 md:my-10 w-full max-w-3xl border border-gray-200 shadow-xl rounded-xl bg-white max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-3rem)] flex flex-col">
+            <div class="p-3 sm:p-5 md:p-6 flex-shrink-0 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-indigo-50/40 rounded-t-xl">
+                <div class="flex items-start justify-between gap-2 sm:gap-3">
+                    <h3 class="proc-h2 font-bold text-gray-900 flex items-center flex-wrap gap-2">
+                        <i class="fas fa-clipboard-check text-indigo-600"></i>
+                        <span>Attendance details</span>
+                    </h3>
+                    <button type="button" onclick="closeAttendanceModal()" class="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0 p-1 rounded-lg hover:bg-white/80" aria-label="Close">
+                        <i class="fas fa-times text-xl sm:text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="attendanceModalContent" class="px-3 sm:px-5 md:px-6 py-3 sm:py-4 overflow-y-auto flex-1 min-h-0 space-y-3 sm:space-y-4 text-gray-800"></div>
+            <div class="px-3 sm:px-5 md:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-end flex-shrink-0 rounded-b-xl bg-gray-50/80">
+                <button type="button" onclick="closeAttendanceModal()" class="w-full sm:w-auto px-5 sm:px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base font-semibold shadow-sm">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let materialRowCount = 0;
+let editingAttendanceId = null;
+let chainFromAttendanceId = null;
+const attendancesData = {{ attendances|tojson }};
+
+function enforceUppercaseOnElement(element) {
+    if (!element || element.dataset.uppercaseBound === '1') return;
+    element.addEventListener('input', function() {
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        const upper = this.value.toUpperCase();
+        if (this.value !== upper) {
+            this.value = upper;
+            if (start !== null && end !== null) {
+                this.setSelectionRange(start, end);
+            }
+        }
+    });
+    element.dataset.uppercaseBound = '1';
+}
+
+function applyUppercaseEnforcement(scope = document) {
+    const selector = 'input[type="text"], input[type="search"], textarea';
+    scope.querySelectorAll(selector).forEach(enforceUppercaseOnElement);
+}
+
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function showMessage(message, type) {
+    const container = document.getElementById('messageContainer');
+    if (!container) return;
+    const bg = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+    container.innerHTML = `
+        <div class="${bg} text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium">
+            ${escapeHtml(message)}
+        </div>
+    `;
+    container.classList.remove('hidden');
+    setTimeout(() => container.classList.add('hidden'), 4000);
+}
+
+function setAttendanceFormMode(mode) {
+    const submitBtn = document.querySelector('#attendanceForm button[type="submit"]');
+    if (!submitBtn) return;
+    if (mode === 'edit') {
+        submitBtn.innerHTML = '<i class="fas fa-save mr-1.5"></i>Update attendance';
+    } else {
+        submitBtn.innerHTML = '<i class="fas fa-save mr-1.5"></i>Save';
+    }
+}
+
+function toggleMaterialsSection() {
+    const checkbox = document.getElementById('materials_required');
+    const section = document.getElementById('materialsSection');
+    if (checkbox.checked) {
+        section.classList.remove('hidden');
+        if (materialRowCount === 0) addMaterialRow();
+    } else {
+        section.classList.add('hidden');
+        document.getElementById('materialsContainer').innerHTML = '';
+        materialRowCount = 0;
+    }
+}
+
+function addMaterialRow() {
+    materialRowCount++;
+    const container = document.getElementById('materialsContainer');
+    const rowId = `material_${materialRowCount}`;
+    const row = document.createElement('div');
+    row.className = 'bg-white rounded-md p-2 sm:p-2.5 border border-gray-200';
+    row.id = rowId;
+    // Always allocate bring-update items to the matter's assigned employee (picker hidden)
+    const defaultAllocId = {{ matter_data.assigned_employee_id if matter_data.assigned_employee_id is not none else 'null' }};
+    const defaultAllocName = {{ (matter_data.assigned_employee_name or '')|tojson }};
+    row.innerHTML = `
+        <div class="flex items-center justify-between mb-1.5 gap-2">
+            <h4 class="text-[11px] sm:text-xs font-semibold text-gray-900">Item ${materialRowCount}</h4>
+            <button type="button" onclick="removeMaterialRow('${rowId}')" class="text-red-600 hover:text-red-800 transition-colors text-xs p-0.5 flex-shrink-0" title="Remove Item">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="proc-row-grid">
+            <div class="proc-no-overflow">
+                <label class="proc-label">Description <span class="text-red-500">*</span></label>
+                <textarea name="material_description_${materialRowCount}" rows="2" class="proc-input" placeholder="Enter item description..." required></textarea>
+            </div>
+            <div class="proc-no-overflow">
+                <label class="proc-label">Frequency to be Reminded</label>
+                <select name="material_frequency_${materialRowCount}" class="proc-input">
+                    <option value="">Select frequency...</option>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Bi-weekly">Bi-weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Once">Once</option>
+                    <option value="Custom">Custom</option>
+                </select>
+            </div>
+        </div>
+        <input type="hidden" id="material_allocated_${materialRowCount}" value="" />
+        <input type="hidden" name="material_allocated_id_${materialRowCount}" id="material_allocated_id_${materialRowCount}" value="" />
+    `;
+    container.appendChild(row);
+    const allocNameInput = document.getElementById(`material_allocated_${materialRowCount}`);
+    const allocIdInput = document.getElementById(`material_allocated_id_${materialRowCount}`);
+    if (allocNameInput) allocNameInput.value = defaultAllocName || '';
+    if (allocIdInput && defaultAllocId != null) allocIdInput.value = defaultAllocId;
+    applyUppercaseEnforcement(row);
+}
+
+function removeMaterialRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+        row.remove();
+        updateMaterialNumbers();
+    }
+}
+
+function updateMaterialNumbers() {
+    const container = document.getElementById('materialsContainer');
+    const rows = container.querySelectorAll('[id^="material_"]');
+    materialRowCount = rows.length;
+    rows.forEach((row, index) => {
+        const header = row.querySelector('h4');
+        if (header) header.textContent = `Item ${index + 1}`;
+    });
+}
+
+function collectMaterialsFromForm() {
+    const materials = [];
+    if (!document.getElementById('materials_required').checked) return materials;
+    const defaultAllocId = {{ matter_data.assigned_employee_id if matter_data.assigned_employee_id is not none else 'null' }};
+    const defaultAllocName = {{ (matter_data.assigned_employee_name or '')|tojson }};
+    document.querySelectorAll('[id^="material_"]').forEach((row) => {
+        const match = row.id.match(/material_(\d+)$/);
+        if (!match) return;
+        const num = match[1];
+        const description = row.querySelector(`[name="material_description_${num}"]`);
+        const frequency = row.querySelector(`[name="material_frequency_${num}"]`);
+        if (description && description.value.trim()) {
+            materials.push({
+                material_description: description.value.trim(),
+                reminder_frequency: frequency && frequency.value ? frequency.value : null,
+                allocated_to_id: defaultAllocId != null ? defaultAllocId : null,
+                allocated_to_name: defaultAllocName || null
+            });
+        }
+    });
+    return materials;
+}
+
+function shouldShowNextAttendanceLink(nextAttendanceValue) {
+    if (!nextAttendanceValue) return false;
+    const v = String(nextAttendanceValue).trim().toLowerCase();
+    return v === 'represented'
+        || v === 'virtual (represented)'
+        || v === 'virtual (client to attend)'
+        || v.startsWith('virtual');
+}
+
+function updateNextAttendanceLinkVisibility() {
+    const wrap = document.getElementById('next_attendance_link_wrap');
+    const hint = document.getElementById('next_attendance_link_hint');
+    const linkInput = document.getElementById('virtual_link');
+    const select = document.getElementById('next_attendance');
+    if (!wrap || !select || !linkInput) return;
+    const val = select.value || '';
+    if (shouldShowNextAttendanceLink(val)) {
+        wrap.classList.remove('hidden');
+        if (hint) hint.textContent = '(' + val + ')';
+    } else {
+        wrap.classList.add('hidden');
+        if (hint) hint.textContent = '';
+    }
+}
+
+document.getElementById('attendanceForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const nextAttendanceValue = document.getElementById('next_attendance').value || null;
+    const virtualLinkRaw = document.getElementById('virtual_link').value.trim();
+
+    const formData = {
+        matter_id: {{ matter_id }},
+        previous_attendance_id: (typeof chainFromAttendanceId === 'number' && chainFromAttendanceId > 0)
+            ? chainFromAttendanceId
+            : null,
+        activity_type: document.getElementById('activity_type').value.trim() || null,
+        date_of_attendance: document.getElementById('date_of_attendance').value,
+        description: document.getElementById('description').value.trim() || null,
+        next_action: document.getElementById('next_action').value.trim() || null,
+        next_activity_type: document.getElementById('next_activity_type').value.trim() || null,
+        next_attendance_date: document.getElementById('next_attendance_date').value || null,
+        next_attendance: nextAttendanceValue,
+        virtual_link: shouldShowNextAttendanceLink(nextAttendanceValue) ? (virtualLinkRaw || null) : null,
+        materials: collectMaterialsFromForm()
+    };
+
+    if (!formData.date_of_attendance) {
+        showMessage('Date of attendance is required', 'error');
+        return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+
+    const isEditing = typeof editingAttendanceId === 'number' && editingAttendanceId > 0;
+    const url = isEditing
+        ? `/api/matters/attendances/update/${editingAttendanceId}`
+        : '/api/matters/attendances/add';
+    const method = isEditing ? 'PUT' : 'POST';
+    submitBtn.innerHTML = isEditing
+        ? '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...'
+        : '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showMessage(data.error, 'error');
+        } else {
+            showMessage(data.message || (isEditing ? 'Attendance updated.' : 'New matter attendance saved.'), 'success');
+            setTimeout(() => location.reload(), 1200);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving matter attendance:', error);
+        showMessage('Error saving matter attendance. Please try again.', 'error');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+function populateForm(attendance) {
+    if (!attendance) return;
+    chainFromAttendanceId = attendance.id;
+    document.getElementById('attendanceForm').reset();
+    document.getElementById('activity_type').value = attendance.activity_type || '';
+    document.getElementById('date_of_attendance').value = attendance.date_of_attendance || '';
+    document.getElementById('description').value = attendance.description || '';
+    document.getElementById('next_action').value = attendance.next_action || '';
+    document.getElementById('next_activity_type').value = attendance.next_activity_type || '';
+    document.getElementById('next_attendance_date').value = attendance.next_attendance_date || '';
+    document.getElementById('next_attendance').value = attendance.next_attendance || '';
+    document.getElementById('virtual_link').value = attendance.virtual_link || '';
+    updateNextAttendanceLinkVisibility();
+
+    if (attendance.materials && attendance.materials.length > 0) {
+        document.getElementById('materials_required').checked = true;
+        document.getElementById('materialsSection').classList.remove('hidden');
+        const container = document.getElementById('materialsContainer');
+        container.innerHTML = '';
+        materialRowCount = 0;
+        attendance.materials.forEach(material => {
+            addMaterialRow();
+            const lastRow = container.lastElementChild;
+            if (lastRow) {
+                const descInput = lastRow.querySelector(`[name="material_description_${materialRowCount}"]`);
+                const freqSelect = lastRow.querySelector(`[name="material_frequency_${materialRowCount}"]`);
+                if (descInput) descInput.value = material.material_description || '';
+                if (freqSelect && material.reminder_frequency) freqSelect.value = material.reminder_frequency;
+            }
+        });
+    } else {
+        document.getElementById('materials_required').checked = false;
+        document.getElementById('materialsSection').classList.add('hidden');
+        document.getElementById('materialsContainer').innerHTML = '';
+        materialRowCount = 0;
+    }
+}
+
+function prefillFormForNewUpdate(attendance) {
+    if (!attendance) return;
+    chainFromAttendanceId = attendance.id;
+    editingAttendanceId = null;
+    document.getElementById('attendanceForm').reset();
+
+    // Smart pre-fill: previous "next" fields become the current attendance details
+    const nextDate = attendance.next_attendance_date
+        ? (typeof attendance.next_attendance_date === 'string' ? attendance.next_attendance_date.trim() : attendance.next_attendance_date)
+        : '';
+    const nextActivityType = attendance.next_activity_type ? String(attendance.next_activity_type).trim() : '';
+
+    if (nextDate) {
+        document.getElementById('date_of_attendance').value = nextDate;
+    }
+    if (nextActivityType) {
+        document.getElementById('activity_type').value = nextActivityType;
+    }
+
+    document.getElementById('materials_required').checked = false;
+    document.getElementById('materialsSection').classList.add('hidden');
+    document.getElementById('materialsContainer').innerHTML = '';
+    materialRowCount = 0;
+    updateNextAttendanceLinkVisibility();
+    setAttendanceFormMode('create');
+}
+
+function newFromAttendance(attendanceId) {
+    const attendance = attendancesData.find(a => a.id === attendanceId);
+    if (!attendance) {
+        showMessage('Attendance not found', 'error');
+        return;
+    }
+    if (attendance.is_latest !== 1 && attendance.is_latest != 1) {
+        showMessage('Only the latest attendance can be used as the basis for a new entry.', 'error');
+        return;
+    }
+    prefillFormForNewUpdate(attendance);
+    showMessage('Form pre-filled from next attendance details. Save will add a new record.', 'success');
+    document.querySelector('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function editAttendance(attendanceId) {
+    const attendance = attendancesData.find(a => a.id === attendanceId);
+    if (!attendance) {
+        showMessage('Attendance not found', 'error');
+        return;
+    }
+    if (attendance.is_latest !== 1 && attendance.is_latest != 1) {
+        showMessage('Only the current attendance can be edited in place.', 'error');
+        return;
+    }
+    populateForm(attendance);
+    editingAttendanceId = attendance.id;
+    setAttendanceFormMode('edit');
+    showMessage('Editing current attendance. Save will update this record.', 'success');
+    document.querySelector('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetForm() {
+    document.getElementById('attendanceForm').reset();
+    document.getElementById('materials_required').checked = false;
+    document.getElementById('materialsSection').classList.add('hidden');
+    document.getElementById('materialsContainer').innerHTML = '';
+    materialRowCount = 0;
+    chainFromAttendanceId = null;
+    editingAttendanceId = null;
+    updateNextAttendanceLinkVisibility();
+    if (attendancesData && attendancesData.length > 0) {
+        const latest = attendancesData.find(a => a.is_latest === 1) ||
+            attendancesData.find(a => a.is_latest == 1) ||
+            attendancesData[0];
+        if (latest) {
+            prefillFormForNewUpdate(latest);
+            return;
+        }
+    }
+    setAttendanceFormMode('create');
+}
+
+function viewAttendanceDetails(attendanceId) {
+    const attendance = attendancesData.find(a => a.id === attendanceId);
+    if (!attendance) {
+        showMessage('Attendance not found', 'error');
+        return;
+    }
+    const materials = Array.isArray(attendance.materials) ? attendance.materials : [];
+    let materialsHtml = '';
+    if (materials.length === 0) {
+        materialsHtml = '<p class="text-sm text-gray-500 italic">No bring update items.</p>';
+    } else {
+        materialsHtml = '<div class="space-y-3">' + materials.map((material, index) => `
+            <div class="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <p class="text-xs font-semibold text-gray-500 mb-1">Item ${index + 1}</p>
+                <p class="text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(material.material_description) || '—'}</p>
+                <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
+                    <div><span class="font-semibold">Frequency:</span> ${escapeHtml(material.reminder_frequency) || '—'}</div>
+                    <div><span class="font-semibold">Allocated to:</span> ${escapeHtml(material.allocated_to_name) || '—'}</div>
+                </div>
+            </div>
+        `).join('') + '</div>';
+    }
+
+    const vlink = (attendance.virtual_link || '').trim();
+    const vlinkHtml = vlink
+        ? `<a href="${escapeHtml(vlink)}" target="_blank" rel="noopener noreferrer" class="text-emerald-700 hover:underline break-all">${escapeHtml(vlink)}</a>`
+        : '<span class="text-gray-400">—</span>';
+
+    document.getElementById('attendanceModalContent').innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase text-gray-500">Activity Type</p>
+                <p class="text-sm text-gray-900">${escapeHtml(attendance.activity_type) || '<span class="text-gray-400">—</span>'}</p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase text-gray-500">Date of Attendance</p>
+                <p class="text-sm text-gray-900">${escapeHtml(attendance.date_of_attendance) || '<span class="text-gray-400">—</span>'}</p>
+            </div>
+        </div>
+        <div>
+            <p class="text-xs font-semibold uppercase text-gray-500">Description</p>
+            <p class="text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(attendance.description) || '<span class="text-gray-400">—</span>'}</p>
+        </div>
+        <div>
+            <p class="text-xs font-semibold uppercase text-gray-500">Next Action</p>
+            <p class="text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(attendance.next_action) || '<span class="text-gray-400">—</span>'}</p>
+        </div>
+        <div class="rounded-lg p-3 border border-emerald-200 bg-emerald-50/50">
+            <h4 class="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <i class="fas fa-calendar-plus text-emerald-600"></i> Next Attendance
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-gray-500">Next Activity Type</p>
+                    <p class="text-sm text-gray-900">${escapeHtml(attendance.next_activity_type) || '<span class="text-gray-400">—</span>'}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase text-gray-500">Next Attendance Date</p>
+                    <p class="text-sm font-semibold text-emerald-700">${escapeHtml(attendance.next_attendance_date) || '<span class="text-gray-400">—</span>'}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase text-gray-500">Next Client Attendance</p>
+                    <p class="text-sm text-gray-900">${escapeHtml(attendance.next_attendance) || '<span class="text-gray-400">—</span>'}</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase text-gray-500">Meeting Link</p>
+                    <p class="text-sm text-gray-900">${vlinkHtml}</p>
+                </div>
+            </div>
+        </div>
+        <div>
+            <h4 class="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <i class="fas fa-clipboard-list text-indigo-600"></i> Bring Update (${materials.length})
+            </h4>
+            ${materialsHtml}
+        </div>
+    `;
+    document.getElementById('attendanceModal').classList.remove('hidden');
+}
+
+function closeAttendanceModal() {
+    document.getElementById('attendanceModal').classList.add('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    applyUppercaseEnforcement(document.getElementById('attendanceForm'));
+    const nextAttendance = document.getElementById('next_attendance');
+    if (nextAttendance) {
+        nextAttendance.addEventListener('change', updateNextAttendanceLinkVisibility);
+        updateNextAttendanceLinkVisibility();
+    }
+    if (attendancesData && attendancesData.length > 0) {
+        const latest = attendancesData.find(a => a.is_latest === 1) ||
+            attendancesData.find(a => a.is_latest == 1) ||
+            attendancesData[0];
+        if (latest) {
+            prefillFormForNewUpdate(latest);
+        }
+    }
+    if (window.location.hash === '#previous-matter-attendances') {
+        setTimeout(function() {
+            const el = document.getElementById('previous-matter-attendances');
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                try { el.focus({ preventScroll: true }); } catch (e) {}
+            }
+        }, 150);
+    }
+});
+</script>
+{% endblock %}

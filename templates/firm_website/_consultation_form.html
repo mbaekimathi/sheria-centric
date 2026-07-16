@@ -1,0 +1,40 @@
+{% if form_success %}
+<div class="firm-alert firm-alert-success" role="status">{{ form_success }}</div>
+{% endif %}
+{% if form_error %}
+<div class="firm-alert firm-alert-error" role="alert">{{ form_error }}</div>
+{% endif %}
+
+<form class="firm-form" method="post" action="{{ firm_url('contact') }}" data-firm-consultation-form novalidate>
+  <div class="firm-form-grid">
+    <div class="firm-form-field">
+      <label for="consult-full-name">Full name <span aria-hidden="true">*</span></label>
+      <input type="text" id="consult-full-name" name="full_name" required autocomplete="name" maxlength="120">
+    </div>
+    <div class="firm-form-field">
+      <label for="consult-phone">Phone</label>
+      <input type="tel" id="consult-phone" name="phone" autocomplete="tel" maxlength="40">
+    </div>
+    <div class="firm-form-field">
+      <label for="consult-email">Email</label>
+      <input type="email" id="consult-email" name="email" autocomplete="email" maxlength="120">
+    </div>
+    {% if practice_areas %}
+    <div class="firm-form-field">
+      <label for="consult-practice">Practice area</label>
+      <select id="consult-practice" name="practice_area">
+        <option value="">Select a practice area (optional)</option>
+        {% for pa in practice_areas %}
+        <option value="{{ pa.name }}"{% if practice_area and practice_area.name == pa.name %} selected{% endif %}>{{ pa.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="firm-form-field firm-form-field-full">
+      <label for="consult-message">How can we help?</label>
+      <textarea id="consult-message" name="message" rows="5" maxlength="4000" placeholder="Briefly describe your matter or question."></textarea>
+    </div>
+  </div>
+  <p class="firm-form-hint">Provide a phone number or email so we can reach you. Fields marked with * are required.</p>
+  <button type="submit" class="firm-btn firm-btn-primary">Submit consultation request</button>
+</form>

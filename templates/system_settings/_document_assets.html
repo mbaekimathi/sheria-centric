@@ -475,7 +475,11 @@
         lhExportBtn.addEventListener('click', function () {
             syncFooterHiddenField();
             const dataUrl = exportHeaderPng();
-            if (letterheadProcessed) letterheadProcessed.value = dataUrl;
+            if (letterheadProcessed) {
+                letterheadProcessed.value = dataUrl;
+                letterheadProcessed.dispatchEvent(new Event('input', { bubbles: true }));
+                document.dispatchEvent(new CustomEvent('settings-autosave'));
+            }
 
             if (letterheadImg) {
                 letterheadImg.src = dataUrl;
@@ -510,7 +514,11 @@
                     input.value = '';
                     return;
                 }
-                if (processedInput) processedInput.value = dataUrl;
+                if (processedInput) {
+                    processedInput.value = dataUrl;
+                    processedInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    document.dispatchEvent(new CustomEvent('settings-autosave'));
+                }
                 if (canvas) {
                     const img = new Image();
                     img.onload = function () {

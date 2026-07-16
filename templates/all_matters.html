@@ -3,83 +3,119 @@
 {% block title %}All Matters - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
-<div class="min-h-[60vh] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-    <div class="absolute inset-0 -z-10 bg-gradient-to-b from-slate-50/80 to-white pointer-events-none" aria-hidden="true"></div>
-
-    <header class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 shadow-xl border border-slate-700/50 mb-6 sm:mb-8">
-        <div class="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent" aria-hidden="true"></div>
-        <div class="relative px-5 sm:px-8 py-6 sm:py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-            <div class="flex items-start gap-4">
-                <div class="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center shadow-lg">
-                    <i class="fas fa-list text-2xl sm:text-3xl text-violet-400"></i>
-                </div>
+<div class="am-page max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+    <!-- Header + filters (matches litigation matters toolbar) -->
+    <div class="bg-white rounded-xl shadow border border-gray-100 px-4 py-3.5 sm:px-5 sm:py-4 mb-4">
+        <div class="flex flex-col gap-3">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div class="min-w-0">
-                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">All Matters</h1>
-                    <p class="text-slate-300 text-sm sm:text-base mt-1 max-w-xl">
-                        Litigation cases and other matters in one place — status and allocation at a glance.
+                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <i class="fas fa-layer-group text-blue-600"></i>
+                        {% if see_firm_wide %}All Matters{% else %}My Matters{% endif %}
+                    </h1>
+                    <p class="text-sm text-gray-500 mt-0.5 hidden sm:block">
+                        {% if see_firm_wide %}
+                        Litigation and non-litigation matters across the firm — grouped by category.
+                        {% else %}
+                        Litigation and non-litigation matters allocated to you — grouped by category.
+                        {% endif %}
                     </p>
-                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 font-medium text-emerald-300 border border-emerald-400/30">
-                            <i class="fas fa-gavel"></i>
-                            <span id="count-cases-label">0 cases</span>
+                    <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        {% if not see_firm_wide %}
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 font-medium text-violet-700 border border-violet-100">
+                            <i class="fas fa-user-check"></i>
+                            Allocated to you
                         </span>
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-3 py-1 font-medium text-sky-300 border border-sky-400/30">
+                        {% endif %}
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 border border-emerald-100">
+                            <i class="fas fa-gavel"></i>
+                            <span id="count-cases-label">0 litigation</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 border border-sky-100">
                             <i class="fas fa-folder-open"></i>
-                            <span id="count-matters-label">0 other matters</span>
+                            <span id="count-matters-label">0 non-litigation</span>
                         </span>
                     </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-100 pt-3 flex flex-col lg:flex-row lg:items-center gap-2.5 lg:gap-3">
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5 shrink-0" role="group" aria-label="Matter type">
+                    <button type="button" data-filter="case"
+                        class="am-type-btn px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center"
+                        aria-pressed="true">
+                        <i class="fas fa-gavel mr-1.5"></i>Litigation
+                    </button>
+                    <button type="button" data-filter="matter"
+                        class="am-type-btn px-3 py-1.5 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-semibold flex items-center"
+                        aria-pressed="false">
+                        <i class="fas fa-folder-open mr-1.5"></i>Non-Litigation
+                    </button>
+                </div>
+
+                <div class="flex-1 min-w-0 flex items-center gap-2">
+                    <label for="am-search" class="sr-only">Search matters</label>
+                    <div class="relative flex-1 min-w-0">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                        <input
+                            type="search"
+                            id="am-search"
+                            class="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 bg-gray-50 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                            placeholder="Search by reference, client, title, or category…"
+                            autocomplete="off"
+                        />
+                        <button
+                            type="button"
+                            id="am-search-clear"
+                            class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                            title="Clear search"
+                            aria-label="Clear search"
+                        >
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        id="am-refresh"
+                        class="inline-flex items-center justify-center w-9 h-9 sm:w-auto sm:px-3 sm:h-9 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-800 transition-colors text-sm font-semibold shrink-0"
+                        title="Refresh"
+                    >
+                        <i class="fas fa-sync-alt"></i>
+                        <span class="hidden sm:inline ml-1.5">Refresh</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="am-groups-meta" class="am-meta hidden pt-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span id="am-meta-groups" class="am-meta-chip">
+                        <i class="fas fa-layer-group"></i>
+                        <span id="am-groups-count">0 categories</span>
+                    </span>
+                    <span id="am-meta-items" class="am-meta-chip am-meta-chip-muted">
+                        <i class="fas fa-list-ul"></i>
+                        <span id="am-items-count">0 items</span>
+                    </span>
                 </div>
             </div>
         </div>
-    </header>
+    </div>
 
-    <div class="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-200/80 overflow-hidden">
-        <div class="px-4 sm:px-6 py-5 sm:py-6 space-y-5">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-600">Filter:</span>
-                    <button type="button" data-filter="all" class="am-filter active px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 text-white">All</button>
-                    <button type="button" data-filter="case" class="am-filter px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">Litigation cases</button>
-                    <button type="button" data-filter="matter" class="am-filter px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">Other matters</button>
-                </div>
-                <div class="w-full sm:w-72 flex-shrink-0">
-                    <label for="am-search" class="sr-only">Search all matters</label>
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
-                        <input id="am-search" type="text" placeholder="Search reference, client, title…" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-4 py-2.5 text-sm placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 transition-all">
-                    </div>
-                </div>
-            </div>
-
+    <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
+        <div class="px-3 sm:px-5 py-4 sm:py-5 space-y-4">
             <div id="am-loading" class="flex flex-col items-center justify-center py-12 sm:py-16 text-slate-500">
-                <div class="w-10 h-10 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin mb-4"></div>
-                <p class="text-sm font-medium">Loading all matters…</p>
+                <div class="am-loader w-11 h-11 border-2 border-blue-500/25 border-t-blue-600 rounded-full mb-4"></div>
+                <p class="text-sm font-medium">{% if see_firm_wide %}Loading all matters…{% else %}Loading your allocated matters…{% endif %}</p>
             </div>
 
-            <div id="am-table-wrap" class="hidden overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/30">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-slate-100 text-slate-600">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Reference</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Title / Category</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Client</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Allocated To</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Date</th>
-                            <th class="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="am-body" class="bg-white divide-y divide-slate-100"></tbody>
-                </table>
-            </div>
+            <div id="am-groups" class="hidden space-y-3 sm:space-y-3.5"></div>
 
             <div id="am-empty" class="hidden flex flex-col items-center justify-center py-12 sm:py-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-center px-4">
-                <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <div class="am-empty-icon w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                     <i class="fas fa-inbox text-2xl text-slate-400"></i>
                 </div>
-                <p class="text-sm font-medium text-slate-600">No matters found</p>
-                <p class="text-xs text-slate-500 mt-1">Try adjusting your search or filter.</p>
+                <p class="text-sm font-medium text-slate-600" id="am-empty-title">No matters found</p>
+                <p class="text-xs text-slate-500 mt-1" id="am-empty-hint">Try adjusting your search or filter.</p>
             </div>
 
             <div id="am-error" class="hidden flex items-center gap-3 rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
@@ -91,9 +127,162 @@
 </div>
 
 <style>
-.am-table tbody tr { transition: background-color 0.15s ease; }
-.am-table tbody tr:hover { background-color: rgb(248 250 252); }
-.am-filter.active { background-color: rgb(30 41 59); color: white; }
+.am-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgb(51 65 85);
+    background: white;
+    border: 1px solid rgb(226 232 240);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    animation: amMetaIn 0.3s ease both;
+}
+.am-meta-chip i {
+    color: rgb(100 116 139);
+    font-size: 0.65rem;
+}
+.am-meta-chip-muted {
+    color: rgb(100 116 139);
+    background: rgb(248 250 252);
+}
+
+.am-loader {
+    animation: amSpin 0.85s linear infinite;
+}
+.am-empty-icon {
+    animation: amPulseSoft 2.2s ease-in-out infinite;
+}
+
+.am-group {
+    position: relative;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 1rem;
+    background: white;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(12px);
+    animation: amFadeUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+.am-group::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--am-accent, #8b5cf6);
+    opacity: 0.85;
+    transition: width 0.25s ease, opacity 0.25s ease;
+}
+.am-group:hover {
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
+    border-color: color-mix(in srgb, var(--am-accent, #8b5cf6) 35%, #e2e8f0);
+    transform: translateY(-1px);
+}
+.am-group:hover::before { width: 4px; opacity: 1; }
+.am-group.is-open {
+    border-color: color-mix(in srgb, var(--am-accent, #8b5cf6) 45%, #e2e8f0);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+.am-group.is-open::before { width: 4px; }
+
+.am-avatar {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+.am-group:hover .am-avatar {
+    transform: scale(1.08) rotate(-4deg);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+.am-group.is-open .am-avatar {
+    transform: scale(1.06);
+    animation: amIconPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.am-avatar i {
+    transition: transform 0.3s ease;
+}
+.am-group:hover .am-avatar i {
+    transform: scale(1.12);
+}
+
+.am-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    transition: transform 0.2s ease;
+}
+.am-group:hover .am-count { transform: scale(1.06); }
+
+.am-chevron {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.am-group.is-open .am-chevron { transform: rotate(180deg); }
+
+.am-group-panel {
+    animation: amPanelIn 0.3s ease both;
+}
+.am-group-toggle {
+    transition: background-color 0.2s ease;
+}
+.am-group.is-open .am-group-toggle {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--am-accent, #8b5cf6) 6%, #f8fafc) 0%, #ffffff 100%);
+}
+
+.am-row-card {
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.am-row-card:active { transform: scale(0.995); }
+
+@keyframes amFadeUp {
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes amMetaIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes amPanelIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes amSpin {
+    to { transform: rotate(360deg); }
+}
+@keyframes amPulseSoft {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.04); opacity: 0.85; }
+}
+@keyframes amIconPop {
+    0% { transform: scale(0.88); }
+    60% { transform: scale(1.12); }
+    100% { transform: scale(1.06); }
+}
+
+@media (min-width: 640px) {
+    .am-avatar { width: 3rem; height: 3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .am-group, .am-group .am-chevron, .am-group-panel, .am-avatar, .am-avatar i,
+    .am-loader, .am-empty-icon, .am-count, .am-meta-chip {
+        animation: none !important;
+        transition: none !important;
+    }
+    .am-group { opacity: 1; transform: none; }
+}
 </style>
 
 {% block extra_js %}
@@ -101,32 +290,108 @@
 <script>
 (function () {
     const roleSlug = {{ current_role_slug|tojson }};
-    const body = document.getElementById('am-body');
+    const seeFirmWide = {{ see_firm_wide|default(false)|tojson }};
+    const groupsEl = document.getElementById('am-groups');
+    const groupsMeta = document.getElementById('am-groups-meta');
+    const groupsCount = document.getElementById('am-groups-count');
+    const itemsCount = document.getElementById('am-items-count');
     const loadingEl = document.getElementById('am-loading');
-    const tableWrap = document.getElementById('am-table-wrap');
     const emptyEl = document.getElementById('am-empty');
+    const emptyTitle = document.getElementById('am-empty-title');
+    const emptyHint = document.getElementById('am-empty-hint');
     const errorBox = document.getElementById('am-error');
     const errorText = document.getElementById('am-error-text');
     const searchInput = document.getElementById('am-search');
+    const searchClear = document.getElementById('am-search-clear');
     const countCasesLabel = document.getElementById('count-cases-label');
     const countMattersLabel = document.getElementById('count-matters-label');
-    const filterButtons = document.querySelectorAll('.am-filter');
+    const typeButtons = document.querySelectorAll('.am-type-btn');
+    const refreshBtn = document.getElementById('am-refresh');
 
     let allItems = [];
-    let activeFilter = 'all';
+    let activeFilter = 'case';
+
+    const TYPE_ACTIVE = 'am-type-btn px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center';
+    const TYPE_IDLE = 'am-type-btn px-3 py-1.5 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-semibold flex items-center';
+
+    const CATEGORY_PALETTES = [
+        { bg: 'bg-teal-100', text: 'text-teal-700', count: 'text-teal-700', countBg: 'bg-teal-50', accent: '#0d9488', icon: 'fa-balance-scale', ring: 'ring-teal-200' },
+        { bg: 'bg-sky-100', text: 'text-sky-700', count: 'text-sky-700', countBg: 'bg-sky-50', accent: '#0284c7', icon: 'fa-handshake', ring: 'ring-sky-200' },
+        { bg: 'bg-emerald-100', text: 'text-emerald-700', count: 'text-emerald-700', countBg: 'bg-emerald-50', accent: '#059669', icon: 'fa-leaf', ring: 'ring-emerald-200' },
+        { bg: 'bg-amber-100', text: 'text-amber-700', count: 'text-amber-700', countBg: 'bg-amber-50', accent: '#d97706', icon: 'fa-stamp', ring: 'ring-amber-200' },
+        { bg: 'bg-rose-100', text: 'text-rose-700', count: 'text-rose-700', countBg: 'bg-rose-50', accent: '#e11d48', icon: 'fa-file-contract', ring: 'ring-rose-200' },
+        { bg: 'bg-indigo-100', text: 'text-indigo-700', count: 'text-indigo-700', countBg: 'bg-indigo-50', accent: '#4f46e5', icon: 'fa-folder', ring: 'ring-indigo-200' },
+        { bg: 'bg-orange-100', text: 'text-orange-700', count: 'text-orange-700', countBg: 'bg-orange-50', accent: '#ea580c', icon: 'fa-briefcase', ring: 'ring-orange-200' },
+        { bg: 'bg-cyan-100', text: 'text-cyan-700', count: 'text-cyan-700', countBg: 'bg-cyan-50', accent: '#0891b2', icon: 'fa-landmark', ring: 'ring-cyan-200' },
+        { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', count: 'text-fuchsia-700', countBg: 'bg-fuchsia-50', accent: '#c026d3', icon: 'fa-layer-group', ring: 'ring-fuchsia-200' },
+        { bg: 'bg-blue-100', text: 'text-blue-700', count: 'text-blue-700', countBg: 'bg-blue-50', accent: '#2563eb', icon: 'fa-bookmark', ring: 'ring-blue-200' },
+    ];
+
+    const KEYWORD_ICONS = [
+        { keys: ['criminal', 'offense', 'prosecution'], icon: 'fa-gavel' },
+        { keys: ['civil', 'suit', 'claim'], icon: 'fa-balance-scale' },
+        { keys: ['family', 'divorce', 'custody', 'matrimonial'], icon: 'fa-heart' },
+        { keys: ['land', 'property', 'conveyance', 'real estate'], icon: 'fa-home' },
+        { keys: ['commercial', 'company', 'corporate', 'business'], icon: 'fa-briefcase' },
+        { keys: ['labour', 'labor', 'employment', 'industrial'], icon: 'fa-users' },
+        { keys: ['constitutional', 'petition', 'judicial review'], icon: 'fa-landmark' },
+        { keys: ['tax', 'revenue', 'customs'], icon: 'fa-coins' },
+        { keys: ['bank', 'finance', 'loan', 'debt'], icon: 'fa-university' },
+        { keys: ['contract', 'agreement', 'deed'], icon: 'fa-file-contract' },
+        { keys: ['mediation', 'arbitration', 'adr'], icon: 'fa-handshake' },
+        { keys: ['probate', 'succession', 'estate', 'will'], icon: 'fa-scroll' },
+        { keys: ['intellectual', 'trademark', 'patent', 'copyright'], icon: 'fa-lightbulb' },
+        { keys: ['immigration', 'visa', 'citizenship'], icon: 'fa-plane' },
+        { keys: ['insurance'], icon: 'fa-shield-alt' },
+        { keys: ['environment', 'environmental'], icon: 'fa-leaf' },
+    ];
+
+    function hashString(str) {
+        let h = 0;
+        const s = String(str || '');
+        for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+        return Math.abs(h);
+    }
+
+    function keywordIcon(name) {
+        const lower = String(name || '').toLowerCase();
+        for (let i = 0; i < KEYWORD_ICONS.length; i++) {
+            const entry = KEYWORD_ICONS[i];
+            for (let j = 0; j < entry.keys.length; j++) {
+                if (lower.indexOf(entry.keys[j]) !== -1) return entry.icon;
+            }
+        }
+        return null;
+    }
+
+    function getPalette(name) {
+        const palette = Object.assign({}, CATEGORY_PALETTES[hashString(name) % CATEGORY_PALETTES.length]);
+        const kw = keywordIcon(name);
+        if (kw) palette.icon = kw;
+        return palette;
+    }
+
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     function detailUrl(item) {
         if (item.item_type === 'case') {
             return '/' + roleSlug + '/case_management/' + item.id;
         }
-        return '/' + roleSlug + '/other_matters/' + item.id;
+        return '/' + roleSlug + '/non_litigation_matters/' + item.id;
     }
 
     function typeBadge(item) {
         if (item.item_type === 'case') {
-            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold"><i class="fas fa-gavel"></i> Case</span>';
+            return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold"><i class="fas fa-gavel"></i> Litigation</span>';
         }
-        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-semibold"><i class="fas fa-folder-open"></i> Matter</span>';
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-semibold"><i class="fas fa-folder-open"></i> Non-Litigation</span>';
     }
 
     function statusPill(status) {
@@ -136,12 +401,85 @@
         if (s.includes('active') || s.includes('open')) cls = 'bg-emerald-100 text-emerald-700';
         else if (s.includes('pending') || s.includes('approval')) cls = 'bg-amber-100 text-amber-700';
         else if (s.includes('closed') || s.includes('suspended') || s.includes('completed')) cls = 'bg-rose-100 text-rose-700';
-        return '<span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ' + cls + '">' + status + '</span>';
+        return '<span class="inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ' + cls + '">' + escapeHtml(status) + '</span>';
     }
 
     function textMatch(value, q) {
         if (!q) return true;
         return String(value || '').toLowerCase().includes(q);
+    }
+
+    function groupKey(item) {
+        return (item.category || 'Uncategorized').trim() || 'Uncategorized';
+    }
+
+    function secondaryLabel(item) {
+        return item.title || 'Untitled';
+    }
+
+    function secondaryHeader() {
+        return 'Title';
+    }
+
+    function groupItems(items) {
+        const map = {};
+        items.forEach(function (item) {
+            const key = groupKey(item);
+            if (!map[key]) map[key] = [];
+            map[key].push(item);
+        });
+        return Object.keys(map)
+            .sort(function (a, b) {
+                return a.localeCompare(b, undefined, { sensitivity: 'base' });
+            })
+            .map(function (key) {
+                return { name: key, items: map[key] };
+            });
+    }
+
+    function slugify(value) {
+        return String(value || 'group').replace(/[^a-zA-Z0-9]+/g, '_');
+    }
+
+    function renderDesktopRows(items) {
+        return items.map(function (item) {
+            return `
+                <tr class="hover:bg-slate-50/80 cursor-pointer transition-colors" data-href="${escapeHtml(detailUrl(item))}">
+                    <td class="px-4 py-3">${typeBadge(item)}</td>
+                    <td class="px-4 py-3 text-slate-800 font-medium whitespace-nowrap">${escapeHtml(item.reference || '-')}</td>
+                    <td class="px-4 py-3 text-slate-700 max-w-[14rem] truncate" title="${escapeHtml(secondaryLabel(item))}">${escapeHtml(secondaryLabel(item))}</td>
+                    <td class="px-4 py-3 text-slate-700 max-w-[10rem] truncate">${escapeHtml(item.client_name || '-')}</td>
+                    <td class="px-4 py-3 text-slate-700 max-w-[10rem] truncate">${escapeHtml(item.allocated_to || 'Unallocated')}</td>
+                    <td class="px-4 py-3">${statusPill(item.status)}</td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">${escapeHtml(item.date || '-')}</td>
+                    <td class="px-4 py-3">
+                        <a href="${escapeHtml(detailUrl(item))}" class="inline-flex items-center text-violet-600 hover:text-violet-800 font-medium text-xs sm:text-sm" onclick="event.stopPropagation()">
+                            <i class="fas fa-eye mr-1"></i>View
+                        </a>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function renderMobileCards(items) {
+        return items.map(function (item) {
+            return `
+                <a href="${escapeHtml(detailUrl(item))}" class="am-row-card block px-3.5 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 active:bg-slate-100">
+                    <div class="flex items-start justify-between gap-2 mb-1.5">
+                        ${typeBadge(item)}
+                        ${statusPill(item.status)}
+                    </div>
+                    <div class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(item.reference || 'No reference')}</div>
+                    <div class="text-xs text-slate-600 mt-0.5 truncate">${escapeHtml(secondaryLabel(item))}</div>
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                        <span class="inline-flex items-center gap-1 truncate max-w-[48%]"><i class="fas fa-user text-slate-400"></i>${escapeHtml(item.client_name || '-')}</span>
+                        <span class="inline-flex items-center gap-1 truncate max-w-[48%]"><i class="fas fa-user-tie text-slate-400"></i>${escapeHtml(item.allocated_to || 'Unallocated')}</span>
+                        <span class="inline-flex items-center gap-1"><i class="fas fa-calendar text-slate-400"></i>${escapeHtml(item.date || '-')}</span>
+                    </div>
+                </a>
+            `;
+        }).join('');
     }
 
     function render() {
@@ -152,44 +490,137 @@
             return (
                 textMatch(item.reference, q) ||
                 textMatch(item.title, q) ||
+                textMatch(item.category, q) ||
                 textMatch(item.client_name, q) ||
                 textMatch(item.allocated_to, q) ||
                 textMatch(item.status, q)
             );
         });
 
-        body.innerHTML = '';
+        groupsEl.innerHTML = '';
         if (filtered.length === 0) {
-            tableWrap.classList.add('hidden');
+            groupsEl.classList.add('hidden');
+            if (groupsMeta) groupsMeta.classList.add('hidden');
             emptyEl.classList.remove('hidden');
+            const hasSearch = !!(searchInput && (searchInput.value || '').trim());
+            if (emptyTitle && emptyHint) {
+                if (hasSearch) {
+                    emptyTitle.textContent = 'No matching matters';
+                    emptyHint.textContent = 'Try adjusting your search.';
+                } else if (activeFilter === 'case') {
+                    emptyTitle.textContent = seeFirmWide ? 'No litigation matters found' : 'No litigation matters allocated to you';
+                    emptyHint.textContent = 'Switch to Non-Litigation or wait for a case allocation.';
+                } else if (activeFilter === 'matter') {
+                    emptyTitle.textContent = seeFirmWide ? 'No non-litigation matters found' : 'No non-litigation matters allocated to you';
+                    emptyHint.textContent = 'Switch to Litigation or wait for a matter allocation.';
+                } else if (!seeFirmWide) {
+                    emptyTitle.textContent = 'No matters allocated to you';
+                    emptyHint.textContent = 'When a case or matter is allocated to your account, it will appear here.';
+                } else {
+                    emptyTitle.textContent = 'No matters found';
+                    emptyHint.textContent = 'There are no cases or non-litigation matters to display yet.';
+                }
+            }
             return;
         }
 
         emptyEl.classList.add('hidden');
-        tableWrap.classList.remove('hidden');
+        groupsEl.classList.remove('hidden');
 
-        filtered.forEach(function (item) {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50 cursor-pointer';
-            tr.onclick = function (e) {
-                if (e.target.closest('a')) return;
-                window.location.href = detailUrl(item);
-            };
-            tr.innerHTML = `
-                <td class="px-4 py-3">${typeBadge(item)}</td>
-                <td class="px-4 py-3 text-slate-800 font-medium">${item.reference || '-'}</td>
-                <td class="px-4 py-3 text-slate-700">${item.title || '-'}</td>
-                <td class="px-4 py-3 text-slate-700">${item.client_name || '-'}</td>
-                <td class="px-4 py-3 text-slate-700">${item.allocated_to || 'Unallocated'}</td>
-                <td class="px-4 py-3">${statusPill(item.status)}</td>
-                <td class="px-4 py-3 text-slate-600">${item.date || '-'}</td>
-                <td class="px-4 py-3">
-                    <a href="${detailUrl(item)}" class="text-violet-600 hover:text-violet-800 font-medium text-xs sm:text-sm" onclick="event.stopPropagation()">
-                        <i class="fas fa-eye mr-1"></i>View
-                    </a>
-                </td>
+        const groups = groupItems(filtered);
+        const groupLabel = groups.length === 1 ? 'category' : 'categories';
+
+        if (groupsMeta) {
+            groupsMeta.classList.remove('hidden');
+            if (groupsCount) {
+                groupsCount.textContent = groups.length + ' ' + groupLabel;
+            }
+            if (itemsCount) {
+                itemsCount.textContent = filtered.length + ' item' + (filtered.length === 1 ? '' : 's');
+            }
+        }
+
+        groups.forEach(function (group, idx) {
+            const groupId = 'am-g-' + slugify(group.name) + '-' + idx;
+            const palette = getPalette(group.name);
+            const card = document.createElement('div');
+            card.className = 'am-group';
+            card.style.setProperty('--am-accent', palette.accent);
+            card.style.animationDelay = Math.min(idx, 14) * 0.045 + 's';
+
+            const caseCount = group.items.filter(function (i) { return i.item_type === 'case'; }).length;
+            const matterCount = group.items.length - caseCount;
+            const mixHint = [
+                caseCount ? (caseCount + ' litigation') : '',
+                matterCount ? (matterCount + ' non-litigation') : ''
+            ].filter(Boolean).join(' · ');
+
+            card.innerHTML = `
+                <button type="button" class="am-group-toggle w-full text-left px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between gap-3" aria-expanded="false" data-target="${groupId}">
+                    <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                        <div class="am-avatar ${palette.bg} ${palette.text} ring-2 ring-offset-1 ${palette.ring}">
+                            <i class="fas ${palette.icon} text-base sm:text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="text-sm sm:text-base font-semibold text-slate-900 truncate">${escapeHtml(group.name)}</div>
+                            <div class="text-[11px] sm:text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span>Category</span>
+                                <span class="text-slate-300 hidden sm:inline">·</span>
+                                <span class="truncate">${escapeHtml(mixHint)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                        <span class="am-count ${palette.countBg} ${palette.count}">${group.items.length}</span>
+                        <i class="fas fa-chevron-down am-chevron text-slate-400 text-sm"></i>
+                    </div>
+                </button>
+                <div id="${groupId}" class="am-group-panel hidden border-t border-slate-200/80 bg-slate-50/50">
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-slate-100/90 text-slate-600">
+                                <tr>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Type</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Reference</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">${secondaryHeader()}</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Client</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Allocated To</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Status</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Date</th>
+                                    <th class="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-slate-100">
+                                ${renderDesktopRows(group.items)}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="md:hidden bg-white">
+                        ${renderMobileCards(group.items)}
+                    </div>
+                </div>
             `;
-            body.appendChild(tr);
+            groupsEl.appendChild(card);
+        });
+
+        groupsEl.querySelectorAll('.am-group-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const targetId = btn.getAttribute('data-target');
+                const panel = document.getElementById(targetId);
+                const card = btn.closest('.am-group');
+                if (!panel) return;
+                const open = !panel.classList.contains('hidden');
+                panel.classList.toggle('hidden', open);
+                btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+                if (card) card.classList.toggle('is-open', !open);
+            });
+        });
+
+        groupsEl.querySelectorAll('tr[data-href]').forEach(function (tr) {
+            tr.addEventListener('click', function (e) {
+                if (e.target.closest('a')) return;
+                window.location.href = tr.getAttribute('data-href');
+            });
         });
     }
 
@@ -207,8 +638,8 @@
                 }
                 allItems = Array.isArray(data.items) ? data.items : [];
                 const counts = data.counts || {};
-                if (countCasesLabel) countCasesLabel.textContent = (counts.cases || 0) + ' case' + ((counts.cases || 0) === 1 ? '' : 's');
-                if (countMattersLabel) countMattersLabel.textContent = (counts.matters || 0) + ' other matter' + ((counts.matters || 0) === 1 ? '' : 's');
+                if (countCasesLabel) countCasesLabel.textContent = (counts.cases || 0) + ' litigation';
+                if (countMattersLabel) countMattersLabel.textContent = (counts.matters || 0) + ' non-litigation';
                 render();
             })
             .catch(function (err) {
@@ -219,17 +650,47 @@
             });
     }
 
-    filterButtons.forEach(function (btn) {
+    function setTypeFilter(filter) {
+        activeFilter = filter === 'matter' ? 'matter' : 'case';
+        typeButtons.forEach(function (btn) {
+            const on = btn.getAttribute('data-filter') === activeFilter;
+            btn.className = on ? TYPE_ACTIVE : TYPE_IDLE;
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        render();
+    }
+
+    function syncSearchClear() {
+        if (!searchClear || !searchInput) return;
+        searchClear.classList.toggle('hidden', !(searchInput.value || '').trim());
+    }
+
+    typeButtons.forEach(function (btn) {
         btn.addEventListener('click', function () {
-            activeFilter = btn.getAttribute('data-filter') || 'all';
-            filterButtons.forEach(function (b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            render();
+            setTypeFilter(btn.getAttribute('data-filter') || 'case');
         });
     });
 
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function () {
+            loadData();
+        });
+    }
+
     if (searchInput) {
-        searchInput.addEventListener('input', render);
+        searchInput.addEventListener('input', function () {
+            syncSearchClear();
+            render();
+        });
+    }
+
+    if (searchClear && searchInput) {
+        searchClear.addEventListener('click', function () {
+            searchInput.value = '';
+            syncSearchClear();
+            searchInput.focus();
+            render();
+        });
     }
 
     loadData();

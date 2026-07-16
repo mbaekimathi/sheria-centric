@@ -1,0 +1,44 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Client voices</p>
+    <h1>{{ page_seo.h1_heading or 'Results & Testimonials' }}</h1>
+    <p class="firm-page-lead">{{ page_seo.meta_description or 'Published outcomes and testimonials shared with client consent.' }}</p>
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container">
+    <div class="firm-results-tabs firm-reveal" data-firm-results-tabs role="tablist" aria-label="Results filter">
+      <button type="button" class="is-active" data-filter="all" role="tab" aria-selected="true">All</button>
+      {% if testimonials %}<button type="button" data-filter="testimonials" role="tab" aria-selected="false">Testimonials</button>{% endif %}
+      {% if case_outcomes %}<button type="button" data-filter="outcomes" role="tab" aria-selected="false">Case outcomes</button>{% endif %}
+    </div>
+
+    {% if testimonials or case_outcomes %}
+    <div class="firm-grid-2" data-firm-results-grid>
+      {% for t in testimonials %}
+      <article class="firm-card firm-quote-card firm-reveal" data-result-type="testimonials">
+        <p class="firm-quote-text">{{ t.quote }}</p>
+        <p class="firm-quote-author">{{ t.client_name or 'Client' }}</p>
+        {% if t.testimonial_date %}<p class="firm-quote-date">{{ t.testimonial_date }}</p>{% endif %}
+      </article>
+      {% endfor %}
+      {% for outcome in case_outcomes %}
+      <article class="firm-card firm-reveal" data-result-type="outcomes">
+        <p class="firm-eyebrow">Case outcome</p>
+        <h2>{{ outcome.practice_area or 'Published outcome' }}</h2>
+        {% if outcome.description %}<p>{{ outcome.description }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="firm-empty-state firm-reveal">Results and testimonials will appear here once published with client consent.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

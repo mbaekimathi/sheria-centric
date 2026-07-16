@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_from_directory, send_file, Response
 import pymysql
 import os
 from werkzeug.utils import secure_filename
@@ -157,6 +157,103 @@ def build_external_url(path):
     if not path.startswith('/'):
         path = '/' + path
     return base.rstrip('/') + path
+
+
+def _default_firm_page_canonical(fragment=None):
+    """Default canonical URL for the single-page firm website."""
+    base = get_public_base_url().rstrip('/')
+    if not base:
+        return ''
+    if not fragment or fragment in ('home', '/'):
+        return f'{base}/'
+    frag = str(fragment).strip().lstrip('#')
+    return f'{base}/#{frag}' if frag else f'{base}/'
+
+
+def _validate_image_upload_has_alt(request, file_key, alt_key, item_label):
+    """Return an error message when a new image upload has no alt text."""
+    f = request.files.get(file_key)
+    if f and getattr(f, 'filename', None):
+        alt = (request.form.get(alt_key) or '').strip()
+        if not alt:
+            return f'Alt text is required when uploading a new image for {item_label}.'
+    return None
+
+
+def _validate_settings_image_alt_uploads(request, settings_section):
+    """Validate alt text for image uploads on settings save."""
+    if settings_section == 'company':
+        return _validate_image_upload_has_alt(
+            request, 'company_logo', 'company_logo_alt', 'company logo'
+        )
+    if settings_section == 'branding':
+        for file_key, alt_key, label in (
+            ('favicon', 'favicon_alt', 'favicon'),
+            ('login_page_background', 'login_page_background_alt', 'login page background'),
+        ):
+            err = _validate_image_upload_has_alt(request, file_key, alt_key, label)
+            if err:
+                return err
+        return None
+    if settings_section != 'legal':
+        return None
+    ids_raw = (request.form.get('employee_ids') or '').strip()
+    if ids_raw:
+        for part in ids_raw.split(','):
+            part = part.strip()
+            if not part.isdigit():
+                continue
+            emp_id = int(part)
+            err = _validate_image_upload_has_alt(
+                request,
+                f'profile_picture_{emp_id}',
+                f'profile_picture_alt_{emp_id}',
+                f'profile photo (employee #{emp_id})',
+            )
+            if err:
+                return err
+    for idx in _practice_area_form_indices(request):
+        err = _validate_image_upload_has_alt(
+            request,
+            f'practice_area_image_{idx}',
+            f'practice_area_image_alt_{idx}',
+            f'practice area image (row {idx + 1})',
+        )
+        if err:
+            return err
+    return None
+
+
+def _format_public_last_updated(value):
+    """Human-readable last-updated date for the public firm website."""
+    if not value:
+        return ''
+    try:
+        return value.strftime('%d %B %Y')
+    except Exception:
+        text = str(value).strip()
+        return text[:10] if len(text) >= 10 else text
+
+
+def _firm_page_seo_from_settings(firm, page_key, *, default_h1=''):
+    """Build page-level SEO dict from company_settings columns."""
+    prefix = f'seo_{page_key}_'
+    meta_title = (firm.get(f'{prefix}meta_title') or '').strip()
+    meta_description = (firm.get(f'{prefix}meta_description') or '').strip()
+    h1_heading = (firm.get(f'{prefix}h1_heading') or '').strip() or default_h1
+    url_slug = (firm.get(f'{prefix}url_slug') or '').strip()
+    canonical_url = (firm.get(f'{prefix}canonical_url') or '').strip()
+    if not canonical_url:
+        canonical_url = _default_firm_page_canonical(
+            None if page_key == 'home' else (url_slug or page_key)
+        )
+    return {
+        'meta_title': meta_title,
+        'meta_description': meta_description,
+        'h1_heading': h1_heading,
+        'url_slug': url_slug,
+        'canonical_url': canonical_url,
+    }
 
 
 def normalize_oauth_authorization_response(authorization_response):
@@ -333,7 +430,7 @@ def test_db_connection():
         return False
 
 # Schema version for migrations
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 def get_db_connection(use_database=True):
     """Create and return database connection"""
@@ -487,6 +584,64 @@ def ensure_case_proceeding_materials_table(cursor, connection=None):
         print(f"[WARNING] ensure_case_proceeding_materials_table: {e}")
 
 
+def ensure_matter_attendances_tables(cursor, connection=None):
+    """Ensure matter attendance tables exist (mirrors case_proceedings for non-litigation)."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS matter_attendances (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                matter_id INT NOT NULL,
+                previous_attendance_id INT NULL,
+                activity_type VARCHAR(255) NULL,
+                date_of_attendance DATE NOT NULL,
+                description TEXT NULL,
+                next_action TEXT NULL,
+                next_activity_type VARCHAR(255) NULL,
+                next_attendance_date DATE NULL,
+                next_attendance VARCHAR(50) NULL,
+                virtual_link VARCHAR(500) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_matter_id (matter_id),
+                INDEX idx_date_of_attendance (date_of_attendance),
+                INDEX idx_previous_attendance_id (previous_attendance_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        # Additive columns for existing DBs (created before next-attendance fields)
+        for column_name, column_def in (
+            ('next_activity_type', 'VARCHAR(255) NULL'),
+            ('next_attendance_date', 'DATE NULL'),
+            ('next_attendance', 'VARCHAR(50) NULL'),
+            ('virtual_link', 'VARCHAR(500) NULL'),
+        ):
+            if not column_exists('matter_attendances', column_name):
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE matter_attendances ADD COLUMN {column_name} {column_def}"
+                    )
+                    print(f"[OK] Added {column_name} column to matter_attendances table")
+                except Exception as e:
+                    print(f"[WARNING] Could not add {column_name} to matter_attendances: {e}")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS matter_attendance_materials (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                attendance_id INT NOT NULL,
+                material_description TEXT NOT NULL,
+                reminder_frequency VARCHAR(50),
+                allocated_to_id INT,
+                allocated_to_name VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_attendance_id (attendance_id),
+                INDEX idx_allocated_to_id (allocated_to_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_matter_attendances_tables: {e}")
+
+
 def ensure_google_drive_oauth_pending_table(cursor, connection=None):
     """Store OAuth state server-side so the Drive popup callback works when the session cookie is not sent."""
     try:
@@ -502,6 +657,91 @@ def ensure_google_drive_oauth_pending_table(cursor, connection=None):
             connection.commit()
     except Exception as e:
         print(f"[WARNING] ensure_google_drive_oauth_pending_table: {e}")
+
+
+def ensure_employee_notification_views_table(cursor, connection=None):
+    """Track which workspace notifications an employee has viewed on the notifications page."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS employee_notification_views (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                employee_id INT NOT NULL,
+                notification_key VARCHAR(191) NOT NULL,
+                viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_employee_notification (employee_id, notification_key),
+                INDEX idx_employee_views (employee_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_employee_notification_views_table: {e}")
+
+
+def ensure_task_allocation_events_table(cursor, connection=None):
+    """Lifecycle events for allocated tasks (received / rejected / submitted)."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_allocation_events (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                task_source ENUM('task_management', 'session_allocation') NOT NULL,
+                task_id INT NOT NULL,
+                event_type ENUM('received', 'rejected', 'submitted') NOT NULL,
+                task_title VARCHAR(255) NOT NULL,
+                assignee_name VARCHAR(255) NULL,
+                created_by_id INT NULL,
+                reference_label VARCHAR(500) NULL,
+                link_path VARCHAR(500) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_alloc_event (task_source, task_id, event_type),
+                INDEX idx_alloc_event_created (created_at),
+                INDEX idx_alloc_event_type (event_type),
+                INDEX idx_alloc_event_created_by (created_by_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        try:
+            cursor.execute("ALTER TABLE task_allocation_events ADD COLUMN created_by_id INT NULL")
+        except Exception:
+            pass
+        try:
+            cursor.execute(
+                "ALTER TABLE task_allocation_events ADD INDEX idx_alloc_event_created_by (created_by_id)"
+            )
+        except Exception:
+            pass
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_task_allocation_events_table: {e}")
+
+
+def ensure_task_interval_reminders_table(cursor, connection=None):
+    """Fired task reminder-interval alerts (when due_at - interval is reached)."""
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_interval_reminders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                task_source ENUM('task_management', 'session_allocation') NOT NULL DEFAULT 'task_management',
+                task_id INT NOT NULL,
+                interval_code VARCHAR(16) NOT NULL,
+                task_title VARCHAR(255) NOT NULL,
+                due_at DATETIME NOT NULL,
+                assignee_id INT NULL,
+                assignee_name VARCHAR(255) NULL,
+                created_by_id INT NULL,
+                reference_label VARCHAR(500) NULL,
+                link_path VARCHAR(500) NULL,
+                fired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_task_interval (task_source, task_id, interval_code),
+                INDEX idx_interval_fired (fired_at),
+                INDEX idx_interval_assignee (assignee_id),
+                INDEX idx_interval_created_by (created_by_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """)
+        if connection:
+            connection.commit()
+    except Exception as e:
+        print(f"[WARNING] ensure_task_interval_reminders_table: {e}")
 
 
 def ensure_push_subscriptions_table(cursor, connection=None):
@@ -541,8 +781,12 @@ def reconcile_additive_schema(cursor, connection=None):
         ensure_task_management_table(cursor, connection)
         ensure_case_proceeding_advocates_table(cursor, connection)
         ensure_case_proceeding_materials_table(cursor, connection)
+        ensure_matter_attendances_tables(cursor, connection)
         ensure_google_drive_oauth_pending_table(cursor, connection)
         ensure_push_subscriptions_table(cursor, connection)
+        ensure_employee_notification_views_table(cursor, connection)
+        ensure_task_allocation_events_table(cursor, connection)
+        ensure_task_interval_reminders_table(cursor, connection)
     except Exception as e:
         print(f"[WARNING] reconcile_additive_schema: {e}")
 
@@ -661,6 +905,113 @@ def ensure_task_management_table(cursor, connection=None):
     except Exception as e:
         print(f"[WARNING] ensure_task_management_table: {e}")
 
+
+def migrate_case_assignment_proceedings_to_tasks(cursor, connection=None):
+    """Move Case Assignment pseudo-attendances into task_management (Recent case tasks)."""
+    try:
+        ensure_task_management_table(cursor, connection)
+        ensure_case_proceeding_materials_table(cursor, connection)
+        cursor.execute("""
+            SELECT id, case_id, next_court_date, date_of_court_appeared, outcome_orders, created_at
+            FROM case_proceedings
+            WHERE court_activity_type = 'Case Assignment'
+        """)
+        proceedings = list(cursor.fetchall() or [])
+        if not proceedings:
+            return 0
+
+        allowed_status = {'Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled'}
+        migrated = 0
+        for proceeding in proceedings:
+            proceeding_id = proceeding['id']
+            case_id = proceeding['case_id']
+            cursor.execute("""
+                SELECT id, material_description, allocated_to_id, allocated_to_name,
+                       task_status, reminder_frequency
+                FROM case_proceeding_materials
+                WHERE proceeding_id = %s
+            """, (proceeding_id,))
+            materials = list(cursor.fetchall() or [])
+            if not materials:
+                materials = [{
+                    'material_description': proceeding.get('outcome_orders') or 'Case Assignment',
+                    'allocated_to_id': None,
+                    'allocated_to_name': None,
+                    'task_status': 'Pending',
+                    'reminder_frequency': None,
+                }]
+
+            cursor.execute("""
+                SELECT filled_by_id, filled_by_name, created_by_id, created_by_name
+                FROM cases WHERE id = %s
+            """, (case_id,))
+            case_row = cursor.fetchone() or {}
+
+            due_date = proceeding.get('next_court_date') or proceeding.get('date_of_court_appeared')
+            if due_date:
+                due_at = f"{due_date} 17:00:00" if not hasattr(due_date, 'strftime') else due_date.strftime('%Y-%m-%d 17:00:00')
+            elif proceeding.get('created_at') and hasattr(proceeding['created_at'], 'strftime'):
+                due_at = proceeding['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                due_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            for material in materials:
+                desc = (material.get('material_description') or proceeding.get('outcome_orders') or 'Case Assignment').strip()
+                title = (desc.split('\n')[0] if desc else 'Case Assignment')[:255]
+                assigned_id = material.get('allocated_to_id') or case_row.get('filled_by_id')
+                assigned_name = material.get('allocated_to_name') or case_row.get('filled_by_name') or 'Unassigned'
+                status = material.get('task_status') or 'Pending'
+                if status not in allowed_status:
+                    status = 'Pending'
+                created_by_id = case_row.get('created_by_id') or assigned_id or 0
+                created_by_name = case_row.get('created_by_name') or 'System'
+                reminder = (material.get('reminder_frequency') or '1d').strip() or '1d'
+
+                cursor.execute("""
+                    SELECT id FROM task_management
+                    WHERE task_type = 'case'
+                      AND linked_id = %s
+                      AND task_title = %s
+                      AND COALESCE(assigned_to_id, 0) = COALESCE(%s, 0)
+                    LIMIT 1
+                """, (case_id, title, assigned_id))
+                if cursor.fetchone():
+                    continue
+
+                cursor.execute("""
+                    INSERT INTO task_management
+                    (task_type, linked_id, task_title, task_description, due_at, reminder_intervals,
+                     assigned_to_id, assigned_to_name, task_status, created_by_id, created_by_name)
+                    VALUES ('case', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    case_id,
+                    title,
+                    desc,
+                    due_at,
+                    reminder,
+                    assigned_id,
+                    assigned_name,
+                    status,
+                    created_by_id,
+                    created_by_name,
+                ))
+                migrated += 1
+
+            cursor.execute("DELETE FROM case_proceeding_materials WHERE proceeding_id = %s", (proceeding_id,))
+            try:
+                cursor.execute("DELETE FROM case_proceeding_advocates WHERE proceeding_id = %s", (proceeding_id,))
+            except Exception:
+                pass
+            cursor.execute("DELETE FROM case_proceedings WHERE id = %s", (proceeding_id,))
+
+        if connection:
+            connection.commit()
+        return migrated
+    except Exception as e:
+        print(f"[WARNING] migrate_case_assignment_proceedings_to_tasks: {e}")
+        return 0
+
+
 def has_active_case_task_access(cursor, case_id, employee_id, task_id=None, permission_key=None):
     """Return True when employee has an active case task allocation for this case."""
     try:
@@ -690,6 +1041,53 @@ def has_active_case_task_access(cursor, case_id, employee_id, task_id=None, perm
         return bool(cursor.fetchone())
     except Exception:
         return False
+
+
+# Cases and non-litigation matters may only be allocated to these roles (at approval).
+CASE_MATTER_ALLOCATION_ROLES = ('Managing Partner', 'Associate Advocate')
+
+
+def is_allocation_eligible_role(role):
+    """True when an employee role may receive case/matter allocation."""
+    return (role or '') in CASE_MATTER_ALLOCATION_ROLES
+
+
+def is_privileged_case_viewer(user_role=None):
+    """Roles that may open case detail/document pages without an active task."""
+    role = user_role if user_role is not None else session.get('employee_role')
+    return role in (
+        'Managing Partner',
+        'Firm Administrator',
+        'Associate Advocate',
+        'Clerk',
+    )
+
+
+def has_unrestricted_case_access(user_role=None, original_role=None):
+    """True for roles that may manage any case like IT Support (view/edit/docs)."""
+    role = user_role if user_role is not None else session.get('employee_role')
+    original = original_role if original_role is not None else session.get('original_role')
+    if original == 'IT Support':
+        return True
+    return role in ('IT Support', 'Firm Administrator', 'Managing Partner')
+
+
+def can_view_matter_record(matter_data):
+    """True when the current user may open a matter detail/document page."""
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    _, _, see_all_matters = _other_matters_api_scope()
+    current_employee_id = session.get('employee_id')
+    assigned_id = matter_data.get('assigned_employee_id')
+    is_assigned = (assigned_id is not None and str(assigned_id) == str(current_employee_id))
+    if is_assigned or see_all_matters:
+        return True
+    # Same roles that can browse case_management / non_litigation_matters lists
+    if user_role in ('Firm Administrator', 'Associate Advocate', 'Clerk'):
+        return True
+    if original_role == 'IT Support':
+        return True
+    return False
 
 def column_exists(table_name, column_name):
     """Check if a column exists in a table"""
@@ -815,17 +1213,52 @@ def create_company_settings_table():
                 print("[OK] Default company settings inserted")
             else:
                 print("[OK] Company settings table already exists")
+                # InnoDB row size cap is 65535 (VARCHARs count at max width; TEXT only ~12 bytes).
+                # Convert long URL/path fields to TEXT before adding more columns.
+                varchar_to_text = (
+                    'company_logo', 'company_tagline', 'website_url',
+                    'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link', 'tiktok_link',
+                    'review_collection_link', 'gbp_business_description',
+                    'default_letterhead', 'stamp_seal_upload', 'default_signature_documents',
+                    'push_app_origin', 'favicon', 'login_page_background',
+                    'google_drive_token_uri', 'google_drive_account_picture',
+                    'homepage_hero_tagline', 'homepage_cta_url', 'homepage_video_url',
+                )
+                for col in varchar_to_text:
+                    if column_exists('company_settings', col):
+                        try:
+                            cursor.execute(f"ALTER TABLE company_settings MODIFY COLUMN {col} TEXT")
+                            connection.commit()
+                        except Exception as e:
+                            print(f"[WARNING] Could not convert '{col}' to TEXT: {e}")
                 # Check and add missing columns
                 columns_to_check = [
                     ('company_name', "VARCHAR(255) NOT NULL DEFAULT 'BAUNI LAW GROUP'"),
-                    ('company_logo', 'VARCHAR(500)'),
-                    ('company_tagline', 'VARCHAR(500)'),
+                    ('company_logo', 'TEXT'),
+                    ('company_tagline', 'TEXT'),
                     ('registration_number', 'VARCHAR(100)'),
                     ('tax_pin_vat_number', 'VARCHAR(50)'),
                     ('year_established', 'VARCHAR(10)'),
+                    ('firm_history', 'TEXT'),
+                    ('mission_statement', 'TEXT'),
+                    ('core_values', 'TEXT'),
+                    ('additional_office_locations', 'TEXT'),
                     ('email', 'VARCHAR(255)'),
                     ('contact_number', 'VARCHAR(20)'),
                     ('whatsapp_number', 'VARCHAR(20)'),
+                    ('whatsapp_business_number', 'VARCHAR(20)'),
+                    ('mpesa_till_number', 'VARCHAR(50)'),
+                    ('mpesa_paybill_number', 'VARCHAR(50)'),
+                    ('mpesa_paybill_account', 'VARCHAR(50)'),
+                    ('gbp_primary_category', 'VARCHAR(255)'),
+                    ('gbp_secondary_categories', 'TEXT'),
+                    ('gbp_service_areas', 'TEXT'),
+                    ('gbp_verification_status', 'VARCHAR(50)'),
+                    ('gbp_business_description', 'TEXT'),
+                    ('review_collection_link', 'TEXT'),
+                    ('review_count', 'INT DEFAULT 0'),
+                    ('review_average_rating', 'DECIMAL(3,1)'),
+                    ('review_platform', 'VARCHAR(100)'),
                     ('alternative_phone', 'VARCHAR(20)'),
                     ('customer_support_email', 'VARCHAR(255)'),
                     ('country', 'VARCHAR(100)'),
@@ -841,20 +1274,28 @@ def create_company_settings_table():
                     ('public_holiday_status', 'VARCHAR(255)'),
                     ('public_holiday_open_time', 'VARCHAR(20)'),
                     ('public_holiday_close_time', 'VARCHAR(20)'),
-                    ('website_url', 'VARCHAR(500)'),
-                    ('fb_link', 'VARCHAR(500)'),
-                    ('linkedin_link', 'VARCHAR(500)'),
-                    ('twitter_link', 'VARCHAR(500)'),
-                    ('instagram_link', 'VARCHAR(500)'),
-                    ('tiktok_link', 'VARCHAR(500)'),
+                    ('website_url', 'TEXT'),
+                    ('fb_link', 'TEXT'),
+                    ('linkedin_link', 'TEXT'),
+                    ('twitter_link', 'TEXT'),
+                    ('instagram_link', 'TEXT'),
+                    ('tiktok_link', 'TEXT'),
                     ('law_society_reg_number', 'VARCHAR(100)'),
                     ('practicing_certificate_number', 'VARCHAR(100)'),
                     ('lead_advocate_name', 'VARCHAR(255)'),
                     ('bar_association_membership', 'VARCHAR(255)'),
-                    ('default_letterhead', 'VARCHAR(500)'),
+                    ('privacy_policy', 'TEXT'),
+                    ('terms_of_service', 'TEXT'),
+                    ('data_protection_registration_number', 'VARCHAR(100)'),
+                    ('website_disclaimer', 'TEXT'),
+                    ('awards_rankings', 'TEXT'),
+                    ('years_collective_experience', 'VARCHAR(50)'),
+                    ('cases_handled_count', 'VARCHAR(50)'),
+                    ('firm_website_enabled', 'TINYINT(1) NOT NULL DEFAULT 0'),
+                    ('default_letterhead', 'TEXT'),
                     ('document_footer_text', 'TEXT'),
-                    ('stamp_seal_upload', 'VARCHAR(500)'),
-                    ('default_signature_documents', 'VARCHAR(500)'),
+                    ('stamp_seal_upload', 'TEXT'),
+                    ('default_signature_documents', 'TEXT'),
                     ('currency', 'VARCHAR(10)'),
                     ('invoice_prefix', 'VARCHAR(20)'),
                     ('payment_terms', 'VARCHAR(100)'),
@@ -869,25 +1310,37 @@ def create_company_settings_table():
                     ('vapid_public_key', 'TEXT'),
                     ('vapid_private_key', 'TEXT'),
                     ('vapid_claims_email', 'VARCHAR(255)'),
-                    ('push_app_origin', 'VARCHAR(500)'),
+                    ('push_app_origin', 'TEXT'),
                     ('primary_brand_color', 'VARCHAR(20)'),
                     ('secondary_color', 'VARCHAR(20)'),
                     ('tertiary_color', 'VARCHAR(20)'),
                     ('theme_preset', 'VARCHAR(50)'),
                     ('font_family', 'VARCHAR(50)'),
                     ('font_size', 'VARCHAR(20)'),
-                    ('favicon', 'VARCHAR(500)'),
-                    ('login_page_background', 'VARCHAR(500)'),
+                    ('favicon', 'TEXT'),
+                    ('login_page_background', 'TEXT'),
+                    ('homepage_hero_tagline', 'TEXT'),
+                    ('homepage_cta_label', 'VARCHAR(120)'),
+                    ('homepage_cta_url', 'TEXT'),
+                    ('homepage_header_phone', 'VARCHAR(30)'),
+                    ('homepage_featured_pa_ids', 'VARCHAR(100)'),
+                    ('homepage_show_trust_lsk', 'TINYINT(1) DEFAULT 1'),
+                    ('homepage_show_trust_years', 'TINYINT(1) DEFAULT 1'),
+                    ('homepage_show_trust_cases', 'TINYINT(1) DEFAULT 1'),
+                    ('homepage_video_url', 'TEXT'),
+                    ('default_consultation_fee', 'VARCHAR(120)'),
+                    ('default_free_consultation', 'TINYINT(1) DEFAULT 0'),
+                    ('consultation_response_time', 'VARCHAR(120)'),
                     ('location_name', 'VARCHAR(255)'),
                     ('longitude', 'DECIMAL(10, 8)'),
                     ('latitude', 'DECIMAL(10, 8)'),
                     ('google_drive_token', 'TEXT'),
                     ('google_drive_refresh_token', 'TEXT'),
-                    ('google_drive_token_uri', 'VARCHAR(500)'),
+                    ('google_drive_token_uri', 'TEXT'),
                     ('google_drive_scopes', 'TEXT'),
                     ('google_drive_account_email', 'VARCHAR(255)'),
                     ('google_drive_account_name', 'VARCHAR(255)'),
-                    ('google_drive_account_picture', 'VARCHAR(500)'),
+                    ('google_drive_account_picture', 'TEXT'),
                     ('google_drive_main_folder_id', 'VARCHAR(255)'),
                     ('google_drive_token_expiry', 'DATETIME NULL'),
                     ('google_drive_last_verified_at', 'DATETIME NULL'),
@@ -1018,6 +1471,32 @@ def create_employees_table():
                             print(f"[OK] Added onboarding column '{column_name}' to employees table")
                         except Exception as e:
                             print(f"[WARNING] Could not add column '{column_name}': {e}")
+
+                attorney_profile_columns = [
+                    ('professional_title', 'VARCHAR(255)'),
+                    ('attorney_bio', 'TEXT'),
+                    ('practice_areas', 'TEXT'),
+                    ('public_contact_email', 'VARCHAR(255)'),
+                    ('public_contact_phone', 'VARCHAR(20)'),
+                    ('lsk_practicing_certificate_number', 'VARCHAR(100)'),
+                    ('education_institutions', 'TEXT'),
+                    ('year_called_to_bar', 'VARCHAR(10)'),
+                    ('meta_title', 'VARCHAR(70)'),
+                    ('meta_description', 'VARCHAR(160)'),
+                    ('url_slug', 'VARCHAR(120)'),
+                    ('h1_heading', 'VARCHAR(255)'),
+                    ('canonical_url', 'VARCHAR(500)'),
+                    ('profile_picture_alt', 'VARCHAR(255)'),
+                    ('video_intro_url', 'VARCHAR(500)'),
+                ]
+                for column_name, column_def in attorney_profile_columns:
+                    if not column_exists('employees', column_name):
+                        try:
+                            cursor.execute(f"ALTER TABLE employees ADD COLUMN {column_name} {column_def}")
+                            connection.commit()
+                            print(f"[OK] Added attorney profile column '{column_name}' to employees table")
+                        except Exception as e:
+                            print(f"[WARNING] Could not add column '{column_name}': {e}")
             
             return True
     except Exception as e:
@@ -1063,6 +1542,498 @@ def create_employee_permissions_table():
     finally:
         if connection:
             connection.close()
+
+
+def create_firm_practice_areas_table():
+    """Firm-wide practice areas for the Legal settings page."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_practice_areas'):
+                cursor.execute("""
+                    CREATE TABLE firm_practice_areas (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        target_keywords TEXT,
+                        short_description TEXT,
+                        long_description TEXT,
+                        sub_specialties TEXT,
+                        meta_title VARCHAR(70),
+                        meta_description VARCHAR(160),
+                        url_slug VARCHAR(120),
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_practice_areas table created")
+            else:
+                print("[OK] firm_practice_areas table already exists")
+                pa_columns = [
+                    ('target_keywords', 'TEXT'),
+                    ('short_description', 'TEXT'),
+                    ('long_description', 'TEXT'),
+                    ('meta_title', 'VARCHAR(70)'),
+                    ('meta_description', 'VARCHAR(160)'),
+                    ('url_slug', 'VARCHAR(120)'),
+                    ('h1_heading', 'VARCHAR(255)'),
+                    ('canonical_url', 'VARCHAR(500)'),
+                    ('image_path', 'VARCHAR(500)'),
+                    ('image_alt', 'VARCHAR(255)'),
+                    ('cta_label', 'VARCHAR(120)'),
+                    ('consultation_fee', 'VARCHAR(120)'),
+                    ('free_consultation', 'TINYINT(1) DEFAULT 0'),
+                    ('response_time_commitment', 'VARCHAR(120)'),
+                ]
+                for column_name, column_def in pa_columns:
+                    if not column_exists('firm_practice_areas', column_name):
+                        try:
+                            cursor.execute(
+                                f"ALTER TABLE firm_practice_areas ADD COLUMN {column_name} {column_def}"
+                            )
+                            connection.commit()
+                            print(f"[OK] Added column '{column_name}' to firm_practice_areas")
+                        except Exception as e:
+                            print(f"[WARNING] Could not add column '{column_name}': {e}")
+                try:
+                    cursor.execute("""
+                        UPDATE firm_practice_areas
+                        SET short_description = description
+                        WHERE (short_description IS NULL OR short_description = '')
+                          AND description IS NOT NULL AND description <> ''
+                    """)
+                    connection.commit()
+                except Exception as e:
+                    print(f"[INFO] firm_practice_areas short_description backfill skipped: {e}")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_practice_areas table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_attorney_notable_cases_table():
+    """Per-attorney notable cases with consent for Legal settings."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('attorney_notable_cases'):
+                cursor.execute("""
+                    CREATE TABLE attorney_notable_cases (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        employee_id INT NOT NULL,
+                        description TEXT NOT NULL,
+                        consent_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        CONSTRAINT fk_attorney_notable_cases_employee
+                            FOREIGN KEY (employee_id) REFERENCES employees(id)
+                            ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] attorney_notable_cases table created")
+            else:
+                print("[OK] attorney_notable_cases table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating attorney_notable_cases table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_notable_case_outcomes_table():
+    """Firm-wide notable case outcomes for Legal settings."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_notable_case_outcomes'):
+                cursor.execute("""
+                    CREATE TABLE firm_notable_case_outcomes (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        description TEXT NOT NULL,
+                        practice_area VARCHAR(255),
+                        consent_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_notable_case_outcomes table created")
+            else:
+                print("[OK] firm_notable_case_outcomes table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_notable_case_outcomes table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_media_mentions_table():
+    """Press and media mentions for Legal settings."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_media_mentions'):
+                cursor.execute("""
+                    CREATE TABLE firm_media_mentions (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        publication VARCHAR(255) NOT NULL,
+                        link VARCHAR(500),
+                        mention_date VARCHAR(50),
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_media_mentions table created")
+            else:
+                print("[OK] firm_media_mentions table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_media_mentions table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_awards_table():
+    """Awards and rankings for Legal / credibility settings."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_awards'):
+                cursor.execute("""
+                    CREATE TABLE firm_awards (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(500) NOT NULL,
+                        year VARCHAR(10),
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_awards table created")
+            else:
+                print("[OK] firm_awards table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_awards table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_page_seo_table():
+    """Per-page SEO metadata for the public firm website (avoids company_settings row-size limits)."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if not table_exists('firm_page_seo'):
+                cursor.execute("""
+                    CREATE TABLE firm_page_seo (
+                        page_key VARCHAR(32) PRIMARY KEY,
+                        meta_title VARCHAR(70),
+                        meta_description VARCHAR(160),
+                        h1_heading VARCHAR(255),
+                        url_slug VARCHAR(120),
+                        canonical_url VARCHAR(500),
+                        body_content LONGTEXT,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_page_seo table created")
+            else:
+                print("[OK] firm_page_seo table already exists")
+                if not column_exists('firm_page_seo', 'body_content'):
+                    try:
+                        cursor.execute(
+                            "ALTER TABLE firm_page_seo ADD COLUMN body_content LONGTEXT"
+                        )
+                        connection.commit()
+                        print("[OK] Added column 'body_content' to firm_page_seo")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add body_content to firm_page_seo: {e}")
+            cursor.execute("SELECT id FROM company_settings ORDER BY id DESC LIMIT 1")
+            cs_row = cursor.fetchone()
+            if cs_row:
+                cursor.execute(
+                    "SELECT * FROM company_settings WHERE id = %s",
+                    (cs_row['id'],),
+                )
+                legacy = cursor.fetchone() or {}
+                for page_key in ('home', 'about'):
+                    cursor.execute(
+                        "SELECT page_key FROM firm_page_seo WHERE page_key = %s",
+                        (page_key,),
+                    )
+                    if cursor.fetchone():
+                        continue
+                    prefix = f'seo_{page_key}_'
+                    meta_title = (legacy.get(f'{prefix}meta_title') or '').strip()
+                    meta_description = (legacy.get(f'{prefix}meta_description') or '').strip()
+                    h1_heading = (legacy.get(f'{prefix}h1_heading') or '').strip()
+                    url_slug = (legacy.get(f'{prefix}url_slug') or '').strip()
+                    canonical_url = (legacy.get(f'{prefix}canonical_url') or '').strip()
+                    if not any((meta_title, meta_description, h1_heading, url_slug, canonical_url)):
+                        continue
+                    cursor.execute("""
+                        INSERT INTO firm_page_seo
+                        (page_key, meta_title, meta_description, h1_heading, url_slug, canonical_url)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (page_key, meta_title, meta_description, h1_heading, url_slug, canonical_url))
+                connection.commit()
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_page_seo table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_image_alt_table():
+    """Alt text for firm website / branding images (avoids company_settings row-size limits)."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if not table_exists('firm_image_alt'):
+                cursor.execute("""
+                    CREATE TABLE firm_image_alt (
+                        asset_key VARCHAR(64) PRIMARY KEY,
+                        alt_text VARCHAR(255) NOT NULL DEFAULT '',
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_image_alt table created")
+            else:
+                print("[OK] firm_image_alt table already exists")
+            cursor.execute("SELECT id FROM company_settings ORDER BY id DESC LIMIT 1")
+            cs_row = cursor.fetchone()
+            if cs_row:
+                cursor.execute(
+                    "SELECT company_logo_alt FROM company_settings WHERE id = %s",
+                    (cs_row['id'],),
+                )
+                legacy = cursor.fetchone() or {}
+                logo_alt = (legacy.get('company_logo_alt') or '').strip()
+                if logo_alt:
+                    cursor.execute("""
+                        INSERT INTO firm_image_alt (asset_key, alt_text)
+                        VALUES ('company_logo', %s)
+                        ON DUPLICATE KEY UPDATE alt_text = IF(alt_text = '', VALUES(alt_text), alt_text)
+                    """, (logo_alt,))
+                    connection.commit()
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_image_alt table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_attorney_education_table():
+    """Structured education entries per attorney."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('attorney_education'):
+                cursor.execute("""
+                    CREATE TABLE attorney_education (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        employee_id INT NOT NULL,
+                        degree VARCHAR(255),
+                        institution VARCHAR(255),
+                        year VARCHAR(10),
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        CONSTRAINT fk_attorney_education_employee
+                            FOREIGN KEY (employee_id) REFERENCES employees(id)
+                            ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] attorney_education table created")
+            else:
+                print("[OK] attorney_education table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating attorney_education table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_testimonials_table():
+    """Client testimonials for Contact / Reviews settings."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_testimonials'):
+                cursor.execute("""
+                    CREATE TABLE firm_testimonials (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        client_name VARCHAR(255) NOT NULL DEFAULT 'Anonymous',
+                        quote TEXT NOT NULL,
+                        testimonial_date VARCHAR(50),
+                        consent_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_testimonials table created")
+            else:
+                print("[OK] firm_testimonials table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_testimonials table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_faqs_table():
+    """FAQ entries for structured data (FAQPage) and the public firm website."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_faqs'):
+                cursor.execute("""
+                    CREATE TABLE firm_faqs (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        question VARCHAR(500) NOT NULL,
+                        answer TEXT NOT NULL,
+                        publish_confirmed TINYINT(1) NOT NULL DEFAULT 0,
+                        sort_order INT NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_faqs table created")
+            else:
+                print("[OK] firm_faqs table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_faqs table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_consultation_requests_table():
+    """Inbound consultation form submissions from the public firm website."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_consultation_requests'):
+                cursor.execute("""
+                    CREATE TABLE firm_consultation_requests (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        full_name VARCHAR(255) NOT NULL,
+                        phone VARCHAR(50),
+                        email VARCHAR(255),
+                        practice_area VARCHAR(255),
+                        message TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_consultation_requests table created")
+            else:
+                print("[OK] firm_consultation_requests table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_consultation_requests table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
+
+def create_firm_blog_posts_table():
+    """Blog / insights posts for the public firm website."""
+    try:
+        connection = get_db_connection()
+        if not connection:
+            return False
+        with connection.cursor() as cursor:
+            if not table_exists('firm_blog_posts'):
+                cursor.execute("""
+                    CREATE TABLE firm_blog_posts (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        title VARCHAR(500) NOT NULL,
+                        slug VARCHAR(200) NOT NULL,
+                        excerpt TEXT,
+                        body LONGTEXT,
+                        author_employee_id INT NULL,
+                        published TINYINT(1) NOT NULL DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            ON UPDATE CURRENT_TIMESTAMP,
+                        UNIQUE KEY uq_firm_blog_slug (slug),
+                        INDEX idx_firm_blog_published (published, updated_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] firm_blog_posts table created")
+            else:
+                print("[OK] firm_blog_posts table already exists")
+        return True
+    except Exception as e:
+        print(f"Error creating/updating firm_blog_posts table: {e}")
+        return False
+    finally:
+        if connection:
+            connection.close()
+
 
 def create_clients_table():
     """Create clients table for Google OAuth authenticated clients"""
@@ -1343,8 +2314,8 @@ def create_case_tables():
                         filing_date DATE NOT NULL,
                         case_category VARCHAR(255) NOT NULL,
                         station VARCHAR(255) NOT NULL,
-                        filled_by_id INT NOT NULL,
-                        filled_by_name VARCHAR(255) NOT NULL,
+                        filled_by_id INT NULL,
+                        filled_by_name VARCHAR(255) NULL,
                         created_by_id INT NOT NULL,
                         created_by_name VARCHAR(255) NOT NULL,
                         description TEXT,
@@ -1352,7 +2323,7 @@ def create_case_tables():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-                        FOREIGN KEY (filled_by_id) REFERENCES employees(id) ON DELETE CASCADE,
+                        FOREIGN KEY (filled_by_id) REFERENCES employees(id) ON DELETE SET NULL,
                         FOREIGN KEY (created_by_id) REFERENCES employees(id) ON DELETE CASCADE,
                         INDEX idx_client_id (client_id),
                         INDEX idx_filled_by_id (filled_by_id),
@@ -1522,6 +2493,15 @@ def create_case_tables():
                     print("[OK] Added court_rank column to cases table")
                 except Exception as e:
                     print(f"[WARNING] Could not add court_rank column: {e}")
+
+            # Allocation happens on approval — filled_by may be unset at registration
+            try:
+                cursor.execute("ALTER TABLE cases MODIFY COLUMN filled_by_id INT NULL")
+                cursor.execute("ALTER TABLE cases MODIFY COLUMN filled_by_name VARCHAR(255) NULL")
+                connection.commit()
+                print("[OK] Made cases.filled_by_* nullable (allocate on approval)")
+            except Exception as e:
+                print(f"[WARNING] Could not make cases.filled_by_* nullable: {e}")
         
         return True
     except Exception as e:
@@ -1532,7 +2512,7 @@ def create_case_tables():
             connection.close()
 
 def create_matters_table():
-    """Create matters table for other matters management"""
+    """Create matters table for non-litigation matters management"""
     try:
         connection = get_db_connection()
         if not connection:
@@ -1550,8 +2530,8 @@ def create_matters_table():
                         client_name VARCHAR(255) NOT NULL,
                         client_phone VARCHAR(20),
                         client_instructions TEXT,
-                        assigned_employee_id INT NOT NULL,
-                        assigned_employee_name VARCHAR(255) NOT NULL,
+                        assigned_employee_id INT NULL,
+                        assigned_employee_name VARCHAR(255) NULL,
                         date_opened DATE NOT NULL,
                         status ENUM('Open', 'In Progress', 'Pending Client', 'Completed', 'On Hold', 'Closed', 'Pending Approval') DEFAULT 'Pending Approval',
                         created_by_id INT NOT NULL,
@@ -1559,7 +2539,7 @@ def create_matters_table():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-                        FOREIGN KEY (assigned_employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+                        FOREIGN KEY (assigned_employee_id) REFERENCES employees(id) ON DELETE SET NULL,
                         FOREIGN KEY (created_by_id) REFERENCES employees(id) ON DELETE CASCADE,
                         INDEX idx_client_id (client_id),
                         INDEX idx_assigned_employee_id (assigned_employee_id),
@@ -1600,6 +2580,38 @@ def create_matters_table():
                     print("[OK] Added allocation_timeline column to matters")
                 except Exception as e:
                     print(f"[WARNING] Could not add allocation_timeline column: {e}")
+
+            # Allocation happens on approval — assignee may be unset at registration
+            try:
+                cursor.execute("ALTER TABLE matters MODIFY COLUMN assigned_employee_id INT NULL")
+                cursor.execute("ALTER TABLE matters MODIFY COLUMN assigned_employee_name VARCHAR(255) NULL")
+                connection.commit()
+                print("[OK] Made matters.assigned_employee_* nullable (allocate on approval)")
+            except Exception as e:
+                print(f"[WARNING] Could not make matters.assigned_employee_* nullable: {e}")
+
+            # Create matter_parties table (mirrors case_parties for non-litigation matters)
+            if not table_exists('matter_parties'):
+                cursor.execute("""
+                    CREATE TABLE matter_parties (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        matter_id INT NOT NULL,
+                        party_name VARCHAR(255) NOT NULL,
+                        party_type VARCHAR(255) NOT NULL,
+                        party_category VARCHAR(255),
+                        firm_agent VARCHAR(255),
+                        party_phone VARCHAR(50),
+                        party_email VARCHAR(255),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        FOREIGN KEY (matter_id) REFERENCES matters(id) ON DELETE CASCADE,
+                        INDEX idx_matter_id (matter_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """)
+                connection.commit()
+                print("[OK] Matter parties table created")
+            else:
+                print("[OK] Matter parties table already exists")
         
         return True
     except Exception as e:
@@ -1837,8 +2849,8 @@ def apply_migrations(current_version):
                             filing_date DATE NOT NULL,
                             case_category VARCHAR(255) NOT NULL,
                             station VARCHAR(255) NOT NULL,
-                            filled_by_id INT NOT NULL,
-                            filled_by_name VARCHAR(255) NOT NULL,
+                            filled_by_id INT NULL,
+                            filled_by_name VARCHAR(255) NULL,
                             created_by_id INT NOT NULL,
                             created_by_name VARCHAR(255) NOT NULL,
                             description TEXT,
@@ -1846,7 +2858,7 @@ def apply_migrations(current_version):
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                             FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
-                            FOREIGN KEY (filled_by_id) REFERENCES employees(id) ON DELETE CASCADE,
+                            FOREIGN KEY (filled_by_id) REFERENCES employees(id) ON DELETE SET NULL,
                             FOREIGN KEY (created_by_id) REFERENCES employees(id) ON DELETE CASCADE,
                             INDEX idx_client_id (client_id),
                             INDEX idx_filled_by_id (filled_by_id),
@@ -2112,6 +3124,13 @@ def apply_migrations(current_version):
 
                 migrations_applied = True
 
+            # Migration 17: Create matter_attendances tables (non-litigation attendance)
+            if current_version < 17:
+                print("Applying migration 17: Creating matter_attendances tables...")
+                ensure_matter_attendances_tables(cursor, connection)
+                print("[OK] matter_attendances tables ready")
+                migrations_applied = True
+
             # Migration 1: Ensure all required columns exist (for older versions)
             if current_version < 1:
                 print("Applying migration 1: Schema updates...")
@@ -2262,6 +3281,43 @@ def init_database():
     if not create_employee_permissions_table():
         print("[ERROR] Failed to create/update employee_permissions table")
         return False
+
+    # Step 4c: Firm practice areas (Legal settings)
+    if not create_firm_practice_areas_table():
+        print("[WARNING] Failed to create/update firm_practice_areas table")
+
+    if not create_firm_testimonials_table():
+        print("[WARNING] Failed to create/update firm_testimonials table")
+
+    if not create_attorney_notable_cases_table():
+        print("[WARNING] Failed to create/update attorney_notable_cases table")
+
+    if not create_firm_notable_case_outcomes_table():
+        print("[WARNING] Failed to create/update firm_notable_case_outcomes table")
+
+    if not create_firm_media_mentions_table():
+        print("[WARNING] Failed to create/update firm_media_mentions table")
+
+    if not create_firm_awards_table():
+        print("[WARNING] Failed to create/update firm_awards table")
+
+    if not create_firm_page_seo_table():
+        print("[WARNING] Failed to create/update firm_page_seo table")
+
+    if not create_firm_image_alt_table():
+        print("[WARNING] Failed to create/update firm_image_alt table")
+
+    if not create_firm_faqs_table():
+        print("[WARNING] Failed to create/update firm_faqs table")
+
+    if not create_firm_consultation_requests_table():
+        print("[WARNING] Failed to create/update firm_consultation_requests table")
+
+    if not create_firm_blog_posts_table():
+        print("[WARNING] Failed to create/update firm_blog_posts table")
+
+    if not create_attorney_education_table():
+        print("[WARNING] Failed to create/update attorney_education table")
     
     # Step 5: Create clients table
     if not create_clients_table():
@@ -2611,6 +3667,1115 @@ def get_company_settings():
     finally:
         if connection:
             connection.close()
+
+
+def is_firm_website_enabled():
+    """True when the tenant's public site should show the law firm website."""
+    settings = get_company_settings()
+    return bool(settings and settings.get('firm_website_enabled'))
+
+
+def _firm_public_asset_url(stored_value):
+    """Public URL for a company logo or employee profile image."""
+    if not stored_value:
+        return None
+    text = str(stored_value).strip()
+    if text.startswith('http://') or text.startswith('https://'):
+        return text
+    return url_for('static', filename=f'uploads/profile_pictures/{text}')
+
+
+def _format_firm_address(firm):
+    """Single-line mailing address from company settings."""
+    if not firm:
+        return ''
+    parts = [
+        firm.get('street_building'),
+        firm.get('office_number_floor'),
+        firm.get('city_town'),
+        firm.get('county_state'),
+        firm.get('postal_address'),
+        firm.get('country'),
+    ]
+    return ', '.join(p.strip() for p in parts if p and str(p).strip())
+
+
+def _normalize_phone_digits(phone):
+    """Digits-only phone for NAP consistency checks."""
+    import re as _re
+    return _re.sub(r'\D', '', str(phone or ''))
+
+
+def _request_is_https():
+    """True when the current request is served over HTTPS (or behind an HTTPS proxy)."""
+    if request.is_secure:
+        return True
+    forwarded = (request.headers.get('X-Forwarded-Proto') or '').split(',')[0].strip().lower()
+    return forwarded == 'https'
+
+
+def _get_sitemap_last_generated(connection):
+    """Last time the XML sitemap was generated (from firm_page_seo metadata row)."""
+    if not connection or not table_exists('firm_page_seo'):
+        return None
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute(
+            "SELECT updated_at FROM firm_page_seo WHERE page_key = %s LIMIT 1",
+            ('_sitemap',),
+        )
+        row = cursor.fetchone()
+        if row and row.get('updated_at'):
+            return _format_public_last_updated(row['updated_at'])
+    return None
+
+
+def _touch_sitemap_generated(connection):
+    """Record sitemap generation timestamp."""
+    if not connection or not table_exists('firm_page_seo'):
+        return
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO firm_page_seo (page_key, meta_title)
+            VALUES ('_sitemap', 'sitemap')
+            ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+        """)
+
+
+def _build_firm_sitemap_entries(connection, firm):
+    """Public firm website URLs for sitemap.xml."""
+    base = get_public_base_url().rstrip('/')
+    if not base or not is_firm_website_enabled():
+        return []
+    entries = [
+        {'loc': f'{base}/', 'priority': '1.0'},
+        {'loc': f'{base}/about', 'priority': '0.8'},
+        {'loc': f'{base}/contact', 'priority': '0.9'},
+    ]
+    practice_areas = []
+    attorneys = []
+    faqs = []
+    testimonials = []
+    case_outcomes = []
+    blog_posts = []
+    careers_content = ''
+    if connection:
+        try:
+            practice_areas = _fetch_firm_practice_areas(connection)
+            attorneys = _fetch_all_employees_for_legal_page(connection)
+            faqs = _fetch_published_firm_faqs(connection)
+            testimonials = _fetch_published_testimonials(connection)
+            case_outcomes = _fetch_published_case_outcomes(connection)
+            blog_posts = _fetch_published_blog_posts(connection)
+            if table_exists('firm_page_seo'):
+                page_map = _fetch_firm_page_seo_map(connection)
+                careers_content = ((page_map.get('careers') or {}).get('body_content') or '').strip()
+        except Exception:
+            pass
+    if practice_areas:
+        entries.append({'loc': f'{base}/practice-areas', 'priority': '0.85'})
+        for pa in practice_areas:
+            slug = _practice_area_public_slug(pa)
+            if slug:
+                entries.append({'loc': f'{base}/practice-areas/{slug}', 'priority': '0.75'})
+    active = [e for e in attorneys if (e.get('status') or 'Active') == 'Active']
+    if active:
+        entries.append({'loc': f'{base}/team', 'priority': '0.8'})
+        for emp in active:
+            slug = _attorney_public_slug(emp)
+            if slug:
+                entries.append({'loc': f'{base}/team/{slug}', 'priority': '0.7'})
+    if faqs:
+        entries.append({'loc': f'{base}/faq', 'priority': '0.65'})
+    if testimonials or case_outcomes:
+        entries.append({'loc': f'{base}/results', 'priority': '0.6'})
+    if blog_posts:
+        entries.append({'loc': f'{base}/blog', 'priority': '0.6'})
+        for post in blog_posts:
+            slug = (post.get('slug') or '').strip()
+            if slug:
+                entries.append({'loc': f'{base}/blog/{slug}', 'priority': '0.55'})
+    if (firm.get('privacy_policy') or '').strip():
+        entries.append({'loc': f'{base}/privacy', 'priority': '0.3'})
+    if (firm.get('terms_of_service') or '').strip():
+        entries.append({'loc': f'{base}/terms', 'priority': '0.3'})
+    if (firm.get('website_disclaimer') or '').strip():
+        entries.append({'loc': f'{base}/disclaimer', 'priority': '0.3'})
+    if careers_content:
+        entries.append({'loc': f'{base}/careers', 'priority': '0.5'})
+    return entries
+
+
+def _compute_firm_seo_status(firm, connection=None):
+    """Read-only technical SEO / NAP status for settings dashboards."""
+    close_conn = False
+    if connection is None:
+        connection = get_db_connection()
+        close_conn = True
+    firm = firm or {}
+    base = get_public_base_url().rstrip('/')
+    firm_site_on = is_firm_website_enabled()
+
+    ssl_ok = False
+    ssl_detail = 'Could not determine HTTPS status.'
+    if base.startswith('https://'):
+        ssl_ok = True
+        ssl_detail = 'Public site URL is configured with HTTPS.'
+    elif _request_is_https():
+        ssl_ok = True
+        ssl_detail = 'Current session is served over HTTPS.'
+    else:
+        ssl_detail = (
+            'Site is not using HTTPS. Set APP_BASE_URL to https://… in production '
+            'or enable SSL on your hosting.'
+        )
+
+    sitemap_url = f'{base}/sitemap.xml' if base else ''
+    sitemap_last = _get_sitemap_last_generated(connection) if connection else None
+    if firm_site_on and sitemap_url:
+        sitemap_status = 'ok'
+        sitemap_detail = (
+            f'Last generated: {sitemap_last}' if sitemap_last
+            else 'Sitemap is available; open the URL once to record generation time.'
+        )
+    elif firm_site_on:
+        sitemap_status = 'warn'
+        sitemap_detail = 'Set a public site URL (APP_BASE_URL) to expose the sitemap.'
+    else:
+        sitemap_status = 'warn'
+        sitemap_detail = 'Enable the law firm website to publish a firm-specific sitemap.'
+
+    robots_url = f'{base}/robots.txt' if base else ''
+    robots_status = 'ok' if robots_url else 'warn'
+    robots_detail = (
+        'robots.txt is served dynamically and references your sitemap when the firm site is on.'
+        if robots_url else 'Set a public site URL to expose robots.txt.'
+    )
+
+    mobile_ok = firm_site_on
+    mobile_detail = (
+        'Firm website templates include a mobile viewport meta tag (mobile-friendly layout).'
+        if firm_site_on else
+        'Turn on the law firm website to use the responsive firm site templates.'
+    )
+
+    nap_issues = []
+    firm_name = (firm.get('company_name') or '').strip()
+    phone = (firm.get('contact_number') or '').strip()
+    email = (firm.get('email') or firm.get('customer_support_email') or '').strip()
+    address_line = _format_firm_address(firm)
+    footer_phone_digits = _normalize_phone_digits(phone)
+    gbp_has_data = any([
+        (firm.get('gbp_primary_category') or '').strip(),
+        (firm.get('gbp_service_areas') or '').strip(),
+        (firm.get('gbp_business_description') or '').strip(),
+    ])
+    has_coords = (
+        firm.get('latitude') is not None and firm.get('longitude') is not None
+        and str(firm.get('latitude')).strip() != '' and str(firm.get('longitude')).strip() != ''
+    )
+
+    if firm_site_on:
+        if not firm_name:
+            nap_issues.append({'label': 'Firm name', 'message': 'Missing — shown in footer and structured data.'})
+        if not phone:
+            nap_issues.append({'label': 'Primary phone', 'message': 'Missing in Contact Details — header, footer, and JSON-LD use this field.'})
+        if not email:
+            nap_issues.append({'label': 'Email', 'message': 'Missing — footer and LegalService schema expect a contact email.'})
+        if not address_line:
+            nap_issues.append({'label': 'Address', 'message': 'Incomplete — add street, city, and country in Company Information.'})
+        elif not (firm.get('city_town') or '').strip():
+            nap_issues.append({'label': 'City / town', 'message': 'Missing — local SEO and maps rely on a complete address.'})
+
+    if gbp_has_data and not has_coords:
+        nap_issues.append({
+            'label': 'GBP maps pin',
+            'message': 'Google Business Profile fields are filled but latitude/longitude are missing.',
+        })
+    if gbp_has_data and not phone:
+        nap_issues.append({
+            'label': 'GBP phone',
+            'message': 'GBP section is configured but Contact Details phone is empty (footer uses the same number).',
+        })
+
+    whatsapp = _normalize_phone_digits(firm.get('whatsapp_business_number') or firm.get('whatsapp_number'))
+    if phone and whatsapp and footer_phone_digits and whatsapp == footer_phone_digits:
+        pass  # same number used for WhatsApp is fine
+
+    nap_status = 'ok' if not nap_issues else 'error'
+
+    return {
+        'firm_site_on': firm_site_on,
+        'public_base_url': base,
+        'ssl': {'status': 'ok' if ssl_ok else 'warn', 'label': 'SSL / HTTPS', 'detail': ssl_detail},
+        'sitemap': {
+            'status': sitemap_status,
+            'label': 'XML Sitemap',
+            'url': sitemap_url,
+            'last_generated': sitemap_last,
+            'detail': sitemap_detail,
+        },
+        'robots': {
+            'status': robots_status,
+            'label': 'robots.txt',
+            'url': robots_url,
+            'detail': robots_detail,
+        },
+        'mobile': {
+            'status': 'ok' if mobile_ok else 'warn',
+            'label': 'Mobile-friendly',
+            'detail': mobile_detail,
+        },
+        'nap': {
+            'status': nap_status,
+            'label': 'NAP consistency',
+            'issues': nap_issues,
+            'detail': (
+                'Name, address, and phone are consistent across Contact, GBP, and the public footer.'
+                if nap_status == 'ok' else
+                'Fix the mismatches below so Google and visitors see the same contact details everywhere.'
+            ),
+        },
+    }
+
+
+def _settings_seo_status_kwargs(company_settings):
+    """Template kwargs for the read-only SEO status panel."""
+    connection = get_db_connection()
+    try:
+        status = _compute_firm_seo_status(company_settings, connection=connection)
+    finally:
+        if connection:
+            connection.close()
+    return {
+        'firm_seo_status': status,
+        'public_site_base_url': get_public_base_url().rstrip('/'),
+    }
+
+
+def _compute_settings_section_completion(section_key, firm, connection=None):
+    """Completion percentage for a settings section (launch-critical fields weighted)."""
+    firm = firm or {}
+    close_conn = False
+    if connection is None:
+        connection = get_db_connection()
+        close_conn = True
+    total = 0
+    done = 0
+
+    def check(weight, ok):
+        nonlocal total, done
+        total += weight
+        if ok:
+            done += weight
+
+    if section_key == 'company':
+        check(2, bool((firm.get('company_name') or '').strip()))
+        check(1, bool((firm.get('company_tagline') or '').strip()))
+        check(1, bool(firm.get('company_logo')))
+        check(1, bool((firm.get('firm_history') or '').strip() or (firm.get('mission_statement') or '').strip()))
+        check(2, bool(_format_firm_address(firm)))
+        check(1, bool((firm.get('seo_home_meta_title') or '').strip()))
+        check(1, bool((firm.get('seo_home_meta_description') or '').strip()))
+    elif section_key == 'contact':
+        check(2, bool((firm.get('contact_number') or '').strip()))
+        check(2, bool((firm.get('email') or firm.get('customer_support_email') or '').strip()))
+        check(1, bool((firm.get('opening_time') or '').strip() and (firm.get('closing_time') or '').strip()))
+        check(1, bool((firm.get('gbp_primary_category') or '').strip()))
+        check(1, bool((firm.get('gbp_service_areas') or '').strip()))
+        has_coords = firm.get('latitude') is not None and firm.get('longitude') is not None
+        check(1, has_coords)
+    elif section_key == 'legal':
+        practice_areas = []
+        attorneys = []
+        if connection:
+            try:
+                practice_areas = _fetch_firm_practice_areas(connection)
+                attorneys = _fetch_all_employees_for_legal_page(connection)
+            except Exception:
+                pass
+        check(2, len(practice_areas) >= 1)
+        active_attys = [e for e in attorneys if (e.get('status') or 'Active') == 'Active']
+        check(2, len(active_attys) >= 1)
+        with_bio = [e for e in active_attys if (e.get('attorney_bio') or '').strip()]
+        check(1, len(with_bio) >= 1)
+        check(1, bool((firm.get('privacy_policy') or '').strip()))
+        check(1, bool((firm.get('terms_of_service') or '').strip()))
+    else:
+        return None
+
+    if total == 0:
+        return None
+    pct = int(round((done / total) * 100))
+    return {'percent': pct, 'done': done, 'total': total}
+
+
+def _get_firm_website_context(page='home', **extra):
+    """Template context for the public law-firm website."""
+    preview_mode = bool(extra.get('preview_mode'))
+    practice_area = extra.get('practice_area')
+    attorney = extra.get('attorney')
+    blog_post = extra.get('blog_post')
+    legal_page_key = extra.get('legal_page_key')
+
+    def firm_url(path=''):
+        return _firm_site_path(path, preview_mode)
+
+    firm = _enrich_company_settings_with_site_meta(get_company_settings() or {'company_name': 'Law Firm'})
+    practice_areas = []
+    attorneys = []
+    testimonials = []
+    case_outcomes = []
+    awards = []
+    faqs = []
+    blog_posts = []
+    careers_content = ''
+    attorney_notable_cases = {}
+    attorney_education = {}
+    connection = get_db_connection()
+    if connection:
+        try:
+            practice_areas = _fetch_firm_practice_areas(connection)
+            attorneys = _fetch_all_employees_for_legal_page(connection)
+            testimonials = _fetch_published_testimonials(connection)
+            case_outcomes = _fetch_published_case_outcomes(connection)
+            awards = _fetch_firm_awards(connection)
+            faqs = _fetch_published_firm_faqs(connection)
+            blog_posts = _fetch_published_blog_posts(connection)
+            attorney_notable_cases = _fetch_published_attorney_notable_cases_by_employee(connection)
+            attorney_education = _fetch_attorney_education_by_employee(connection)
+            if table_exists('firm_page_seo'):
+                page_seo_map = _fetch_firm_page_seo_map(connection)
+                careers_row = page_seo_map.get('careers') or {}
+                careers_content = (careers_row.get('body_content') or '').strip()
+        finally:
+            connection.close()
+    working_days = (firm.get('working_days') or '').replace(',', ', ')
+    hours_bits = []
+    if firm.get('opening_time') and firm.get('closing_time'):
+        hours_bits.append(f"{firm.get('opening_time')} – {firm.get('closing_time')}")
+    if working_days:
+        hours_bits.append(working_days)
+    business_hours = ' · '.join(hours_bits)
+    firm_name = (firm.get('company_name') or 'Law Firm').strip()
+    seo_home = _firm_page_seo_from_settings(firm, 'home', default_h1=firm_name)
+    seo_about = _firm_page_seo_from_settings(firm, 'about', default_h1='About Us')
+    if not seo_home['meta_title']:
+        tagline = (firm.get('company_tagline') or '').strip()
+        seo_home['meta_title'] = f"{firm_name}{(' | ' + tagline) if tagline else ''}"[:70]
+    if not seo_home['meta_description']:
+        tagline = (firm.get('company_tagline') or '').strip()
+        seo_home['meta_description'] = (tagline or f'Welcome to {firm_name}')[:160]
+    if not seo_about['meta_description']:
+        seo_about['meta_description'] = (
+            firm.get('mission_statement') or 'Learn more about our firm, our mission, and our values.'
+        )[:160]
+    for pa in practice_areas:
+        pa['url_slug'] = _practice_area_public_slug(pa)
+        if pa.get('updated_at'):
+            pa['last_updated_display'] = _format_public_last_updated(pa['updated_at'])
+        if pa.get('image_path'):
+            pa['image_url'] = _firm_public_asset_url(pa['image_path'])
+    for emp in attorneys:
+        emp['url_slug'] = _attorney_public_slug(emp)
+        if emp.get('updated_at'):
+            emp['last_updated_display'] = _format_public_last_updated(emp['updated_at'])
+        if emp.get('profile_picture'):
+            emp['profile_picture_url'] = _firm_public_asset_url(emp.get('profile_picture'))
+    page_seo = _resolve_firm_page_seo(
+        page, firm, firm_name, seo_home, seo_about, extra,
+    )
+    breadcrumbs = _firm_breadcrumbs(
+        page,
+        preview_mode=preview_mode,
+        practice_area=practice_area,
+        attorney=attorney,
+        blog_post=blog_post,
+    )
+    json_ld_scripts = _build_firm_website_jsonld_scripts(
+        firm=firm,
+        firm_name=firm_name,
+        firm_logo_stored=firm.get('company_logo'),
+        practice_areas=practice_areas,
+        attorneys=attorneys,
+        faqs=faqs,
+        seo_home=seo_home,
+        business_hours=business_hours,
+        attorney_education=attorney_education,
+        page=page,
+        page_seo=page_seo,
+        breadcrumbs=breadcrumbs,
+        practice_area=practice_area,
+        attorney=attorney,
+        blog_post=blog_post,
+    )
+    featured_practice_areas = _resolve_featured_practice_areas(practice_areas, firm)
+    trust_badges = _firm_trust_badges(firm, awards)
+    hero_tagline = (
+        (firm.get('homepage_hero_tagline') or '').strip()
+        or (firm.get('company_tagline') or '').strip()
+    )
+    display_phone = (
+        (firm.get('homepage_header_phone') or '').strip()
+        or (firm.get('contact_number') or '').strip()
+    )
+    cta_label = _firm_cta_label(firm, practice_area)
+    cta_url_raw = (firm.get('homepage_cta_url') or '').strip()
+    if cta_url_raw.startswith('http'):
+        hero_cta_url = cta_url_raw
+    elif cta_url_raw:
+        hero_cta_url = firm_url(cta_url_raw.lstrip('/'))
+    else:
+        hero_cta_url = firm_url('contact')
+    homepage_video_embed = _video_embed_url(firm.get('homepage_video_url'))
+    attorney_video_embed = ''
+    if attorney:
+        attorney_video_embed = _video_embed_url(attorney.get('video_intro_url'))
+    consultation_fee_label = _firm_consultation_fee_label(firm, practice_area)
+    response_time_label = _firm_response_time_label(firm, practice_area)
+    intro_source = (firm.get('firm_history') or firm.get('mission_statement') or '').strip()
+    firm_intro_excerpt = _text_excerpt(intro_source, 320)
+    theme = _firm_website_theme(firm)
+    whatsapp_number = (
+        firm.get('whatsapp_business_number') or firm.get('whatsapp_number') or ''
+    ).strip()
+    active_attorneys = [e for e in attorneys if (e.get('status') or 'Active') == 'Active']
+    area_attorneys = (
+        _attorneys_for_practice_area(active_attorneys, practice_area.get('name'))
+        if practice_area else []
+    )
+    map_embed_url = ''
+    if firm.get('latitude') is not None and firm.get('longitude') is not None:
+        map_embed_url = (
+            f"https://maps.google.com/maps?q={firm['latitude']},{firm['longitude']}"
+            f"&z=15&output=embed"
+        )
+    elif firm_address := _format_firm_address(firm):
+        from urllib.parse import quote_plus
+        map_embed_url = f"https://maps.google.com/maps?q={quote_plus(firm_address)}&z=15&output=embed"
+
+    legal_content = ''
+    legal_titles = {
+        'privacy': 'Privacy Policy',
+        'terms': 'Terms of Service',
+        'disclaimer': 'Website Disclaimer',
+    }
+    if legal_page_key == 'privacy':
+        legal_content = firm.get('privacy_policy') or ''
+    elif legal_page_key == 'terms':
+        legal_content = firm.get('terms_of_service') or ''
+    elif legal_page_key == 'disclaimer':
+        legal_content = firm.get('website_disclaimer') or ''
+
+    ctx = {
+        'firm': firm,
+        'firm_name': firm_name,
+        'firm_tagline': hero_tagline,
+        'firm_logo_url': _firm_public_asset_url(firm.get('company_logo')),
+        'firm_logo_alt': (firm.get('company_logo_alt') or firm_name).strip(),
+        'firm_address': _format_firm_address(firm),
+        'firm_email': (firm.get('email') or firm.get('customer_support_email') or '').strip(),
+        'firm_phone': display_phone,
+        'firm_whatsapp': (firm.get('whatsapp_number') or '').strip(),
+        'firm_whatsapp_business': (firm.get('whatsapp_business_number') or '').strip(),
+        'business_hours': business_hours,
+        'practice_areas': practice_areas,
+        'attorneys': active_attorneys,
+        'testimonials': testimonials,
+        'case_outcomes': case_outcomes,
+        'awards': awards,
+        'faqs': faqs,
+        'blog_posts': blog_posts,
+        'careers_content': careers_content,
+        'attorney_notable_cases': attorney_notable_cases,
+        'attorney_education': attorney_education,
+        'firm_public_asset_url': _firm_public_asset_url,
+        'seo_home': seo_home,
+        'seo_about': seo_about,
+        'page_seo': page_seo,
+        'breadcrumbs': breadcrumbs,
+        'current_page': page,
+        'preview_mode': preview_mode,
+        'firm_url': firm_url,
+        'featured_practice_areas': featured_practice_areas,
+        'trust_badges': trust_badges,
+        'firm_intro_excerpt': firm_intro_excerpt,
+        'theme': theme,
+        'whatsapp_url': _whatsapp_chat_url(whatsapp_number),
+        'firm_nav': _firm_website_nav_items(
+            practice_areas, active_attorneys, faqs, testimonials, case_outcomes,
+            blog_posts=blog_posts, careers_content=careers_content, preview_mode=preview_mode,
+        ),
+        'hero_cta_label': cta_label,
+        'hero_cta_url': hero_cta_url,
+        'consultation_fee_label': consultation_fee_label,
+        'response_time_label': response_time_label,
+        'homepage_video_embed': homepage_video_embed,
+        'attorney_video_embed': attorney_video_embed,
+        'site_last_updated': _format_public_last_updated(firm.get('updated_at')),
+        'json_ld_scripts': json_ld_scripts,
+        'map_embed_url': map_embed_url,
+        'practice_area': practice_area,
+        'attorney': attorney,
+        'blog_post': blog_post,
+        'area_attorneys': area_attorneys,
+        'legal_page_key': legal_page_key,
+        'legal_content': legal_content,
+        'legal_page_title': legal_titles.get(legal_page_key or '', ''),
+        'form_success': extra.get('form_success'),
+        'form_error': extra.get('form_error'),
+    }
+    return ctx
+
+
+def _text_excerpt(text, max_len=280):
+    """Trim long text for homepage intros."""
+    if not text:
+        return ''
+    cleaned = ' '.join(str(text).split())
+    if len(cleaned) <= max_len:
+        return cleaned
+    snippet = cleaned[:max_len].rsplit(' ', 1)[0]
+    return f'{snippet}…'
+
+
+def _firm_website_theme(firm):
+    """Branding tokens from company settings for the public firm site."""
+    primary = (firm.get('primary_brand_color') or '#1E1A4E').strip()
+    secondary = (firm.get('secondary_color') or '#6C5CE7').strip()
+    tertiary = (firm.get('tertiary_color') or '#A29BFE').strip()
+    font_body = (firm.get('font_family') or 'Inter').strip()
+    serif_fonts = {
+        'Merriweather', 'Lora', 'Source Serif 4', 'Playfair Display',
+    }
+    font_heading = font_body if font_body in serif_fonts else 'Playfair Display'
+    return {
+        'primary': primary,
+        'secondary': secondary,
+        'tertiary': tertiary,
+        'font_body': font_body,
+        'font_heading': font_heading,
+    }
+
+
+def _firm_trust_badges(firm, awards):
+    """Trust signals for the homepage from legal credentials and firm stats."""
+    badges = []
+    show_lsk = firm.get('homepage_show_trust_lsk', 1)
+    show_years = firm.get('homepage_show_trust_years', 1)
+    show_cases = firm.get('homepage_show_trust_cases', 1)
+    if show_lsk and (firm.get('law_society_reg_number') or '').strip():
+        badges.append({
+            'icon': 'fa-certificate',
+            'label': 'LSK Registered',
+            'detail': firm.get('law_society_reg_number'),
+        })
+    if (firm.get('bar_association_membership') or '').strip():
+        badges.append({
+            'icon': 'fa-scale-balanced',
+            'label': 'Bar Association',
+            'detail': firm.get('bar_association_membership'),
+        })
+    if (firm.get('year_established') or '').strip():
+        badges.append({
+            'icon': 'fa-landmark',
+            'label': f'Est. {firm.get("year_established")}',
+            'detail': 'Trusted local advocates',
+        })
+    if show_years and (firm.get('years_collective_experience') or '').strip():
+        badges.append({
+            'icon': 'fa-briefcase',
+            'label': f'{firm.get("years_collective_experience")}+ Years',
+            'detail': 'Collective experience',
+        })
+    if show_cases and (firm.get('cases_handled_count') or '').strip():
+        badges.append({
+            'icon': 'fa-gavel',
+            'label': f'{firm.get("cases_handled_count")}+ Cases',
+            'detail': 'Matters handled',
+        })
+    for award in (awards or [])[:1]:
+        title = (award.get('title') or '').strip()
+        if title:
+            badges.append({
+                'icon': 'fa-award',
+                'label': title,
+                'detail': (award.get('year') or '').strip() or 'Recognition',
+            })
+    return badges[:5]
+
+
+def _resolve_featured_practice_areas(practice_areas, firm):
+    """Homepage featured practice areas from settings (max 3)."""
+    ids_raw = (firm.get('homepage_featured_pa_ids') or '').strip()
+    if ids_raw:
+        id_order = [x.strip() for x in ids_raw.split(',') if x.strip()]
+        by_id = {str(pa.get('id')): pa for pa in practice_areas}
+        featured = [by_id[pid] for pid in id_order if pid in by_id]
+        if featured:
+            return featured[:3]
+    return practice_areas[:3]
+
+
+def _firm_cta_label(firm, practice_area=None):
+    if practice_area and (practice_area.get('cta_label') or '').strip():
+        return practice_area['cta_label'].strip()
+    return (firm.get('homepage_cta_label') or 'Book a Consultation').strip()
+
+
+def _firm_consultation_fee_label(firm, practice_area=None):
+    if practice_area and practice_area.get('free_consultation'):
+        return 'Free consultation'
+    if practice_area and (practice_area.get('consultation_fee') or '').strip():
+        return practice_area['consultation_fee'].strip()
+    if firm.get('default_free_consultation'):
+        return 'Free consultation'
+    fee = (firm.get('default_consultation_fee') or '').strip()
+    return fee or ''
+
+
+def _firm_response_time_label(firm, practice_area=None):
+    if practice_area and (practice_area.get('response_time_commitment') or '').strip():
+        return practice_area['response_time_commitment'].strip()
+    return (firm.get('consultation_response_time') or '').strip()
+
+
+def _video_embed_url(url):
+    """Convert YouTube/Vimeo share URLs to embed URLs."""
+    if not url:
+        return ''
+    text = str(url).strip()
+    if not text:
+        return ''
+    import re as _re
+    yt = _re.search(
+        r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([\w-]{11})',
+        text,
+    )
+    if yt:
+        return f'https://www.youtube.com/embed/{yt.group(1)}'
+    vimeo = _re.search(r'vimeo\.com/(?:video/)?(\d+)', text)
+    if vimeo:
+        return f'https://player.vimeo.com/video/{vimeo.group(1)}'
+    if 'youtube.com/embed' in text or 'player.vimeo.com' in text:
+        return text
+    return ''
+
+
+def _firm_website_nav_items(
+    practice_areas, attorneys, faqs, testimonials, case_outcomes,
+    *, blog_posts=None, careers_content='', preview_mode=False,
+):
+    """Primary navigation links — omit empty sections."""
+    def u(path):
+        return _firm_site_path(path, preview_mode)
+
+    items = [
+        {'key': 'home', 'label': 'Home', 'url': u('')},
+        {'key': 'about', 'label': 'About', 'url': u('about')},
+    ]
+    if practice_areas:
+        items.append({'key': 'practice_areas', 'label': 'Practice Areas', 'url': u('practice-areas')})
+    if attorneys:
+        items.append({'key': 'team', 'label': 'Our Team', 'url': u('team')})
+    if testimonials or case_outcomes:
+        items.append({'key': 'results', 'label': 'Results', 'url': u('results')})
+    if blog_posts:
+        items.append({'key': 'blog', 'label': 'Insights', 'url': u('blog')})
+    if faqs:
+        items.append({'key': 'faq', 'label': 'FAQ', 'url': u('faq')})
+    if careers_content:
+        items.append({'key': 'careers', 'label': 'Careers', 'url': u('careers')})
+    items.append({'key': 'contact', 'label': 'Contact', 'url': u('contact')})
+    return items
+
+
+def _whatsapp_chat_url(phone_number):
+    """Build a WhatsApp click-to-chat URL from a stored phone number."""
+    if not phone_number:
+        return ''
+    import re as _re
+    digits = _re.sub(r'\D', '', str(phone_number))
+    if not digits:
+        return ''
+    if digits.startswith('0') and len(digits) >= 10:
+        digits = '254' + digits[1:]
+    elif len(digits) == 9:
+        digits = '254' + digits
+    return f'https://wa.me/{digits}'
+
+
+def _firm_site_path(path='', preview_mode=False):
+    """Build a public firm-site path, optionally under /website_preview for staff."""
+    path = (path or '').strip('/')
+    if preview_mode:
+        return f'/website_preview/{path}' if path else '/website_preview'
+    return f'/{path}' if path else '/'
+
+
+def _firm_canonical_url(path=''):
+    """Absolute canonical URL for a firm website path."""
+    base = get_public_base_url().rstrip('/')
+    if not base:
+        return ''
+    path = (path or '').strip('/')
+    return f'{base}/{path}' if path else f'{base}/'
+
+
+def _practice_area_public_slug(pa):
+    return (pa.get('url_slug') or str(pa.get('id') or '')).strip()
+
+
+def _attorney_public_slug(emp):
+    slug = (emp.get('url_slug') or '').strip()
+    if slug:
+        return slug
+    return _slugify_url(emp.get('full_name') or '')
+
+
+def _find_practice_area(practice_areas, slug):
+    if not slug:
+        return None
+    for pa in practice_areas:
+        if _practice_area_public_slug(pa) == slug or str(pa.get('id')) == str(slug):
+            return pa
+    return None
+
+
+def _find_attorney(attorneys, slug):
+    if not slug:
+        return None
+    for emp in attorneys:
+        if _attorney_public_slug(emp) == slug or str(emp.get('id')) == str(slug):
+            return emp
+    return None
+
+
+def _seo_from_practice_area(pa, firm_name):
+    slug = _practice_area_public_slug(pa)
+    return {
+        'meta_title': ((pa.get('meta_title') or f'{pa.get("name")} | {firm_name}') or firm_name)[:70],
+        'meta_description': (
+            (pa.get('meta_description') or pa.get('short_description') or pa.get('description') or '')[:160]
+        ),
+        'h1_heading': (pa.get('h1_heading') or pa.get('name') or '').strip(),
+        'url_slug': slug,
+        'canonical_url': (
+            (pa.get('canonical_url') or '').strip()
+            or _firm_canonical_url(f'practice-areas/{slug}')
+        ),
+    }
+
+
+def _seo_from_attorney(emp, firm_name):
+    slug = _attorney_public_slug(emp)
+    return {
+        'meta_title': ((emp.get('meta_title') or f'{emp.get("full_name")} | {firm_name}') or firm_name)[:70],
+        'meta_description': (
+            (emp.get('meta_description') or _text_excerpt(emp.get('attorney_bio') or '', 155))[:160]
+        ),
+        'h1_heading': (emp.get('h1_heading') or emp.get('full_name') or '').strip(),
+        'url_slug': slug,
+        'canonical_url': (
+            (emp.get('canonical_url') or '').strip()
+            or _firm_canonical_url(f'team/{slug}')
+        ),
+    }
+
+
+def _seo_from_blog_post(post, firm_name):
+    slug = (post.get('slug') or '').strip()
+    return {
+        'meta_title': (post.get('title') or firm_name)[:70],
+        'meta_description': (post.get('excerpt') or _text_excerpt(post.get('body') or '', 155))[:160],
+        'h1_heading': (post.get('title') or '').strip(),
+        'url_slug': slug,
+        'canonical_url': _firm_canonical_url(f'blog/{slug}'),
+    }
+
+
+def _static_page_seo(page, firm, firm_name, seo_home, seo_about):
+    """Default SEO for list/static firm pages."""
+    defaults = {
+        'practice_areas': (
+            f'Practice Areas | {firm_name}',
+            'Explore our legal practice areas and the services we provide to clients.',
+            'Practice Areas',
+            'practice-areas',
+        ),
+        'team': (
+            f'Our Team | {firm_name}',
+            'Meet the advocates and legal professionals at our firm.',
+            'Our Team',
+            'team',
+        ),
+        'contact': (
+            f'Contact Us | {firm_name}',
+            'Book a consultation or reach our office by phone, email, or WhatsApp.',
+            'Contact Us',
+            'contact',
+        ),
+        'faq': (
+            f'FAQ | {firm_name}',
+            'Answers to common questions about our firm and legal services.',
+            'Frequently Asked Questions',
+            'faq',
+        ),
+        'results': (
+            f'Results & Testimonials | {firm_name}',
+            'Published case outcomes and client testimonials shared with consent.',
+            'Results & Testimonials',
+            'results',
+        ),
+        'blog': (
+            f'Insights | {firm_name}',
+            'Legal insights and articles from our advocates.',
+            'Insights & Articles',
+            'blog',
+        ),
+        'careers': (
+            f'Careers | {firm_name}',
+            'Career opportunities at our law firm.',
+            'Careers',
+            'careers',
+        ),
+        'privacy': (
+            f'Privacy Policy | {firm_name}',
+            _text_excerpt(firm.get('privacy_policy') or '', 155),
+            'Privacy Policy',
+            'privacy',
+        ),
+        'terms': (
+            f'Terms of Service | {firm_name}',
+            _text_excerpt(firm.get('terms_of_service') or '', 155),
+            'Terms of Service',
+            'terms',
+        ),
+        'disclaimer': (
+            f'Disclaimer | {firm_name}',
+            _text_excerpt(firm.get('website_disclaimer') or '', 155),
+            'Website Disclaimer',
+            'disclaimer',
+        ),
+    }
+    title, desc, h1, slug = defaults.get(page, (firm_name, firm.get('company_tagline') or '', firm_name, page))
+    return {
+        'meta_title': title[:70],
+        'meta_description': (desc or '')[:160],
+        'h1_heading': h1,
+        'url_slug': slug,
+        'canonical_url': _firm_canonical_url(slug),
+    }
+
+
+def _resolve_firm_page_seo(page, firm, firm_name, seo_home, seo_about, extra):
+    pa = extra.get('practice_area')
+    emp = extra.get('attorney')
+    post = extra.get('blog_post')
+    if pa:
+        return _seo_from_practice_area(pa, firm_name)
+    if emp:
+        return _seo_from_attorney(emp, firm_name)
+    if post:
+        return _seo_from_blog_post(post, firm_name)
+    if page == 'home':
+        return seo_home
+    if page == 'about':
+        return seo_about
+    return _static_page_seo(page, firm, firm_name, seo_home, seo_about)
+
+
+def _firm_breadcrumbs(page, preview_mode=False, practice_area=None, attorney=None, blog_post=None):
+    crumbs = [{'label': 'Home', 'url': _firm_site_path('', preview_mode)}]
+    if page == 'home':
+        return crumbs
+    if page == 'about':
+        crumbs.append({'label': 'About', 'url': None})
+    elif page == 'practice_areas':
+        crumbs.append({'label': 'Practice Areas', 'url': None})
+    elif page == 'practice_area' and practice_area:
+        crumbs.append({'label': 'Practice Areas', 'url': _firm_site_path('practice-areas', preview_mode)})
+        crumbs.append({'label': practice_area.get('name'), 'url': None})
+    elif page == 'team':
+        crumbs.append({'label': 'Our Team', 'url': None})
+    elif page == 'attorney' and attorney:
+        crumbs.append({'label': 'Our Team', 'url': _firm_site_path('team', preview_mode)})
+        crumbs.append({'label': attorney.get('full_name'), 'url': None})
+    elif page == 'contact':
+        crumbs.append({'label': 'Contact', 'url': None})
+    elif page == 'faq':
+        crumbs.append({'label': 'FAQ', 'url': None})
+    elif page == 'results':
+        crumbs.append({'label': 'Results', 'url': None})
+    elif page == 'blog':
+        crumbs.append({'label': 'Insights', 'url': None})
+    elif page == 'blog_post' and blog_post:
+        crumbs.append({'label': 'Insights', 'url': _firm_site_path('blog', preview_mode)})
+        crumbs.append({'label': blog_post.get('title'), 'url': None})
+    elif page == 'careers':
+        crumbs.append({'label': 'Careers', 'url': None})
+    elif page in ('privacy', 'terms', 'disclaimer'):
+        labels = {'privacy': 'Privacy Policy', 'terms': 'Terms of Service', 'disclaimer': 'Disclaimer'}
+        crumbs.append({'label': labels[page], 'url': None})
+    return crumbs
+
+
+def _attorneys_for_practice_area(attorneys, practice_area_name):
+    if not practice_area_name:
+        return []
+    name_lower = practice_area_name.lower()
+    matched = []
+    for emp in attorneys:
+        if (emp.get('status') or 'Active') != 'Active':
+            continue
+        areas = (emp.get('practice_areas') or '').lower()
+        if name_lower in areas or any(
+            name_lower in p.strip().lower()
+            for p in areas.replace('\n', ',').split(',') if p.strip()
+        ):
+            matched.append(emp)
+    return matched
+
+
+FIRM_WEBSITE_TEMPLATES = {
+    'home': 'firm_website/pages/home.html',
+    'about': 'firm_website/pages/about.html',
+    'practice_areas': 'firm_website/pages/practice_areas.html',
+    'practice_area': 'firm_website/pages/practice_area.html',
+    'team': 'firm_website/pages/team.html',
+    'attorney': 'firm_website/pages/attorney.html',
+    'contact': 'firm_website/pages/contact.html',
+    'faq': 'firm_website/pages/faq.html',
+    'results': 'firm_website/pages/results.html',
+    'blog': 'firm_website/pages/blog.html',
+    'blog_post': 'firm_website/pages/blog_post.html',
+    'careers': 'firm_website/pages/careers.html',
+    'privacy': 'firm_website/pages/legal.html',
+    'terms': 'firm_website/pages/legal.html',
+    'disclaimer': 'firm_website/pages/legal.html',
+}
+
+
+def _render_firm_website_page(page_key, **extra):
+    """Render a firm website page template with shared CMS context."""
+    template_name = FIRM_WEBSITE_TEMPLATES.get(page_key)
+    if not template_name:
+        flash('Page not found.', 'error')
+        return redirect(url_for('index'))
+    ctx = _get_firm_website_context(page=page_key, **extra)
+    return render_template(template_name, **ctx)
+
+
+def _guard_firm_website_public():
+    """Ensure firm website is published for public visitors."""
+    auth = _redirect_authenticated_user_from_public_site()
+    if auth:
+        return auth
+    if not is_firm_website_enabled():
+        flash('This page is not available.', 'info')
+        return redirect(url_for('index'))
+    return None
+
+
+def _dispatch_firm_website_path(subpath='', preview_mode=False):
+    """Route a firm website path to the correct page."""
+    subpath = (subpath or '').strip('/')
+    parts = [p for p in subpath.split('/') if p] if subpath else []
+
+    if not parts:
+        return _render_firm_website_page('home', preview_mode=preview_mode)
+
+    head = parts[0]
+    if head == 'about':
+        return _render_firm_website_page('about', preview_mode=preview_mode)
+    if head == 'practice-areas':
+        if len(parts) == 1:
+            return _render_firm_website_page('practice_areas', preview_mode=preview_mode)
+        ctx = _get_firm_website_context(page='practice_area', preview_mode=preview_mode)
+        pa = _find_practice_area(ctx['practice_areas'], parts[1])
+        if not pa:
+            flash('Practice area not found.', 'error')
+            return redirect(_firm_site_path('practice-areas', preview_mode))
+        return _render_firm_website_page('practice_area', preview_mode=preview_mode, practice_area=pa)
+    if head == 'team':
+        if len(parts) == 1:
+            return _render_firm_website_page('team', preview_mode=preview_mode)
+        ctx = _get_firm_website_context(page='attorney', preview_mode=preview_mode)
+        emp = _find_attorney(ctx['attorneys'], parts[1])
+        if not emp or (emp.get('status') or 'Active') != 'Active':
+            flash('Team member not found.', 'error')
+            return redirect(_firm_site_path('team', preview_mode))
+        return _render_firm_website_page('attorney', preview_mode=preview_mode, attorney=emp)
+    if head == 'contact':
+        return _firm_contact_handler(preview_mode=preview_mode)
+    if head == 'faq':
+        return _render_firm_website_page('faq', preview_mode=preview_mode)
+    if head == 'results':
+        return _render_firm_website_page('results', preview_mode=preview_mode)
+    if head == 'blog':
+        if len(parts) == 1:
+            return _render_firm_website_page('blog', preview_mode=preview_mode)
+        connection = get_db_connection()
+        post = None
+        if connection:
+            try:
+                post = _fetch_blog_post_by_slug(connection, parts[1])
+            finally:
+                connection.close()
+        if not post:
+            flash('Article not found.', 'error')
+            return redirect(_firm_site_path('blog', preview_mode))
+        return _render_firm_website_page('blog_post', preview_mode=preview_mode, blog_post=post)
+    if head == 'careers':
+        ctx = _get_firm_website_context(page='careers', preview_mode=preview_mode)
+        if not ctx.get('careers_content'):
+            flash('Careers page is not available.', 'info')
+            return redirect(_firm_site_path('', preview_mode))
+        return _render_firm_website_page('careers', preview_mode=preview_mode)
+    if head in ('privacy', 'terms', 'disclaimer'):
+        return _render_firm_website_page(head, preview_mode=preview_mode, legal_page_key=head)
+
+    flash('Page not found.', 'error')
+    return redirect(_firm_site_path('', preview_mode))
+
+
+def _firm_contact_handler(preview_mode=False):
+    """GET/POST contact page for the firm website."""
+    form_success = None
+    form_error = None
+    if request.method == 'POST':
+        connection = get_db_connection()
+        if not connection:
+            form_error = 'Unable to submit your request right now. Please try again later.'
+        else:
+            try:
+                ok, msg = _save_firm_consultation_request(connection, request.form)
+                if ok:
+                    form_success = msg
+                else:
+                    form_error = msg
+            except Exception as err:
+                print(f"Consultation form error: {err}")
+                form_error = 'An error occurred while submitting your request.'
+            finally:
+                connection.close()
+    return _render_firm_website_page(
+        'contact',
+        preview_mode=preview_mode,
+        form_success=form_success,
+        form_error=form_error,
+    )
+
+
+def _render_sheria_or_firm_public(sheria_template):
+    """Render Sheria marketing page or the firm website when that mode is enabled."""
+    signed_in_redirect = _redirect_authenticated_user_from_public_site()
+    if signed_in_redirect:
+        return signed_in_redirect
+    if is_firm_website_enabled():
+        if request.endpoint != 'index':
+            return redirect(url_for('index'))
+        return _render_firm_website_page('home')
+    return render_template(sheria_template)
 
 
 COMPANY_ASSET_STATIC_PREFIX = 'uploads/profile_pictures'
@@ -3374,6 +5539,7 @@ def inject_global_theme_settings():
         'SYSTEM_SETTINGS_NAV': SYSTEM_SETTINGS_SECTIONS,
         'COMPANY_INFORMATION_SECTION': COMPANY_INFORMATION_SECTION,
         'COMPANY_TEMPLATES_SECTION': COMPANY_TEMPLATES_SECTION,
+        'WEBSITE_TEMPLATES_SECTION': WEBSITE_TEMPLATES_SECTION,
         'settings_section_key': section_key,
         'company_asset_static_path': company_asset_static_path,
         'company_asset_basename': company_asset_basename,
@@ -3752,7 +5918,60 @@ def index():
         return redirect(url_for('dashboard'))
     if 'client_id' in session:
         return redirect(url_for('client_dashboard'))
+    if is_firm_website_enabled():
+        return _render_firm_website_page('home')
     return render_template('index.html')
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    """Dynamic robots.txt for public crawlers."""
+    base = get_public_base_url().rstrip('/')
+    lines = ['User-agent: *', 'Allow: /']
+    if is_firm_website_enabled():
+        lines.extend([
+            'Disallow: /login',
+            'Disallow: /client_login',
+            'Disallow: /website_preview',
+        ])
+        if base:
+            lines.append(f'Sitemap: {base}/sitemap.xml')
+    body = '\n'.join(lines) + '\n'
+    return Response(body, mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    """Dynamic XML sitemap for the public firm website."""
+    firm = get_company_settings() or {}
+    connection = get_db_connection()
+    entries = []
+    try:
+        entries = _build_firm_sitemap_entries(connection, firm)
+        if connection:
+            _touch_sitemap_generated(connection)
+            connection.commit()
+    finally:
+        if connection:
+            connection.close()
+    if not entries:
+        return Response(
+            '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
+            mimetype='application/xml',
+        )
+    from xml.sax.saxutils import escape
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for entry in entries:
+        parts.append('  <url>')
+        parts.append(f'    <loc>{escape(entry["loc"])}</loc>')
+        if entry.get('priority'):
+            parts.append(f'    <priority>{entry["priority"]}</priority>')
+        parts.append('  </url>')
+    parts.append('</urlset>')
+    return Response('\n'.join(parts), mimetype='application/xml')
 
 
 def _redirect_authenticated_user_from_public_site():
@@ -3767,46 +5986,61 @@ def _redirect_authenticated_user_from_public_site():
 @app.route('/platform')
 def website_platform():
     """Public website platform page."""
-    signed_in_redirect = _redirect_authenticated_user_from_public_site()
-    if signed_in_redirect:
-        return signed_in_redirect
-    return render_template('platform.html')
+    return _render_sheria_or_firm_public('platform.html')
 
 
 @app.route('/features')
 def website_features():
     """Public website features page."""
-    signed_in_redirect = _redirect_authenticated_user_from_public_site()
-    if signed_in_redirect:
-        return signed_in_redirect
-    return render_template('features.html')
+    return _render_sheria_or_firm_public('features.html')
 
 
 @app.route('/pricing')
 def website_pricing():
     """Public website pricing page."""
-    signed_in_redirect = _redirect_authenticated_user_from_public_site()
-    if signed_in_redirect:
-        return signed_in_redirect
-    return render_template('pricing.html')
+    return _render_sheria_or_firm_public('pricing.html')
 
 
 @app.route('/security')
 def website_security():
     """Public website security page."""
-    signed_in_redirect = _redirect_authenticated_user_from_public_site()
-    if signed_in_redirect:
-        return signed_in_redirect
-    return render_template('security.html')
+    return _render_sheria_or_firm_public('security.html')
 
 
-@app.route('/contact')
+@app.route('/contact', methods=['GET', 'POST'])
 def website_contact():
     """Public website contact page."""
+    if is_firm_website_enabled():
+        deny = _guard_firm_website_public()
+        if deny:
+            return deny
+        return _firm_contact_handler()
     signed_in_redirect = _redirect_authenticated_user_from_public_site()
     if signed_in_redirect:
         return signed_in_redirect
     return render_template('contact.html')
+
+
+@app.route('/about')
+@app.route('/practice-areas')
+@app.route('/practice-areas/<path:subpath>')
+@app.route('/team')
+@app.route('/team/<path:subpath>')
+@app.route('/faq')
+@app.route('/results')
+@app.route('/blog')
+@app.route('/blog/<path:subpath>')
+@app.route('/privacy')
+@app.route('/terms')
+@app.route('/disclaimer')
+@app.route('/careers')
+def firm_website_public(subpath=None):
+    """Public multi-page firm website routes."""
+    deny = _guard_firm_website_public()
+    if deny:
+        return deny
+    route_path = (request.path or '/').strip('/')
+    return _dispatch_firm_website_path(route_path)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -4057,6 +6291,15 @@ def role_to_slug(role):
     return _re.sub(r'[^a-z0-9]+', '-', role.lower()).strip('-') or 'employee'
 
 
+def _slugify_url(text):
+    """URL-safe slug for practice area pages."""
+    import re as _re
+    if not text:
+        return ''
+    s = _re.sub(r'[^\w\s-]', '', str(text).lower().strip())
+    return _re.sub(r'[\s_]+', '-', s).strip('-')[:120]
+
+
 def slug_to_role(slug):
     """Inverse of role_to_slug; returns None for an unknown slug."""
     if not slug:
@@ -4067,6 +6310,30 @@ def slug_to_role(slug):
 def current_role_slug():
     """The slug for the role currently active in the session."""
     return role_to_slug(session.get('employee_role') or 'Employee')
+
+
+def _employee_prefixed_path(endpoint, **values):
+    """Build a role-prefixed path for the logged-in employee, or plain url_for path."""
+    try:
+        path = url_for(endpoint, **values)
+    except Exception:
+        return None
+    if 'employee_id' not in session:
+        return path
+    if not _is_role_prefixable(path):
+        return path
+    for slug in SLUG_TO_ROLE:
+        if path.startswith('/' + slug + '/') or path == '/' + slug:
+            return path
+    return '/' + current_role_slug() + path
+
+
+def _employee_redirect(endpoint, **values):
+    """Redirect a logged-in employee to a role-prefixed in-app URL."""
+    path = _employee_prefixed_path(endpoint, **values)
+    if not path:
+        return redirect(url_for('dashboard'))
+    return redirect(path)
 
 
 # Paths that should never be prefixed with a role slug.
@@ -4104,7 +6371,7 @@ _ROLE_PREFIX_SKIP_EXACT = {
     # OAuth callback
     '/callback',
     # Misc
-    '/favicon.ico', '/favicon.svg', '/robots.txt',
+    '/favicon.ico', '/favicon.svg', '/robots.txt', '/sitemap.xml',
     '/sw.js', '/manifest.json', '/manifest.webmanifest',
     '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png',
     # Session-mutating helpers - these redirect themselves to the right
@@ -4193,28 +6460,24 @@ def _enforce_role_prefix_on_employee_urls():
     return redirect(new_url)
 
 
-def _generate_unique_work_email(full_name, domain):
-    """Build a unique 'first.last@domain' (or first@domain) work-email address.
+def _normalize_email_local_part(local):
+    """Sanitize a mailbox local-part for firm work emails (a-z, 0-9, . _ -)."""
+    import re as _re
+    local = (local or '').strip().lower()
+    local = _re.sub(r'[^a-z0-9._-]+', '', local)
+    local = _re.sub(r'\.+', '.', local).strip('._-')
+    return local[:64]
 
-    Falls back to numeric suffixes if the address is already taken.
-    Returns the lowercase address string, or None if a base local-part can't
-    be derived from the name."""
-    if not domain:
-        return None
-    parts = [p for p in (full_name or '').split() if p.strip()]
-    if not parts:
-        return None
-    first = _slugify_name_part(parts[0])
-    last = _slugify_name_part(parts[-1]) if len(parts) > 1 else ''
-    if not first:
-        return None
 
-    base_local = f"{first}.{last}" if last and last != first else first
-    domain = str(domain).strip().lstrip('@').lower()
+def _unique_work_email_from_local(base_local, domain):
+    """Return an unused local@domain address, appending numeric suffixes if needed."""
+    domain = str(domain or '').strip().lstrip('@').lower()
+    base_local = _normalize_email_local_part(base_local)
+    if not domain or not base_local:
+        return None
 
     connection = get_db_connection()
     if not connection:
-        # Best-effort fallback without uniqueness check.
         return f"{base_local}@{domain}"
 
     try:
@@ -4228,12 +6491,38 @@ def _generate_unique_work_email(full_name, domain):
                 if not cursor.fetchone():
                     return candidate
                 candidate = f"{base_local}{attempt + 1}@{domain}"
-            return candidate  # Highly unlikely collision after 100 attempts.
+            return candidate
     except Exception as e:
         print(f"[work_email] uniqueness check failed: {e}")
         return f"{base_local}@{domain}"
     finally:
         connection.close()
+
+
+def _generate_unique_work_email(full_name, domain, local_override=None):
+    """Build a unique 'first.last@domain' (or first@domain) work-email address.
+
+    Falls back to numeric suffixes if the address is already taken.
+    Returns the lowercase address string, or None if a base local-part can't
+    be derived from the name (unless local_override is provided)."""
+    domain = str(domain or '').strip().lstrip('@').lower()
+    if not domain:
+        return None
+
+    override = _normalize_email_local_part(local_override)
+    if override:
+        return _unique_work_email_from_local(override, domain)
+
+    parts = [p for p in (full_name or '').split() if p.strip()]
+    if not parts:
+        return None
+    first = _slugify_name_part(parts[0])
+    last = _slugify_name_part(parts[-1]) if len(parts) > 1 else ''
+    if not first:
+        return None
+
+    base_local = f"{first}.{last}" if last and last != first else first
+    return _unique_work_email_from_local(base_local, domain)
 
 
 def _generate_temp_password(length=12):
@@ -4366,8 +6655,11 @@ def _send_approval_welcome_email(personal_email, full_name, work_email,
 
 
 def _send_signup_received_email(to_email, full_name, employee_code):
-    """Send a 'Application received - pending approval' email after signup.
-    Uses the same SMTP plumbing as the password-reset flow."""
+    """Send an 'Application received' email after signup.
+
+    Guides the new user to sign in with their firm code, complete onboarding,
+    then wait for the administrator approval notification.
+    """
     try:
         email_settings = get_email_settings()
         if not email_settings:
@@ -4393,20 +6685,46 @@ def _send_signup_received_email(to_email, full_name, employee_code):
             firm_name = 'SHERIA CENTRIC'
 
         greeting_name = (full_name or 'there').split(' ')[0].title()
-        subject = f"Your {firm_name} application has been received"
+        subject = f"Your {firm_name} application has been received — next steps"
+
+        login_url = ''
+        try:
+            login_url = build_external_url('/login') or ''
+        except Exception:
+            login_url = ''
 
         text_body = (
             f"Hi {greeting_name},\n\n"
-            f"Thanks for registering with {firm_name}. We've received your application "
-            f"and it is now waiting for administrator approval.\n\n"
-            f"What happens next:\n"
-            f"  1. A firm administrator will review your details.\n"
-            f"  2. You will receive a follow-up email once your account is approved.\n"
-            f"  3. After approval, sign in with your 6-digit firm code and password.\n\n"
-            f"Your submitted firm code: {employee_code}\n\n"
+            f"Thanks for registering with {firm_name}. We've received your application.\n\n"
+            f"Your 6-digit firm code (use this to log in): {employee_code}\n\n"
+            f"Complete these steps now:\n"
+            f"  1. Sign in at the staff portal with your firm code and the password you created.\n"
+            f"  2. Finish employee onboarding — payroll/payment details, employment contract, "
+            f"national ID or passport, and KRA PIN certificate.\n"
+            f"  3. Submit the onboarding form. You will then be locked out until approval.\n"
+            f"  4. Wait for an email from an administrator confirming your account is approved.\n\n"
+        )
+        if login_url:
+            text_body += f"Sign in here: {login_url}\n\n"
+        text_body += (
+            f"Do not wait for approval before completing onboarding — your administrator "
+            f"reviews your account after onboarding is submitted.\n\n"
             f"If you did not register with {firm_name}, you can safely ignore this email.\n\n"
             f"— {firm_name}"
         )
+
+        login_cta = ""
+        if login_url:
+            login_cta = f"""
+              <div style="margin:22px 0 6px; text-align:center;">
+                <a href="{login_url}" style="display:inline-block; padding:12px 22px; border-radius:12px; background:#3a2e95; color:#fff; text-decoration:none; font-weight:700; font-size:0.95rem;">
+                  Sign in to complete onboarding →
+                </a>
+              </div>
+              <p style="margin:0 0 8px; text-align:center; color:#9ca3af; font-size:0.75rem;">
+                Or open {login_url}
+              </p>
+            """
 
         html_body = f"""
         <div style="font-family: -apple-system, Segoe UI, Inter, Arial, sans-serif; background:#f4f3fb; padding:32px 12px;">
@@ -4414,31 +6732,43 @@ def _send_signup_received_email(to_email, full_name, employee_code):
             <div style="padding:28px 32px 22px; background:linear-gradient(135deg,#1f1853 0%,#3a2e95 100%); color:#fff;">
               <div style="font-size:0.78rem; letter-spacing:0.18em; text-transform:uppercase; opacity:0.85;">Application received</div>
               <div style="font-size:1.45rem; font-weight:800; margin-top:4px;">Welcome, {greeting_name}.</div>
-              <div style="font-size:0.95rem; opacity:0.9; margin-top:6px;">Your {firm_name} account is pending approval.</div>
+              <div style="font-size:0.95rem; opacity:0.9; margin-top:6px;">Sign in with your firm code to finish onboarding.</div>
             </div>
             <div style="padding:26px 32px;">
               <p style="margin:0 0 14px; color:#374151; font-size:0.96rem; line-height:1.6;">
-                Thanks for registering with <strong>{firm_name}</strong>. We've received your application and it's now waiting for a firm administrator to review and approve your account.
+                Thanks for registering with <strong>{firm_name}</strong>. Your application is in —
+                next, log in with the firm code you registered and complete onboarding so an
+                administrator can review and approve your account.
               </p>
 
-              <div style="margin:18px 0; padding:14px 16px; border-radius:12px; background:#f3f2ff; border:1px solid #cfc9ff;">
-                <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#4f46e5; margin-bottom:6px;">Status</div>
-                <div style="font-size:0.95rem; color:#1E1A4E; font-weight:700;">Pending administrator approval</div>
+              <div style="margin:18px 0; padding:16px 18px; border-radius:12px; background:#fffaf0; border:1px solid #fde4b3; text-align:center;">
+                <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#92400e; margin-bottom:6px;">Your firm code (login ID)</div>
+                <div style="font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:1.55rem; font-weight:800; letter-spacing:0.3em; color:#1E1A4E;">{employee_code}</div>
+                <div style="font-size:0.82rem; color:#92400e; margin-top:8px; line-height:1.5;">
+                  Use this code with the password you created to sign in to the staff portal.
+                </div>
               </div>
 
-              <div style="margin:18px 0;">
-                <div style="font-size:0.85rem; font-weight:700; color:#1E1A4E; margin-bottom:8px;">What happens next</div>
-                <ol style="margin:0; padding-left:18px; color:#374151; font-size:0.92rem; line-height:1.7;">
-                  <li>A firm administrator reviews your details.</li>
-                  <li>You'll receive a follow-up email once your account is approved.</li>
-                  <li>After approval, sign in with your 6-digit firm code and password.</li>
+              {login_cta}
+
+              <div style="margin:20px 0 8px;">
+                <div style="font-size:0.85rem; font-weight:700; color:#1E1A4E; margin-bottom:10px;">How to complete onboarding</div>
+                <ol style="margin:0; padding-left:18px; color:#374151; font-size:0.92rem; line-height:1.75;">
+                  <li><strong>Sign in</strong> with your 6-digit firm code and password.</li>
+                  <li>You will be taken to the <strong>Employee Onboarding</strong> form.</li>
+                  <li>Fill in <strong>payroll &amp; payment details</strong> (bank or mobile money).</li>
+                  <li>Upload your <strong>employment contract</strong>, <strong>national ID or passport</strong>, and <strong>KRA PIN certificate</strong>.</li>
+                  <li>Submit the form. After that, wait for an administrator to approve your account.</li>
                 </ol>
               </div>
 
-              <div style="margin:18px 0 0; padding:14px 16px; border-radius:12px; background:#fffaf0; border:1px solid #fde4b3;">
-                <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#92400e; margin-bottom:4px;">Your submitted firm code</div>
-                <div style="font-family:'SFMono-Regular', Menlo, Consolas, monospace; font-size:1.4rem; font-weight:800; letter-spacing:0.3em; color:#1E1A4E;">{employee_code}</div>
-                <div style="font-size:0.78rem; color:#92400e; margin-top:6px;">Keep this safe — you'll use it to sign in after approval.</div>
+              <div style="margin:18px 0 0; padding:14px 16px; border-radius:12px; background:#f3f2ff; border:1px solid #cfc9ff;">
+                <div style="font-size:0.75rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#4f46e5; margin-bottom:6px;">After you submit</div>
+                <div style="font-size:0.92rem; color:#1E1A4E; line-height:1.55;">
+                  Portal access pauses until approval. Watch this inbox for an
+                  <strong>account approved</strong> email from your administrator — that message
+                  confirms you can use the full staff portal.
+                </div>
               </div>
 
               <p style="margin:22px 0 0; color:#9ca3af; font-size:0.78rem; line-height:1.55;">
@@ -4806,7 +7136,16 @@ def signup():
                      password_hash, profile_picture, role, status)
                     VALUES (%s, %s, %s, NULL, %s, %s, %s, 'Employee', 'Pending Approval')
                 """, (full_name, phone_number, personal_email, employee_code, password_hash, profile_picture))
+                new_employee_id = cursor.lastrowid
                 connection.commit()
+
+                # Alert Managing Partner and IT Support that approval is needed
+                try:
+                    _notify_approvers_of_employee_registration(
+                        new_employee_id, full_name, event='registered'
+                    )
+                except Exception as notify_err:
+                    print(f"[signup] Approver notification error: {notify_err}")
 
                 # Send confirmation email (best-effort; never block registration on email failures)
                 email_sent = False
@@ -4818,12 +7157,13 @@ def signup():
                 if email_sent:
                     flash(
                         f"Registration successful! A confirmation has been sent to {personal_email}. "
-                        "Your account is pending administrator approval.",
+                        "Sign in with your firm code to complete onboarding, then wait for administrator approval.",
                         'success'
                     )
                 else:
                     flash(
-                        "Registration successful! Your account is pending administrator approval. "
+                        "Registration successful! Sign in with your firm code to complete onboarding, "
+                        "then wait for administrator approval. "
                         "(We could not send the confirmation email — please check with your administrator.)",
                         'success'
                     )
@@ -5221,9 +7561,22 @@ def assign_role_and_approve():
     if not has_permission:
         return jsonify({'error': 'Forbidden'}), 403
     
-    data = request.get_json()
+    data = request.get_json() or {}
     employee_id = data.get('employee_id')
     new_role = data.get('role')
+    work_email_local = (data.get('work_email_local') or '').strip()
+
+    def _as_bool(value, default=True):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+    allocate_work_email = _as_bool(data.get('allocate_work_email'), True)
+    link_personal_email = _as_bool(data.get('link_personal_email'), True)
     
     if not employee_id:
         return jsonify({'success': False, 'error': 'Employee ID required'}), 400
@@ -5265,118 +7618,164 @@ def assign_role_and_approve():
                 cursor.execute("UPDATE employees SET status = 'Active' WHERE id = %s", (employee_id,))
             connection.commit()
 
-        # ---- Allocate a work email under the configured cPanel domain. ----
+        # ---- Optionally allocate a work email and link it to personal email. ----
         work_email_info = {
             'allocated': False,
             'work_email': employee.get('work_email'),
             'reason': None,
+            'forwarded': False,
+            'forward_reason': None,
         }
         email_sent = False
+        personal_email = (employee.get('personal_email') or employee.get('work_email') or '').strip()
 
-        try:
-            email_settings = get_email_settings()
-            cpanel_domain = (email_settings or {}).get('cpanel_domain') or ''
-            cpanel_token = (email_settings or {}).get('cpanel_api_token') or ''
-            cpanel_user = (email_settings or {}).get('cpanel_user') or ''
-            cpanel_port = (email_settings or {}).get('cpanel_api_port') or 2083
+        if not allocate_work_email:
+            work_email_info['reason'] = 'Work email allocation skipped by approver.'
+        else:
+            try:
+                email_settings = get_email_settings()
+                cpanel_domain = (email_settings or {}).get('cpanel_domain') or ''
+                cpanel_token = (email_settings or {}).get('cpanel_api_token') or ''
+                cpanel_user = (email_settings or {}).get('cpanel_user') or ''
+                cpanel_port = (email_settings or {}).get('cpanel_api_port') or 2083
 
-            current_email = (employee.get('work_email') or '').lower()
-            current_domain = current_email.split('@', 1)[1] if '@' in current_email else ''
-            already_on_domain = (
-                cpanel_domain and current_domain and
-                current_domain == str(cpanel_domain).lower()
-            )
+                current_email = (employee.get('work_email') or '').strip()
+                current_domain = current_email.split('@', 1)[1].lower() if '@' in current_email else ''
+                already_on_domain = (
+                    cpanel_domain and current_domain and
+                    current_domain == str(cpanel_domain).lower()
+                )
 
-            if not email_settings or not cpanel_domain or not cpanel_token or not cpanel_user:
-                work_email_info['reason'] = 'Email settings not configured (work email not allocated).'
-            elif already_on_domain:
-                work_email_info['allocated'] = True
-                work_email_info['work_email'] = current_email
-                work_email_info['reason'] = 'Employee already has a work email on the firm domain.'
-            else:
-                new_work_email = _generate_unique_work_email(employee.get('full_name') or '', cpanel_domain)
-                if not new_work_email:
-                    work_email_info['reason'] = "Could not derive a work email from the employee's name."
+                if not email_settings or not cpanel_domain or not cpanel_token or not cpanel_user:
+                    work_email_info['reason'] = 'Email settings not configured (work email not allocated).'
+                elif already_on_domain:
+                    work_email_info['allocated'] = True
+                    work_email_info['work_email'] = current_email
+                    work_email_info['reason'] = 'Employee already has a work email on the firm domain.'
                 else:
-                    temp_password = _generate_temp_password(12)
-                    cpanel_result = create_sub_email(
-                        cpanel_token, cpanel_domain, cpanel_user, cpanel_port,
-                        new_work_email, temp_password
+                    new_work_email = _generate_unique_work_email(
+                        employee.get('full_name') or '',
+                        cpanel_domain,
+                        local_override=work_email_local or None,
                     )
-
-                    if cpanel_result and cpanel_result.get('status') == 1:
-                        # Assign the new firm-domain work email. We never touch
-                        # personal_email here — it was captured at signup and
-                        # remains the employee's private contact address.
-                        # For any legacy account where personal_email is still
-                        # NULL we copy the prior work_email into it as a
-                        # one-time rescue, so we don't lose the only address
-                        # the employee gave us.
-                        connection2 = get_db_connection()
-                        try:
-                            with connection2.cursor() as cur2:
-                                if employee.get('personal_email'):
-                                    cur2.execute(
-                                        "UPDATE employees SET work_email = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                                        (new_work_email, employee_id)
-                                    )
-                                else:
-                                    cur2.execute(
-                                        """
-                                        UPDATE employees
-                                        SET work_email = %s,
-                                            personal_email = COALESCE(personal_email, %s),
-                                            updated_at = CURRENT_TIMESTAMP
-                                        WHERE id = %s
-                                        """,
-                                        (new_work_email, employee.get('work_email'), employee_id)
-                                    )
-                                connection2.commit()
-                        finally:
-                            connection2.close()
-
-                        # Save in local email_accounts so the firm SMTP/IMAP can use it.
-                        try:
-                            save_email_account_to_db(
-                                new_work_email, temp_password,
-                                employee.get('full_name') or new_work_email,
-                                False, session.get('employee_id')
-                            )
-                        except Exception as ee:
-                            print(f"[approval] Failed to save email_accounts row: {ee}")
-
-                        work_email_info['allocated'] = True
-                        work_email_info['work_email'] = new_work_email
-
-                        # Personal email is the authoritative contact address.
-                        # For brand-new accounts it was captured at signup; for
-                        # legacy accounts we just copied work_email into it above.
-                        personal_email = employee.get('personal_email') or employee.get('work_email')
-                        if personal_email:
-                            try:
-                                email_sent = _send_approval_welcome_email(
-                                    personal_email,
-                                    employee.get('full_name') or '',
-                                    new_work_email,
-                                    temp_password,
-                                    employee.get('employee_code') or '',
-                                    effective_role,
-                                    webmail_url=f"https://{cpanel_domain}/webmail"
-                                )
-                            except Exception as me:
-                                print(f"[approval] Welcome email send error: {me}")
+                    if not new_work_email:
+                        work_email_info['reason'] = "Could not derive a work email from the employee's name."
                     else:
-                        err = (cpanel_result or {}).get('errors') or []
-                        err_msg = (err[0].get('message') if err and isinstance(err[0], dict) else None) or 'cPanel email creation failed.'
-                        work_email_info['reason'] = err_msg
-                        print(f"[approval] cPanel email creation failed for {new_work_email}: {cpanel_result}")
-        except Exception as e:
-            print(f"[approval] Work-email allocation error: {e}")
-            work_email_info['reason'] = 'Work email allocation failed; please configure it manually.'
+                        temp_password = _generate_temp_password(12)
+                        cpanel_result = create_sub_email(
+                            cpanel_token, cpanel_domain, cpanel_user, cpanel_port,
+                            new_work_email, temp_password
+                        )
+
+                        if cpanel_result and cpanel_result.get('status') == 1:
+                            # Keep personal_email intact; only set work_email.
+                            # Legacy rescue: if personal_email is empty, preserve
+                            # the prior contact address in personal_email.
+                            connection2 = get_db_connection()
+                            try:
+                                with connection2.cursor() as cur2:
+                                    if employee.get('personal_email'):
+                                        cur2.execute(
+                                            "UPDATE employees SET work_email = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                                            (new_work_email, employee_id)
+                                        )
+                                    else:
+                                        cur2.execute(
+                                            """
+                                            UPDATE employees
+                                            SET work_email = %s,
+                                                personal_email = COALESCE(personal_email, %s),
+                                                updated_at = CURRENT_TIMESTAMP
+                                            WHERE id = %s
+                                            """,
+                                            (new_work_email, employee.get('work_email'), employee_id)
+                                        )
+                                    connection2.commit()
+                            finally:
+                                connection2.close()
+
+                            try:
+                                save_email_account_to_db(
+                                    new_work_email, temp_password,
+                                    employee.get('full_name') or new_work_email,
+                                    False, session.get('employee_id')
+                                )
+                            except Exception as ee:
+                                print(f"[approval] Failed to save email_accounts row: {ee}")
+
+                            work_email_info['allocated'] = True
+                            work_email_info['work_email'] = new_work_email
+                            personal_email = (
+                                employee.get('personal_email')
+                                or employee.get('work_email')
+                                or personal_email
+                            )
+
+                            if personal_email:
+                                try:
+                                    email_sent = _send_approval_welcome_email(
+                                        personal_email,
+                                        employee.get('full_name') or '',
+                                        new_work_email,
+                                        temp_password,
+                                        employee.get('employee_code') or '',
+                                        effective_role,
+                                        webmail_url=f"https://{cpanel_domain}/webmail"
+                                    )
+                                except Exception as me:
+                                    print(f"[approval] Welcome email send error: {me}")
+                        else:
+                            err = (cpanel_result or {}).get('errors') or []
+                            err_msg = (
+                                err[0].get('message')
+                                if err and isinstance(err[0], dict)
+                                else None
+                            ) or 'cPanel email creation failed.'
+                            work_email_info['reason'] = err_msg
+                            print(f"[approval] cPanel email creation failed for {new_work_email}: {cpanel_result}")
+
+                # Link firm work mailbox → personal inbox via cPanel forwarder.
+                if (
+                    work_email_info['allocated']
+                    and link_personal_email
+                    and personal_email
+                    and work_email_info.get('work_email')
+                    and email_settings
+                    and cpanel_domain
+                    and cpanel_token
+                    and cpanel_user
+                ):
+                    work_addr = (work_email_info['work_email'] or '').strip().lower()
+                    personal_addr = personal_email.strip().lower()
+                    if work_addr == personal_addr:
+                        work_email_info['forward_reason'] = 'Personal email matches work email; forwarder skipped.'
+                    else:
+                        fwd_result = add_email_forwarder(
+                            cpanel_token, cpanel_domain, cpanel_user, cpanel_port,
+                            work_email_info['work_email'], personal_email
+                        )
+                        if fwd_result and fwd_result.get('status') == 1:
+                            work_email_info['forwarded'] = True
+                        else:
+                            err = (fwd_result or {}).get('errors') or []
+                            err_msg = (
+                                err[0].get('message')
+                                if err and isinstance(err[0], dict)
+                                else None
+                            ) or (fwd_result or {}).get('error') or 'Forwarder setup failed.'
+                            work_email_info['forward_reason'] = err_msg
+                            print(f"[approval] Forwarder failed for {work_email_info['work_email']} → {personal_email}: {fwd_result}")
+            except Exception as e:
+                print(f"[approval] Work-email allocation error: {e}")
+                work_email_info['reason'] = 'Work email allocation failed; please configure it manually.'
 
         message = 'Employee approved successfully'
         if work_email_info['allocated']:
             message += f" and assigned work email {work_email_info['work_email']}."
+            if work_email_info['forwarded']:
+                message += f' Linked to personal email {personal_email} (mail forwarded).'
+            elif link_personal_email and work_email_info.get('forward_reason'):
+                message += f" (Forwarder not set: {work_email_info['forward_reason']})"
             if email_sent:
                 message += ' A welcome email has been sent to their personal address.'
         elif work_email_info['reason']:
@@ -5387,7 +7786,8 @@ def assign_role_and_approve():
             'message': message,
             'work_email_allocated': work_email_info['allocated'],
             'work_email': work_email_info['work_email'],
-            'personal_email': employee.get('personal_email') or employee.get('work_email'),
+            'personal_email': personal_email,
+            'personal_email_linked': work_email_info['forwarded'],
             'welcome_email_sent': email_sent
         })
     except Exception as e:
@@ -5481,6 +7881,64 @@ def get_active_employees():
         return jsonify({'error': str(e)}), 500
     finally:
         connection.close()
+
+
+@app.route('/api/allocation_eligible_employees')
+def allocation_eligible_employees():
+    """Active Managing Partners and Associate Advocates for case/matter allocation."""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk']
+    if not ((user_role in allowed_roles) or (original_role == 'IT Support')):
+        return jsonify({'error': 'Forbidden'}), 403
+
+    query = (request.args.get('q') or '').strip()
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            role_placeholders = ', '.join(['%s'] * len(CASE_MATTER_ALLOCATION_ROLES))
+            params = list(CASE_MATTER_ALLOCATION_ROLES)
+            if query:
+                like = f'%{query}%'
+                cursor.execute(f"""
+                    SELECT id, full_name, phone_number, work_email, employee_code, role, status
+                    FROM employees
+                    WHERE status = 'Active'
+                      AND role IN ({role_placeholders})
+                      AND (full_name LIKE %s OR COALESCE(employee_code, '') LIKE %s OR COALESCE(work_email, '') LIKE %s)
+                    ORDER BY
+                        CASE WHEN role = 'Managing Partner' THEN 0 ELSE 1 END,
+                        full_name ASC
+                    LIMIT 50
+                """, (*params, like, like, like))
+            else:
+                cursor.execute(f"""
+                    SELECT id, full_name, phone_number, work_email, employee_code, role, status
+                    FROM employees
+                    WHERE status = 'Active'
+                      AND role IN ({role_placeholders})
+                    ORDER BY
+                        CASE WHEN role = 'Managing Partner' THEN 0 ELSE 1 END,
+                        full_name ASC
+                """, params)
+            employees = cursor.fetchall()
+            return jsonify({
+                'success': True,
+                'employees': employees,
+                'total': len(employees),
+            })
+    except Exception as e:
+        print(f"Error fetching allocation-eligible employees: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        connection.close()
+
 
 @app.route('/api/get_employee')
 def get_employee():
@@ -7170,6 +9628,8 @@ def _fetch_session_allocation(cursor, material_id, employee_id, mark_received=Fa
             COALESCE(p.next_court_date, p.date_of_court_appeared, m.created_at) AS due_at,
             m.reminder_frequency AS reminder_intervals,
             COALESCE(m.task_status, 'Pending') AS task_status,
+            m.allocated_to_id AS assigned_to_id,
+            m.allocated_to_name AS assigned_to_name,
             m.allocated_to_name AS created_by_name,
             m.created_at,
             c.tracking_number AS case_tracking_number,
@@ -7191,6 +9651,10 @@ def _fetch_session_allocation(cursor, material_id, employee_id, mark_received=Fa
         if connection:
             connection.commit()
         task['task_status'] = 'Received'
+        try:
+            _record_allocation_event_from_task_row(cursor, connection, task, 'received')
+        except Exception as event_exc:
+            print(f"[notifications] Session received event error: {event_exc}")
     return _serialize_my_task(task) if task else None
 
 def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection=None):
@@ -7212,6 +9676,7 @@ def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection
             t.allow_view_case_documents,
             t.allow_upload_case_documents,
             t.allow_download_case_documents,
+            t.created_by_id,
             t.created_by_name,
             t.created_at,
             c.tracking_number AS case_tracking_number,
@@ -7239,6 +9704,11 @@ def _fetch_my_task(cursor, task_id, employee_id, mark_received=False, connection
         if connection:
             connection.commit()
         task['task_status'] = 'Received'
+        task['task_source'] = 'task_management'
+        try:
+            _record_allocation_event_from_task_row(cursor, connection, task, 'received')
+        except Exception as event_exc:
+            print(f"[notifications] Task received event error: {event_exc}")
     return _serialize_my_task(task) if task else None
 
 def _normalize_my_task_row_dates(task):
@@ -7385,6 +9855,727 @@ def _summarize_my_tasks(tasks):
         'needs_accept': needs_accept,
     }
 
+def _employee_notification_key(item):
+    """Stable key for a notification feed item."""
+    if item.get('key'):
+        return str(item['key'])
+    ntype = item.get('type') or ''
+    if ntype == 'task':
+        return f"task:{item.get('id')}"
+    if ntype == 'reminder':
+        return f"reminder:{item.get('id')}"
+    if ntype == 'calendar':
+        return f"calendar:{item.get('case_id')}:{item.get('court_date')}"
+    if ntype == 'approval':
+        return f"approval:{item.get('id')}"
+    if ntype == 'allocation':
+        return f"allocation:{item.get('id')}"
+    if ntype == 'due_reminder':
+        return f"due_reminder:{item.get('id')}"
+    return None
+
+
+# Roles that receive in-app + push alerts when an employee registers / needs approval.
+EMPLOYEE_REGISTRATION_APPROVER_ROLES = ('Managing Partner', 'IT Support')
+
+# Roles that receive allocated-task lifecycle alerts (received / rejected / submitted).
+TASK_ALLOCATION_ALERT_ROLES = (
+    'Managing Partner',
+    'Firm Administrator',
+    'IT Support',
+    'Clerk',
+    'Associate Advocate',
+)
+
+TASK_REMINDER_INTERVAL_DELTAS = {
+    '10m': (0, 10),
+    '30m': (0, 30),
+    '1h': (0, 60),
+    '6h': (0, 360),
+    '12h': (0, 720),
+    '1d': (1, 0),
+    '2d': (2, 0),
+    '7d': (7, 0),
+}
+
+TASK_REMINDER_INTERVAL_LABELS = {
+    '10m': '10 minutes before',
+    '30m': '30 minutes before',
+    '1h': '1 hour before',
+    '6h': '6 hours before',
+    '12h': '12 hours before',
+    '1d': '1 day before',
+    '2d': '2 days before',
+    '7d': '1 week before',
+}
+
+
+def _employee_receives_registration_approval_alerts(role, original_role=None):
+    """True when this account should see employee registration approval notifications."""
+    return (
+        role in EMPLOYEE_REGISTRATION_APPROVER_ROLES
+        or original_role in EMPLOYEE_REGISTRATION_APPROVER_ROLES
+    )
+
+
+def _employee_receives_task_allocation_alerts(role, original_role=None):
+    """True when this account should see allocated-task lifecycle notifications."""
+    return (
+        role in TASK_ALLOCATION_ALERT_ROLES
+        or original_role in TASK_ALLOCATION_ALERT_ROLES
+    )
+
+
+def _get_active_allocation_alert_recipient_ids(cursor):
+    """Return Active employee IDs for roles that receive allocation lifecycle alerts."""
+    cursor.execute(
+        """
+        SELECT id
+        FROM employees
+        WHERE status = 'Active'
+          AND role IN (
+            'Managing Partner', 'Firm Administrator', 'IT Support',
+            'Clerk', 'Associate Advocate'
+          )
+        """
+    )
+    return [
+        int(row['id'])
+        for row in (cursor.fetchall() or [])
+        if row.get('id') is not None
+    ]
+
+
+def _parse_reminder_interval_code(code):
+    """Return (days, minutes) for a reminder interval token, or None if unknown."""
+    token = (code or '').strip().lower()
+    if not token:
+        return None
+    return TASK_REMINDER_INTERVAL_DELTAS.get(token)
+
+
+def _reminder_fire_at(due_at, interval_code):
+    """Compute when a reminder should fire for a due_at + interval token."""
+    from datetime import timedelta
+    parsed = _parse_reminder_interval_code(interval_code)
+    if not due_at or not parsed:
+        return None
+    days, minutes = parsed
+    try:
+        return due_at - timedelta(days=days, minutes=minutes)
+    except Exception:
+        return None
+
+
+def _task_allocation_event_copy(event_type):
+    """Title / verb / icon for an allocation lifecycle event."""
+    if event_type == 'received':
+        return {
+            'title': 'Allocated task received',
+            'verb': 'received',
+            'icon': 'fa-inbox',
+            'push_title': 'Task received',
+        }
+    if event_type == 'rejected':
+        return {
+            'title': 'Allocated task rejected',
+            'verb': 'rejected',
+            'icon': 'fa-times-circle',
+            'push_title': 'Task rejected',
+        }
+    return {
+        'title': 'Allocated task submitted',
+        'verb': 'submitted',
+        'icon': 'fa-check-circle',
+        'push_title': 'Task submitted',
+    }
+
+
+def _build_task_allocation_link(task_source, task_type, linked_id, task_id):
+    """Build an in-app path for reviewing an allocation."""
+    try:
+        if task_source == 'session_allocation' and linked_id:
+            return url_for('case_details', case_id=int(linked_id))
+        if task_type == 'matter' and linked_id:
+            return url_for('matter_task_management')
+        if linked_id:
+            return url_for('case_task_management', case_id=int(linked_id), edit_task=int(task_id))
+        return url_for('case_task_management')
+    except Exception:
+        return url_for('notifications')
+
+
+def _record_task_allocation_event(
+    cursor,
+    connection,
+    *,
+    task_source,
+    task_id,
+    event_type,
+    task_title,
+    assignee_name=None,
+    created_by_id=None,
+    reference_label=None,
+    link_path=None,
+    notify=True,
+):
+    """Persist a received/rejected/submitted event and notify alert recipients."""
+    if event_type not in ('received', 'rejected', 'submitted'):
+        return None
+    if not task_id:
+        return None
+
+    ensure_task_allocation_events_table(cursor, connection)
+    title = (task_title or 'Allocated task').strip() or 'Allocated task'
+    assignee = (assignee_name or 'Assignee').strip() or 'Assignee'
+    reference = (reference_label or '-').strip() or '-'
+    path = (link_path or url_for('notifications')).strip() or url_for('notifications')
+    creator_id = int(created_by_id) if created_by_id else None
+
+    cursor.execute(
+        """
+        INSERT IGNORE INTO task_allocation_events
+            (task_source, task_id, event_type, task_title, assignee_name, created_by_id, reference_label, link_path)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            task_source,
+            int(task_id),
+            event_type,
+            title[:255],
+            assignee[:255],
+            creator_id,
+            reference[:500],
+            path[:500],
+        ),
+    )
+    event_id = cursor.lastrowid
+    if connection:
+        connection.commit()
+
+    # INSERT IGNORE returns 0 when the unique key already exists.
+    if not event_id:
+        return None
+
+    if notify:
+        try:
+            _notify_allocation_alert_recipients(
+                event_type=event_type,
+                task_title=title,
+                assignee_name=assignee,
+                reference_label=reference,
+                link_path=path,
+                extra_employee_ids=[creator_id] if creator_id else None,
+            )
+        except Exception as notify_exc:
+            print(f"[notifications] Allocation event notify error: {notify_exc}")
+    return event_id
+
+
+def _notify_allocation_alert_recipients(
+    *,
+    event_type,
+    task_title,
+    assignee_name,
+    reference_label,
+    link_path=None,
+    extra_employee_ids=None,
+):
+    """Push device alerts to allocation-alert roles (and optional extra IDs)."""
+    connection = get_db_connection()
+    if not connection:
+        return
+    recipient_ids = []
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            recipient_ids = _get_active_allocation_alert_recipient_ids(cursor)
+    except Exception as exc:
+        print(f"[notifications] Allocation alert recipient lookup error: {exc}")
+        return
+    finally:
+        connection.close()
+
+    for extra_id in extra_employee_ids or []:
+        try:
+            extra_id = int(extra_id)
+        except (TypeError, ValueError):
+            continue
+        if extra_id and extra_id not in recipient_ids:
+            recipient_ids.append(extra_id)
+
+    copy = _task_allocation_event_copy(event_type)
+    body = (
+        f"{assignee_name or 'An assignee'} {copy['verb']} "
+        f"\"{task_title or 'allocated task'}\" — {reference_label or '-'}"
+    )
+    path = (link_path or '/notifications').strip() or '/notifications'
+    if path.startswith('http://') or path.startswith('https://'):
+        url = path
+    else:
+        url = f"{_push_app_origin()}{path if path.startswith('/') else '/' + path}"
+
+    for recipient_id in recipient_ids:
+        _schedule_employee_workspace_push(recipient_id, copy['push_title'], body, url)
+        _schedule_push_for_employee(recipient_id)
+
+
+def _fetch_task_allocation_event_notifications(cursor, employee_id=None, viewer_role=None, limit=60):
+    """Build feed items for allocation lifecycle alerts (alert roles + creators)."""
+    ensure_task_allocation_events_table(cursor)
+    if _employee_receives_task_allocation_alerts(viewer_role):
+        cursor.execute(
+            """
+            SELECT id, task_source, task_id, event_type, task_title, assignee_name,
+                   created_by_id, reference_label, link_path, created_at
+            FROM task_allocation_events
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (int(limit),),
+        )
+    elif employee_id:
+        cursor.execute(
+            """
+            SELECT id, task_source, task_id, event_type, task_title, assignee_name,
+                   created_by_id, reference_label, link_path, created_at
+            FROM task_allocation_events
+            WHERE created_by_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+            """,
+            (int(employee_id), int(limit)),
+        )
+    else:
+        return []
+
+    items = []
+    for row in cursor.fetchall() or []:
+        event_type = row.get('event_type') or 'received'
+        copy = _task_allocation_event_copy(event_type)
+        created = row.get('created_at')
+        created_text = '-'
+        sort_key = '0000-01-01 00:00'
+        if created:
+            try:
+                created_text = created.strftime('%Y-%m-%d %H:%M')
+                sort_key = created.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                created_text = str(created)
+                sort_key = str(created)
+        link = (row.get('link_path') or '').strip() or url_for('notifications')
+        status_label = {
+            'received': 'Received',
+            'rejected': 'Rejected',
+            'submitted': 'Submitted',
+        }.get(event_type, event_type.replace('_', ' ').title())
+        items.append({
+            'type': 'allocation',
+            'id': row.get('id'),
+            'key': f"allocation:{row.get('id')}",
+            'icon': copy['icon'],
+            'title': copy['title'],
+            'subtitle': (
+                f"{row.get('assignee_name') or 'Assignee'} {copy['verb']} "
+                f"\"{row.get('task_title') or 'task'}\""
+            ),
+            'status': status_label,
+            'meta': (
+                f"{row.get('reference_label') or '-'} · "
+                f"{created_text}"
+            ),
+            'link': link,
+            'sort_key': sort_key,
+        })
+    return items
+
+
+def _record_allocation_event_from_task_row(cursor, connection, task, event_type):
+    """Record a lifecycle event from a task_management / session row."""
+    if not task:
+        return None
+    task_source = task.get('task_source') or 'task_management'
+    task_id = task.get('id')
+    task_type = task.get('task_type') or 'case'
+    linked_id = task.get('linked_id')
+    created_by_id = task.get('created_by_id')
+    if task_source == 'session_allocation':
+        title = task.get('task_title') or task.get('material_description') or 'Session allocation'
+        assignee = task.get('assigned_to_name') or task.get('created_by_name') or 'Assignee'
+        ref = (
+            f"{task.get('case_tracking_number') or '-'} - "
+            f"{task.get('case_client_name') or 'Case'}"
+        )
+    elif task_type == 'matter':
+        title = task.get('task_title') or 'Matter task'
+        assignee = task.get('assigned_to_name') or 'Assignee'
+        ref = (
+            f"{task.get('matter_reference_number') or '-'} - "
+            f"{task.get('matter_title') or 'Matter'}"
+        )
+    else:
+        title = task.get('task_title') or 'Case task'
+        assignee = task.get('assigned_to_name') or 'Assignee'
+        ref = (
+            f"{task.get('case_tracking_number') or '-'} - "
+            f"{task.get('case_client_name') or 'Case'}"
+        )
+    link = _build_task_allocation_link(task_source, task_type, linked_id, task_id)
+    return _record_task_allocation_event(
+        cursor,
+        connection,
+        task_source=task_source if task_source in ('task_management', 'session_allocation') else 'task_management',
+        task_id=task_id,
+        event_type=event_type,
+        task_title=title,
+        assignee_name=assignee,
+        created_by_id=created_by_id,
+        reference_label=ref,
+        link_path=link,
+        notify=True,
+    )
+
+
+def _fetch_task_interval_reminder_notifications(cursor, employee_id, viewer_role=None, limit=60):
+    """Build feed items for fired task reminder intervals visible to this employee."""
+    ensure_task_interval_reminders_table(cursor)
+    if _employee_receives_task_allocation_alerts(viewer_role):
+        cursor.execute(
+            """
+            SELECT id, task_source, task_id, interval_code, task_title, due_at,
+                   assignee_id, assignee_name, created_by_id, reference_label, link_path, fired_at
+            FROM task_interval_reminders
+            ORDER BY fired_at DESC
+            LIMIT %s
+            """,
+            (int(limit),),
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT id, task_source, task_id, interval_code, task_title, due_at,
+                   assignee_id, assignee_name, created_by_id, reference_label, link_path, fired_at
+            FROM task_interval_reminders
+            WHERE assignee_id = %s OR created_by_id = %s
+            ORDER BY fired_at DESC
+            LIMIT %s
+            """,
+            (int(employee_id), int(employee_id), int(limit)),
+        )
+
+    items = []
+    for row in cursor.fetchall() or []:
+        interval_code = (row.get('interval_code') or '').strip()
+        interval_label = TASK_REMINDER_INTERVAL_LABELS.get(interval_code, interval_code or 'Reminder')
+        due_val = row.get('due_at')
+        due_text = '-'
+        if due_val:
+            try:
+                due_text = due_val.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                due_text = str(due_val)
+        fired = row.get('fired_at')
+        sort_key = '0000-01-01 00:00'
+        fired_text = '-'
+        if fired:
+            try:
+                fired_text = fired.strftime('%Y-%m-%d %H:%M')
+                sort_key = fired.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                fired_text = str(fired)
+                sort_key = str(fired)
+        link = (row.get('link_path') or '').strip()
+        if not link:
+            if row.get('task_source') == 'session_allocation':
+                link = url_for('my_tasks', session_view=row.get('task_id'))
+            else:
+                link = url_for('my_tasks', view=row.get('task_id'))
+        items.append({
+            'type': 'due_reminder',
+            'id': row.get('id'),
+            'key': f"due_reminder:{row.get('id')}",
+            'icon': 'fa-clock',
+            'title': f"Task reminder · {interval_label}",
+            'subtitle': (
+                f"{row.get('task_title') or 'Task'} — "
+                f"{row.get('assignee_name') or 'Assignee'}"
+            ),
+            'status': 'Due soon',
+            'meta': f"{row.get('reference_label') or '-'} · Due {due_text} · Fired {fired_text}",
+            'link': link,
+            'sort_key': sort_key,
+        })
+    return items
+
+
+def _process_due_task_reminders(cursor=None, connection=None):
+    """Fire task reminder intervals that have reached their timeline."""
+    from datetime import datetime
+
+    owns_connection = connection is None
+    if owns_connection:
+        connection = get_db_connection()
+        if not connection:
+            return 0
+    close_cursor = cursor is None
+    fired_count = 0
+    try:
+        if cursor is None:
+            cursor = connection.cursor(pymysql.cursors.DictCursor)
+        ensure_task_management_table(cursor, connection)
+        ensure_task_interval_reminders_table(cursor, connection)
+        now = datetime.now()
+
+        cursor.execute(
+            """
+            SELECT
+                t.id,
+                t.task_type,
+                t.linked_id,
+                t.task_title,
+                t.due_at,
+                t.reminder_intervals,
+                t.assigned_to_id,
+                t.assigned_to_name,
+                t.created_by_id,
+                t.task_status,
+                c.tracking_number AS case_tracking_number,
+                c.client_name AS case_client_name,
+                m.matter_reference_number,
+                m.matter_title
+            FROM task_management t
+            LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
+            LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
+            WHERE t.task_status IN ('Pending', 'Received', 'In Progress')
+              AND t.due_at IS NOT NULL
+              AND t.reminder_intervals IS NOT NULL
+              AND TRIM(t.reminder_intervals) <> ''
+            ORDER BY t.due_at ASC
+            LIMIT 400
+            """
+        )
+        tasks = list(cursor.fetchall() or [])
+        for task in tasks:
+            due_at = task.get('due_at')
+            if not due_at:
+                continue
+            raw_intervals = (task.get('reminder_intervals') or '').replace(';', ',')
+            interval_codes = []
+            for part in raw_intervals.split(','):
+                code = part.strip().lower()
+                if code and code not in interval_codes and code in TASK_REMINDER_INTERVAL_DELTAS:
+                    interval_codes.append(code)
+            if not interval_codes:
+                continue
+
+            task_type = task.get('task_type') or 'case'
+            if task_type == 'matter':
+                ref = (
+                    f"{task.get('matter_reference_number') or '-'} - "
+                    f"{task.get('matter_title') or 'Matter'}"
+                )
+            else:
+                ref = (
+                    f"{task.get('case_tracking_number') or '-'} - "
+                    f"{task.get('case_client_name') or 'Case'}"
+                )
+            link = _build_task_allocation_link(
+                'task_management', task_type, task.get('linked_id'), task.get('id')
+            )
+            title = (task.get('task_title') or 'Task').strip() or 'Task'
+            assignee_name = (task.get('assigned_to_name') or 'Assignee').strip() or 'Assignee'
+            assignee_id = task.get('assigned_to_id')
+            created_by_id = task.get('created_by_id')
+
+            for interval_code in interval_codes:
+                fire_at = _reminder_fire_at(due_at, interval_code)
+                if not fire_at or now < fire_at:
+                    continue
+                cursor.execute(
+                    """
+                    INSERT IGNORE INTO task_interval_reminders
+                        (task_source, task_id, interval_code, task_title, due_at,
+                         assignee_id, assignee_name, created_by_id, reference_label, link_path)
+                    VALUES ('task_management', %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        int(task['id']),
+                        interval_code,
+                        title[:255],
+                        due_at,
+                        int(assignee_id) if assignee_id else None,
+                        assignee_name[:255],
+                        int(created_by_id) if created_by_id else None,
+                        ref[:500],
+                        link[:500],
+                    ),
+                )
+                reminder_id = cursor.lastrowid
+                if not reminder_id:
+                    continue
+                fired_count += 1
+                interval_label = TASK_REMINDER_INTERVAL_LABELS.get(interval_code, interval_code)
+                due_text = due_at.strftime('%Y-%m-%d %H:%M') if hasattr(due_at, 'strftime') else str(due_at)
+                push_title = f'Task reminder · {interval_label}'
+                push_body = f"{title} — due {due_text} · {ref}"
+                push_path = link if str(link).startswith('/') else f'/{link}'
+                push_url = f"{_push_app_origin()}{push_path}"
+                notify_ids = []
+                for candidate in (assignee_id, created_by_id):
+                    try:
+                        candidate = int(candidate)
+                    except (TypeError, ValueError):
+                        continue
+                    if candidate and candidate not in notify_ids:
+                        notify_ids.append(candidate)
+                for recipient_id in notify_ids:
+                    _schedule_employee_workspace_push(recipient_id, push_title, push_body, push_url)
+                    _schedule_push_for_employee(recipient_id)
+
+        if connection:
+            connection.commit()
+    except Exception as exc:
+        print(f"[reminders] process due task reminders error: {exc}")
+    finally:
+        if close_cursor and cursor is not None:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if owns_connection and connection is not None:
+            connection.close()
+    return fired_count
+
+
+def _fetch_pending_employee_approval_notifications(cursor):
+    """Build feed items for employees waiting on registration/onboarding approval."""
+    cursor.execute("""
+        SELECT id, full_name, personal_email, employee_code, created_at, onboarding_completed
+        FROM employees
+        WHERE status = 'Pending Approval'
+        ORDER BY onboarding_completed DESC, created_at ASC
+        LIMIT 50
+    """)
+    items = []
+    for emp in cursor.fetchall() or []:
+        created = emp.get('created_at')
+        created_text = '-'
+        sort_key = '9999-12-31 23:59'
+        if created:
+            try:
+                created_text = created.strftime('%Y-%m-%d %H:%M')
+                sort_key = created.strftime('%Y-%m-%d %H:%M')
+            except Exception:
+                created_text = str(created)
+                sort_key = str(created)
+        onboarding_done = bool(emp.get('onboarding_completed'))
+        items.append({
+            'type': 'approval',
+            'id': emp.get('id'),
+            'key': f"approval:{emp.get('id')}",
+            'icon': 'fa-user-check',
+            'title': f"Approve {emp.get('full_name') or 'new employee'}",
+            'subtitle': (
+                'Onboarding completed — ready to assign a role and approve'
+                if onboarding_done
+                else 'New registration — pending onboarding and approval'
+            ),
+            'status': 'Ready' if onboarding_done else 'Awaiting',
+            'meta': (
+                f"{emp.get('employee_code') or '-'} · "
+                f"{emp.get('personal_email') or '-'} · "
+                f"{created_text}"
+            ),
+            'link': url_for('onboarding_approval_detail', employee_id=emp.get('id')),
+            'sort_key': sort_key,
+        })
+    return items
+
+
+def _get_active_registration_approver_ids(cursor):
+    """Return Active Managing Partner / IT Support employee IDs."""
+    cursor.execute("""
+        SELECT id
+        FROM employees
+        WHERE status = 'Active'
+          AND role IN ('Managing Partner', 'IT Support')
+    """)
+    return [
+        int(row['id'])
+        for row in (cursor.fetchall() or [])
+        if row.get('id') is not None
+    ]
+
+
+def _notify_approvers_of_employee_registration(new_employee_id, full_name, event='registered'):
+    """Push + digest alerts to Managing Partner and IT Support for a pending employee."""
+    connection = get_db_connection()
+    if not connection:
+        return
+    approver_ids = []
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            approver_ids = _get_active_registration_approver_ids(cursor)
+    except Exception as exc:
+        print(f"[signup] Approver lookup error: {exc}")
+        return
+    finally:
+        connection.close()
+
+    name = (full_name or 'A new employee').strip() or 'A new employee'
+    if event == 'onboarding':
+        title = 'Employee ready for approval'
+        body = f"{name} completed onboarding and needs role assignment and approval."
+    else:
+        title = 'New employee registration'
+        body = f"{name} registered and is pending approval."
+    url = f"{_push_app_origin()}/onboarding_approvals"
+    skip_id = int(new_employee_id) if new_employee_id else None
+
+    for approver_id in approver_ids:
+        if skip_id and approver_id == skip_id:
+            continue
+        _schedule_employee_workspace_push(approver_id, title, body, url)
+        _schedule_push_for_employee(approver_id)
+
+
+def _get_viewed_notification_keys(cursor, employee_id):
+    """Return notification keys the employee has already viewed."""
+    ensure_employee_notification_views_table(cursor)
+    cursor.execute(
+        "SELECT notification_key FROM employee_notification_views WHERE employee_id = %s",
+        (employee_id,),
+    )
+    return {row.get('notification_key') for row in (cursor.fetchall() or []) if row.get('notification_key')}
+
+
+def _filter_unviewed_notifications(notifications, viewed_keys):
+    """Keep only notifications the employee has not viewed yet."""
+    if not viewed_keys:
+        return list(notifications or [])
+    return [
+        item for item in (notifications or [])
+        if _employee_notification_key(item) not in viewed_keys
+    ]
+
+
+def _mark_notification_viewed(cursor, connection, employee_id, notification_key):
+    """Persist that an employee viewed a notification on the notifications page."""
+    key = (notification_key or '').strip()
+    if not key or len(key) > 191:
+        return False
+    ensure_employee_notification_views_table(cursor, connection)
+    cursor.execute(
+        """
+        INSERT IGNORE INTO employee_notification_views (employee_id, notification_key)
+        VALUES (%s, %s)
+        """,
+        (employee_id, key),
+    )
+    if connection:
+        connection.commit()
+    return True
+
+
 def _build_employee_notifications_feed(cursor, employee_id):
     """Build unified notifications feed for an employee."""
     from datetime import date, timedelta
@@ -7394,6 +10585,14 @@ def _build_employee_notifications_feed(cursor, employee_id):
     days_ahead = max(1, min(90, int(settings.get('court_reminder_days_ahead') or 14)))
     end_date = today + timedelta(days=days_ahead)
     notifications_feed = []
+
+    viewer_role = None
+    try:
+        cursor.execute("SELECT role FROM employees WHERE id = %s LIMIT 1", (employee_id,))
+        viewer_row = cursor.fetchone() or {}
+        viewer_role = viewer_row.get('role')
+    except Exception:
+        viewer_role = None
 
     cursor.execute("""
         SELECT
@@ -7431,12 +10630,16 @@ def _build_employee_notifications_feed(cursor, employee_id):
             ref = f"{task.get('case_tracking_number') or '-'} - {task.get('case_client_name') or 'Case'}"
         else:
             ref = f"{task.get('matter_reference_number') or '-'} - {task.get('matter_title') or 'Matter'}"
+        task_status = (task.get('task_status') or 'Pending').strip() or 'Pending'
         notifications_feed.append({
             'type': 'task',
-            'icon': 'fa-tasks',
+            'id': task['id'],
+            'key': f"task:{task['id']}",
+            'icon': 'fa-list-check',
             'title': task.get('task_title') or 'Assigned task',
             'subtitle': ref,
-            'meta': f"Status: {task.get('task_status') or '-'} | Due: {due_text}",
+            'status': task_status,
+            'meta': f"Due {due_text}" if due_text != '-' else 'No due date',
             'link': url_for('my_tasks', view=task['id']),
             'sort_key': due_text if due_text != '-' else '9999-12-31 23:59',
         })
@@ -7466,12 +10669,16 @@ def _build_employee_notifications_feed(cursor, employee_id):
                 next_text = next_date.strftime('%Y-%m-%d')
             except Exception:
                 next_text = str(next_date)
+        rem_status = (material.get('task_status') or 'Pending').strip() or 'Pending'
         notifications_feed.append({
             'type': 'reminder',
+            'id': material.get('id'),
+            'key': f"reminder:{material.get('id')}",
             'icon': 'fa-bell',
             'title': material.get('material_description') or 'Session allocation',
             'subtitle': f"{material.get('tracking_number') or '-'} - {material.get('client_name') or 'Case'}",
-            'meta': f"Status: {material.get('task_status') or 'Pending'} | Next court: {next_text}",
+            'status': rem_status,
+            'meta': f"Court {next_text}" if next_text != '-' else 'Court date TBD',
             'link': url_for('my_tasks', session_view=material.get('id')),
             'sort_key': next_text if next_text != '-' else '9999-12-31',
         })
@@ -7503,13 +10710,46 @@ def _build_employee_notifications_feed(cursor, employee_id):
                     next_text = str(next_date)
             notifications_feed.append({
                 'type': 'calendar',
-                'icon': 'fa-calendar-alt',
+                'case_id': cal.get('case_id'),
+                'court_date': next_text if next_text != '-' else '',
+                'key': f"calendar:{cal.get('case_id')}:{next_text if next_text != '-' else ''}",
+                'icon': 'fa-calendar-day',
                 'title': cal.get('next_attendance') or 'Upcoming court date',
                 'subtitle': f"{cal.get('tracking_number') or '-'} - {cal.get('client_name') or 'Case'}",
-                'meta': f"Scheduled: {next_text}",
+                'status': 'Upcoming',
+                'meta': f"On {next_text}" if next_text != '-' else 'Date TBD',
                 'link': url_for('case_calendar', case_id=cal.get('case_id')),
                 'sort_key': next_text if next_text != '-' else '9999-12-31',
             })
+
+    if _employee_receives_registration_approval_alerts(viewer_role):
+        try:
+            notifications_feed.extend(_fetch_pending_employee_approval_notifications(cursor))
+        except Exception as exc:
+            print(f"[notifications] Pending employee approval feed error: {exc}")
+
+    try:
+        _process_due_task_reminders()
+    except Exception as exc:
+        print(f"[notifications] Due reminder process error: {exc}")
+
+    try:
+        notifications_feed.extend(
+            _fetch_task_allocation_event_notifications(
+                cursor, employee_id=employee_id, viewer_role=viewer_role
+            )
+        )
+    except Exception as exc:
+        print(f"[notifications] Task allocation event feed error: {exc}")
+
+    try:
+        notifications_feed.extend(
+            _fetch_task_interval_reminder_notifications(
+                cursor, employee_id, viewer_role=viewer_role
+            )
+        )
+    except Exception as exc:
+        print(f"[notifications] Task interval reminder feed error: {exc}")
 
     notifications_feed.sort(key=lambda x: x.get('sort_key') or '9999-12-31 23:59')
     return notifications_feed[:120]
@@ -7601,10 +10841,106 @@ def _compute_employee_badge_counts(cursor, employee_id, user_role=None, original
         except Exception:
             approve_cases_badge_count = 0
 
+    pending_employee_approval_cnt = 0
+    if _employee_receives_registration_approval_alerts(user_role, original_role):
+        try:
+            cursor.execute("""
+                SELECT COUNT(*) AS cnt
+                FROM employees
+                WHERE status = 'Pending Approval'
+            """)
+            row = cursor.fetchone() or {}
+            pending_employee_approval_cnt = int(row.get('cnt') or 0)
+        except Exception:
+            pending_employee_approval_cnt = 0
+
+    allocation_event_cnt = 0
+    try:
+        ensure_task_allocation_events_table(cursor)
+        ensure_employee_notification_views_table(cursor)
+        if _employee_receives_task_allocation_alerts(user_role, original_role):
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM task_allocation_events e
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM employee_notification_views v
+                    WHERE v.employee_id = %s
+                      AND v.notification_key = CONCAT('allocation:', e.id)
+                )
+                """,
+                (employee_id,),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM task_allocation_events e
+                WHERE e.created_by_id = %s
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM employee_notification_views v
+                    WHERE v.employee_id = %s
+                      AND v.notification_key = CONCAT('allocation:', e.id)
+                )
+                """,
+                (employee_id, employee_id),
+            )
+        row = cursor.fetchone() or {}
+        allocation_event_cnt = int(row.get('cnt') or 0)
+    except Exception:
+        allocation_event_cnt = 0
+
+    due_reminder_cnt = 0
+    try:
+        ensure_task_interval_reminders_table(cursor)
+        ensure_employee_notification_views_table(cursor)
+        if _employee_receives_task_allocation_alerts(user_role, original_role):
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM task_interval_reminders r
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM employee_notification_views v
+                    WHERE v.employee_id = %s
+                      AND v.notification_key = CONCAT('due_reminder:', r.id)
+                )
+                """,
+                (employee_id,),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM task_interval_reminders r
+                WHERE (r.assignee_id = %s OR r.created_by_id = %s)
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM employee_notification_views v
+                    WHERE v.employee_id = %s
+                      AND v.notification_key = CONCAT('due_reminder:', r.id)
+                )
+                """,
+                (employee_id, employee_id, employee_id),
+            )
+        row = cursor.fetchone() or {}
+        due_reminder_cnt = int(row.get('cnt') or 0)
+    except Exception:
+        due_reminder_cnt = 0
+
     my_task_badge_count = base_cnt + session_cnt
     return {
         'my_task_badge_count': my_task_badge_count,
-        'notification_badge_count': my_task_badge_count + calendar_cnt,
+        'reminder_badge_count': calendar_cnt + due_reminder_cnt,
+        'notification_badge_count': (
+            my_task_badge_count
+            + calendar_cnt
+            + pending_employee_approval_cnt
+            + allocation_event_cnt
+            + due_reminder_cnt
+        ),
         'approve_matters_badge_count': approve_matters_badge_count,
         'approve_cases_badge_count': approve_cases_badge_count,
     }
@@ -7721,7 +11057,19 @@ def reject_my_task(task_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
             cursor.execute("""
-                SELECT t.id, t.task_status
+                SELECT
+                    t.id,
+                    t.task_type,
+                    t.linked_id,
+                    t.task_title,
+                    t.task_status,
+                    t.assigned_to_name,
+                    t.created_by_id,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    m.matter_reference_number,
+                    m.matter_title,
+                    'task_management' AS task_source
                 FROM task_management t
                 LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
                 LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
@@ -7747,6 +11095,10 @@ def reject_my_task(task_id):
 
             cursor.execute("UPDATE task_management SET task_status = 'Cancelled' WHERE id = %s", (task_id,))
             connection.commit()
+            try:
+                _record_allocation_event_from_task_row(cursor, connection, task, 'rejected')
+            except Exception as event_exc:
+                print(f"[notifications] Task rejected event error: {event_exc}")
             if _is_ajax_json_request():
                 return jsonify({
                     'success': True,
@@ -7875,6 +11227,64 @@ def api_notifications_feed():
     finally:
         connection.close()
 
+
+@app.route('/api/notifications/page')
+def api_notifications_page_feed():
+    """Return unviewed notifications for the notifications page only."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+            ensure_employee_notification_views_table(cursor, connection)
+            ensure_task_allocation_events_table(cursor, connection)
+            notifications_feed = _build_employee_notifications_feed(cursor, employee_id)
+            viewed_keys = _get_viewed_notification_keys(cursor, employee_id)
+            unviewed = _filter_unviewed_notifications(notifications_feed, viewed_keys)
+            return jsonify({
+                'success': True,
+                'notifications': unviewed,
+                'count': len(unviewed),
+            })
+    except Exception as e:
+        print(f"API notifications page error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while loading notifications.'}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/notifications/mark-viewed', methods=['POST'])
+def api_notifications_mark_viewed():
+    """Mark a notification as viewed on the notifications page."""
+    if 'employee_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    notification_key = (payload.get('notification_key') or request.form.get('notification_key') or '').strip()
+    if not notification_key:
+        return jsonify({'success': False, 'error': 'notification_key is required.'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'success': False, 'error': 'Database connection error.'}), 500
+
+    employee_id = session.get('employee_id')
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            _mark_notification_viewed(cursor, connection, employee_id, notification_key)
+            return jsonify({'success': True})
+    except Exception as e:
+        print(f"API mark notification viewed error: {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while updating the notification.'}), 500
+    finally:
+        connection.close()
+
 @app.route('/api/employee/badge-counts')
 def api_employee_badge_counts():
     """Return live nav badge counts for the logged-in employee."""
@@ -7957,7 +11367,19 @@ def complete_my_task(task_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
             cursor.execute("""
-                SELECT t.id, t.task_status
+                SELECT
+                    t.id,
+                    t.task_type,
+                    t.linked_id,
+                    t.task_title,
+                    t.task_status,
+                    t.assigned_to_name,
+                    t.created_by_id,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    m.matter_reference_number,
+                    m.matter_title,
+                    'task_management' AS task_source
                 FROM task_management t
                 LEFT JOIN cases c ON t.task_type = 'case' AND t.linked_id = c.id
                 LEFT JOIN matters m ON t.task_type = 'matter' AND t.linked_id = m.id
@@ -7979,6 +11401,10 @@ def complete_my_task(task_id):
 
             cursor.execute("UPDATE task_management SET task_status = 'Submitted' WHERE id = %s", (task_id,))
             connection.commit()
+            try:
+                _record_allocation_event_from_task_row(cursor, connection, task, 'submitted')
+            except Exception as event_exc:
+                print(f"[notifications] Task submitted event error: {event_exc}")
             flash('Task submitted successfully.', 'success')
     except Exception as e:
         print(f"Complete task error: {e}")
@@ -8098,9 +11524,20 @@ def reject_my_session_task(material_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_case_proceeding_materials_table(cursor, connection)
             cursor.execute("""
-                SELECT id, COALESCE(task_status, 'Pending') AS task_status
-                FROM case_proceeding_materials
-                WHERE id = %s AND allocated_to_id = %s
+                SELECT
+                    m.id,
+                    'case' AS task_type,
+                    p.case_id AS linked_id,
+                    COALESCE(NULLIF(m.material_description, ''), 'Allocated Session Item') AS task_title,
+                    COALESCE(m.task_status, 'Pending') AS task_status,
+                    m.allocated_to_name AS assigned_to_name,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    'session_allocation' AS task_source
+                FROM case_proceeding_materials m
+                INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+                INNER JOIN cases c ON c.id = p.case_id
+                WHERE m.id = %s AND m.allocated_to_id = %s
                 LIMIT 1
             """, (material_id, employee_id))
             task = cursor.fetchone()
@@ -8120,6 +11557,10 @@ def reject_my_session_task(material_id):
                 (material_id,)
             )
             connection.commit()
+            try:
+                _record_allocation_event_from_task_row(cursor, connection, task, 'rejected')
+            except Exception as event_exc:
+                print(f"[notifications] Session rejected event error: {event_exc}")
             if _is_ajax_json_request():
                 return jsonify({
                     'success': True,
@@ -8153,9 +11594,20 @@ def complete_my_session_task(material_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_case_proceeding_materials_table(cursor, connection)
             cursor.execute("""
-                SELECT id, COALESCE(task_status, 'Pending') AS task_status
-                FROM case_proceeding_materials
-                WHERE id = %s AND allocated_to_id = %s
+                SELECT
+                    m.id,
+                    'case' AS task_type,
+                    p.case_id AS linked_id,
+                    COALESCE(NULLIF(m.material_description, ''), 'Allocated Session Item') AS task_title,
+                    COALESCE(m.task_status, 'Pending') AS task_status,
+                    m.allocated_to_name AS assigned_to_name,
+                    c.tracking_number AS case_tracking_number,
+                    c.client_name AS case_client_name,
+                    'session_allocation' AS task_source
+                FROM case_proceeding_materials m
+                INNER JOIN case_proceedings p ON p.id = m.proceeding_id
+                INNER JOIN cases c ON c.id = p.case_id
+                WHERE m.id = %s AND m.allocated_to_id = %s
                 LIMIT 1
             """, (material_id, employee_id))
             task = cursor.fetchone()
@@ -8171,6 +11623,10 @@ def complete_my_session_task(material_id):
                 (material_id,)
             )
             connection.commit()
+            try:
+                _record_allocation_event_from_task_row(cursor, connection, task, 'submitted')
+            except Exception as event_exc:
+                print(f"[notifications] Session submitted event error: {event_exc}")
             flash('Session allocation submitted successfully.', 'success')
     except Exception as e:
         print(f"Complete session task error: {e}")
@@ -8206,8 +11662,8 @@ def _push_key_storage_status():
     db_priv = _vapid_private_key_from_settings()
     env_pub = _vapid_env_public_key()
     env_priv = _vapid_env_private_key()
-    has_db = bool(db_pub and db_priv)
-    has_env = bool(env_pub and env_priv)
+    has_db = bool(_is_valid_vapid_public_key(db_pub) and db_priv)
+    has_env = bool(_is_valid_vapid_public_key(env_pub) and env_priv)
     if has_db and has_env:
         source = 'database'
         note = 'Saved in company settings (server environment also has keys).'
@@ -8323,6 +11779,23 @@ def _vapid_private_key_from_settings():
     return (settings.get('vapid_private_key') or '').strip()
 
 
+def _is_valid_vapid_public_key(key):
+    """Return True when key is a urlsafe-base64 uncompressed P-256 point (65 bytes)."""
+    if not key or not isinstance(key, str):
+        return False
+    raw = key.strip().replace(' ', '').replace('\n', '')
+    if len(raw) < 80:
+        return False
+    try:
+        import base64
+        padded = raw + ('=' * ((4 - (len(raw) % 4)) % 4))
+        decoded = base64.urlsafe_b64decode(padded.encode('ascii'))
+    except Exception:
+        return False
+    # Uncompressed EC point: 0x04 || X(32) || Y(32)
+    return len(decoded) == 65 and decoded[0] == 0x04
+
+
 def _vapid_claims_email():
     settings = get_company_settings() or {}
     from_db = (settings.get('vapid_claims_email') or '').strip()
@@ -8368,10 +11841,16 @@ def _get_vapid_credentials():
 
 
 def _vapid_public_key_b64():
+    """Return the active applicationServerKey, preferring a valid DB key over env."""
     from_db = _vapid_public_key_from_settings()
+    if _is_valid_vapid_public_key(from_db):
+        return from_db.strip()
     if from_db:
-        return from_db
-    return (os.environ.get('VAPID_PUBLIC_KEY') or '').strip()
+        print(f"[push] ignoring invalid vapid_public_key in company_settings (len={len(from_db)})")
+    from_env = (os.environ.get('VAPID_PUBLIC_KEY') or '').strip()
+    if _is_valid_vapid_public_key(from_env):
+        return from_env
+    return ''
 
 
 def _push_app_origin():
@@ -8479,6 +11958,39 @@ def _compute_employee_push_payload(cursor, employee_id):
             'sort': cal.get('next_court_date') or '9999-12-31'
         })
 
+    try:
+        cursor.execute("SELECT role FROM employees WHERE id = %s LIMIT 1", (employee_id,))
+        viewer_row = cursor.fetchone() or {}
+        viewer_role = viewer_row.get('role')
+        if _employee_receives_registration_approval_alerts(viewer_role):
+            for approval in _fetch_pending_employee_approval_notifications(cursor):
+                items.append({
+                    'kind': 'approval',
+                    'title': approval.get('title') or 'Employee approval needed',
+                    'subtitle': approval.get('subtitle') or 'Open Onboarding & Approvals',
+                    'sort': approval.get('sort_key') or '0000-01-01',
+                })
+        for allocation in _fetch_task_allocation_event_notifications(
+            cursor, employee_id=employee_id, viewer_role=viewer_role, limit=40
+        ):
+            items.append({
+                'kind': 'allocation',
+                'title': allocation.get('title') or 'Task allocation update',
+                'subtitle': allocation.get('subtitle') or 'Open Notifications',
+                'sort': allocation.get('sort_key') or '0000-01-01',
+            })
+        for due_reminder in _fetch_task_interval_reminder_notifications(
+            cursor, employee_id, viewer_role=viewer_role, limit=40
+        ):
+            items.append({
+                'kind': 'due_reminder',
+                'title': due_reminder.get('title') or 'Task reminder',
+                'subtitle': due_reminder.get('subtitle') or 'Open Notifications',
+                'sort': due_reminder.get('sort_key') or '0000-01-01',
+            })
+    except Exception as exc:
+        print(f"[push] Pending employee / allocation payload error: {exc}")
+
     items.sort(key=lambda x: str(x.get('sort') or '9999-12-31'))
     count = len(items)
     if count == 0:
@@ -8496,12 +12008,15 @@ def _compute_employee_push_payload(cursor, employee_id):
         body = f"{body} (+{count - 1} more)"
     digest_src = '|'.join(f"{i.get('kind')}:{i.get('title')}:{i.get('subtitle')}" for i in items[:8])
     digest = hashlib.sha256(digest_src.encode('utf-8')).hexdigest()[:64]
+    lead_url = f"{_push_app_origin()}/notifications"
+    if lead.get('kind') == 'approval':
+        lead_url = f"{_push_app_origin()}/onboarding_approvals"
     return {
         'count': count,
         'digest': digest,
         'title': lead.get('title') or 'Workspace update',
         'body': body,
-        'url': f"{_push_app_origin()}/notifications"
+        'url': lead_url,
     }
 
 
@@ -8724,27 +12239,33 @@ _push_worker_started = False
 
 
 def start_push_notification_worker():
-    """Background loop that sends push alerts even when nobody is browsing."""
+    """Background loop: fire due task reminders and send push digests."""
     global _push_worker_started
     if _push_worker_started:
-        return
-    if not _get_vapid_credentials() or not _vapid_public_key_b64():
-        print('[INFO] Web Push disabled — set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in .env')
         return
     _push_worker_started = True
 
     import threading
 
+    vapid_ready = bool(_get_vapid_credentials() and _vapid_public_key_b64())
+    if not vapid_ready:
+        print('[INFO] Web Push keys missing — reminder timeline worker still runs; device push disabled until VAPID is set')
+
     def _loop():
         time.sleep(15)
         while True:
             try:
-                _dispatch_all_push_notifications(force=False)
+                _process_due_task_reminders()
             except Exception as exc:
-                print(f"[push] worker loop error: {exc}")
+                print(f"[reminders] worker loop error: {exc}")
+            if vapid_ready:
+                try:
+                    _dispatch_all_push_notifications(force=False)
+                except Exception as exc:
+                    print(f"[push] worker loop error: {exc}")
             time.sleep(60)
 
-    threading.Thread(target=_loop, daemon=True, name='push-notification-worker').start()
+    threading.Thread(target=_loop, daemon=True, name='workspace-alert-worker').start()
 
 
 @app.route('/api/push/vapid-public-key')
@@ -9013,7 +12534,10 @@ def notifications():
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
-            notifications_feed = _build_employee_notifications_feed(cursor, employee_id)
+            ensure_employee_notification_views_table(cursor, connection)
+            all_notifications = _build_employee_notifications_feed(cursor, employee_id)
+            viewed_keys = _get_viewed_notification_keys(cursor, employee_id)
+            notifications_feed = _filter_unviewed_notifications(all_notifications, viewed_keys)
     except Exception as e:
         print(f"Error loading notifications: {e}")
         flash('An error occurred while loading notifications.', 'error')
@@ -11891,8 +15415,98 @@ def onboarding_approvals():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    email_settings = get_email_settings() or {}
+    email_domain = (email_settings.get('cpanel_domain') or 'baunilawgroup.com').strip().lstrip('@')
     
-    return render_template('onboarding_approvals.html', company_settings=company_settings)
+    return render_template(
+        'onboarding_approvals.html',
+        company_settings=company_settings,
+        email_domain=email_domain,
+        email_configured=bool(
+            email_settings.get('cpanel_api_token')
+            and email_settings.get('cpanel_user')
+            and email_settings.get('cpanel_domain')
+        ),
+    )
+
+
+@app.route('/onboarding_approvals/<int:employee_id>')
+def onboarding_approval_detail(employee_id):
+    """Full-page onboarding review for one pending (or listed) employee."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    user_role = session.get('employee_role')
+    original_role = session.get('original_role')
+    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
+    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
+
+    if not has_permission:
+        flash('You do not have permission to access this page', 'error')
+        return redirect(url_for('dashboard'))
+
+    company_settings = get_company_settings()
+    if not company_settings:
+        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('onboarding_approvals'))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            if not column_exists('employees', 'kra_pin_document'):
+                try:
+                    cursor.execute("ALTER TABLE employees ADD COLUMN kra_pin_document VARCHAR(255)")
+                    connection.commit()
+                except Exception as e:
+                    print(f"Could not add kra_pin_document column: {e}")
+            cursor.execute("""
+                SELECT
+                    id, full_name, phone_number, work_email, personal_email,
+                    employee_code, role, status,
+                    account_number, account_name, salary, salary_components, tax_pin, pay_frequency,
+                    payment_method, bank_name, mobile_money_company,
+                    employment_contract, id_front, id_back, kra_pin_document, signature, stamp,
+                    onboarding_completed, created_at
+                FROM employees
+                WHERE id = %s
+            """, (employee_id,))
+            employee = cursor.fetchone()
+
+        if not employee:
+            flash('Employee not found.', 'error')
+            return redirect(url_for('onboarding_approvals'))
+
+        if employee.get('created_at'):
+            try:
+                employee['created_at'] = employee['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            except Exception:
+                employee['created_at'] = str(employee['created_at'])
+        employee['onboarding_completed'] = bool(employee.get('onboarding_completed'))
+
+        email_settings = get_email_settings() or {}
+        email_domain = (email_settings.get('cpanel_domain') or 'baunilawgroup.com').strip().lstrip('@')
+
+        return render_template(
+            'onboarding_approval_detail.html',
+            company_settings=company_settings,
+            employee=employee,
+            email_domain=email_domain,
+            email_configured=bool(
+                email_settings.get('cpanel_api_token')
+                and email_settings.get('cpanel_user')
+                and email_settings.get('cpanel_domain')
+            ),
+        )
+    except Exception as e:
+        print(f"Onboarding approval detail error: {e}")
+        flash('An error occurred while loading employee details.', 'error')
+        return redirect(url_for('onboarding_approvals'))
+    finally:
+        connection.close()
 
 @app.route('/onboarding')
 def onboarding():
@@ -12198,6 +15812,23 @@ def submit_onboarding():
                   employment_contract, id_front, id_back, kra_pin_document, signature, signature_hash, 
                   stamp, stamp_hash, employee_id))
             connection.commit()
+
+            # Notify Managing Partner / IT Support that this employee is ready to approve
+            try:
+                with connection.cursor(pymysql.cursors.DictCursor) as name_cursor:
+                    name_cursor.execute(
+                        "SELECT full_name FROM employees WHERE id = %s LIMIT 1",
+                        (employee_id,),
+                    )
+                    emp_row = name_cursor.fetchone() or {}
+                _notify_approvers_of_employee_registration(
+                    employee_id,
+                    emp_row.get('full_name') or session.get('employee_name') or 'Employee',
+                    event='onboarding',
+                )
+            except Exception as notify_err:
+                print(f"[onboarding] Approver notification error: {notify_err}")
+
             flash('Onboarding information submitted successfully!', 'success')
             return redirect(url_for('dashboard'))
     except Exception as e:
@@ -12653,28 +16284,9 @@ def finance_billing():
 
     return render_template('finance_billing.html', company_settings=company_settings)
 
-@app.route('/matter_management')
-def matter_management():
-    """Matter Management landing page with links to Case Management and Other Matters"""
-    if 'employee_id' not in session:
-        return redirect(url_for('login'))
-    user_role = session.get('employee_role')
-    original_role = session.get('original_role')
-    allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner', 'Clerk', 'Associate Advocate']
-    has_permission = (user_role in allowed_roles) or (original_role == 'IT Support')
-    if not has_permission:
-        flash('You do not have permission to access this page', 'error')
-        return redirect(url_for('dashboard'))
-    company_settings = get_company_settings()
-    if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    return render_template('matter_management.html', company_settings=company_settings,
-                           user_role=user_role, current_employee_id=session.get('employee_id'))
-
-
 @app.route('/all_matters')
 def all_matters():
-    """Unified view of litigation cases and other matters with status and allocation."""
+    """Unified view of litigation cases and non-litigation matters with status and allocation."""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     user_role = session.get('employee_role')
@@ -12687,29 +16299,32 @@ def all_matters():
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    _, see_firm_wide = _all_matters_overview_scope()
     return render_template(
         'all_matters.html',
         company_settings=company_settings,
         user_role=user_role,
         current_employee_id=session.get('employee_id'),
+        see_firm_wide=see_firm_wide,
     )
 
 
 def _all_matters_overview_scope():
-    """Return (employee_id, see_firm_wide) for the all-matters overview."""
+    """Return (employee_id, see_firm_wide) for the all-matters overview.
+
+    Managing Partner, Firm Administrator, and IT Support (active role) see the
+    full firm portfolio. Associate Advocate and Clerk only see items allocated
+    to the logged-in employee (including when IT Support role-switches into them).
+    """
     user_role = session.get('employee_role')
-    original_role = session.get('original_role')
     employee_id = session.get('employee_id')
-    see_firm_wide = (
-        user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
-        or original_role == 'IT Support'
-    )
+    see_firm_wide = user_role in ['Managing Partner', 'Firm Administrator', 'IT Support']
     return employee_id, see_firm_wide
 
 
 @app.route('/api/all-matters/overview', methods=['GET'])
 def api_all_matters_overview():
-    """Cases and other matters in one list with status and allocation."""
+    """Cases and non-litigation matters in one list with status and allocation."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
 
@@ -12720,8 +16335,10 @@ def api_all_matters_overview():
 
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_task_management_table(cursor, connection)
+
             case_cols = (
-                "c.id, c.tracking_number, c.client_name, c.case_category, "
+                "c.id, c.tracking_number, c.client_name, c.case_category, c.case_type, "
                 "c.filing_date, c.status, c.filled_by_name, c.filled_by_id"
             )
             if see_firm_wide:
@@ -12732,13 +16349,21 @@ def api_all_matters_overview():
                              c.filing_date DESC, c.created_at DESC
                 """)
             else:
+                # Allocated advocate, or active case-task assignee
                 cursor.execute(f"""
                     SELECT {case_cols}
                     FROM cases c
                     WHERE c.filled_by_id = %s
+                       OR EXISTS (
+                            SELECT 1 FROM task_management t
+                            WHERE t.task_type = 'case'
+                              AND t.linked_id = c.id
+                              AND t.assigned_to_id = %s
+                              AND t.task_status IN ('Pending', 'Received', 'In Progress')
+                       )
                     ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END,
                              c.filing_date DESC, c.created_at DESC
-                """, (employee_id,))
+                """, (employee_id, employee_id))
 
             cases = cursor.fetchall() or []
             for case in cases:
@@ -12762,9 +16387,16 @@ def api_all_matters_overview():
                     SELECT {matter_cols}
                     FROM matters m
                     WHERE m.assigned_employee_id = %s
+                       OR EXISTS (
+                            SELECT 1 FROM task_management t
+                            WHERE t.task_type = 'matter'
+                              AND t.linked_id = m.id
+                              AND t.assigned_to_id = %s
+                              AND t.task_status IN ('Pending', 'Received', 'In Progress')
+                       )
                     ORDER BY CASE WHEN m.status = 'Pending Approval' THEN 0 ELSE 1 END,
                              m.date_opened DESC, m.created_at DESC
-                """, (employee_id,))
+                """, (employee_id, employee_id))
 
             matters = cursor.fetchall() or []
             for matter in matters:
@@ -12777,7 +16409,8 @@ def api_all_matters_overview():
                     'item_type': 'case',
                     'id': case['id'],
                     'reference': case.get('tracking_number') or '',
-                    'title': case.get('case_category') or 'Litigation case',
+                    'title': case.get('case_type') or case.get('case_category') or 'Litigation case',
+                    'category': case.get('case_category') or 'Uncategorized',
                     'client_name': case.get('client_name') or '',
                     'allocated_to': case.get('filled_by_name') or 'Unallocated',
                     'status': case.get('status') or '',
@@ -12788,7 +16421,8 @@ def api_all_matters_overview():
                     'item_type': 'matter',
                     'id': matter['id'],
                     'reference': matter.get('matter_reference_number') or '',
-                    'title': matter.get('matter_title') or matter.get('matter_category') or 'Other matter',
+                    'title': matter.get('matter_title') or 'Untitled matter',
+                    'category': matter.get('matter_category') or 'Uncategorized',
                     'client_name': matter.get('client_name') or '',
                     'allocated_to': matter.get('assigned_employee_name') or 'Unallocated',
                     'status': matter.get('status') or '',
@@ -12798,6 +16432,7 @@ def api_all_matters_overview():
             items.sort(key=lambda item: item.get('date') or '', reverse=True)
             items.sort(key=lambda item: 0 if 'pending' in (item.get('status') or '').lower() else 1)
 
+            scope_label = 'firm-wide' if see_firm_wide else 'allocated to you'
             return jsonify({
                 'items': items,
                 'counts': {
@@ -12805,7 +16440,8 @@ def api_all_matters_overview():
                     'matters': len(matters),
                     'total': len(items),
                 },
-                'message': f'Found {len(items)} matter(s)',
+                'scope': 'firm' if see_firm_wide else 'allocated',
+                'message': f'Found {len(items)} matter(s) ({scope_label})',
             })
     except Exception as e:
         print(f"Error loading all matters overview: {e}")
@@ -12941,8 +16577,9 @@ def case_task_management():
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
+            migrate_case_assignment_proceedings_to_tasks(cursor, connection)
 
-            if user_role == 'IT Support' or original_role == 'IT Support':
+            if has_unrestricted_case_access(user_role, original_role):
                 cursor.execute("""
                     SELECT id, tracking_number, client_name, filled_by_name, created_by_name, status
                     FROM cases
@@ -12951,12 +16588,33 @@ def case_task_management():
             else:
                 cursor.execute("""
                     SELECT id, tracking_number, client_name, filled_by_name, created_by_name, status
-                    FROM cases
-                    WHERE filled_by_id = %s
+                    FROM cases c
+                    WHERE c.filled_by_id = %s
+                       OR EXISTS (
+                            SELECT 1 FROM task_management t
+                            WHERE t.task_type = 'case'
+                              AND t.linked_id = c.id
+                              AND t.assigned_to_id = %s
+                       )
                     ORDER BY updated_at DESC
-                """, (current_employee_id,))
+                """, (current_employee_id, current_employee_id))
             cases = cursor.fetchall()
             case_ids = {str(c['id']) for c in cases}
+
+            # Ensure deep-linked case_id is available even if not yet in scoped list
+            if selected_case_id and selected_case_id not in case_ids:
+                cursor.execute("""
+                    SELECT id, tracking_number, client_name, filled_by_name, created_by_name, status, filled_by_id
+                    FROM cases WHERE id = %s
+                """, (selected_case_id,))
+                extra_case = cursor.fetchone()
+                if extra_case and (
+                    has_unrestricted_case_access(user_role, original_role)
+                    or str(extra_case.get('filled_by_id') or '') == str(current_employee_id)
+                    or is_privileged_case_viewer(user_role)
+                ):
+                    cases = list(cases) + [extra_case]
+                    case_ids.add(str(extra_case['id']))
 
             cursor.execute("""
                 SELECT id, full_name, role
@@ -13231,7 +16889,7 @@ def case_tracking():
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
 
     current_employee_id = session['employee_id']
-    is_mp = user_role == 'Managing Partner'
+    see_firm_wide = has_unrestricted_case_access(user_role, original_role)
 
     connection = get_db_connection()
     if not connection:
@@ -13243,8 +16901,8 @@ def case_tracking():
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             mp_clause = ""
             params = ()
-            if is_mp:
-                mp_clause = " AND c.filled_by_id = %s AND c.status = 'Active' "
+            if not see_firm_wide:
+                mp_clause = " AND c.filled_by_id = %s "
                 params = (current_employee_id,)
 
             cursor.execute(
@@ -13272,10 +16930,12 @@ def case_tracking():
                 INNER JOIN cases c ON c.id = p.case_id
                 LEFT JOIN clients cl ON c.client_id = cl.id
                 WHERE 1=1
+                  AND (p.court_activity_type IS NULL OR p.court_activity_type <> 'Case Assignment')
                   AND p.id = (
                       SELECT p2.id
                       FROM case_proceedings p2
                       WHERE p2.case_id = p.case_id
+                        AND (p2.court_activity_type IS NULL OR p2.court_activity_type <> 'Case Assignment')
                       ORDER BY COALESCE(p2.updated_at, p2.created_at) DESC, p2.id DESC
                       LIMIT 1
                   )
@@ -13314,7 +16974,7 @@ def case_tracking():
 
 @app.route('/matter_tracking')
 def matter_tracking():
-    """Matter tracking page - lists matters accessible to the current user."""
+    """Matter tracking page - lists matters allocated to the current user."""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
 
@@ -13340,37 +17000,21 @@ def matter_tracking():
     matters = []
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            if user_role == 'IT Support' or original_role == 'IT Support':
-                cursor.execute("""
-                    SELECT
-                        id,
-                        matter_reference_number,
-                        matter_title,
-                        client_name,
-                        assigned_employee_name,
-                        status,
-                        date_opened,
-                        created_at,
-                        updated_at
-                    FROM matters
-                    ORDER BY updated_at DESC, created_at DESC
-                """)
-            else:
-                cursor.execute("""
-                    SELECT
-                        id,
-                        matter_reference_number,
-                        matter_title,
-                        client_name,
-                        assigned_employee_name,
-                        status,
-                        date_opened,
-                        created_at,
-                        updated_at
-                    FROM matters
-                    WHERE assigned_employee_id = %s
-                    ORDER BY updated_at DESC, created_at DESC
-                """, (current_employee_id,))
+            cursor.execute("""
+                SELECT
+                    id,
+                    matter_reference_number,
+                    matter_title,
+                    client_name,
+                    assigned_employee_name,
+                    status,
+                    date_opened,
+                    created_at,
+                    updated_at
+                FROM matters
+                WHERE assigned_employee_id = %s
+                ORDER BY updated_at DESC, created_at DESC
+            """, (current_employee_id,))
             matters = cursor.fetchall()
 
             for m in matters:
@@ -13536,8 +17180,8 @@ def case_details(case_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             employee_id = session.get('employee_id')
             task_id = (request.args.get('task_id') or '').strip()
-            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
+            unrestricted = has_unrestricted_case_access(user_role, original_role)
+            is_privileged_case_view_role = is_privileged_case_viewer(user_role)
             # Fetch case details with client and employee information
             cursor.execute("""
                 SELECT 
@@ -13591,7 +17235,7 @@ def case_details(case_id):
                 return redirect(url_for('case_management'))
 
             is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-            if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
+            if not unrestricted and not is_privileged_case_view_role and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view'):
                     flash('You can only access this case while your allocated task is active.', 'error')
@@ -13861,7 +17505,7 @@ def case_edit(case_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             employee_id = session.get('employee_id')
             task_id = (request.args.get('task_id') or '').strip()
-            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
+            unrestricted = has_unrestricted_case_access(user_role, original_role)
             # Fetch case details
             cursor.execute("""
                 SELECT 
@@ -13893,7 +17537,7 @@ def case_edit(case_id):
                 return redirect(url_for('case_management'))
 
             is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-            if not is_it_support and not is_case_owner:
+            if not unrestricted and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='edit'):
                     flash('This task does not allow editing case details or is no longer active.', 'error')
@@ -13963,8 +17607,8 @@ def case_documents(case_id):
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             employee_id = session.get('employee_id')
             task_id = (request.args.get('task_id') or '').strip()
-            is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-            is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
+            unrestricted = has_unrestricted_case_access(user_role, original_role)
+            is_privileged_case_view_role = is_privileged_case_viewer(user_role)
             # Fetch case details with client information
             cursor.execute("""
                 SELECT 
@@ -13993,7 +17637,7 @@ def case_documents(case_id):
                 return redirect(url_for('case_management'))
 
             is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-            if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
+            if not unrestricted and not is_privileged_case_view_role and not is_case_owner:
                 ensure_task_management_table(cursor, connection)
                 if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='view_documents'):
                     flash('You can only access case documents while your allocated task is active.', 'error')
@@ -14234,6 +17878,9 @@ def case_proceedings(case_id):
             if not case_data:
                 flash('Case not found', 'error')
                 return redirect(url_for('case_management'))
+
+            # Case Assignment allocations belong under Recent case tasks, not attendances
+            migrate_case_assignment_proceedings_to_tasks(cursor, connection)
             
             # Fetch all proceedings for this case (including all versions/history)
             cursor.execute("""
@@ -14264,6 +17911,7 @@ def case_proceedings(case_id):
                     END as is_latest
                 FROM case_proceedings p
                 WHERE p.case_id = %s
+                  AND (p.court_activity_type IS NULL OR p.court_activity_type <> 'Case Assignment')
                 ORDER BY 
                     CASE 
                         WHEN EXISTS (
@@ -14699,13 +18347,14 @@ def case_allocate(case_id):
                 flash('Case not found', 'error')
                 return redirect(url_for('case_management'))
             
-            # Case handlers: employees whose role is Managing Partner or Associate Advocate (active)
-            cursor.execute("""
+            # Case handlers: Managing Partner or Associate Advocate (active)
+            role_placeholders = ', '.join(['%s'] * len(CASE_MATTER_ALLOCATION_ROLES))
+            cursor.execute(f"""
                 SELECT id, full_name, employee_code, role
                 FROM employees
-                WHERE status = 'Active' AND role IN ('Managing Partner', 'Associate Advocate')
+                WHERE status = 'Active' AND role IN ({role_placeholders})
                 ORDER BY role ASC, full_name ASC
-            """)
+            """, list(CASE_MATTER_ALLOCATION_ROLES))
             case_handlers = cursor.fetchall() or []
             
             company_settings = get_company_settings()
@@ -15300,7 +18949,7 @@ def api_delete_proceeding(proceeding_id):
 
 @app.route('/api/cases/search', methods=['GET'])
 def api_cases_search():
-    """Search cases by client name and/or phone (?q=). Empty q lists all (role-filtered). Managing Partners see only their active allocated cases."""
+    """Search cases by client name and/or phone (?q=). Empty q lists all (role-filtered)."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
 
@@ -15308,7 +18957,9 @@ def api_cases_search():
     search_term = (request.args.get('q') or request.args.get('phone') or '').strip()
     current_employee_id = session['employee_id']
     user_role = session.get('employee_role')
-    is_mp = (user_role == 'Managing Partner')
+    original_role = session.get('original_role')
+    # Managing Partner / Firm Admin / IT Support see firm-wide (same as IT Support case list)
+    see_firm_wide = has_unrestricted_case_access(user_role, original_role)
 
     connection = get_db_connection()
     if not connection:
@@ -15321,9 +18972,11 @@ def api_cases_search():
             if column_exists('cases', 'allocation_description'):
                 cols += ", c.allocation_description, c.allocation_timeline"
 
-            # Managing Partner restriction clause
-            mp_clause = "AND c.filled_by_id = %s AND c.status = 'Active'" if is_mp else ""
-            mp_params_extra = (current_employee_id,) if is_mp else ()
+            scope_clause = ""
+            scope_params = ()
+            if not see_firm_wide:
+                scope_clause = "AND c.filled_by_id = %s"
+                scope_params = (current_employee_id,)
 
             if search_term:
                 cursor.execute("""
@@ -15350,9 +19003,7 @@ def api_cases_search():
 
                 client_ids = [c['id'] for c in matching_clients]
                 placeholders = ','.join(['%s'] * len(client_ids))
-                params = tuple(client_ids)
-                if is_mp:
-                    params = params + (current_employee_id,)
+                params = tuple(client_ids) + scope_params
 
                 cursor.execute("""
                     SELECT """ + cols + """,
@@ -15366,7 +19017,7 @@ def api_cases_search():
                         cl.created_at as client_created_at
                     FROM cases c
                     LEFT JOIN clients cl ON c.client_id = cl.id
-                    WHERE c.client_id IN (""" + placeholders + """) """ + mp_clause + """
+                    WHERE c.client_id IN (""" + placeholders + """) """ + scope_clause + """
                     ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END ASC,
                              c.filing_date DESC, c.created_at DESC
                 """, params)
@@ -15378,24 +19029,7 @@ def api_cases_search():
                         f'Found {len(cases)} case(s) across {len(matching_clients)} matching clients'
                     )
             else:
-                if is_mp:
-                    cursor.execute("""
-                        SELECT """ + cols + """,
-                            cl.id as client_table_id,
-                            cl.full_name as client_full_name,
-                            cl.phone_number as client_phone,
-                            cl.email as client_email,
-                            cl.profile_picture as client_profile_picture,
-                            cl.client_type as client_type,
-                            cl.status as client_status,
-                            cl.created_at as client_created_at
-                        FROM cases c
-                        LEFT JOIN clients cl ON c.client_id = cl.id
-                        WHERE c.filled_by_id = %s AND c.status = 'Active'
-                        ORDER BY c.filing_date DESC, c.created_at DESC
-                    """, (current_employee_id,))
-                    message = 'Displaying your active allocated cases'
-                else:
+                if see_firm_wide:
                     cursor.execute("""
                         SELECT """ + cols + """,
                             cl.id as client_table_id,
@@ -15412,6 +19046,24 @@ def api_cases_search():
                                  c.filing_date DESC, c.created_at DESC
                     """)
                     message = 'Displaying all cases'
+                else:
+                    cursor.execute("""
+                        SELECT """ + cols + """,
+                            cl.id as client_table_id,
+                            cl.full_name as client_full_name,
+                            cl.phone_number as client_phone,
+                            cl.email as client_email,
+                            cl.profile_picture as client_profile_picture,
+                            cl.client_type as client_type,
+                            cl.status as client_status,
+                            cl.created_at as client_created_at
+                        FROM cases c
+                        LEFT JOIN clients cl ON c.client_id = cl.id
+                        WHERE c.filled_by_id = %s
+                        ORDER BY CASE WHEN c.status = 'Pending Approval' THEN 0 ELSE 1 END ASC,
+                                 c.filing_date DESC, c.created_at DESC
+                    """, (current_employee_id,))
+                    message = 'Displaying your allocated cases'
                 cases = cursor.fetchall()
             
             # Convert date objects to strings for JSON serialization
@@ -15447,7 +19099,7 @@ def api_cases_search():
 
 @app.route('/api/cases/<int:case_id>/approve', methods=['POST'])
 def api_approve_case(case_id):
-    """Firm Administrator or Managing Partner approves a case: allocates it to an employee, sets status to Active, and optionally creates a calendar/reminder entry."""
+    """Approve a pending case only after it has been allocated; creates the case task."""
     if 'employee_id' not in session:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
 
@@ -15462,28 +19114,76 @@ def api_approve_case(case_id):
     instructions = (data.get('instructions') or '').strip() or None
     due_date = (data.get('due_date') or '').strip() or None
     timeline = (data.get('timeline') or '').strip() or None
+    reminder_raw = data.get('reminder_intervals')
+    if isinstance(reminder_raw, list):
+        reminder_intervals = [str(x).strip() for x in reminder_raw if str(x).strip()]
+    elif isinstance(reminder_raw, str) and reminder_raw.strip():
+        reminder_intervals = [x.strip() for x in reminder_raw.split(',') if x.strip()]
+    elif timeline:
+        reminder_intervals = [x.strip() for x in timeline.split(',') if x.strip()]
+    else:
+        reminder_intervals = ['1d']
+    allow_view_case_details = 1 if data.get('allow_view_case_details', True) else 0
+    allow_edit_case_details = 1 if data.get('allow_edit_case_details', True) else 0
+    allow_view_case_documents = 1 if data.get('allow_view_case_documents', True) else 0
+    allow_upload_case_documents = 1 if data.get('allow_upload_case_documents', True) else 0
+    allow_download_case_documents = 1 if data.get('allow_download_case_documents', True) else 0
 
-    if not alloc_employee_id:
-        return jsonify({'success': False, 'error': 'Please select an employee to allocate the case to'}), 400
+    if not due_date:
+        return jsonify({'success': False, 'error': 'Please set a timeline / due date for the case task'}), 400
+    if not reminder_intervals:
+        return jsonify({'success': False, 'error': 'Select at least one reminder interval'}), 400
 
     connection = get_db_connection()
     if not connection:
         return jsonify({'success': False, 'error': 'Database connection error'}), 500
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            cursor.execute("SELECT id, status, tracking_number FROM cases WHERE id = %s", (case_id,))
+            cursor.execute("SELECT id, status, tracking_number, filled_by_id, filled_by_name FROM cases WHERE id = %s", (case_id,))
             case = cursor.fetchone()
             if not case:
                 return jsonify({'success': False, 'error': 'Case not found'}), 404
             if case.get('status') != 'Pending Approval':
                 return jsonify({'success': False, 'error': 'Case is not pending approval'}), 400
 
-            # Fetch the employee to allocate to
-            cursor.execute("SELECT id, full_name FROM employees WHERE id = %s AND status = 'Active'", (alloc_employee_id,))
+            # Must allocate first (separate step) before approving
+            if not case.get('filled_by_id'):
+                return jsonify({
+                    'success': False,
+                    'error': 'Allocate this case to a Managing Partner or Associate Advocate before approving.',
+                }), 400
+
+            try:
+                existing_alloc_id = int(case['filled_by_id'])
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'Invalid existing case allocation'}), 400
+
+            # Payload employee_id is optional; if provided it must match the allocated handler
+            if alloc_employee_id not in (None, ''):
+                try:
+                    if int(alloc_employee_id) != existing_alloc_id:
+                        return jsonify({
+                            'success': False,
+                            'error': 'Case is already allocated. Re-allocate first if you need to change the handler.',
+                        }), 400
+                except (TypeError, ValueError):
+                    return jsonify({'success': False, 'error': 'Invalid employee ID'}), 400
+            alloc_employee_id = existing_alloc_id
+
+            # Fetch the allocated employee (Managing Partner or Associate Advocate only)
+            cursor.execute(
+                "SELECT id, full_name, role FROM employees WHERE id = %s AND status = 'Active'",
+                (alloc_employee_id,),
+            )
             employee = cursor.fetchone()
             if not employee:
-                return jsonify({'success': False, 'error': 'Selected employee not found or is not active'}), 400
-            employee_name = employee['full_name']
+                return jsonify({'success': False, 'error': 'Allocated employee not found or is not active'}), 400
+            if not is_allocation_eligible_role(employee.get('role')):
+                return jsonify({
+                    'success': False,
+                    'error': 'Cases can only be allocated to Managing Partners or Associate Advocates',
+                }), 400
+            employee_name = employee['full_name'] or case.get('filled_by_name')
 
             # Ensure allocation columns exist
             if not column_exists('cases', 'allocation_description'):
@@ -15499,6 +19199,9 @@ def api_approve_case(case_id):
                 except Exception:
                     pass
 
+            reminder_csv = ','.join(reminder_intervals)
+            allocation_timeline = timeline or reminder_csv
+
             # Allocate + approve the case in one update
             cursor.execute("""
                 UPDATE cases
@@ -15509,43 +19212,73 @@ def api_approve_case(case_id):
                     status = 'Active',
                     updated_at = NOW()
                 WHERE id = %s
-            """, (alloc_employee_id, employee_name, instructions, timeline, case_id))
+            """, (alloc_employee_id, employee_name, instructions, allocation_timeline, case_id))
 
-            # If a due_date is provided, create a calendar/reminder entry for the allocated employee
-            if due_date:
-                from datetime import date as _date
-                today_str = _date.today().isoformat()
-                activity_type = 'Case Assignment'
-                orders_text = instructions or f'Case {case.get("tracking_number", "")} allocated to {employee_name}'
-                if timeline:
-                    orders_text += f'\nTimeline: {timeline}'
-                # Insert a case_proceedings entry so it appears on the calendar
-                cursor.execute("""
-                    INSERT INTO case_proceedings
-                        (case_id, court_activity_type, date_of_court_appeared, next_court_date,
-                         next_attendance, outcome_orders, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
-                """, (case_id, activity_type, today_str, due_date, employee_name, orders_text))
-                proceeding_id = cursor.lastrowid
-
-                # Insert a material linked to that proceeding for the reminder feed
-                cursor.execute("""
-                    INSERT INTO case_proceeding_materials
-                        (proceeding_id, material_description, allocated_to_id, allocated_to_name, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, NOW(), NOW())
-                """, (proceeding_id, orders_text, alloc_employee_id, employee_name))
-                material_id = cursor.lastrowid
-                if alloc_employee_id and material_id:
-                    try:
-                        ref = f"{case.get('tracking_number') or '-'} - {case.get('client_name') or 'Case'}"
-                        _notify_session_allocated_push(
-                            alloc_employee_id, orders_text, ref, material_id=material_id
-                        )
-                    except Exception as push_exc:
-                        print(f"[push] case approval session notify error: {push_exc}")
+            # Create a case task with the same access permissions as Case Task Management
+            ensure_task_management_table(cursor, connection)
+            orders_text = instructions or f'Case {case.get("tracking_number", "")} allocated to {employee_name}'
+            task_title = (orders_text.split('\n')[0] if orders_text else 'Case Assignment')[:255]
+            due_at = due_date.replace('T', ' ')
+            if len(due_at) == 10:
+                due_at = f"{due_at} 17:00:00"
+            cursor.execute("""
+                INSERT INTO task_management
+                (task_type, linked_id, task_title, task_description, due_at, reminder_intervals,
+                 assigned_to_id, assigned_to_name,
+                 allow_view_case_details, allow_edit_case_details, allow_view_case_documents,
+                 allow_upload_case_documents, allow_download_case_documents,
+                 task_status, created_by_id, created_by_name)
+                VALUES ('case', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending', %s, %s)
+            """, (
+                case_id,
+                task_title,
+                orders_text,
+                due_at,
+                reminder_csv,
+                alloc_employee_id,
+                employee_name,
+                allow_view_case_details,
+                allow_edit_case_details,
+                allow_view_case_documents,
+                allow_upload_case_documents,
+                allow_download_case_documents,
+                session.get('employee_id'),
+                session.get('employee_name') or 'Unknown',
+            ))
+            task_id = cursor.lastrowid
+            if alloc_employee_id and task_id:
+                try:
+                    cursor.execute(
+                        "SELECT tracking_number, client_name FROM cases WHERE id = %s",
+                        (case_id,),
+                    )
+                    case_row = cursor.fetchone() or {}
+                    ref = f"{case_row.get('tracking_number') or case.get('tracking_number') or '-'} - {case_row.get('client_name') or 'Case'}"
+                    _notify_task_assigned_push(
+                        alloc_employee_id, task_title, 'case', ref, task_id=task_id
+                    )
+                except Exception as push_exc:
+                    print(f"[push] case approval task notify error: {push_exc}")
 
             connection.commit()
-            return jsonify({'success': True, 'message': f'Case approved and allocated to {employee_name} successfully'})
+            try:
+                redirect_url = url_for('case_task_management', case_id=case_id)
+                # Prefix with active role slug when applicable (same as role_url)
+                active_slug = None
+                try:
+                    active_slug = current_role_slug()
+                except Exception:
+                    active_slug = None
+                if active_slug and _is_role_prefixable(redirect_url):
+                    redirect_url = '/' + active_slug + redirect_url
+            except Exception:
+                redirect_url = f'/case_management/tasks?case_id={case_id}'
+            return jsonify({
+                'success': True,
+                'message': f'Case approved and allocated to {employee_name} successfully',
+                'redirect_url': redirect_url,
+                'task_id': task_id,
+            })
     except Exception as e:
         if connection:
             connection.rollback()
@@ -15576,6 +19309,7 @@ def api_cases_pending_approval():
                     c.filing_date,
                     c.case_category,
                     c.station,
+                    c.filled_by_id,
                     c.filled_by_name,
                     c.created_by_name,
                     c.description,
@@ -15646,12 +19380,63 @@ def register_case():
             connection.close()
     
     employee_id = session.get('employee_id')
+
+    case_type_options = []
+    case_category_options = []
+    station_options = []
+    connection = get_db_connection()
+    if connection:
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT type_name FROM (
+                        SELECT type_name FROM case_types
+                        WHERE type_name IS NOT NULL AND TRIM(type_name) <> ''
+                        UNION
+                        SELECT DISTINCT case_type AS type_name FROM cases
+                        WHERE case_type IS NOT NULL AND TRIM(case_type) <> ''
+                    ) t
+                    ORDER BY type_name ASC
+                """)
+                case_type_options = [row['type_name'] for row in cursor.fetchall()]
+
+                cursor.execute("""
+                    SELECT category_name FROM (
+                        SELECT category_name FROM case_categories
+                        WHERE category_name IS NOT NULL AND TRIM(category_name) <> ''
+                        UNION
+                        SELECT DISTINCT case_category AS category_name FROM cases
+                        WHERE case_category IS NOT NULL AND TRIM(case_category) <> ''
+                    ) c
+                    ORDER BY category_name ASC
+                """)
+                case_category_options = [row['category_name'] for row in cursor.fetchall()]
+
+                cursor.execute("""
+                    SELECT station_name FROM (
+                        SELECT station_name FROM stations
+                        WHERE station_name IS NOT NULL AND TRIM(station_name) <> ''
+                        UNION
+                        SELECT DISTINCT station AS station_name FROM cases
+                        WHERE station IS NOT NULL AND TRIM(station) <> ''
+                    ) s
+                    ORDER BY station_name ASC
+                """)
+                station_options = [row['station_name'] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error loading register case dropdown options: {e}")
+        finally:
+            connection.close()
+
     return render_template(
         'register_case.html',
         company_settings=company_settings,
         employee_name=employee_name,
         employee_id=employee_id,
         court_rank_options=COURT_RANK_OPTIONS,
+        case_type_options=case_type_options,
+        case_category_options=case_category_options,
+        station_options=station_options,
     )
 
 @app.route('/api/clients/search', methods=['GET'])
@@ -15661,18 +19446,19 @@ def api_clients_search():
         return jsonify({'error': 'Unauthorized'}), 401
     
     query = request.args.get('q', '').strip()
+    list_all = request.args.get('all', '').strip() in ('1', 'true', 'yes')
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            if query:
+            if query and not list_all:
                 cursor.execute("""
                     SELECT id, full_name, email, phone_number, client_type
                     FROM clients 
                     WHERE status = 'Active' 
-                    AND (full_name LIKE %s OR email LIKE %s OR phone_number LIKE %s)
+                    AND (full_name LIKE %s OR email LIKE %s OR COALESCE(phone_number, '') LIKE %s)
                     ORDER BY full_name ASC
                     LIMIT 20
                 """, (f'%{query}%', f'%{query}%', f'%{query}%'))
@@ -15682,7 +19468,6 @@ def api_clients_search():
                     FROM clients 
                     WHERE status = 'Active'
                     ORDER BY full_name ASC
-                    LIMIT 50
                 """)
             clients = cursor.fetchall()
             return jsonify({'clients': clients})
@@ -16078,8 +19863,8 @@ def api_cases_register():
     
     data = request.get_json()
     
-    # Validate required fields
-    required_fields = ['client_id', 'client_name', 'court_rank', 'case_type', 'filing_date', 'case_category', 'station', 'filled_by_id', 'filled_by_name']
+    # Validate required fields — allocation (filled_by) is set on approval, not registration
+    required_fields = ['client_id', 'client_name', 'court_rank', 'case_type', 'filing_date', 'case_category', 'station']
     for field in required_fields:
         if not data.get(field):
             return jsonify({'error': f'{field} is required'}), 400
@@ -16103,7 +19888,24 @@ def api_cases_register():
             if not tracking_number:
                 return jsonify({'error': 'Failed to generate tracking number'}), 500
             
-            # Insert case with status 'Pending Approval'
+            # Ensure lookup tables stay in sync (including newly typed "Other" values)
+            case_type_val = data['case_type'].strip().upper()
+            case_category_val = data['case_category'].strip().upper()
+            station_val = data['station'].strip().upper()
+            cursor.execute(
+                "INSERT IGNORE INTO case_types (type_name) VALUES (%s)",
+                (case_type_val,),
+            )
+            cursor.execute(
+                "INSERT IGNORE INTO case_categories (category_name) VALUES (%s)",
+                (case_category_val,),
+            )
+            cursor.execute(
+                "INSERT IGNORE INTO stations (station_name) VALUES (%s)",
+                (station_val,),
+            )
+
+            # Insert case with status 'Pending Approval' and no allocation yet
             cursor.execute("""
                 INSERT INTO cases (
                     tracking_number, court_case_number, client_id, client_name, court_rank, case_type, filing_date, case_category, 
@@ -16115,12 +19917,12 @@ def api_cases_register():
                 data['client_id'],
                 data['client_name'].upper(),
                 court_rank,
-                data['case_type'].upper(),
+                case_type_val,
                 data['filing_date'],
-                data['case_category'].upper(),
-                data['station'].upper(),
-                data['filled_by_id'],
-                data['filled_by_name'].upper(),
+                case_category_val,
+                station_val,
+                None,
+                None,
                 created_by_id,
                 created_by_name.upper(),
                 data.get('description', ''),
@@ -16164,14 +19966,14 @@ def api_cases_register():
 
 @app.route('/api/cases/update/<int:case_id>', methods=['PUT'])
 def api_cases_update(case_id):
-    """API endpoint to update an existing case"""
+    """API endpoint to update an existing case (allocation is managed on approve/allocate)."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.get_json()
     
-    # Validate required fields
-    required_fields = ['client_id', 'client_name', 'court_rank', 'case_type', 'filing_date', 'case_category', 'station', 'filled_by_id', 'filled_by_name']
+    # Validate required fields — allocation is optional here and role-restricted when set
+    required_fields = ['client_id', 'client_name', 'court_rank', 'case_type', 'filing_date', 'case_category', 'station']
     for field in required_fields:
         if not data.get(field):
             return jsonify({'error': f'{field} is required'}), 400
@@ -16185,11 +19987,33 @@ def api_cases_update(case_id):
         return jsonify({'error': 'Database connection error'}), 500
     
     try:
-        with connection.cursor() as cursor:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             # Check if case exists
-            cursor.execute("SELECT id FROM cases WHERE id = %s", (case_id,))
-            if not cursor.fetchone():
+            cursor.execute("SELECT id, filled_by_id, filled_by_name FROM cases WHERE id = %s", (case_id,))
+            existing = cursor.fetchone()
+            if not existing:
                 return jsonify({'error': 'Case not found'}), 404
+
+            filled_by_id = existing.get('filled_by_id')
+            filled_by_name = existing.get('filled_by_name')
+            if data.get('filled_by_id') and data.get('filled_by_name'):
+                try:
+                    candidate_id = int(data['filled_by_id'])
+                except (TypeError, ValueError):
+                    return jsonify({'error': 'Invalid filled_by_id'}), 400
+                cursor.execute(
+                    "SELECT id, full_name, role FROM employees WHERE id = %s AND status = 'Active'",
+                    (candidate_id,),
+                )
+                handler = cursor.fetchone()
+                if not handler:
+                    return jsonify({'error': 'Selected case handler not found or inactive'}), 400
+                if not is_allocation_eligible_role(handler.get('role')):
+                    return jsonify({
+                        'error': 'Cases can only be allocated to Managing Partners or Associate Advocates',
+                    }), 400
+                filled_by_id = handler['id']
+                filled_by_name = handler['full_name']
             
             # Update case
             cursor.execute("""
@@ -16216,8 +20040,8 @@ def api_cases_update(case_id):
                 data['filing_date'],
                 data['case_category'].upper(),
                 data['station'].upper(),
-                data['filled_by_id'],
-                data['filled_by_name'].upper(),
+                filled_by_id,
+                (filled_by_name or '').upper() if filled_by_name else None,
                 data.get('description', ''),
                 case_id
             ))
@@ -16340,12 +20164,20 @@ def api_allocate_case(case_id):
             if not case:
                 return jsonify({'success': False, 'error': 'Case not found'}), 404
             
-            # Get employee name
-            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (employee_id,))
+            # Get employee name — Managing Partner or Associate Advocate only
+            cursor.execute(
+                "SELECT id, full_name, role FROM employees WHERE id = %s AND status = 'Active'",
+                (employee_id,),
+            )
             employee = cursor.fetchone()
             
             if not employee:
-                return jsonify({'success': False, 'error': 'Case handler not found'}), 400
+                return jsonify({'success': False, 'error': 'Case handler not found or inactive'}), 400
+            if not is_allocation_eligible_role(employee.get('role')):
+                return jsonify({
+                    'success': False,
+                    'error': 'Cases can only be allocated to Managing Partners or Associate Advocates',
+                }), 400
             
             employee_name = employee['full_name']
             
@@ -17911,10 +21743,10 @@ def _case_document_action_allowed(cursor, case_id, employee_id, task_id=None, pe
     case_row = cursor.fetchone()
     if not case_row:
         return False, 'Case not found.'
-    is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-    is_privileged = user_role in ['Managing Partner', 'Firm Administrator']
+    is_unrestricted = has_unrestricted_case_access(user_role, original_role)
+    is_privileged = is_privileged_case_viewer(user_role)
     is_case_owner = str(case_row.get('filled_by_id') or '') == str(employee_id)
-    if is_it_support or is_privileged or is_case_owner:
+    if is_unrestricted or is_privileged or is_case_owner:
         return True, None
     ensure_task_management_table(cursor, None)
     if has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key=permission_key):
@@ -18192,15 +22024,15 @@ def upload_case_document(case_id):
                 employee_id = session.get('employee_id')
                 user_role = session.get('employee_role')
                 original_role = session.get('original_role')
-                is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-                is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
+                unrestricted = has_unrestricted_case_access(user_role, original_role)
+                is_privileged_case_view_role = is_privileged_case_viewer(user_role)
                 is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
                 task_id = (request.form.get('task_id') or request.args.get('task_id') or '').strip()
-                if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
+                if not unrestricted and not is_privileged_case_view_role and not is_case_owner:
                     ensure_task_management_table(cursor, connection)
                     if not has_active_case_task_access(cursor, case_id, employee_id, task_id or None, permission_key='upload_documents'):
                         return jsonify({'success': False, 'error': 'You can only upload while your allocated task is active.'}), 403
-                
+
                 # Get main folder ID
                 main_folder_id = session.get('google_drive_main_folder_id')
                 if not main_folder_id:
@@ -18584,10 +22416,10 @@ def create_case_google_file(case_id):
                 employee_id = session.get('employee_id')
                 user_role = session.get('employee_role')
                 original_role = session.get('original_role')
-                is_it_support = (user_role == 'IT Support') or (original_role == 'IT Support')
-                is_privileged_case_view_role = user_role in ['Managing Partner', 'Firm Administrator']
+                unrestricted = has_unrestricted_case_access(user_role, original_role)
+                is_privileged_case_view_role = is_privileged_case_viewer(user_role)
                 is_case_owner = str(case_data.get('filled_by_id') or '') == str(employee_id)
-                if not is_it_support and not is_privileged_case_view_role and not is_case_owner:
+                if not unrestricted and not is_privileged_case_view_role and not is_case_owner:
                     ensure_task_management_table(cursor, connection)
                     if not task_id:
                         return jsonify({'success': False, 'error': 'task_id is required for task-based case access.'}), 403
@@ -18862,7 +22694,7 @@ def create_matter_google_file(matter_id):
                     client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
                     client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
                 else:
-                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Non-Litigation Matters')
 
                 ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
                 ref_safe = re.sub(r'[\\/:*?"<>|]', '_', ref)
@@ -19504,7 +23336,7 @@ def upload_matter_document(matter_id):
                     client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
                     client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
                 else:
-                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Non-Litigation Matters')
                 ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
                 ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
                 matter_folder_name = f"Matter {ref}"
@@ -19557,7 +23389,8 @@ def upload_matter_document(matter_id):
         print(f"Upload matter document error: {e}")
         return jsonify({'success': False, 'error': f'Upload failed: {str(e)}'}), 500
 
-@app.route('/other_matters/<int:matter_id>/document/<file_id>/download')
+@app.route('/other_matters/<int:matter_id>/document/<file_id>/download')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>/document/<file_id>/download')
 def download_matter_document(matter_id, file_id):
     """Stream a matter document from Google Drive as a download."""
     if 'employee_id' not in session:
@@ -19678,7 +23511,7 @@ def delete_matter_document_api(matter_id, file_id):
             client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
             client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
         else:
-            client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+            client_folder_id = get_or_create_folder(service, main_folder_id, 'Non-Litigation Matters')
         ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
         ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
         matter_folder_name = f"Matter {ref}"
@@ -20547,7 +24380,7 @@ def view_client_document_type(client_id, document_type):
                                      client=client,
                                      client_id=client_id,
                                      document_type=document_type,
-                                     document_type_name='Other Matters',
+                                     document_type_name='Non-Litigation Matters',
                                      matters=matters,
                                      company_settings=company_settings)
         except Exception as e:
@@ -20857,7 +24690,7 @@ def _format_calendar_matter(matter, today=None):
     return matter
 
 
-def _build_firm_calendar_events(upcoming_proceedings, all_proceedings, matters):
+def _build_firm_calendar_events(upcoming_proceedings, all_proceedings, matters, include_past_appearances=True):
     """Build date-keyed event map matching case_calendar format."""
     calendar_events = {}
 
@@ -20870,14 +24703,15 @@ def _build_firm_calendar_events(upcoming_proceedings, all_proceedings, matters):
                 'proceeding': proceeding,
             })
 
-    for proceeding in all_proceedings:
-        key = proceeding.get('date_of_court_appeared')
-        if key:
-            calendar_events.setdefault(key, []).append({
-                'type': 'appeared',
-                'source': 'case',
-                'proceeding': proceeding,
-            })
+    if include_past_appearances:
+        for proceeding in all_proceedings:
+            key = proceeding.get('date_of_court_appeared')
+            if key:
+                calendar_events.setdefault(key, []).append({
+                    'type': 'appeared',
+                    'source': 'case',
+                    'proceeding': proceeding,
+                })
 
     for matter in matters:
         key = matter.get('date_opened')
@@ -21016,7 +24850,8 @@ def calendar():
                 matter_events.append(_format_calendar_matter(matter, today))
 
             calendar_events = _build_firm_calendar_events(
-                all_upcoming_proceedings, all_proceedings, matter_events
+                all_upcoming_proceedings, all_proceedings, matter_events,
+                include_past_appearances=False,
             )
 
             all_agenda = sorted(
@@ -21045,7 +24880,8 @@ def calendar():
                     if _calendar_item_allocated_to_employee(m, employee_id)
                 ]
                 calendar_events_mine = _build_firm_calendar_events(
-                    upcoming_mine, proceedings_mine, matters_mine
+                    upcoming_mine, proceedings_mine, matters_mine,
+                    include_past_appearances=False,
                 )
                 all_agenda_mine = sorted(
                     upcoming_mine + matters_mine,
@@ -21187,6 +25023,48 @@ def reminders():
                 if matter.get('created_at'):
                     matter['created_at'] = matter['created_at'].strftime('%Y-%m-%d %H:%M:%S')
 
+            # ── Fired task reminder intervals ─────────────────────────────────
+            task_due_reminders = []
+            try:
+                ensure_task_interval_reminders_table(cursor, connection)
+                _process_due_task_reminders()
+                cursor.execute("""
+                    SELECT
+                        r.id,
+                        r.task_id,
+                        r.interval_code,
+                        r.task_title,
+                        r.due_at,
+                        r.assignee_name,
+                        r.reference_label,
+                        r.link_path,
+                        r.fired_at
+                    FROM task_interval_reminders r
+                    ORDER BY r.fired_at DESC
+                    LIMIT 100
+                """)
+                for row in cursor.fetchall() or []:
+                    interval_code = (row.get('interval_code') or '').strip()
+                    row['interval_label'] = TASK_REMINDER_INTERVAL_LABELS.get(
+                        interval_code, interval_code or 'Reminder'
+                    )
+                    due_val = row.get('due_at')
+                    if due_val:
+                        try:
+                            row['due_at'] = due_val.strftime('%Y-%m-%d %H:%M')
+                        except Exception:
+                            row['due_at'] = str(due_val)
+                    fired = row.get('fired_at')
+                    if fired:
+                        try:
+                            row['fired_at'] = fired.strftime('%Y-%m-%d %H:%M')
+                        except Exception:
+                            row['fired_at'] = str(fired)
+                    task_due_reminders.append(row)
+            except Exception as rem_exc:
+                print(f"[reminders] task interval list error: {rem_exc}")
+                task_due_reminders = []
+
             company_settings = get_company_settings()
             if not company_settings:
                 company_settings = {'company_name': 'BAUNI LAW GROUP'}
@@ -21195,7 +25073,8 @@ def reminders():
                                  company_settings=company_settings,
                                  proceedings_with_materials=proceedings_with_materials,
                                  all_reminders=all_reminders,
-                                 all_matters=all_matters)
+                                 all_matters=all_matters,
+                                 task_due_reminders=task_due_reminders)
     except Exception as e:
         print(f"Error fetching reminders: {e}")
         flash('An error occurred while fetching reminders.', 'error')
@@ -22058,6 +25937,25 @@ def create_sub_email(api_token, domain, user, api_port, email_address, password,
             quota=quota
         )
         return result
+    except Exception as e:
+        return {'error': str(e), 'status': 0}
+
+def add_email_forwarder(api_token, domain, user, api_port, email_address, forward_to):
+    """Forward mail from a firm mailbox to another address (e.g. personal email)."""
+    try:
+        email_address = (email_address or '').strip()
+        forward_to = (forward_to or '').strip()
+        domain = str(domain or '').strip().lstrip('@')
+        if not email_address or not forward_to or not domain:
+            return {'error': 'email, forward_to, and domain are required', 'status': 0}
+        return cpanel_api_call(
+            api_token, domain, user, api_port,
+            'Email', 'add_forwarder',
+            domain=domain,
+            email=email_address,
+            fwdopt='fwd',
+            fwdemail=forward_to
+        )
     except Exception as e:
         return {'error': str(e), 'status': 0}
 
@@ -23103,13 +27001,28 @@ def api_create_work_email():
                     """, (email_address, employee_id))
                     connection.commit()
                 
-                # TODO: Set up email forwarding to personal email if provided
-                # This would require additional cPanel API calls to set up forwarding
-                if personal_email:
-                    print(f"Note: Email forwarding to {personal_email} should be configured in cPanel")
+                # Forward firm work mailbox to personal inbox when provided.
+                forward_ok = False
+                if personal_email and personal_email.lower() != email_address.lower():
+                    fwd_result = add_email_forwarder(
+                        email_settings['cpanel_api_token'],
+                        email_settings['cpanel_domain'],
+                        email_settings['cpanel_user'],
+                        email_settings['cpanel_api_port'],
+                        email_address,
+                        personal_email
+                    )
+                    forward_ok = bool(fwd_result and fwd_result.get('status') == 1)
+                    if not forward_ok:
+                        print(f"[create-work-email] Forwarder failed for {email_address} → {personal_email}: {fwd_result}")
                 
                 connection.close()
-                return jsonify({'success': True, 'message': 'Work email created and linked successfully'})
+                msg = 'Work email created and linked successfully'
+                if personal_email and forward_ok:
+                    msg += f' (forwarding to {personal_email})'
+                elif personal_email and not forward_ok:
+                    msg += ' (mailbox created, but personal forwarding could not be set)'
+                return jsonify({'success': True, 'message': msg, 'personal_email_linked': forward_ok})
             else:
                 error_msg = result.get('errors', [{}])[0].get('message', 'Unknown error') if result.get('errors') else 'Failed to create email'
                 connection.close()
@@ -23232,13 +27145,57 @@ def system_health_module():
 
 # Basic company profile (standalone — not listed under System Settings nav).
 COMPANY_INFORMATION_SECTION = {
-    'label': 'Basic Company Information',
+    'label': 'Company Information',
     'icon': 'fa-building',
 }
 
 COMPANY_TEMPLATES_SECTION = {
-    'label': 'Company Templates',
-    'icon': 'fa-copy',
+    'label': 'Website Template',
+    'icon': 'fa-globe',
+}
+
+# Alias for templates that may reference the old name.
+WEBSITE_TEMPLATES_SECTION = COMPANY_TEMPLATES_SECTION
+
+# Google Business Profile primary categories (law / legal — single-select).
+GBP_PRIMARY_CATEGORIES = [
+    'Law Firm',
+    'Lawyer',
+    'Attorney',
+    'Divorce Lawyer',
+    'Family Law Attorney',
+    'Criminal Justice Attorney',
+    'Estate Planning Attorney',
+    'Immigration Attorney',
+    'Personal Injury Attorney',
+    'Real Estate Attorney',
+    'Tax Attorney',
+    'Trial Attorney',
+    'Bankruptcy Attorney',
+    'Employment Attorney',
+    'Intellectual Property Attorney',
+    'Legal Services',
+    'Notary Public',
+]
+
+FIRM_WEBSITE_PREVIEW_SECTIONS = [
+    {'label': 'Home', 'url': '/website_preview'},
+    {'label': 'About', 'url': '/website_preview/about'},
+    {'label': 'Practice Areas', 'url': '/website_preview/practice-areas'},
+    {'label': 'Our Team', 'url': '/website_preview/team'},
+    {'label': 'Contact', 'url': '/website_preview/contact'},
+    {'label': 'FAQ', 'url': '/website_preview/faq'},
+    {'label': 'Results', 'url': '/website_preview/results'},
+    {'label': 'Insights', 'url': '/website_preview/blog'},
+]
+
+SHERIA_MARKETING_PREVIEW_PAGES = {
+    'home': 'index.html',
+    'platform': 'platform.html',
+    'features': 'features.html',
+    'pricing': 'pricing.html',
+    'security': 'security.html',
+    'contact': 'contact.html',
 }
 
 # Firm stamp / signature scan pages (linked from Document Settings).
@@ -23270,11 +27227,13 @@ SYSTEM_CAPTURE_ASSETS = {
 }
 
 # Additional company settings pages (sidebar under Company, with company_information & templates).
+# business-hours and social-media are merged into the contact page (legacy URLs redirect).
+_SETTINGS_MERGED_INTO_CONTACT = frozenset({'business-hours', 'social-media'})
+# physical address is merged into company information (legacy URLs redirect).
+_SETTINGS_MERGED_INTO_COMPANY = frozenset({'address'})
+
 SYSTEM_SETTINGS_SECTIONS = {
     'contact': {'label': 'Contact Information', 'icon': 'fa-address-book'},
-    'address': {'label': 'Physical Address', 'icon': 'fa-map-marker-alt'},
-    'business-hours': {'label': 'Business Hours', 'icon': 'fa-clock'},
-    'social-media': {'label': 'Social Media Links', 'icon': 'fa-share-alt'},
     'legal': {'label': 'Legal & Professional', 'icon': 'fa-balance-scale'},
     'documents': {'label': 'Document Settings', 'icon': 'fa-file-alt'},
     'billing': {'label': 'Billing & Finance', 'icon': 'fa-dollar-sign'},
@@ -23283,7 +27242,1316 @@ SYSTEM_SETTINGS_SECTIONS = {
 }
 
 # All valid settings_section form keys (company + system settings pages).
-ALL_SETTINGS_SECTION_KEYS = {'company'} | set(SYSTEM_SETTINGS_SECTIONS.keys())
+ALL_SETTINGS_SECTION_KEYS = (
+    {'company', 'website'} | set(SYSTEM_SETTINGS_SECTIONS.keys())
+    | _SETTINGS_MERGED_INTO_CONTACT | _SETTINGS_MERGED_INTO_COMPANY
+)
+
+
+def _fetch_all_employees_for_legal_page(connection):
+    """All employees with attorney-directory profile fields for Legal settings."""
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, full_name, role, status, profile_picture, profile_picture_alt,
+                   work_email, personal_email, phone_number,
+                   professional_title, attorney_bio, practice_areas,
+                   public_contact_email, public_contact_phone,
+                   lsk_practicing_certificate_number, education_institutions,
+                   year_called_to_bar, meta_title, meta_description, url_slug,
+                   h1_heading, canonical_url, video_intro_url, updated_at
+            FROM employees
+            ORDER BY full_name ASC
+        """)
+        return cursor.fetchall()
+
+
+def _save_attorney_directory_profiles(cursor, request, upload_folder):
+    """Persist per-employee attorney profile fields from the legal settings form."""
+    ids_raw = (request.form.get('employee_ids') or '').strip()
+    if not ids_raw:
+        return 0
+    updated = 0
+    for part in ids_raw.split(','):
+        part = part.strip()
+        if not part.isdigit():
+            continue
+        emp_id = int(part)
+        cursor.execute("SELECT id FROM employees WHERE id = %s", (emp_id,))
+        if not cursor.fetchone():
+            continue
+        fields = {
+            'professional_title': (request.form.get(f'professional_title_{emp_id}') or '').strip(),
+            'attorney_bio': (request.form.get(f'attorney_bio_{emp_id}') or '').strip(),
+            'practice_areas': (request.form.get(f'practice_areas_{emp_id}') or '').strip(),
+            'public_contact_email': (request.form.get(f'public_contact_email_{emp_id}') or '').strip(),
+            'public_contact_phone': (request.form.get(f'public_contact_phone_{emp_id}') or '').strip(),
+            'lsk_practicing_certificate_number': (
+                request.form.get(f'lsk_practicing_certificate_number_{emp_id}') or ''
+            ).strip(),
+            'education_institutions': (
+                request.form.get(f'education_institutions_{emp_id}') or ''
+            ).strip(),
+            'year_called_to_bar': (request.form.get(f'year_called_to_bar_{emp_id}') or '').strip(),
+            'meta_title': (request.form.get(f'attorney_meta_title_{emp_id}') or '').strip()[:70],
+            'meta_description': (
+                request.form.get(f'attorney_meta_description_{emp_id}') or ''
+            ).strip()[:160],
+            'h1_heading': (request.form.get(f'attorney_h1_heading_{emp_id}') or '').strip(),
+            'profile_picture_alt': (
+                request.form.get(f'profile_picture_alt_{emp_id}') or ''
+            ).strip(),
+            'video_intro_url': (request.form.get(f'video_intro_url_{emp_id}') or '').strip()[:500],
+        }
+        url_slug = (request.form.get(f'attorney_url_slug_{emp_id}') or '').strip()
+        if not url_slug:
+            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (emp_id,))
+            row = cursor.fetchone()
+            name_for_slug = row['full_name'] if row else ''
+            url_slug = _slugify_url(name_for_slug)
+        else:
+            url_slug = _slugify_url(url_slug)
+        fields['url_slug'] = url_slug
+        canonical_url = (request.form.get(f'attorney_canonical_url_{emp_id}') or '').strip()
+        if not canonical_url and url_slug:
+            canonical_url = _default_firm_page_canonical(url_slug)
+        fields['canonical_url'] = canonical_url
+        f = request.files.get(f'profile_picture_{emp_id}')
+        if f and f.filename and allowed_file(f.filename):
+            filename = secure_filename(f.filename)
+            ext = filename.rsplit('.', 1)[1].lower()
+            unique = f"emp_{emp_id}_{secrets.token_hex(6)}.{ext}"
+            path = os.path.join(upload_folder, unique)
+            f.save(path)
+            fields['profile_picture'] = unique
+        set_clause = ', '.join(f"`{k}` = %s" for k in fields)
+        cursor.execute(
+            f"UPDATE employees SET {set_clause} WHERE id = %s",
+            list(fields.values()) + [emp_id],
+        )
+        updated += 1
+    return updated
+
+
+def _collect_repeatable_form_values(request, field_prefix):
+    """Collect non-empty values from indexed form fields like prefix0, prefix1."""
+    indices = set()
+    for key in request.form:
+        if key.startswith(field_prefix):
+            suffix = key[len(field_prefix):]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    values = []
+    for idx in sorted(indices):
+        val = (request.form.get(f'{field_prefix}{idx}') or '').strip()
+        if val:
+            values.append(val)
+    return values
+
+
+def _text_lines_to_list(text):
+    if not text:
+        return []
+    return [line.strip() for line in str(text).splitlines() if line.strip()]
+
+
+def _fetch_firm_page_seo_map(connection):
+    """Return {page_key: row} for firm_page_seo."""
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT page_key, meta_title, meta_description, h1_heading,
+                   url_slug, canonical_url, body_content, updated_at
+            FROM firm_page_seo
+        """)
+        return {row['page_key']: row for row in cursor.fetchall()}
+
+
+def _fetch_firm_image_alt_map(connection):
+    """Return {asset_key: alt_text} for firm_image_alt."""
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("SELECT asset_key, alt_text FROM firm_image_alt")
+        return {row['asset_key']: row['alt_text'] for row in cursor.fetchall()}
+
+
+def _enrich_company_settings_with_site_meta(settings, connection=None):
+    """Merge firm_page_seo and firm_image_alt into a company_settings dict for forms / public site."""
+    if not settings:
+        settings = {}
+    close_conn = False
+    if connection is None:
+        connection = get_db_connection()
+        close_conn = True
+    if not connection:
+        return settings
+    try:
+        if not table_exists('firm_page_seo'):
+            return settings
+        page_seo = _fetch_firm_page_seo_map(connection)
+        for page_key, row in page_seo.items():
+            prefix = f'seo_{page_key}_'
+            for field in ('meta_title', 'meta_description', 'h1_heading', 'url_slug', 'canonical_url'):
+                val = row.get(field)
+                if val is not None and str(val).strip():
+                    settings[f'{prefix}{field}'] = str(val).strip()
+        if table_exists('firm_image_alt'):
+            alts = _fetch_firm_image_alt_map(connection)
+            alt_field_map = {
+                'company_logo': 'company_logo_alt',
+                'favicon': 'favicon_alt',
+                'login_page_background': 'login_page_background_alt',
+            }
+            for asset_key, field_name in alt_field_map.items():
+                if alts.get(asset_key):
+                    settings[field_name] = alts[asset_key]
+    finally:
+        if close_conn and connection:
+            connection.close()
+    return settings
+
+
+def _firm_absolute_public_url(path_or_url):
+    """Absolute URL for JSON-LD and external structured data."""
+    if not path_or_url:
+        return None
+    text = str(path_or_url).strip()
+    if not text:
+        return None
+    if text.startswith('http://') or text.startswith('https://'):
+        return text
+    base = get_public_base_url().rstrip('/')
+    if not base:
+        return text
+    if not text.startswith('/'):
+        text = '/' + text
+    return base + text
+
+
+def _firm_absolute_asset_url(stored_value):
+    """Absolute URL for uploaded firm assets without Flask url_for."""
+    if not stored_value:
+        return None
+    text = str(stored_value).strip()
+    if text.startswith('http://') or text.startswith('https://'):
+        return text
+    filename = company_asset_basename(text)
+    if not filename:
+        return None
+    base = get_public_base_url().rstrip('/')
+    if not base:
+        return None
+    return f"{base}/static/{COMPANY_ASSET_STATIC_PREFIX}/{filename}"
+
+
+def _firm_structured_data_same_as(firm):
+    """Social and web profile URLs for schema.org sameAs."""
+    urls = []
+    seen = set()
+    for key in ('website_url', 'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link'):
+        val = (firm.get(key) or '').strip()
+        if val and val not in seen:
+            if not val.startswith('http'):
+                val = 'https://' + val.lstrip('/')
+            urls.append(val)
+            seen.add(val)
+    review_link = (firm.get('review_collection_link') or '').strip()
+    if review_link and review_link not in seen:
+        if not review_link.startswith('http'):
+            review_link = 'https://' + review_link.lstrip('/')
+        urls.append(review_link)
+        seen.add(review_link)
+    return urls
+
+
+def _jsonld_clean(value):
+    """Remove empty values from JSON-LD dicts/lists."""
+    if isinstance(value, dict):
+        cleaned = {}
+        for key, item in value.items():
+            child = _jsonld_clean(item)
+            if child is None or child == '' or child == [] or child == {}:
+                continue
+            cleaned[key] = child
+        return cleaned
+    if isinstance(value, list):
+        return [_jsonld_clean(item) for item in value if item is not None and item != '']
+    return value
+
+
+def _firm_postal_address_jsonld(firm):
+    """schema.org PostalAddress from company settings."""
+    street = (firm.get('street_building') or '').strip()
+    if firm.get('office_number_floor'):
+        floor = str(firm.get('office_number_floor')).strip()
+        street = f"{street}, {floor}".strip(', ') if street else floor
+    address = {
+        '@type': 'PostalAddress',
+        'streetAddress': street or None,
+        'addressLocality': (firm.get('city_town') or '').strip() or None,
+        'addressRegion': (firm.get('county_state') or '').strip() or None,
+        'postalCode': (firm.get('postal_code') or '').strip() or None,
+        'addressCountry': (firm.get('country') or 'Kenya').strip() or 'Kenya',
+    }
+    if firm.get('postal_address'):
+        address['postOfficeBoxNumber'] = str(firm.get('postal_address')).strip()
+    return _jsonld_clean(address)
+
+
+def _build_firm_website_jsonld_scripts(
+    *,
+    firm,
+    firm_name,
+    firm_logo_stored,
+    practice_areas,
+    attorneys,
+    faqs,
+    seo_home,
+    business_hours,
+    attorney_education=None,
+    page='home',
+    page_seo=None,
+    breadcrumbs=None,
+    practice_area=None,
+    attorney=None,
+    blog_post=None,
+):
+    """Build JSON-LD script payloads for the public firm website."""
+    attorney_education = attorney_education or {}
+    page_seo = page_seo or seo_home
+    base = get_public_base_url().rstrip('/')
+    canonical = (seo_home.get('canonical_url') or '').strip() or (f'{base}/' if base else '')
+    page_canonical = (page_seo.get('canonical_url') or '').strip() or canonical
+    org_id = f'{canonical}#legalservice' if canonical else None
+    scripts = []
+
+    area_served = _text_lines_to_list(firm.get('gbp_service_areas'))
+    legal_service = _jsonld_clean({
+        '@context': 'https://schema.org',
+        '@type': 'LegalService',
+        '@id': org_id,
+        'name': firm_name,
+        'description': (seo_home.get('meta_description') or firm.get('company_tagline') or '').strip() or None,
+        'url': canonical or None,
+        'image': _firm_absolute_asset_url(firm_logo_stored),
+        'telephone': (firm.get('contact_number') or '').strip() or None,
+        'email': (firm.get('email') or firm.get('customer_support_email') or '').strip() or None,
+        'address': _firm_postal_address_jsonld(firm),
+        'geo': (
+            {
+                '@type': 'GeoCoordinates',
+                'latitude': float(firm['latitude']),
+                'longitude': float(firm['longitude']),
+            }
+            if firm.get('latitude') is not None and firm.get('longitude') is not None
+            else None
+        ),
+        'openingHours': business_hours or None,
+        'areaServed': [{'@type': 'Place', 'name': area} for area in area_served] if area_served else None,
+        'sameAs': _firm_structured_data_same_as(firm),
+        'aggregateRating': (
+            {
+                '@type': 'AggregateRating',
+                'ratingValue': float(firm['review_average_rating']),
+                'reviewCount': int(firm.get('review_count') or 0),
+                'bestRating': 5,
+                'worstRating': 1,
+            }
+            if firm.get('review_average_rating') and int(firm.get('review_count') or 0) > 0
+            else None
+        ),
+        'knowsAbout': [pa.get('name') for pa in practice_areas if pa.get('name')] or None,
+    })
+    if legal_service:
+        scripts.append(json.dumps(legal_service, ensure_ascii=False))
+
+    attorney_targets = []
+    if page == 'attorney' and attorney:
+        attorney_targets = [attorney]
+    elif page == 'team':
+        attorney_targets = [
+            emp for emp in attorneys if (emp.get('status') or 'Active') == 'Active'
+        ]
+
+    for emp in attorney_targets:
+        emp_slug = _attorney_public_slug(emp)
+        emp_url = _firm_absolute_public_url(f'team/{emp_slug}') if emp_slug else canonical
+        credentials = []
+        for edu in attorney_education.get(emp.get('id'), []):
+            label = ' '.join(
+                p for p in (
+                    (edu.get('degree') or '').strip(),
+                    (edu.get('institution') or '').strip(),
+                ) if p
+            )
+            if label:
+                credentials.append({
+                    '@type': 'EducationalOccupationalCredential',
+                    'name': label,
+                })
+        if emp.get('lsk_practicing_certificate_number'):
+            credentials.append({
+                '@type': 'EducationalOccupationalCredential',
+                'credentialCategory': 'Professional License',
+                'name': f"LSK Practicing Certificate {emp['lsk_practicing_certificate_number']}",
+            })
+        attorney_ld = _jsonld_clean({
+            '@context': 'https://schema.org',
+            '@type': 'Attorney',
+            'name': emp.get('full_name'),
+            'jobTitle': (emp.get('professional_title') or emp.get('role') or 'Attorney').strip(),
+            'description': (emp.get('attorney_bio') or '').strip() or None,
+            'image': _firm_absolute_asset_url(emp.get('profile_picture')),
+            'url': emp_url,
+            'email': (emp.get('public_contact_email') or emp.get('work_email') or '').strip() or None,
+            'telephone': (emp.get('public_contact_phone') or emp.get('phone_number') or '').strip() or None,
+            'worksFor': {'@id': org_id} if org_id else {'@type': 'LegalService', 'name': firm_name},
+            'knowsAbout': [
+                p.strip() for p in (emp.get('practice_areas') or '').replace('\n', ',').split(',')
+                if p.strip()
+            ] or None,
+            'hasCredential': credentials or None,
+        })
+        if attorney_ld.get('name'):
+            scripts.append(json.dumps(attorney_ld, ensure_ascii=False))
+
+    faq_targets = []
+    if page in ('faq', 'home') and faqs:
+        faq_targets = faqs
+    if faqs and page == 'practice_area' and practice_area:
+        faq_targets = faqs
+
+    if faq_targets:
+        faq_page = {
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            'mainEntity': [
+                {
+                    '@type': 'Question',
+                    'name': faq['question'],
+                    'acceptedAnswer': {
+                        '@type': 'Answer',
+                        'text': faq['answer'],
+                    },
+                }
+                for faq in faq_targets
+                if faq.get('question') and faq.get('answer')
+            ],
+        }
+        if faq_page['mainEntity']:
+            scripts.append(json.dumps(faq_page, ensure_ascii=False))
+
+    if blog_post:
+        article_ld = _jsonld_clean({
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            'headline': blog_post.get('title'),
+            'description': (blog_post.get('excerpt') or '').strip() or None,
+            'dateModified': (
+                blog_post['updated_at'].isoformat()
+                if hasattr(blog_post.get('updated_at'), 'isoformat')
+                else str(blog_post.get('updated_at') or '')
+            ) or None,
+            'author': (
+                {'@type': 'Person', 'name': blog_post.get('author_name')}
+                if blog_post.get('author_name') else None
+            ),
+            'publisher': {'@type': 'LegalService', 'name': firm_name},
+            'url': page_canonical,
+        })
+        if article_ld.get('headline'):
+            scripts.append(json.dumps(article_ld, ensure_ascii=False))
+
+    breadcrumb_items = []
+    crumbs = breadcrumbs or [{'label': 'Home', 'url': '/'}]
+    for idx, crumb in enumerate(crumbs, start=1):
+        item_url = crumb.get('url')
+        if item_url and not str(item_url).startswith('http'):
+            item_url = _firm_absolute_public_url(item_url.lstrip('/'))
+        breadcrumb_items.append(_jsonld_clean({
+            '@type': 'ListItem',
+            'position': idx,
+            'name': crumb.get('label'),
+            'item': item_url,
+        }))
+    if breadcrumb_items:
+        scripts.append(json.dumps({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            'itemListElement': breadcrumb_items,
+        }, ensure_ascii=False))
+    return scripts
+
+
+def _save_firm_page_seo_from_form(cursor, request, page_keys):
+    """Persist home/about SEO rows from the company settings form."""
+    if not table_exists('firm_page_seo'):
+        return 0
+    saved = 0
+    for page_key in page_keys:
+        prefix = f'seo_{page_key}_'
+        meta_title = (request.form.get(f'{prefix}meta_title') or '').strip()[:70]
+        meta_description = (request.form.get(f'{prefix}meta_description') or '').strip()[:160]
+        h1_heading = (request.form.get(f'{prefix}h1_heading') or '').strip()
+        url_slug = (request.form.get(f'{prefix}url_slug') or '').strip()
+        canonical_url = (request.form.get(f'{prefix}canonical_url') or '').strip()
+        if page_key == 'home' and not canonical_url:
+            canonical_url = _default_firm_page_canonical()
+        if page_key == 'about':
+            slug = url_slug or 'about'
+            if not canonical_url:
+                canonical_url = _default_firm_page_canonical(slug)
+        if not any((meta_title, meta_description, h1_heading, url_slug, canonical_url)):
+            cursor.execute("DELETE FROM firm_page_seo WHERE page_key = %s", (page_key,))
+            saved += 1
+            continue
+        cursor.execute("""
+            INSERT INTO firm_page_seo
+            (page_key, meta_title, meta_description, h1_heading, url_slug, canonical_url)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                meta_title = VALUES(meta_title),
+                meta_description = VALUES(meta_description),
+                h1_heading = VALUES(h1_heading),
+                url_slug = VALUES(url_slug),
+                canonical_url = VALUES(canonical_url)
+        """, (page_key, meta_title, meta_description, h1_heading, url_slug, canonical_url))
+        saved += 1
+    return saved
+
+
+def _save_firm_image_alt_from_form(cursor, request, asset_field_map):
+    """Persist image alt text rows. asset_field_map: {asset_key: form_field_name}."""
+    if not table_exists('firm_image_alt'):
+        return 0
+    saved = 0
+    for asset_key, field_name in asset_field_map.items():
+        if request.form.get(field_name) is None:
+            continue
+        alt_text = (request.form.get(field_name) or '').strip()
+        cursor.execute("""
+            INSERT INTO firm_image_alt (asset_key, alt_text)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE alt_text = VALUES(alt_text)
+        """, (asset_key, alt_text))
+        saved += 1
+    return saved
+
+
+def _fetch_firm_practice_areas(connection):
+    """All firm practice areas ordered for display."""
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, name, description, target_keywords, short_description, long_description,
+                   sub_specialties, meta_title, meta_description, url_slug,
+                   h1_heading, canonical_url, image_path, image_alt,
+                   cta_label, consultation_fee, free_consultation, response_time_commitment,
+                   sort_order, updated_at
+            FROM firm_practice_areas
+            ORDER BY sort_order ASC, name ASC
+        """)
+        return cursor.fetchall()
+
+
+def _practice_area_form_indices(request):
+    """Collect numeric row indices from practice-area form field names."""
+    indices = set()
+    for key in request.form:
+        if key.startswith('practice_area_name_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_practice_areas_from_form(cursor, request, upload_folder=None):
+    """Replace firm practice areas with rows submitted from the legal settings form."""
+    indices = _practice_area_form_indices(request)
+    keep_ids = []
+    sort_order = 0
+    used_slugs = set()
+    for idx in indices:
+        name = (request.form.get(f'practice_area_name_{idx}') or '').strip()
+        if not name:
+            continue
+        target_keywords = (request.form.get(f'practice_area_target_keywords_{idx}') or '').strip()
+        short_description = (request.form.get(f'practice_area_short_description_{idx}') or '').strip()
+        if not short_description:
+            short_description = (request.form.get(f'practice_area_description_{idx}') or '').strip()
+        long_description = (request.form.get(f'practice_area_long_description_{idx}') or '').strip()
+        sub_specialties = (request.form.get(f'practice_area_sub_specialties_{idx}') or '').strip()
+        meta_title = (request.form.get(f'practice_area_meta_title_{idx}') or '').strip()[:70]
+        meta_description = (request.form.get(f'practice_area_meta_description_{idx}') or '').strip()[:160]
+        h1_heading = (request.form.get(f'practice_area_h1_heading_{idx}') or '').strip() or name
+        image_alt = (request.form.get(f'practice_area_image_alt_{idx}') or '').strip()
+        url_slug = (request.form.get(f'practice_area_url_slug_{idx}') or '').strip()
+        if not url_slug:
+            url_slug = _slugify_url(name)
+        else:
+            url_slug = _slugify_url(url_slug)
+        if url_slug:
+            base_slug = url_slug
+            n = 2
+            while url_slug in used_slugs:
+                url_slug = f'{base_slug}-{n}'
+                n += 1
+            used_slugs.add(url_slug)
+        canonical_url = (request.form.get(f'practice_area_canonical_url_{idx}') or '').strip()
+        if not canonical_url and url_slug:
+            canonical_url = _default_firm_page_canonical(f'practice-areas/{url_slug}')
+        cta_label = (request.form.get(f'practice_area_cta_label_{idx}') or '').strip()[:120]
+        consultation_fee = (request.form.get(f'practice_area_consultation_fee_{idx}') or '').strip()[:120]
+        free_consultation = 1 if request.form.get(f'practice_area_free_consultation_{idx}') == 'on' else 0
+        response_time_commitment = (
+            request.form.get(f'practice_area_response_time_{idx}') or ''
+        ).strip()[:120]
+        description = short_description
+        pa_id_raw = (request.form.get(f'practice_area_id_{idx}') or '').strip()
+        existing_image_path = None
+        if pa_id_raw.isdigit():
+            pa_id = int(pa_id_raw)
+            cursor.execute(
+                "SELECT id, image_path FROM firm_practice_areas WHERE id = %s",
+                (pa_id,),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                existing_image_path = existing.get('image_path')
+        image_path = existing_image_path
+        if upload_folder:
+            f = request.files.get(f'practice_area_image_{idx}')
+            if f and f.filename and allowed_file(f.filename):
+                filename = secure_filename(f.filename)
+                ext = filename.rsplit('.', 1)[1].lower()
+                token = pa_id_raw if pa_id_raw.isdigit() else secrets.token_hex(4)
+                unique = f"pa_{token}_{secrets.token_hex(6)}.{ext}"
+                path = os.path.join(upload_folder, unique)
+                f.save(path)
+                if existing_image_path:
+                    old_path = os.path.join(upload_folder, os.path.basename(existing_image_path))
+                    if os.path.isfile(old_path):
+                        try:
+                            os.remove(old_path)
+                        except OSError:
+                            pass
+                image_path = unique
+        pa_id_raw = (request.form.get(f'practice_area_id_{idx}') or '').strip()
+        if pa_id_raw.isdigit():
+            pa_id = int(pa_id_raw)
+            cursor.execute("SELECT id FROM firm_practice_areas WHERE id = %s", (pa_id,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_practice_areas
+                    SET name = %s, description = %s, target_keywords = %s,
+                        short_description = %s, long_description = %s,
+                        sub_specialties = %s, meta_title = %s, meta_description = %s,
+                        url_slug = %s, h1_heading = %s, canonical_url = %s,
+                        image_path = %s, image_alt = %s,
+                        cta_label = %s, consultation_fee = %s, free_consultation = %s,
+                        response_time_commitment = %s, sort_order = %s
+                    WHERE id = %s
+                """, (name, description, target_keywords, short_description, long_description,
+                      sub_specialties, meta_title, meta_description, url_slug, h1_heading,
+                      canonical_url, image_path, image_alt,
+                      cta_label, consultation_fee, free_consultation, response_time_commitment,
+                      sort_order, pa_id))
+                keep_ids.append(pa_id)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO firm_practice_areas
+            (name, description, target_keywords, short_description, long_description,
+             sub_specialties, meta_title, meta_description, url_slug, h1_heading,
+             canonical_url, image_path, image_alt,
+             cta_label, consultation_fee, free_consultation, response_time_commitment, sort_order)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (name, description, target_keywords, short_description, long_description,
+              sub_specialties, meta_title, meta_description, url_slug, h1_heading,
+              canonical_url, image_path, image_alt,
+              cta_label, consultation_fee, free_consultation, response_time_commitment, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM firm_practice_areas WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM firm_practice_areas")
+    return len(keep_ids)
+
+
+def _fetch_attorney_notable_cases_by_employee(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, employee_id, description, consent_confirmed, sort_order
+            FROM attorney_notable_cases
+            ORDER BY employee_id ASC, sort_order ASC, id ASC
+        """)
+        by_employee = {}
+        for row in cursor.fetchall():
+            by_employee.setdefault(row['employee_id'], []).append(row)
+        return by_employee
+
+
+def _attorney_notable_case_indices(request, emp_id):
+    indices = set()
+    prefix = f'attorney_notable_case_description_{emp_id}_'
+    for key in request.form:
+        if key.startswith(prefix):
+            suffix = key[len(prefix):]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_attorney_notable_cases_for_employee(cursor, request, emp_id):
+    indices = _attorney_notable_case_indices(request, emp_id)
+    keep_ids = []
+    sort_order = 0
+    for idx in indices:
+        description = (request.form.get(f'attorney_notable_case_description_{emp_id}_{idx}') or '').strip()
+        if not description:
+            continue
+        consent = 1 if request.form.get(f'attorney_notable_case_consent_{emp_id}_{idx}') == 'on' else 0
+        case_id_raw = (request.form.get(f'attorney_notable_case_id_{emp_id}_{idx}') or '').strip()
+        if case_id_raw.isdigit():
+            case_id = int(case_id_raw)
+            cursor.execute(
+                "SELECT id FROM attorney_notable_cases WHERE id = %s AND employee_id = %s",
+                (case_id, emp_id),
+            )
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE attorney_notable_cases
+                    SET description = %s, consent_confirmed = %s, sort_order = %s
+                    WHERE id = %s
+                """, (description, consent, sort_order, case_id))
+                keep_ids.append(case_id)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO attorney_notable_cases (employee_id, description, consent_confirmed, sort_order)
+            VALUES (%s, %s, %s, %s)
+        """, (emp_id, description, consent, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM attorney_notable_cases WHERE employee_id = %s AND id NOT IN ({placeholders})",
+            [emp_id] + keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM attorney_notable_cases WHERE employee_id = %s", (emp_id,))
+    return len(keep_ids)
+
+
+def _save_attorney_notable_cases_from_form(cursor, request):
+    ids_raw = (request.form.get('employee_ids') or '').strip()
+    if not ids_raw:
+        return 0
+    total = 0
+    for part in ids_raw.split(','):
+        part = part.strip()
+        if not part.isdigit():
+            continue
+        emp_id = int(part)
+        cursor.execute("SELECT id FROM employees WHERE id = %s", (emp_id,))
+        if cursor.fetchone():
+            total += _save_attorney_notable_cases_for_employee(cursor, request, emp_id)
+    return total
+
+
+def _fetch_firm_notable_case_outcomes(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, description, practice_area, consent_confirmed, sort_order
+            FROM firm_notable_case_outcomes
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _case_outcome_form_indices(request):
+    indices = set()
+    for key in request.form:
+        if key.startswith('case_outcome_description_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_notable_case_outcomes_from_form(cursor, request):
+    indices = _case_outcome_form_indices(request)
+    keep_ids = []
+    sort_order = 0
+    for idx in indices:
+        description = (request.form.get(f'case_outcome_description_{idx}') or '').strip()
+        if not description:
+            continue
+        practice_area = (request.form.get(f'case_outcome_practice_area_{idx}') or '').strip()
+        consent = 1 if request.form.get(f'case_outcome_consent_{idx}') == 'on' else 0
+        outcome_id_raw = (request.form.get(f'case_outcome_id_{idx}') or '').strip()
+        if outcome_id_raw.isdigit():
+            outcome_id = int(outcome_id_raw)
+            cursor.execute("SELECT id FROM firm_notable_case_outcomes WHERE id = %s", (outcome_id,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_notable_case_outcomes
+                    SET description = %s, practice_area = %s, consent_confirmed = %s, sort_order = %s
+                    WHERE id = %s
+                """, (description, practice_area, consent, sort_order, outcome_id))
+                keep_ids.append(outcome_id)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO firm_notable_case_outcomes
+            (description, practice_area, consent_confirmed, sort_order)
+            VALUES (%s, %s, %s, %s)
+        """, (description, practice_area, consent, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM firm_notable_case_outcomes WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM firm_notable_case_outcomes")
+    return len(keep_ids)
+
+
+def _fetch_firm_media_mentions(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, publication, link, mention_date, sort_order
+            FROM firm_media_mentions
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _media_mention_form_indices(request):
+    indices = set()
+    for key in request.form:
+        if key.startswith('media_mention_publication_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_media_mentions_from_form(cursor, request):
+    indices = _media_mention_form_indices(request)
+    keep_ids = []
+    sort_order = 0
+    for idx in indices:
+        publication = (request.form.get(f'media_mention_publication_{idx}') or '').strip()
+        if not publication:
+            continue
+        link = (request.form.get(f'media_mention_link_{idx}') or '').strip()
+        mention_date = (request.form.get(f'media_mention_date_{idx}') or '').strip()
+        mention_id_raw = (request.form.get(f'media_mention_id_{idx}') or '').strip()
+        if mention_id_raw.isdigit():
+            mention_id = int(mention_id_raw)
+            cursor.execute("SELECT id FROM firm_media_mentions WHERE id = %s", (mention_id,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_media_mentions
+                    SET publication = %s, link = %s, mention_date = %s, sort_order = %s
+                    WHERE id = %s
+                """, (publication, link, mention_date, sort_order, mention_id))
+                keep_ids.append(mention_id)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO firm_media_mentions (publication, link, mention_date, sort_order)
+            VALUES (%s, %s, %s, %s)
+        """, (publication, link, mention_date, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM firm_media_mentions WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM firm_media_mentions")
+    return len(keep_ids)
+
+
+def _fetch_firm_awards(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, title, year, sort_order
+            FROM firm_awards
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _award_form_indices(request):
+    indices = set()
+    for key in request.form:
+        if key.startswith('award_title_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_awards_from_form(cursor, request):
+    indices = _award_form_indices(request)
+    keep_ids = []
+    sort_order = 0
+    for idx in indices:
+        title = (request.form.get(f'award_title_{idx}') or '').strip()
+        if not title:
+            continue
+        year = (request.form.get(f'award_year_{idx}') or '').strip()
+        award_id_raw = (request.form.get(f'award_id_{idx}') or '').strip()
+        if award_id_raw.isdigit():
+            award_id = int(award_id_raw)
+            cursor.execute("SELECT id FROM firm_awards WHERE id = %s", (award_id,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_awards SET title = %s, year = %s, sort_order = %s WHERE id = %s
+                """, (title, year, sort_order, award_id))
+                keep_ids.append(award_id)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO firm_awards (title, year, sort_order) VALUES (%s, %s, %s)
+        """, (title, year, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(f"DELETE FROM firm_awards WHERE id NOT IN ({placeholders})", keep_ids)
+    else:
+        cursor.execute("DELETE FROM firm_awards")
+    return len(keep_ids)
+
+
+def _fetch_attorney_education_by_employee(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, employee_id, degree, institution, year, sort_order
+            FROM attorney_education
+            ORDER BY employee_id ASC, sort_order ASC, id ASC
+        """)
+        by_employee = {}
+        for row in cursor.fetchall():
+            by_employee.setdefault(row['employee_id'], []).append(row)
+        return by_employee
+
+
+def _education_form_indices(request, emp_id):
+    indices = set()
+    prefix = f'attorney_education_degree_{emp_id}_'
+    for key in request.form:
+        if key.startswith(prefix):
+            suffix = key[len(prefix):]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_attorney_education_for_employee(cursor, request, emp_id):
+    indices = _education_form_indices(request, emp_id)
+    keep_ids = []
+    sort_order = 0
+    summary_lines = []
+    for idx in indices:
+        degree = (request.form.get(f'attorney_education_degree_{emp_id}_{idx}') or '').strip()
+        institution = (request.form.get(f'attorney_education_institution_{emp_id}_{idx}') or '').strip()
+        year = (request.form.get(f'attorney_education_year_{emp_id}_{idx}') or '').strip()
+        if not degree and not institution:
+            continue
+        edu_id_raw = (request.form.get(f'attorney_education_id_{emp_id}_{idx}') or '').strip()
+        if edu_id_raw.isdigit():
+            edu_id = int(edu_id_raw)
+            cursor.execute(
+                "SELECT id FROM attorney_education WHERE id = %s AND employee_id = %s",
+                (edu_id, emp_id),
+            )
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE attorney_education
+                    SET degree = %s, institution = %s, year = %s, sort_order = %s
+                    WHERE id = %s
+                """, (degree, institution, year, sort_order, edu_id))
+                keep_ids.append(edu_id)
+                sort_order += 1
+                parts = [p for p in (degree, institution, year) if p]
+                if parts:
+                    summary_lines.append(', '.join(parts))
+                continue
+        cursor.execute("""
+            INSERT INTO attorney_education (employee_id, degree, institution, year, sort_order)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (emp_id, degree, institution, year, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+        parts = [p for p in (degree, institution, year) if p]
+        if parts:
+            summary_lines.append(', '.join(parts))
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM attorney_education WHERE employee_id = %s AND id NOT IN ({placeholders})",
+            [emp_id] + keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM attorney_education WHERE employee_id = %s", (emp_id,))
+    cursor.execute(
+        "UPDATE employees SET education_institutions = %s WHERE id = %s",
+        ('\n'.join(summary_lines), emp_id),
+    )
+    return len(keep_ids)
+
+
+def _save_attorney_education_from_form(cursor, request):
+    ids_raw = (request.form.get('employee_ids') or '').strip()
+    if not ids_raw:
+        return 0
+    total = 0
+    for part in ids_raw.split(','):
+        part = part.strip()
+        if not part.isdigit():
+            continue
+        emp_id = int(part)
+        cursor.execute("SELECT id FROM employees WHERE id = %s", (emp_id,))
+        if cursor.fetchone():
+            total += _save_attorney_education_for_employee(cursor, request, emp_id)
+    return total
+
+
+def _fetch_published_testimonials(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, client_name, quote, testimonial_date, consent_confirmed, sort_order
+            FROM firm_testimonials
+            WHERE consent_confirmed = 1
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _fetch_published_case_outcomes(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, description, practice_area, consent_confirmed, sort_order
+            FROM firm_notable_case_outcomes
+            WHERE consent_confirmed = 1
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _fetch_published_attorney_notable_cases_by_employee(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, employee_id, description, consent_confirmed, sort_order
+            FROM attorney_notable_cases
+            WHERE consent_confirmed = 1
+            ORDER BY employee_id ASC, sort_order ASC, id ASC
+        """)
+        by_employee = {}
+        for row in cursor.fetchall():
+            by_employee.setdefault(row['employee_id'], []).append(row)
+        return by_employee
+
+
+def _fetch_firm_testimonials(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, client_name, quote, testimonial_date, consent_confirmed, sort_order
+            FROM firm_testimonials
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _testimonial_form_indices(request):
+    indices = set()
+    for key in request.form:
+        if key.startswith('testimonial_quote_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_testimonials_from_form(cursor, request):
+    indices = _testimonial_form_indices(request)
+    keep_ids = []
+    sort_order = 0
+    for idx in indices:
+        quote = (request.form.get(f'testimonial_quote_{idx}') or '').strip()
+        if not quote:
+            continue
+        client_name = (request.form.get(f'testimonial_client_name_{idx}') or '').strip() or 'Anonymous'
+        testimonial_date = (request.form.get(f'testimonial_date_{idx}') or '').strip()
+        consent = 1 if request.form.get(f'testimonial_consent_{idx}') == 'on' else 0
+        tid_raw = (request.form.get(f'testimonial_id_{idx}') or '').strip()
+        if tid_raw.isdigit():
+            tid = int(tid_raw)
+            cursor.execute("SELECT id FROM firm_testimonials WHERE id = %s", (tid,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_testimonials
+                    SET client_name = %s, quote = %s, testimonial_date = %s,
+                        consent_confirmed = %s, sort_order = %s
+                    WHERE id = %s
+                """, (client_name, quote, testimonial_date, consent, sort_order, tid))
+                keep_ids.append(tid)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO firm_testimonials
+            (client_name, quote, testimonial_date, consent_confirmed, sort_order)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (client_name, quote, testimonial_date, consent, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM firm_testimonials WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM firm_testimonials")
+    return len(keep_ids)
+
+
+def _fetch_firm_faqs(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, question, answer, publish_confirmed, sort_order, updated_at
+            FROM firm_faqs
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _fetch_published_firm_faqs(connection):
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT id, question, answer, sort_order
+            FROM firm_faqs
+            WHERE publish_confirmed = 1
+            ORDER BY sort_order ASC, id ASC
+        """)
+        return cursor.fetchall()
+
+
+def _faq_form_indices(request):
+    indices = set()
+    for key in request.form:
+        if key.startswith('faq_question_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_faqs_from_form(cursor, request):
+    indices = _faq_form_indices(request)
+    keep_ids = []
+    sort_order = 0
+    for idx in indices:
+        question = (request.form.get(f'faq_question_{idx}') or '').strip()
+        answer = (request.form.get(f'faq_answer_{idx}') or '').strip()
+        if not question or not answer:
+            continue
+        publish = 1 if request.form.get(f'faq_publish_{idx}') == 'on' else 0
+        faq_id_raw = (request.form.get(f'faq_id_{idx}') or '').strip()
+        if faq_id_raw.isdigit():
+            faq_id = int(faq_id_raw)
+            cursor.execute("SELECT id FROM firm_faqs WHERE id = %s", (faq_id,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_faqs
+                    SET question = %s, answer = %s, publish_confirmed = %s, sort_order = %s
+                    WHERE id = %s
+                """, (question, answer, publish, sort_order, faq_id))
+                keep_ids.append(faq_id)
+                sort_order += 1
+                continue
+        cursor.execute("""
+            INSERT INTO firm_faqs (question, answer, publish_confirmed, sort_order)
+            VALUES (%s, %s, %s, %s)
+        """, (question, answer, publish, sort_order))
+        keep_ids.append(cursor.lastrowid)
+        sort_order += 1
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM firm_faqs WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM firm_faqs")
+    return len(keep_ids)
+
+
+def _fetch_published_blog_posts(connection):
+    if not table_exists('firm_blog_posts'):
+        return []
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.author_employee_id,
+                   p.updated_at, e.full_name AS author_name, e.url_slug AS author_slug
+            FROM firm_blog_posts p
+            LEFT JOIN employees e ON e.id = p.author_employee_id
+            WHERE p.published = 1
+            ORDER BY p.updated_at DESC, p.id DESC
+        """)
+        rows = cursor.fetchall()
+        for row in rows:
+            if row.get('updated_at'):
+                row['last_updated_display'] = _format_public_last_updated(row['updated_at'])
+        return rows
+
+
+def _fetch_blog_post_by_slug(connection, slug):
+    if not table_exists('firm_blog_posts') or not slug:
+        return None
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.author_employee_id,
+                   p.updated_at, e.full_name AS author_name, e.url_slug AS author_slug,
+                   e.meta_title AS author_meta_title
+            FROM firm_blog_posts p
+            LEFT JOIN employees e ON e.id = p.author_employee_id
+            WHERE p.slug = %s AND p.published = 1
+            LIMIT 1
+        """, (slug,))
+        row = cursor.fetchone()
+        if row and row.get('updated_at'):
+            row['last_updated_display'] = _format_public_last_updated(row['updated_at'])
+        return row
+
+
+def _save_firm_consultation_request(connection, form):
+    name = (form.get('full_name') or '').strip()
+    if not name:
+        return False, 'Please enter your name.'
+    phone = (form.get('phone') or '').strip()
+    email = (form.get('email') or '').strip()
+    practice_area = (form.get('practice_area') or '').strip()
+    message = (form.get('message') or '').strip()
+    if not phone and not email:
+        return False, 'Please provide a phone number or email address.'
+    if not table_exists('firm_consultation_requests'):
+        return False, 'Consultation requests are not available right now.'
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO firm_consultation_requests
+            (full_name, phone, email, practice_area, message)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (name, phone, email, practice_area, message))
+    connection.commit()
+    return True, 'Thank you. Your consultation request has been received. We will contact you shortly.'
+
+
+def _fetch_firm_blog_posts(connection):
+    """All blog posts for admin (published and drafts)."""
+    if not table_exists('firm_blog_posts'):
+        return []
+    with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+        cursor.execute("""
+            SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.author_employee_id,
+                   p.published, p.updated_at, e.full_name AS author_name
+            FROM firm_blog_posts p
+            LEFT JOIN employees e ON e.id = p.author_employee_id
+            ORDER BY p.updated_at DESC, p.id DESC
+        """)
+        return cursor.fetchall()
+
+
+def _blog_form_indices(request):
+    indices = set()
+    for key in request.form:
+        if key.startswith('blog_title_'):
+            suffix = key[len('blog_title_'):]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    return sorted(indices)
+
+
+def _save_firm_blog_posts_from_form(cursor, request):
+    if not table_exists('firm_blog_posts'):
+        return 0
+    indices = _blog_form_indices(request)
+    keep_ids = []
+    for idx in indices:
+        title = (request.form.get(f'blog_title_{idx}') or '').strip()
+        if not title:
+            continue
+        slug = (request.form.get(f'blog_slug_{idx}') or '').strip() or _slugify_url(title)
+        slug = slug[:200] or f'post-{idx}'
+        excerpt = (request.form.get(f'blog_excerpt_{idx}') or '').strip()
+        body = (request.form.get(f'blog_body_{idx}') or '').strip()
+        published = 1 if request.form.get(f'blog_published_{idx}') == 'on' else 0
+        author_raw = (request.form.get(f'blog_author_{idx}') or '').strip()
+        author_id = int(author_raw) if author_raw.isdigit() else None
+        post_id_raw = (request.form.get(f'blog_id_{idx}') or '').strip()
+        if post_id_raw.isdigit():
+            post_id = int(post_id_raw)
+            cursor.execute("SELECT id FROM firm_blog_posts WHERE id = %s", (post_id,))
+            if cursor.fetchone():
+                cursor.execute("""
+                    UPDATE firm_blog_posts
+                    SET title = %s, slug = %s, excerpt = %s, body = %s,
+                        author_employee_id = %s, published = %s
+                    WHERE id = %s
+                """, (title, slug, excerpt, body, author_id, published, post_id))
+                keep_ids.append(post_id)
+                continue
+        cursor.execute("""
+            INSERT INTO firm_blog_posts
+            (title, slug, excerpt, body, author_employee_id, published)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (title, slug, excerpt, body, author_id, published))
+        keep_ids.append(cursor.lastrowid)
+    if keep_ids:
+        placeholders = ','.join(['%s'] * len(keep_ids))
+        cursor.execute(
+            f"DELETE FROM firm_blog_posts WHERE id NOT IN ({placeholders})",
+            keep_ids,
+        )
+    else:
+        cursor.execute("DELETE FROM firm_blog_posts")
+    return len(keep_ids)
+
+
+def _save_firm_careers_from_form(cursor, request):
+    """Persist careers page body content in firm_page_seo."""
+    if not table_exists('firm_page_seo'):
+        return 0
+    body = (request.form.get('seo_careers_body_content') or '').strip()
+    meta_title = (request.form.get('seo_careers_meta_title') or '').strip()[:70]
+    meta_description = (request.form.get('seo_careers_meta_description') or '').strip()[:160]
+    h1 = (request.form.get('seo_careers_h1_heading') or '').strip() or 'Careers'
+    if not body and not meta_title and not meta_description:
+        cursor.execute("DELETE FROM firm_page_seo WHERE page_key = 'careers'")
+        return 1
+    cursor.execute("""
+        INSERT INTO firm_page_seo
+        (page_key, meta_title, meta_description, h1_heading, url_slug, body_content)
+        VALUES ('careers', %s, %s, %s, 'careers', %s)
+        ON DUPLICATE KEY UPDATE
+            meta_title = VALUES(meta_title),
+            meta_description = VALUES(meta_description),
+            h1_heading = VALUES(h1_heading),
+            body_content = VALUES(body_content)
+    """, (meta_title, meta_description, h1, body))
+    return 1
 
 
 def _system_settings_access_check():
@@ -23306,37 +28574,114 @@ def _system_settings_access_check():
     return None
 
 
+def _website_preview_access_check():
+    """Logged-in employees may open read-only website previews."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+    return None
+
+
 @app.route('/company_information')
 def company_information():
     """Basic company / law firm profile (standalone page, not under System Settings)."""
     deny = _system_settings_access_check()
     if deny:
         return deny
-    company_settings = get_company_settings()
-    if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    return render_template(
-        'system_settings_page.html',
+    company_settings = _enrich_company_settings_with_site_meta(
+        get_company_settings() or {'company_name': 'BAUNI LAW GROUP'}
+    )
+    template_kwargs = dict(
         company_settings=company_settings,
         settings_section_key='company',
         section_meta=COMPANY_INFORMATION_SECTION,
         page_group='company',
+        public_site_base_url=get_public_base_url().rstrip('/'),
     )
+    template_kwargs.update(_settings_seo_status_kwargs(company_settings))
+    template_kwargs['section_completion'] = _compute_settings_section_completion(
+        'company', company_settings,
+    )
+    careers_row = {}
+    conn = get_db_connection()
+    if conn:
+        try:
+            if table_exists('firm_page_seo'):
+                careers_row = _fetch_firm_page_seo_map(conn).get('careers') or {}
+        finally:
+            conn.close()
+    template_kwargs['careers_page_seo'] = careers_row
+    conn_pa = get_db_connection()
+    if conn_pa:
+        try:
+            template_kwargs['firm_practice_areas'] = _fetch_firm_practice_areas(conn_pa)
+        finally:
+            conn_pa.close()
+    else:
+        template_kwargs['firm_practice_areas'] = []
+    featured_raw = (company_settings.get('homepage_featured_pa_ids') or '').split(',')
+    template_kwargs['homepage_featured_pa_slots'] = [
+        featured_raw[i].strip() if i < len(featured_raw) else ''
+        for i in range(3)
+    ]
+    return render_template('system_settings_page.html', **template_kwargs)
 
 
-@app.route('/company_templates_settings')
-def company_templates_settings():
-    """Firm-wide document templates used across the system."""
+@app.route('/website_templates_settings')
+def website_templates_settings():
+    """Public website template and layout settings for the firm."""
     deny = _system_settings_access_check()
     if deny:
         return deny
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
-    return render_template(
-        'company_templates_settings.html',
+    company_settings = _enrich_company_settings_with_site_meta(company_settings)
+    template_kwargs = dict(
         company_settings=company_settings,
+        firm_preview_sections=FIRM_WEBSITE_PREVIEW_SECTIONS,
+        marketing_preview_pages=SHERIA_MARKETING_PREVIEW_PAGES,
     )
+    template_kwargs.update(_settings_seo_status_kwargs(company_settings))
+    return render_template('website_templates_settings.html', **template_kwargs)
+
+
+@app.route('/website_preview')
+@app.route('/website_preview/<path:subpath>')
+def website_firm_preview(subpath=''):
+    """Staff-only preview of the law firm public website (ignores live toggle)."""
+    deny = _website_preview_access_check()
+    if deny:
+        return deny
+    return _dispatch_firm_website_path(subpath or '', preview_mode=True)
+
+
+@app.route('/website_preview/marketing')
+@app.route('/website_preview/marketing/<page_slug>')
+def website_marketing_preview(page_slug='home'):
+    """Staff-only preview of SHERIA CENTRIC marketing pages."""
+    deny = _website_preview_access_check()
+    if deny:
+        return deny
+    template_name = SHERIA_MARKETING_PREVIEW_PAGES.get(page_slug)
+    if not template_name:
+        flash('Unknown preview page.', 'error')
+        return _employee_redirect('website_templates_settings')
+    return render_template(template_name, preview_mode=True)
+
+
+@app.route('/website_templates_settings/preview')
+def website_templates_settings_preview():
+    """Shortcut from Website Template settings to the firm site preview."""
+    deny = _website_preview_access_check()
+    if deny:
+        return deny
+    return _employee_redirect('website_firm_preview')
+
+
+@app.route('/company_templates_settings')
+def company_templates_settings():
+    """Legacy URL — redirect to Website Template settings."""
+    return redirect(url_for('website_templates_settings'))
 
 
 @app.route('/system_settings')
@@ -23357,18 +28702,33 @@ def system_settings_section(section):
         return deny
     if section == 'company':
         return redirect(url_for('company_information'))
+    if section in _SETTINGS_MERGED_INTO_COMPANY:
+        return redirect(url_for('company_information'))
+    if section in _SETTINGS_MERGED_INTO_CONTACT:
+        return redirect(url_for('system_settings_section', section='contact'))
     if section not in SYSTEM_SETTINGS_SECTIONS:
         flash('Unknown settings page.', 'error')
         return redirect(url_for('system_settings_section', section='contact'))
     company_settings = get_company_settings()
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
+    company_settings = _enrich_company_settings_with_site_meta(company_settings)
     template_kwargs = dict(
         company_settings=company_settings,
         settings_section_key=section,
         section_meta=SYSTEM_SETTINGS_SECTIONS[section],
         page_group='company',
     )
+    template_kwargs.update(_settings_seo_status_kwargs(company_settings))
+    if section in ('company', 'contact', 'legal'):
+        conn_for_pct = get_db_connection()
+        try:
+            template_kwargs['section_completion'] = _compute_settings_section_completion(
+                section, company_settings, connection=conn_for_pct,
+            )
+        finally:
+            if conn_for_pct:
+                conn_for_pct.close()
     if section == 'notifications':
         push_status = _push_key_storage_status()
         es = get_email_settings()
@@ -23388,6 +28748,57 @@ def system_settings_section(section):
             sms_configured=_notification_sms_configured(ss),
             whatsapp_configured=_notification_whatsapp_configured(ws),
         )
+    if section == 'legal':
+        firm_employees = []
+        firm_practice_areas = []
+        firm_case_outcomes = []
+        firm_media_mentions = []
+        firm_awards = []
+        firm_faqs = []
+        firm_blog_posts = []
+        attorney_notable_cases = {}
+        attorney_education = {}
+        emp_conn = get_db_connection()
+        if emp_conn:
+            try:
+                firm_employees = _fetch_all_employees_for_legal_page(emp_conn)
+                firm_practice_areas = _fetch_firm_practice_areas(emp_conn)
+                firm_case_outcomes = _fetch_firm_notable_case_outcomes(emp_conn)
+                firm_media_mentions = _fetch_firm_media_mentions(emp_conn)
+                firm_awards = _fetch_firm_awards(emp_conn)
+                firm_faqs = _fetch_firm_faqs(emp_conn)
+                firm_blog_posts = _fetch_firm_blog_posts(emp_conn)
+                attorney_notable_cases = _fetch_attorney_notable_cases_by_employee(emp_conn)
+                attorney_education = _fetch_attorney_education_by_employee(emp_conn)
+            finally:
+                emp_conn.close()
+        template_kwargs['firm_employees'] = firm_employees
+        template_kwargs['firm_practice_areas'] = firm_practice_areas
+        template_kwargs['firm_case_outcomes'] = firm_case_outcomes
+        template_kwargs['firm_media_mentions'] = firm_media_mentions
+        template_kwargs['firm_awards'] = firm_awards
+        template_kwargs['firm_faqs'] = firm_faqs
+        template_kwargs['firm_blog_posts'] = firm_blog_posts
+        template_kwargs['attorney_notable_cases'] = attorney_notable_cases
+        template_kwargs['attorney_education'] = attorney_education
+        template_kwargs['public_site_base_url'] = get_public_base_url().rstrip('/')
+    if section == 'contact':
+        firm_testimonials = []
+        t_conn = get_db_connection()
+        if t_conn:
+            try:
+                firm_testimonials = _fetch_firm_testimonials(t_conn)
+            finally:
+                t_conn.close()
+        template_kwargs['firm_testimonials'] = firm_testimonials
+        template_kwargs['GBP_PRIMARY_CATEGORIES'] = GBP_PRIMARY_CATEGORIES
+        template_kwargs['gbp_secondary_items'] = _text_lines_to_list(
+            (company_settings or {}).get('gbp_secondary_categories')
+        )
+        template_kwargs['gbp_service_area_items'] = _text_lines_to_list(
+            (company_settings or {}).get('gbp_service_areas')
+        )
+        template_kwargs['public_site_base_url'] = get_public_base_url().rstrip('/')
     return render_template('system_settings_page.html', **template_kwargs)
 
 
@@ -23825,22 +29236,52 @@ def system_settings_google_branding_preview():
 @app.route('/system_settings/update', methods=['POST'])
 def update_company_settings():
     """Update company settings from the system settings form"""
+    ajax_save = _is_ajax_json_request()
+
+    def _settings_save_response(ok, message, *, status=200, redirect_section=None, unchanged=False):
+        if ajax_save:
+            payload = {'success': ok, 'message': message}
+            if unchanged:
+                payload['unchanged'] = True
+            return jsonify(payload), status
+        if message:
+            if unchanged:
+                flash(message, 'info')
+            elif ok:
+                flash(message, 'success')
+            else:
+                flash(message, 'error')
+        section = redirect_section
+        if section is None:
+            section = (request.form.get('settings_section') or 'company').strip()
+        if section in _SETTINGS_MERGED_INTO_CONTACT:
+            section = 'contact'
+        if section in _SETTINGS_MERGED_INTO_COMPANY:
+            section = 'company'
+        if section not in ALL_SETTINGS_SECTION_KEYS:
+            section = 'company'
+        if section == 'company':
+            return redirect(url_for('company_information'))
+        if section == 'website':
+            return redirect(url_for('website_templates_settings'))
+        return redirect(url_for('system_settings_section', section=section))
+
     if 'employee_id' not in session:
-        return redirect(url_for('login'))
+        return _settings_save_response(False, 'Session expired. Please sign in again.', status=401, redirect_section='contact')
     user_role = session.get('employee_role')
     original_role = session.get('original_role')
     allowed_roles = ['IT Support', 'Firm Administrator', 'Managing Partner']
     if user_role not in allowed_roles and original_role != 'IT Support':
-        flash('You do not have permission to update company settings', 'error')
-        return redirect(url_for('dashboard'))
+        return _settings_save_response(False, 'You do not have permission to update company settings', status=403)
     connection = get_db_connection()
     if not connection:
-        flash('Database error.', 'error')
-        return redirect(url_for('company_information'))
+        return _settings_save_response(False, 'Database error.', status=500)
 
     # Fine-grained permission: update system settings
     deny = enforce_permission(connection, 'system_manage_settings', redirect_endpoint='system_settings')
     if deny:
+        if ajax_save:
+            return _settings_save_response(False, 'You do not have permission to perform this action.', status=403)
         return deny
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -23859,8 +29300,7 @@ def update_company_settings():
             cursor.execute("SELECT * FROM company_settings WHERE id = (SELECT id FROM company_settings ORDER BY id DESC LIMIT 1)")
             current_settings = cursor.fetchone()
             if not current_settings:
-                flash('No company settings record found.', 'error')
-                return redirect(url_for('company_information'))
+                return _settings_save_response(False, 'No company settings record found.', status=404)
             pk = current_settings['id']
             upload_folder = app.config['UPLOAD_FOLDER']
 
@@ -23953,15 +29393,32 @@ def update_company_settings():
                 return unique
             updates = {}
             settings_section = (request.form.get('settings_section') or 'company').strip()
+            if settings_section in _SETTINGS_MERGED_INTO_CONTACT:
+                settings_section = 'contact'
+            if settings_section in _SETTINGS_MERGED_INTO_COMPANY:
+                settings_section = 'company'
             if settings_section not in ALL_SETTINGS_SECTION_KEYS:
                 settings_section = 'company'
+            alt_err = _validate_settings_image_alt_uploads(request, settings_section)
+            if alt_err:
+                return _settings_save_response(False, alt_err, status=400, redirect_section=settings_section)
             text_fields = [
                 'company_name', 'company_tagline', 'registration_number', 'tax_pin_vat_number', 'year_established',
-                'email', 'contact_number', 'whatsapp_number', 'alternative_phone', 'customer_support_email',
+                'firm_history', 'mission_statement', 'core_values', 'location_name', 'additional_office_locations',
+                'email', 'contact_number', 'whatsapp_number', 'whatsapp_business_number', 'alternative_phone', 'customer_support_email',
+                'mpesa_till_number', 'mpesa_paybill_number', 'mpesa_paybill_account',
+                'gbp_primary_category', 'gbp_secondary_categories', 'gbp_service_areas',
+                'gbp_verification_status', 'gbp_business_description',
+                'review_collection_link', 'review_platform',
                 'country', 'county_state', 'city_town', 'street_building', 'office_number_floor', 'postal_address', 'postal_code',
                 'opening_time', 'closing_time', 'public_holiday_status', 'public_holiday_open_time', 'public_holiday_close_time',
                 'website_url', 'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link',
                 'law_society_reg_number', 'practicing_certificate_number', 'lead_advocate_name', 'bar_association_membership',
+                'privacy_policy', 'terms_of_service', 'data_protection_registration_number', 'website_disclaimer',
+                'awards_rankings', 'years_collective_experience', 'cases_handled_count',
+                'homepage_hero_tagline', 'homepage_cta_label', 'homepage_cta_url',
+                'homepage_header_phone', 'homepage_video_url',
+                'default_consultation_fee', 'consultation_response_time',
                 'document_footer_text', 'currency', 'invoice_prefix', 'payment_terms', 'bank_account_details', 'mobile_payment_mpesa',
                 'primary_brand_color', 'secondary_color', 'tertiary_color', 'theme_preset', 'font_family', 'font_size'
             ]
@@ -23969,6 +29426,30 @@ def update_company_settings():
                 val = request.form.get(key)
                 if val is not None:
                     updates[key] = val.strip() if isinstance(val, str) else val
+            page_seo_updated = 0
+            image_alt_updated = 0
+            if settings_section == 'company':
+                page_seo_updated = _save_firm_page_seo_from_form(cursor, request, ('home', 'about'))
+                careers_updated = _save_firm_careers_from_form(cursor, request)
+                featured_ids = []
+                for slot in (1, 2, 3):
+                    raw = (request.form.get(f'homepage_featured_pa_{slot}') or '').strip()
+                    if raw.isdigit():
+                        featured_ids.append(raw)
+                updates['homepage_featured_pa_ids'] = ','.join(featured_ids)
+                for key in (
+                    'homepage_show_trust_lsk', 'homepage_show_trust_years',
+                    'homepage_show_trust_cases', 'default_free_consultation',
+                ):
+                    updates[key] = 1 if request.form.get(key) == 'on' else 0
+                image_alt_updated = _save_firm_image_alt_from_form(
+                    cursor, request, {'company_logo': 'company_logo_alt'}
+                )
+            if settings_section == 'branding':
+                image_alt_updated = _save_firm_image_alt_from_form(cursor, request, {
+                    'favicon': 'favicon_alt',
+                    'login_page_background': 'login_page_background_alt',
+                })
             if settings_section == 'branding':
                 if request.form.get('primary_brand_color') is not None:
                     updates['primary_brand_color'] = _normalize_hex_color(
@@ -24006,9 +29487,44 @@ def update_company_settings():
                 font_size_val = updates.get('font_size')
                 if font_size_val is not None and font_size_val not in allowed_font_sizes:
                     updates['font_size'] = 'comfortable'
-            if settings_section == 'business-hours':
+            if settings_section == 'contact':
                 wd = request.form.getlist('working_days')
                 updates['working_days'] = ','.join(wd) if wd else ''
+                for coord in ('latitude', 'longitude'):
+                    if request.form.get(coord) is not None:
+                        raw = (request.form.get(coord) or '').strip()
+                        if raw == '':
+                            updates[coord] = None
+                        else:
+                            try:
+                                updates[coord] = float(raw)
+                            except ValueError:
+                                pass
+                rc_raw = (request.form.get('review_count') or '').strip()
+                if request.form.get('review_count') is not None:
+                    updates['review_count'] = int(rc_raw) if rc_raw.isdigit() else 0
+                rr_raw = (request.form.get('review_average_rating') or '').strip()
+                if request.form.get('review_average_rating') is not None:
+                    if rr_raw == '':
+                        updates['review_average_rating'] = None
+                    else:
+                        try:
+                            updates['review_average_rating'] = round(float(rr_raw), 1)
+                        except ValueError:
+                            pass
+                gbp_status = updates.get('gbp_verification_status')
+                if gbp_status is not None and gbp_status not in ('', 'Verified', 'Pending', 'Not Started'):
+                    updates['gbp_verification_status'] = ''
+                if updates.get('gbp_business_description') and len(updates['gbp_business_description']) > 750:
+                    updates['gbp_business_description'] = updates['gbp_business_description'][:750]
+                gbp_primary = updates.get('gbp_primary_category')
+                if gbp_primary is not None and gbp_primary and gbp_primary not in GBP_PRIMARY_CATEGORIES:
+                    updates['gbp_primary_category'] = ''
+                rp = updates.get('review_platform')
+                if rp is not None and rp not in ('', 'Google', 'Facebook', 'Other'):
+                    updates['review_platform'] = ''
+            if settings_section == 'website':
+                updates['firm_website_enabled'] = 1 if request.form.get('firm_website_enabled') == 'on' else 0
             if settings_section == 'notifications':
                 for key in [
                     'send_email_notifications', 'send_sms_notifications', 'whatsapp_notifications',
@@ -24023,7 +29539,13 @@ def update_company_settings():
                 vapid_email = (request.form.get('vapid_claims_email') or '').strip()
                 push_origin = (request.form.get('push_app_origin') or '').strip()
                 if vapid_pub:
-                    updates['vapid_public_key'] = vapid_pub
+                    if _is_valid_vapid_public_key(vapid_pub):
+                        updates['vapid_public_key'] = vapid_pub
+                    else:
+                        flash(
+                            'VAPID public key is invalid. Use Generate Keys or paste a full urlsafe-base64 applicationServerKey.',
+                            'error',
+                        )
                 if vapid_priv:
                     updates['vapid_private_key'] = vapid_priv
                 if vapid_email:
@@ -24071,31 +29593,74 @@ def update_company_settings():
                     if saved:
                         _delete_stored_asset(current_settings.get(col))
                         updates[col] = saved
-            if not updates:
-                flash('No changes to save.', 'info')
-                if settings_section == 'company':
-                    return redirect(url_for('company_information'))
-                return redirect(url_for('system_settings_section', section=settings_section or 'contact'))
-            set_clause = ', '.join([f"`{k}` = %s" for k in updates])
-            sql = f"UPDATE company_settings SET {set_clause} WHERE id = %s"
-            cursor.execute(sql, list(updates.values()) + [pk])
+            attorney_profiles_updated = 0
+            practice_areas_updated = 0
+            attorney_notable_cases_updated = 0
+            case_outcomes_updated = 0
+            media_mentions_updated = 0
+            awards_updated = 0
+            education_updated = 0
+            faqs_updated = 0
+            blog_posts_updated = 0
+            careers_updated = 0
+            testimonials_updated = 0
+            if settings_section == 'legal':
+                attorney_profiles_updated = _save_attorney_directory_profiles(
+                    cursor, request, upload_folder
+                )
+                education_updated = _save_attorney_education_from_form(cursor, request)
+                attorney_notable_cases_updated = _save_attorney_notable_cases_from_form(cursor, request)
+                practice_areas_updated = _save_firm_practice_areas_from_form(
+                    cursor, request, upload_folder
+                )
+                case_outcomes_updated = _save_firm_notable_case_outcomes_from_form(cursor, request)
+                media_mentions_updated = _save_firm_media_mentions_from_form(cursor, request)
+                awards_updated = _save_firm_awards_from_form(cursor, request)
+                faqs_updated = _save_firm_faqs_from_form(cursor, request)
+                blog_posts_updated = _save_firm_blog_posts_from_form(cursor, request)
+            if settings_section == 'contact':
+                testimonials_updated = _save_firm_testimonials_from_form(cursor, request)
+                sec_cats = _collect_repeatable_form_values(request, 'gbp_secondary_category_')
+                if sec_cats or any(k.startswith('gbp_secondary_category_') for k in request.form):
+                    updates['gbp_secondary_categories'] = '\n'.join(sec_cats)
+                svc_areas = _collect_repeatable_form_values(request, 'gbp_service_area_')
+                if svc_areas or any(k.startswith('gbp_service_area_') for k in request.form):
+                    updates['gbp_service_areas'] = '\n'.join(svc_areas)
+            legal_related_saved = (
+                attorney_profiles_updated or education_updated or attorney_notable_cases_updated
+                or practice_areas_updated or case_outcomes_updated or media_mentions_updated
+                or awards_updated or faqs_updated or blog_posts_updated
+            )
+            site_meta_saved = page_seo_updated or image_alt_updated or careers_updated
+            if not updates and not legal_related_saved and not testimonials_updated and not site_meta_saved:
+                return _settings_save_response(
+                    True, 'No changes to save.', redirect_section=settings_section, unchanged=True
+                )
+            if updates:
+                set_clause = ', '.join([f"`{k}` = %s" for k in updates])
+                sql = f"UPDATE company_settings SET {set_clause} WHERE id = %s"
+                cursor.execute(sql, list(updates.values()) + [pk])
             connection.commit()
-            flash('Company settings updated successfully.', 'success')
+            legal_saved = legal_related_saved
+            if legal_saved and updates:
+                save_msg = 'Legal settings saved successfully.'
+            elif legal_saved:
+                save_msg = 'Legal settings saved successfully.'
+            elif site_meta_saved and not updates:
+                save_msg = 'Company settings updated successfully.'
+            else:
+                save_msg = 'Company settings updated successfully.'
+            return _settings_save_response(True, save_msg, redirect_section=settings_section)
     except Exception as e:
         print(f"Error updating company settings: {e}")
-        flash('An error occurred while saving.', 'error')
+        return _settings_save_response(False, 'An error occurred while saving.', status=500)
     finally:
         connection.close()
-    redirect_section = (request.form.get('settings_section') or 'company').strip()
-    if redirect_section not in ALL_SETTINGS_SECTION_KEYS:
-        redirect_section = 'company'
-    if redirect_section == 'company':
-        return redirect(url_for('company_information'))
-    return redirect(url_for('system_settings_section', section=redirect_section))
 
-@app.route('/other_matters')
+@app.route('/other_matters')  # legacy
+@app.route('/non_litigation_matters')
 def other_matters():
-    """Other Matters page - shows only matters allocated to the logged-in user"""
+    """Non-Litigation Matters page - shows only matters allocated to the logged-in user"""
     if 'employee_id' not in session:
         return redirect(url_for('login'))
     
@@ -24124,7 +29689,8 @@ def other_matters():
                            can_approve_matters=can_approve_matters,
                            see_all_matters=see_all_matters)
 
-@app.route('/other_matters/tasks', methods=['GET', 'POST'])
+@app.route('/other_matters/tasks', methods=['GET', 'POST'])  # legacy
+@app.route('/non_litigation_matters/tasks', methods=['GET', 'POST'])
 def matter_task_management():
     """Matter task management page."""
     if 'employee_id' not in session:
@@ -24166,19 +29732,12 @@ def matter_task_management():
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             ensure_task_management_table(cursor, connection)
 
-            if user_role == 'IT Support' or original_role == 'IT Support':
-                cursor.execute("""
-                    SELECT id, matter_reference_number, matter_title, assigned_employee_id, assigned_employee_name, status
-                    FROM matters
-                    ORDER BY updated_at DESC
-                """)
-            else:
-                cursor.execute("""
-                    SELECT id, matter_reference_number, matter_title, assigned_employee_id, assigned_employee_name, status
-                    FROM matters
-                    WHERE assigned_employee_id = %s
-                    ORDER BY updated_at DESC
-                """, (current_employee_id,))
+            cursor.execute("""
+                SELECT id, matter_reference_number, matter_title, assigned_employee_id, assigned_employee_name, status
+                FROM matters
+                WHERE assigned_employee_id = %s
+                ORDER BY updated_at DESC
+            """, (current_employee_id,))
             matters = cursor.fetchall()
             matter_ids = {str(m['id']) for m in matters}
 
@@ -24368,7 +29927,7 @@ def approve_matters():
 
 
 def _other_matters_api_scope():
-    """Scope for Other Matters listing APIs: (current_employee_id, is_mp, see_all_matters).
+    """Scope for Non-Litigation Matters listing APIs: (current_employee_id, is_mp, see_all_matters).
     IT Support (including role-switch) sees all matters firm-wide; Managing Partner only own active;
     others see matters assigned to them."""
     current_employee_id = session['employee_id']
@@ -24717,7 +30276,7 @@ def api_matter_singular(matter_id):
 
 @app.route('/api/approve_matter/<int:matter_id>', methods=['POST'])
 def api_approve_matter(matter_id):
-    """Approve a pending matter, allocate it, and save allocation details."""
+    """Approve a pending matter only after allocation; creates a matter task like case approval."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
 
@@ -24729,8 +30288,28 @@ def api_approve_matter(matter_id):
 
     data = request.get_json(silent=True) or {}
     allocated_employee_id = data.get('allocated_employee_id')
-    allocation_description = (data.get('allocation_description') or '').strip()
-    allocation_timeline = (data.get('allocation_timeline') or '').strip()
+    allocation_description = (data.get('allocation_description') or data.get('instructions') or '').strip()
+    allocation_timeline = (data.get('allocation_timeline') or data.get('timeline') or '').strip()
+    due_date = (data.get('due_date') or '').strip() or None
+    reminder_raw = data.get('reminder_intervals')
+    if isinstance(reminder_raw, list):
+        reminder_intervals = [str(x).strip() for x in reminder_raw if str(x).strip()]
+    elif isinstance(reminder_raw, str) and reminder_raw.strip():
+        reminder_intervals = [x.strip() for x in reminder_raw.split(',') if x.strip()]
+    elif allocation_timeline:
+        reminder_intervals = [x.strip() for x in allocation_timeline.split(',') if x.strip()]
+    else:
+        reminder_intervals = []
+    allow_view_case_details = 1 if data.get('allow_view_case_details', True) else 0
+    allow_edit_case_details = 1 if data.get('allow_edit_case_details', True) else 0
+    allow_view_case_documents = 1 if data.get('allow_view_case_documents', True) else 0
+    allow_upload_case_documents = 1 if data.get('allow_upload_case_documents', True) else 0
+    allow_download_case_documents = 1 if data.get('allow_download_case_documents', True) else 0
+
+    if not due_date:
+        return jsonify({'error': 'Please set a timeline / due date for the matter task'}), 400
+    if not reminder_intervals:
+        return jsonify({'error': 'Select at least one reminder interval'}), 400
 
     connection = get_db_connection()
     if not connection:
@@ -24743,9 +30322,10 @@ def api_approve_matter(matter_id):
 
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # First, verify the matter exists and has status 'Pending Approval'
             cursor.execute("""
-                SELECT id, status, assigned_employee_id, allocation_description, allocation_timeline
+                SELECT id, status, assigned_employee_id, assigned_employee_name,
+                       allocation_description, allocation_timeline,
+                       matter_reference_number, matter_title, client_name
                 FROM matters
                 WHERE id = %s
             """, (matter_id,))
@@ -24757,18 +30337,26 @@ def api_approve_matter(matter_id):
             if matter['status'] != 'Pending Approval':
                 return jsonify({'error': f'Matter is not pending approval. Current status: {matter["status"]}'}), 400
 
-            # Allow approve button to work after allocation even if payload is omitted.
-            effective_employee_id = allocated_employee_id or matter.get('assigned_employee_id')
-            if not effective_employee_id:
-                return jsonify({'error': 'Allocate this matter first, or provide allocated employee details.'}), 400
+            # Must allocate first (separate step) — do not approve without an existing assignee
+            if not matter.get('assigned_employee_id'):
+                return jsonify({'error': 'Allocate this matter to a Managing Partner or Associate Advocate before approving.'}), 400
 
             try:
-                effective_employee_id = int(effective_employee_id)
+                effective_employee_id = int(matter['assigned_employee_id'])
             except (TypeError, ValueError):
                 return jsonify({'error': 'Invalid allocated employee'}), 400
 
+            # Optional payload may confirm the same assignee, but cannot allocate during approve
+            if allocated_employee_id not in (None, '',):
+                try:
+                    if int(allocated_employee_id) != effective_employee_id:
+                        return jsonify({'error': 'Matter is already allocated. Re-allocate first if you need to change the assignee.'}), 400
+                except (TypeError, ValueError):
+                    return jsonify({'error': 'Invalid allocated employee'}), 400
+
+            reminder_csv = ','.join(reminder_intervals)
             effective_description = allocation_description or (matter.get('allocation_description') or '').strip() or 'APPROVED AND ALLOCATED'
-            effective_timeline = allocation_timeline or (matter.get('allocation_timeline') or '').strip() or 'AS SCHEDULED'
+            effective_timeline = allocation_timeline or reminder_csv
 
             # Ensure allocation metadata columns exist
             if not column_exists('matters', 'allocation_description'):
@@ -24784,7 +30372,7 @@ def api_approve_matter(matter_id):
                 except Exception:
                     pass
 
-            # Fetch and validate allowed assignee (Firm Administrator or Managing Partner)
+            # Fetch and validate allowed assignee (Managing Partner or Associate Advocate)
             cursor.execute("""
                 SELECT id, full_name, role
                 FROM employees
@@ -24793,8 +30381,8 @@ def api_approve_matter(matter_id):
             assignee = cursor.fetchone()
             if not assignee:
                 return jsonify({'error': 'Allocated employee not found'}), 404
-            if assignee.get('role') not in ['Firm Administrator', 'Managing Partner']:
-                return jsonify({'error': 'Allocated employee must be a Firm Administrator or Managing Partner'}), 400
+            if not is_allocation_eligible_role(assignee.get('role')):
+                return jsonify({'error': 'Allocated employee must be a Managing Partner or Associate Advocate'}), 400
 
             # Update allocation and approve the matter
             cursor.execute("""
@@ -24813,11 +30401,72 @@ def api_approve_matter(matter_id):
                 effective_timeline,
                 matter_id
             ))
+
+            # Create matter task (same pattern as case approval)
+            ensure_task_management_table(cursor, connection)
+            orders_text = effective_description or (
+                f"Matter {matter.get('matter_reference_number') or ''} allocated to {assignee['full_name']}"
+            )
+            task_title = (orders_text.split('\n')[0] if orders_text else 'Matter Assignment')[:255]
+            due_at = due_date.replace('T', ' ')
+            if len(due_at) == 10:
+                due_at = f"{due_at} 17:00:00"
+            cursor.execute("""
+                INSERT INTO task_management
+                (task_type, linked_id, task_title, task_description, due_at, reminder_intervals,
+                 assigned_to_id, assigned_to_name,
+                 allow_view_case_details, allow_edit_case_details, allow_view_case_documents,
+                 allow_upload_case_documents, allow_download_case_documents,
+                 task_status, created_by_id, created_by_name)
+                VALUES ('matter', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending', %s, %s)
+            """, (
+                matter_id,
+                task_title,
+                orders_text,
+                due_at,
+                reminder_csv,
+                assignee['id'],
+                assignee['full_name'],
+                allow_view_case_details,
+                allow_edit_case_details,
+                allow_view_case_documents,
+                allow_upload_case_documents,
+                allow_download_case_documents,
+                session.get('employee_id'),
+                session.get('employee_name') or 'Unknown',
+            ))
+            task_id = cursor.lastrowid
+            if assignee['id'] and task_id:
+                try:
+                    ref = (
+                        f"{matter.get('matter_reference_number') or '-'} - "
+                        f"{matter.get('matter_title') or matter.get('client_name') or 'Matter'}"
+                    )
+                    _notify_task_assigned_push(
+                        assignee['id'], task_title, 'matter', ref, task_id=task_id
+                    )
+                except Exception as push_exc:
+                    print(f"[push] matter approval task notify error: {push_exc}")
+
             connection.commit()
+
+            try:
+                redirect_url = url_for('matter_task_management')
+                active_slug = None
+                try:
+                    active_slug = current_role_slug()
+                except Exception:
+                    active_slug = None
+                if active_slug and _is_role_prefixable(redirect_url):
+                    redirect_url = '/' + active_slug + redirect_url
+            except Exception:
+                redirect_url = '/non_litigation_matters/tasks'
 
             return jsonify({
                 'success': True,
-                'message': f"Matter approved and allocated to {assignee['full_name']} successfully"
+                'message': f"Matter approved and task allocated to {assignee['full_name']} successfully",
+                'redirect_url': redirect_url,
+                'task_id': task_id,
             })
     except Exception as e:
         print(f"Error approving matter: {e}")
@@ -24903,12 +30552,20 @@ def api_allocate_matter(matter_id):
             if not matter:
                 return jsonify({'success': False, 'error': 'Matter not found'}), 404
             
-            # Get employee name
-            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (employee_id,))
+            # Get employee — Managing Partner or Associate Advocate only
+            cursor.execute(
+                "SELECT id, full_name, role FROM employees WHERE id = %s AND status = 'Active'",
+                (employee_id,),
+            )
             employee = cursor.fetchone()
             
             if not employee:
-                return jsonify({'success': False, 'error': 'Employee not found'}), 400
+                return jsonify({'success': False, 'error': 'Employee not found or inactive'}), 400
+            if not is_allocation_eligible_role(employee.get('role')):
+                return jsonify({
+                    'success': False,
+                    'error': 'Matters can only be allocated to Managing Partners or Associate Advocates',
+                }), 400
             
             employee_name = employee['full_name']
             
@@ -25041,7 +30698,8 @@ def api_matter_accept(matter_id):
         if connection:
             connection.close()
 
-@app.route('/other_matters/register')
+@app.route('/other_matters/register')  # legacy
+@app.route('/non_litigation_matters/register')
 def register_matter():
     """Register New Matter page"""
     if 'employee_id' not in session:
@@ -25051,17 +30709,36 @@ def register_matter():
     if not company_settings:
         company_settings = {'company_name': 'BAUNI LAW GROUP'}
 
+    matter_category_options = []
     connection = get_db_connection()
     if connection:
-        # Fine-grained permission: register other matters
+        # Fine-grained permission: register non-litigation matters
         deny = enforce_permission(connection, 'matter_register_other')
-        connection.close()
         if deny:
+            connection.close()
             return deny
+        try:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT matter_category
+                    FROM matters
+                    WHERE matter_category IS NOT NULL AND TRIM(matter_category) <> ''
+                    ORDER BY matter_category ASC
+                """)
+                matter_category_options = [row['matter_category'] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error loading matter category options: {e}")
+        finally:
+            connection.close()
     
-    return render_template('register_matter.html', company_settings=company_settings)
+    return render_template(
+        'register_matter.html',
+        company_settings=company_settings,
+        matter_category_options=matter_category_options,
+    )
 
-@app.route('/other_matters/<int:matter_id>')
+@app.route('/other_matters/<int:matter_id>')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>')
 def matter_details(matter_id):
     """Matter Details page"""
     if 'employee_id' not in session:
@@ -25122,12 +30799,8 @@ def matter_details(matter_id):
                 flash('Matter not found', 'error')
                 return redirect(url_for('other_matters'))
             
-            # Allocated user can view; IT Support (incl. role-switch) can view any matter
-            _, _, see_all_matters = _other_matters_api_scope()
-            current_employee_id = session.get('employee_id')
-            assigned_id = matter_data.get('assigned_employee_id')
-            is_assigned = (assigned_id is not None and str(assigned_id) == str(current_employee_id))
-            if not is_assigned and not see_all_matters:
+            # Allocated user, IT Support, and matter-list roles can open the detail page
+            if not can_view_matter_record(matter_data):
                 flash('You do not have access to this matter.', 'error')
                 return redirect(url_for('other_matters'))
             
@@ -25195,7 +30868,7 @@ def matter_details(matter_id):
                                     client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
                                     client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
                                 else:
-                                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                                    client_folder_id = get_or_create_folder(service, main_folder_id, 'Non-Litigation Matters')
                                 ref_safe = re.sub(r'[\\/:*?"<>|]', '_', ref)
                                 matter_folder_name = f"Matter {ref_safe}"
                                 matter_doc_folder_id = get_or_create_folder(service, client_folder_id, matter_folder_name)
@@ -25266,7 +30939,8 @@ def matter_details(matter_id):
     finally:
         connection.close()
 
-@app.route('/other_matters/<int:matter_id>/documents')
+@app.route('/other_matters/<int:matter_id>/documents')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>/documents')
 def matter_documents(matter_id):
     """Matter Documents page - upload and list documents for a specific matter in Google Drive"""
     if 'employee_id' not in session:
@@ -25306,11 +30980,7 @@ def matter_documents(matter_id):
                 flash('Matter not found', 'error')
                 return redirect(url_for('other_matters'))
             
-            _, _, see_all_matters = _other_matters_api_scope()
-            current_employee_id = session.get('employee_id')
-            assigned_id = matter_data.get('assigned_employee_id')
-            is_assigned = (assigned_id is not None and str(assigned_id) == str(current_employee_id))
-            if not is_assigned and not see_all_matters:
+            if not can_view_matter_record(matter_data):
                 flash('You do not have access to this matter.', 'error')
                 return redirect(url_for('other_matters'))
             
@@ -25354,7 +31024,7 @@ def matter_documents(matter_id):
                                 client_folder_name = get_user_folder_name(client_phone, client_name, 'client')
                                 client_folder_id = get_or_create_folder(service, main_folder_id, client_folder_name)
                             else:
-                                client_folder_id = get_or_create_folder(service, main_folder_id, 'Other Matters')
+                                client_folder_id = get_or_create_folder(service, main_folder_id, 'Non-Litigation Matters')
                             
                             ref = (matter_data.get('matter_reference_number') or '').strip() or f'Matter-{matter_id}'
                             ref = re.sub(r'[\\/:*?"<>|]', '_', ref)
@@ -25444,7 +31114,8 @@ def matter_documents(matter_id):
     finally:
         connection.close()
 
-@app.route('/other_matters/<int:matter_id>/edit')
+@app.route('/other_matters/<int:matter_id>/edit')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>/edit')
 def matter_edit(matter_id):
     """Matter Edit page"""
     if 'employee_id' not in session:
@@ -25498,6 +31169,25 @@ def matter_edit(matter_id):
             # Convert date objects to strings
             if matter_data.get('date_opened'):
                 matter_data['date_opened'] = matter_data['date_opened'].strftime('%Y-%m-%d')
+
+            # Load parties for this matter
+            cursor.execute("""
+                SELECT
+                    id, party_name, party_type, party_category,
+                    firm_agent, party_phone, party_email
+                FROM matter_parties
+                WHERE matter_id = %s
+                ORDER BY id ASC
+            """, (matter_id,))
+            parties = cursor.fetchall() or []
+
+            cursor.execute("""
+                SELECT DISTINCT matter_category
+                FROM matters
+                WHERE matter_category IS NOT NULL AND TRIM(matter_category) <> ''
+                ORDER BY matter_category ASC
+            """)
+            matter_category_options = [row['matter_category'] for row in cursor.fetchall()]
             
             company_settings = get_company_settings()
             if not company_settings:
@@ -25506,6 +31196,8 @@ def matter_edit(matter_id):
             return render_template('matter_edit.html', 
                                  matter_data=matter_data, 
                                  matter_id=matter_id,
+                                 parties=parties,
+                                 matter_category_options=matter_category_options,
                                  company_settings=company_settings)
     except Exception as e:
         print(f"Error fetching matter for edit: {e}")
@@ -25514,7 +31206,8 @@ def matter_edit(matter_id):
     finally:
         connection.close()
 
-@app.route('/other_matters/<int:matter_id>/status')
+@app.route('/other_matters/<int:matter_id>/status')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>/status')
 def matter_status(matter_id):
     """Change Matter Status page"""
     if 'employee_id' not in session:
@@ -25563,7 +31256,8 @@ def matter_status(matter_id):
     finally:
         connection.close()
 
-@app.route('/other_matters/<int:matter_id>/allocate')
+@app.route('/other_matters/<int:matter_id>/allocate')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>/allocate')
 def matter_allocate(matter_id):
     """Change Matter Allocation page"""
     if 'employee_id' not in session:
@@ -25613,7 +31307,8 @@ def matter_allocate(matter_id):
     finally:
         connection.close()
 
-@app.route('/other_matters/<int:matter_id>/audit')
+@app.route('/other_matters/<int:matter_id>/audit')  # legacy
+@app.route('/non_litigation_matters/<int:matter_id>/audit')
 def matter_audit_progress(matter_id):
     """Matter Audit Progress page"""
     if 'employee_id' not in session:
@@ -25713,6 +31408,385 @@ def matter_audit_progress(matter_id):
     finally:
         connection.close()
 
+
+def _matter_attendance_access_ok(matter_data):
+    """Assigned employee or matter-detail viewer roles can access matter attendance."""
+    return can_view_matter_record(matter_data)
+
+
+@app.route('/non_litigation_matters/<int:matter_id>/attendances')
+@app.route('/other_matters/<int:matter_id>/attendances')  # legacy
+def matter_attendances(matter_id):
+    """Update matter attendance page (mirrors case court attendance logic)."""
+    if 'employee_id' not in session:
+        return redirect(url_for('login'))
+
+    connection = get_db_connection()
+    if not connection:
+        flash('Database connection error.', 'error')
+        return redirect(url_for('other_matters'))
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_matter_attendances_tables(cursor, connection)
+
+            cursor.execute("""
+                SELECT
+                    id,
+                    matter_reference_number,
+                    matter_title,
+                    matter_category,
+                    client_name,
+                    assigned_employee_id,
+                    assigned_employee_name,
+                    status
+                FROM matters
+                WHERE id = %s
+            """, (matter_id,))
+            matter_data = cursor.fetchone()
+
+            if not matter_data:
+                flash('Matter not found', 'error')
+                return redirect(url_for('other_matters'))
+
+            if not _matter_attendance_access_ok(matter_data):
+                flash('You do not have access to this matter.', 'error')
+                return redirect(url_for('other_matters'))
+
+            cursor.execute("""
+                SELECT
+                    id,
+                    previous_attendance_id,
+                    activity_type,
+                    date_of_attendance,
+                    description,
+                    next_action,
+                    next_activity_type,
+                    next_attendance_date,
+                    next_attendance,
+                    virtual_link,
+                    created_at,
+                    updated_at,
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM matter_attendances a2
+                            WHERE a2.previous_attendance_id = a.id
+                        ) THEN 0
+                        ELSE 1
+                    END as is_latest
+                FROM matter_attendances a
+                WHERE a.matter_id = %s
+                ORDER BY
+                    CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM matter_attendances a2
+                            WHERE a2.previous_attendance_id = a.id
+                        ) THEN 0
+                        ELSE 1
+                    END DESC,
+                    a.date_of_attendance DESC,
+                    a.created_at DESC
+            """, (matter_id,))
+            attendances = cursor.fetchall()
+
+            for attendance in attendances:
+                cursor.execute("""
+                    SELECT
+                        id,
+                        material_description,
+                        reminder_frequency,
+                        allocated_to_id,
+                        allocated_to_name,
+                        created_at,
+                        updated_at
+                    FROM matter_attendance_materials
+                    WHERE attendance_id = %s
+                    ORDER BY created_at ASC
+                """, (attendance['id'],))
+                attendance['materials'] = cursor.fetchall()
+
+                if attendance.get('date_of_attendance'):
+                    attendance['date_of_attendance'] = attendance['date_of_attendance'].strftime('%Y-%m-%d')
+                if attendance.get('next_attendance_date'):
+                    attendance['next_attendance_date'] = attendance['next_attendance_date'].strftime('%Y-%m-%d')
+                if attendance.get('created_at'):
+                    attendance['created_at'] = attendance['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                if attendance.get('updated_at'):
+                    attendance['updated_at'] = attendance['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                for material in attendance['materials']:
+                    if material.get('created_at'):
+                        material['created_at'] = material['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    if material.get('updated_at'):
+                        material['updated_at'] = material['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+
+            company_settings = get_company_settings()
+            if not company_settings:
+                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+
+            return render_template(
+                'matter_attendances.html',
+                matter_data=matter_data,
+                matter_id=matter_id,
+                attendances=attendances,
+                company_settings=company_settings,
+            )
+    except Exception as e:
+        print(f"Error fetching matter attendances: {e}")
+        flash('An error occurred while fetching matter attendances.', 'error')
+        return redirect(url_for('other_matters'))
+    finally:
+        connection.close()
+
+
+@app.route('/api/matters/attendances/add', methods=['POST'])
+def api_add_matter_attendance():
+    """Always insert a new matter attendance row (history kept). Optional previous_attendance_id chains records."""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json() or {}
+
+    if not data.get('matter_id'):
+        return jsonify({'error': 'Matter ID is required'}), 400
+    if not data.get('date_of_attendance'):
+        return jsonify({'error': 'Date of attendance is required'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_matter_attendances_tables(cursor, connection)
+
+            cursor.execute(
+                "SELECT id, assigned_employee_id FROM matters WHERE id = %s",
+                (data['matter_id'],),
+            )
+            matter_row = cursor.fetchone()
+            if not matter_row:
+                return jsonify({'error': 'Matter not found'}), 404
+            if not _matter_attendance_access_ok(matter_row):
+                return jsonify({'error': 'You do not have access to this matter'}), 403
+
+            prev_raw = data.get('previous_attendance_id')
+            prev_id = None
+            if prev_raw is not None and prev_raw != '':
+                try:
+                    prev_id = int(prev_raw)
+                except (TypeError, ValueError):
+                    prev_id = None
+            if prev_id:
+                cursor.execute(
+                    "SELECT id, matter_id FROM matter_attendances WHERE id = %s",
+                    (prev_id,),
+                )
+                prow = cursor.fetchone()
+                if not prow or int(prow['matter_id']) != int(data['matter_id']):
+                    return jsonify({'error': 'Invalid previous attendance for this matter'}), 400
+                cursor.execute(
+                    """
+                    SELECT 1 FROM matter_attendances
+                    WHERE previous_attendance_id = %s LIMIT 1
+                    """,
+                    (prev_id,),
+                )
+                if cursor.fetchone():
+                    return jsonify({
+                        'error': 'That attendance already has a newer record. Refresh the page and try again.',
+                    }), 400
+
+            cursor.execute("""
+                INSERT INTO matter_attendances (
+                    matter_id, previous_attendance_id, activity_type,
+                    date_of_attendance, description, next_action,
+                    next_activity_type, next_attendance_date, next_attendance, virtual_link
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                data['matter_id'],
+                prev_id,
+                data.get('activity_type') or None,
+                data['date_of_attendance'],
+                data.get('description') or None,
+                data.get('next_action') or None,
+                data.get('next_activity_type') or None,
+                data.get('next_attendance_date') or None,
+                data.get('next_attendance') or None,
+                data.get('virtual_link') or None,
+            ))
+            connection.commit()
+            attendance_id = cursor.lastrowid
+
+            materials_added = 0
+            if data.get('materials') and isinstance(data['materials'], list):
+                for material in data['materials']:
+                    if material.get('material_description'):
+                        cursor.execute("""
+                            INSERT INTO matter_attendance_materials (
+                                attendance_id, material_description, reminder_frequency,
+                                allocated_to_id, allocated_to_name
+                            ) VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            attendance_id,
+                            material['material_description'],
+                            material.get('reminder_frequency') or None,
+                            material.get('allocated_to_id') or None,
+                            material.get('allocated_to_name') or None,
+                        ))
+                        materials_added += 1
+                connection.commit()
+
+            message = 'New matter attendance saved (previous records kept for reference)'
+            if materials_added > 0:
+                message += f' with {materials_added} bring update item(s)'
+
+            return jsonify({
+                'success': True,
+                'message': message,
+                'attendance_id': attendance_id,
+            })
+    except Exception as e:
+        print(f"Error adding matter attendance: {e}")
+        connection.rollback()
+        return jsonify({'error': 'Server error: ' + str(e)}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/matters/attendances/update/<int:attendance_id>', methods=['PUT'])
+def api_update_matter_attendance(attendance_id):
+    """Update an existing matter attendance in place (no new record)."""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json() or {}
+    if not data.get('date_of_attendance'):
+        return jsonify({'error': 'Date of attendance is required'}), 400
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_matter_attendances_tables(cursor, connection)
+
+            cursor.execute("""
+                SELECT a.id, a.matter_id, m.assigned_employee_id
+                FROM matter_attendances a
+                INNER JOIN matters m ON m.id = a.matter_id
+                WHERE a.id = %s
+            """, (attendance_id,))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Attendance not found'}), 404
+            if not _matter_attendance_access_ok(row):
+                return jsonify({'error': 'You do not have access to this matter'}), 403
+
+            cursor.execute("""
+                UPDATE matter_attendances SET
+                    activity_type = %s,
+                    date_of_attendance = %s,
+                    description = %s,
+                    next_action = %s,
+                    next_activity_type = %s,
+                    next_attendance_date = %s,
+                    next_attendance = %s,
+                    virtual_link = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (
+                data.get('activity_type') or None,
+                data['date_of_attendance'],
+                data.get('description') or None,
+                data.get('next_action') or None,
+                data.get('next_activity_type') or None,
+                data.get('next_attendance_date') or None,
+                data.get('next_attendance') or None,
+                data.get('virtual_link') or None,
+                attendance_id,
+            ))
+            connection.commit()
+
+            cursor.execute(
+                "DELETE FROM matter_attendance_materials WHERE attendance_id = %s",
+                (attendance_id,),
+            )
+            if data.get('materials') and isinstance(data['materials'], list):
+                for material in data['materials']:
+                    if material.get('material_description'):
+                        cursor.execute("""
+                            INSERT INTO matter_attendance_materials (
+                                attendance_id, material_description, reminder_frequency,
+                                allocated_to_id, allocated_to_name
+                            ) VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            attendance_id,
+                            material['material_description'],
+                            material.get('reminder_frequency') or None,
+                            material.get('allocated_to_id') or None,
+                            material.get('allocated_to_name') or None,
+                        ))
+            connection.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Matter attendance updated successfully',
+                'attendance_id': attendance_id,
+            })
+    except Exception as e:
+        print(f"Error updating matter attendance: {e}")
+        connection.rollback()
+        return jsonify({'error': 'Server error: ' + str(e)}), 500
+    finally:
+        connection.close()
+
+
+@app.route('/api/matters/attendances/delete/<int:attendance_id>', methods=['DELETE'])
+def api_delete_matter_attendance(attendance_id):
+    """Delete a matter attendance record."""
+    if 'employee_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    connection = get_db_connection()
+    if not connection:
+        return jsonify({'error': 'Database connection error'}), 500
+
+    try:
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            ensure_matter_attendances_tables(cursor, connection)
+
+            cursor.execute("""
+                SELECT a.id, a.matter_id, m.assigned_employee_id
+                FROM matter_attendances a
+                INNER JOIN matters m ON m.id = a.matter_id
+                WHERE a.id = %s
+            """, (attendance_id,))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Attendance not found'}), 404
+            if not _matter_attendance_access_ok(row):
+                return jsonify({'error': 'You do not have access to this matter'}), 403
+
+            cursor.execute(
+                "DELETE FROM matter_attendance_materials WHERE attendance_id = %s",
+                (attendance_id,),
+            )
+            cursor.execute("DELETE FROM matter_attendances WHERE id = %s", (attendance_id,))
+            connection.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Matter attendance deleted successfully',
+            })
+    except Exception as e:
+        print(f"Error deleting matter attendance: {e}")
+        connection.rollback()
+        return jsonify({'error': 'Server error: ' + str(e)}), 500
+    finally:
+        connection.close()
+
+
 @app.route('/api/matters/clients/search', methods=['GET'])
 def api_matters_clients_search():
     """API endpoint to search clients by name or phone number for matters"""
@@ -25720,13 +31794,14 @@ def api_matters_clients_search():
         return jsonify({'error': 'Unauthorized'}), 401
     
     query = request.args.get('q', '').strip()
+    list_all = request.args.get('all', '').strip() in ('1', 'true', 'yes')
     connection = get_db_connection()
     if not connection:
         return jsonify({'error': 'Database connection error'}), 500
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            if query:
+            if query and not list_all:
                 like = f'%{query}%'
                 cursor.execute("""
                     SELECT id, full_name, email, phone_number, client_type
@@ -25742,7 +31817,6 @@ def api_matters_clients_search():
                     FROM clients 
                     WHERE status = 'Active'
                     ORDER BY full_name ASC
-                    LIMIT 50
                 """)
             clients = cursor.fetchall()
             return jsonify({'clients': clients})
@@ -25792,7 +31866,7 @@ def api_matters_employees_search():
 
 @app.route('/api/matters/approvers/search', methods=['GET'])
 def api_matters_approvers_search():
-    """Search active employees eligible for matter approval allocation."""
+    """Search active Managing Partners and Associate Advocates for matter allocation."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
 
@@ -25803,31 +31877,32 @@ def api_matters_approvers_search():
 
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            role_filter = "AND role IN ('Firm Administrator', 'Managing Partner')"
+            role_placeholders = ', '.join(['%s'] * len(CASE_MATTER_ALLOCATION_ROLES))
+            params = list(CASE_MATTER_ALLOCATION_ROLES)
             if query:
                 like = f'%{query}%'
                 cursor.execute(f"""
                     SELECT id, full_name, employee_code, work_email, role
                     FROM employees
                     WHERE status = 'Active'
-                    {role_filter}
+                    AND role IN ({role_placeholders})
                     AND (full_name LIKE %s OR COALESCE(employee_code, '') LIKE %s)
                     ORDER BY
                         CASE WHEN role = 'Managing Partner' THEN 0 ELSE 1 END,
                         full_name ASC
                     LIMIT 20
-                """, (like, like))
+                """, (*params, like, like))
             else:
                 cursor.execute(f"""
                     SELECT id, full_name, employee_code, work_email, role
                     FROM employees
                     WHERE status = 'Active'
-                    {role_filter}
+                    AND role IN ({role_placeholders})
                     ORDER BY
                         CASE WHEN role = 'Managing Partner' THEN 0 ELSE 1 END,
                         full_name ASC
                     LIMIT 50
-                """)
+                """, params)
             employees = cursor.fetchall()
             return jsonify({'employees': employees})
     except Exception as e:
@@ -25906,20 +31981,26 @@ def api_register_matter():
                 if not client:
                     return jsonify({'success': False, 'error': 'Client not found'}), 404
                 
-                # Assigned employee: optional in JSON; otherwise current user (form no longer picks assignee)
+                # Assigned employee is set on approval — leave unallocated at registration
                 assignee_id = data.get('assigned_employee_id')
+                employee = None
                 if assignee_id is not None and assignee_id != '':
                     try:
                         assignee_id = int(assignee_id)
                     except (TypeError, ValueError):
                         return jsonify({'success': False, 'error': 'Invalid assigned_employee_id'}), 400
-                else:
-                    assignee_id = int(session['employee_id'])
-                
-                cursor.execute("SELECT id, full_name FROM employees WHERE id = %s", (assignee_id,))
-                employee = cursor.fetchone()
-                if not employee:
-                    return jsonify({'success': False, 'error': 'Employee not found'}), 404
+                    cursor.execute(
+                        "SELECT id, full_name, role FROM employees WHERE id = %s AND status = 'Active'",
+                        (assignee_id,),
+                    )
+                    employee = cursor.fetchone()
+                    if not employee:
+                        return jsonify({'success': False, 'error': 'Employee not found'}), 404
+                    if not is_allocation_eligible_role(employee.get('role')):
+                        return jsonify({
+                            'success': False,
+                            'error': 'Matters can only be allocated to Managing Partners or Associate Advocates',
+                        }), 400
                 
                 # Get current user info
                 cursor.execute("SELECT id, full_name FROM employees WHERE id = %s", (session['employee_id'],))
@@ -25938,7 +32019,7 @@ def api_register_matter():
                 count = count_result['count'] + 1 if count_result else 1
                 matter_ref = f"MAT-{year}-{str(count).zfill(5)}"
                 
-                # Insert matter (status is always 'Pending Approval' for new matters)
+                # Insert matter (status is always 'Pending Approval'; allocation deferred to approval)
                 cursor.execute("""
                     INSERT INTO matters (
                         matter_reference_number, matter_title, matter_category,
@@ -25954,8 +32035,8 @@ def api_register_matter():
                     client['full_name'],
                     client.get('phone_number', ''),
                     data.get('client_instructions', ''),
-                    employee['id'],
-                    employee['full_name'],
+                    employee['id'] if employee else None,
+                    employee['full_name'] if employee else None,
                     data['date_opened'],
                     'Pending Approval',  # Always set to Pending Approval for new matters
                     creator['id'],
@@ -25964,6 +32045,27 @@ def api_register_matter():
                 
                 connection.commit()
                 matter_id = cursor.lastrowid
+
+                # Insert parties if provided (same shape as case registration)
+                if data.get('parties') and isinstance(data.get('parties'), list):
+                    for party in data.get('parties', []):
+                        if party.get('party_name') and party.get('party_type'):
+                            cursor.execute("""
+                                INSERT INTO matter_parties (
+                                    matter_id, party_name, party_type, party_category,
+                                    firm_agent, party_phone, party_email
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                matter_id,
+                                party['party_name'],
+                                party['party_type'],
+                                party.get('party_category') or None,
+                                party.get('firm_agent') or None,
+                                party.get('party_phone') or None,
+                                party.get('party_email') or None,
+                            ))
+                    connection.commit()
                 
                 return jsonify({
                     'success': True,
@@ -25983,14 +32085,14 @@ def api_register_matter():
 
 @app.route('/api/matters/update/<int:matter_id>', methods=['PUT'])
 def api_matters_update(matter_id):
-    """API endpoint to update an existing matter"""
+    """API endpoint to update an existing matter (allocation / assignee is not editable here)."""
     if 'employee_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.get_json()
     
-    # Validate required fields
-    required_fields = ['matter_title', 'matter_category', 'date_opened', 'status']
+    # Validate required fields (assignee/status are managed on dedicated pages)
+    required_fields = ['matter_title', 'matter_category', 'client_id', 'date_opened']
     for field in required_fields:
         if not data.get(field):
             return jsonify({'success': False, 'error': f'{field} is required'}), 400
@@ -26001,53 +32103,69 @@ def api_matters_update(matter_id):
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            # Check if matter exists and get current assignee
-            cursor.execute("SELECT id, assigned_employee_id FROM matters WHERE id = %s", (matter_id,))
+            # Check if matter exists
+            cursor.execute("SELECT id FROM matters WHERE id = %s", (matter_id,))
             matter_row = cursor.fetchone()
             if not matter_row:
                 return jsonify({'success': False, 'error': 'Matter not found'}), 404
-            
-            # Keep current assignee if no new one is provided
-            assignee_id = data.get('assigned_employee_id')
-            if assignee_id is not None and assignee_id != '':
-                try:
-                    assignee_id = int(assignee_id)
-                except (TypeError, ValueError):
-                    return jsonify({'success': False, 'error': 'Invalid assigned_employee_id'}), 400
-            else:
-                assignee_id = matter_row['assigned_employee_id']
 
-            # Get employee name
-            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (assignee_id,))
-            employee = cursor.fetchone()
-            if not employee:
-                return jsonify({'success': False, 'error': 'Assigned employee not found'}), 400
+            try:
+                client_id = int(data['client_id'])
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'Invalid client_id'}), 400
+
+            cursor.execute("SELECT id, full_name, phone_number FROM clients WHERE id = %s", (client_id,))
+            client = cursor.fetchone()
+            if not client:
+                return jsonify({'success': False, 'error': 'Client not found'}), 404
             
-            assigned_employee_name = employee['full_name']
-            
-            # Update matter
+            # Update matter details — do not change assigned employee (matter allocation)
             cursor.execute("""
                 UPDATE matters SET
                     matter_title = %s,
                     matter_category = %s,
-                    assigned_employee_id = %s,
-                    assigned_employee_name = %s,
+                    client_id = %s,
+                    client_name = %s,
+                    client_phone = %s,
                     date_opened = %s,
-                    status = %s,
                     client_instructions = %s,
                     updated_at = NOW()
                 WHERE id = %s
             """, (
                 data['matter_title'].upper().strip(),
                 data['matter_category'].upper().strip(),
-                assignee_id,
-                assigned_employee_name,
+                client['id'],
+                client['full_name'],
+                client.get('phone_number') or '',
                 data['date_opened'],
-                data['status'],
-                data.get('client_instructions', '').strip(),
+                (data.get('client_instructions') or '').strip(),
                 matter_id
             ))
             connection.commit()
+
+            # Replace parties (same approach as case update)
+            cursor.execute("DELETE FROM matter_parties WHERE matter_id = %s", (matter_id,))
+            connection.commit()
+
+            if data.get('parties') and isinstance(data.get('parties'), list):
+                for party in data.get('parties', []):
+                    if party.get('party_name') and party.get('party_type'):
+                        cursor.execute("""
+                            INSERT INTO matter_parties (
+                                matter_id, party_name, party_type, party_category,
+                                firm_agent, party_phone, party_email
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            matter_id,
+                            party['party_name'].upper() if isinstance(party['party_name'], str) else party['party_name'],
+                            party['party_type'].upper() if isinstance(party['party_type'], str) else party['party_type'],
+                            party.get('party_category').upper() if party.get('party_category') and isinstance(party.get('party_category'), str) else (party.get('party_category') if party.get('party_category') else None),
+                            party.get('firm_agent').upper() if party.get('firm_agent') and isinstance(party.get('firm_agent'), str) else (party.get('firm_agent') if party.get('firm_agent') else None),
+                            party.get('party_phone') if party.get('party_phone') else None,
+                            party.get('party_email') if party.get('party_email') else None,
+                        ))
+                connection.commit()
             
             return jsonify({
                 'success': True,
@@ -26071,6 +32189,7 @@ def inject_my_task_badge():
             return {
                 'my_task_badge_count': 0,
                 'notification_badge_count': 0,
+                'reminder_badge_count': 0,
                 'approve_matters_badge_count': 0,
                 'approve_cases_badge_count': 0
             }
@@ -26080,6 +32199,7 @@ def inject_my_task_badge():
             return {
                 'my_task_badge_count': 0,
                 'notification_badge_count': 0,
+                'reminder_badge_count': 0,
                 'approve_matters_badge_count': 0,
                 'approve_cases_badge_count': 0
             }
@@ -26099,6 +32219,7 @@ def inject_my_task_badge():
         return {
             'my_task_badge_count': 0,
             'notification_badge_count': 0,
+            'reminder_badge_count': 0,
             'approve_matters_badge_count': 0,
             'approve_cases_badge_count': 0
         }

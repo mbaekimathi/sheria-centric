@@ -420,7 +420,7 @@ const googleDriveConnected = {{ 'true' if google_drive_connected else 'false' }}
 const matterDocVerify = createDocumentActionVerify({
     apiBase: '/api/matter/' + matterId + '/document',
     downloadUrlBuilder: function (fileId, token) {
-        return '/other_matters/' + matterId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
+        return '/non_litigation_matters/' + matterId + '/document/' + encodeURIComponent(fileId) + '/download?token=' + encodeURIComponent(token);
     },
     deleteUrlBuilder: function (fileId) {
         return '/api/matter/' + matterId + '/document/' + encodeURIComponent(fileId) + '/delete';

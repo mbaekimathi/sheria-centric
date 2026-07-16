@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Features | SHERIA CENTRIC</title>
-  <meta name="description" content="Explore detailed SHERIA CENTRIC modules for legal operations, case management, document control, and billing.">
-  {# PWA: manifest, icons, theme-color, service worker registration. #}
+  <meta name="description" content="Explore SHERIA CENTRIC features: case management, document vault, court calendar, billing, client portal, audit trail, and analytics.">
   {% include "_pwa_head.html" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,19 +15,32 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <style>
+    body { margin: 0; }
+    .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
+    .skip-link:focus { top: 16px; }
+  </style>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+<body class="features-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" id="site-header" x-data="{open:false}">
     <div class="container nav-wrap">
       <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
           <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
         </svg>
         <span>SHERIA CENTRIC</span>
       </a>
-      <nav class="desktop-nav"><a href="/platform" class="nav-link">Platform</a><a href="/features" class="nav-link">Features</a><a href="/pricing" class="nav-link">Pricing</a><a href="/security" class="nav-link">Security</a><a href="/contact" class="nav-link">Contact</a></nav>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="/platform" class="nav-link">Platform</a>
+        <a href="/features" class="nav-link">Features</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        <a href="/security" class="nav-link">Security</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </nav>
       <div class="nav-actions">
         <details class="login-dropdown">
           <summary class="login-summary" aria-label="Login menu">
@@ -41,14 +53,14 @@
             <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
           </div>
         </details>
-        <a href="/contact" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-label="Toggle navigation">
+        <a href="#features-cta" class="btn btn-demo">Request Demo</a>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
           <i class="ph ph-list" x-show="!open"></i>
           <i class="ph ph-x" x-show="open" style="display:none"></i>
         </button>
       </div>
     </div>
-    <div class="mobile-menu" x-show="open" x-transition.origin.top>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
       <span class="mobile-section-label">Navigate</span>
       <a href="/platform" @click="open=false">Platform</a>
       <a href="/features" @click="open=false">Features</a>
@@ -58,49 +70,275 @@
       <span class="mobile-section-label">Account</span>
       <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
       <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-      <a href="/contact" @click="open=false" class="btn btn-demo">Request Demo</a>
+      <a href="#features-cta" @click="open=false" class="btn btn-demo">Request Demo</a>
     </div>
   </header>
 
-  <main class="inner-page">
-    <section class="page-hero section">
-      <div class="container hero-split">
-        <div>
-          <p class="eyebrow">FEATURES</p>
-          <h1>Detailed modules for high-performing legal teams</h1>
-          <p>Every feature is built around daily advocate workflows: court preparation, file control, communication, billing, and compliance reporting.</p>
+  <main id="main-content">
+    <!-- Hero: bento mosaic preview -->
+    <section class="features-hero section" id="hero">
+      <div class="container features-hero-grid">
+        <div class="features-hero-copy" data-aos="fade-right">
+          <p class="eyebrow" style="color: var(--color-accent-light);">Platform Features</p>
+          <h1>Eight modules.<br><em>One</em> operating system.</h1>
+          <p class="features-hero-lead">
+            From the first client briefing to the final invoice &mdash; every capability your firm needs is mapped, connected, and ready to run. No bolt-ons. No blind spots.
+          </p>
+          <div class="features-hero-pills">
+            <span>Case Management</span>
+            <span>Document Vault</span>
+            <span>Court Calendar</span>
+            <span>Billing</span>
+            <span>Client Portal</span>
+          </div>
+          <div class="hero-ctas">
+            <a href="#explorer" class="btn btn-primary">Browse all features</a>
+            <a href="#module-architecture" class="btn btn-secondary">See how modules connect</a>
+          </div>
         </div>
-        <div class="hero-split-media" data-aos="zoom-in">
-          <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1000&auto=format&q=80" alt="Modern legal team collaborating with case records">
-          <span class="hero-chip chip-a">8 core legal modules</span>
-          <span class="hero-chip chip-b">Designed for speed + control</span>
+
+        <div class="features-bento-mosaic" aria-hidden="true" data-aos="fade-left">
+          <div class="bento-cell bento-a">
+            <i class="ph ph-briefcase"></i>
+            <strong>Matter Management</strong>
+            <span>Intake to closure</span>
+          </div>
+          <div class="bento-cell bento-b">
+            <i class="ph ph-files"></i>
+            <strong>Document Vault</strong>
+            <span>Version control</span>
+          </div>
+          <div class="bento-cell bento-c">
+            <i class="ph ph-calendar-dots"></i>
+            <strong>Court Calendar</strong>
+          </div>
+          <div class="bento-cell bento-d">
+            <i class="ph ph-bell-ringing"></i>
+            <strong>Alerts</strong>
+          </div>
+          <div class="bento-cell bento-e">
+            <i class="ph ph-money"></i>
+            <strong>Billing Engine</strong>
+            <span>Invoices &amp; collections</span>
+          </div>
+          <div class="bento-cell bento-f">
+            <i class="ph ph-users-three"></i>
+            <strong>Client Portal</strong>
+          </div>
+          <div class="bento-cell bento-g">
+            <i class="ph ph-shield-check"></i>
+            <strong>Audit Trail &amp; Access Control</strong>
+          </div>
+          <div class="bento-cell bento-h">
+            <i class="ph ph-chart-line-up"></i>
+            <strong>Analytics</strong>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="section">
-      <div class="container section-head">
-        <p class="eyebrow">MODULE ARCHITECTURE</p>
-        <h2>Navigate the platform as a connected module tree</h2>
-        <p>Select any branch in the tree to understand responsibilities, workflows, and operational outcomes, then open its detailed visual brief.</p>
+    <!-- Capability metrics -->
+    <section class="features-metrics" aria-label="Platform capability highlights">
+      <div class="container features-metrics-grid">
+        <article data-aos="fade-up"><strong>8</strong><span>Integrated modules</span></article>
+        <article data-aos="fade-up" data-aos-delay="60"><strong>40+</strong><span>Built-in workflows</span></article>
+        <article data-aos="fade-up" data-aos-delay="120"><strong>100%</strong><span>Audit coverage</span></article>
+        <article data-aos="fade-up" data-aos-delay="180"><strong>3</strong><span>Countries supported</span></article>
       </div>
     </section>
 
-    <section class="section system-tree-section">
+    <!-- Interactive feature explorer -->
+    <section class="section feature-explorer" id="explorer" x-data="{ tab: 'all' }">
       <div class="container">
-        <div class="section-head">
-          <p class="eyebrow">SYSTEM MAP</p>
-          <h2>Module tree: how SHERIA CENTRIC works together</h2>
-          <p>This architecture view shows the full legal operations stack and how core modules feed each other from intake to closure.</p>
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Feature Explorer</p>
+          <h2>Find the capability you need</h2>
+          <p>Filter by practice area to see how SHERIA CENTRIC supports each part of your firm&rsquo;s operations.</p>
         </div>
 
-        <div class="tree-legend">
+        <div class="feature-tabs" role="tablist" aria-label="Filter features by category" data-aos="fade-up">
+          <button type="button" role="tab" :class="{ active: tab === 'all' }" :aria-selected="tab === 'all'" @click="tab = 'all'">All features</button>
+          <button type="button" role="tab" :class="{ active: tab === 'practice' }" :aria-selected="tab === 'practice'" @click="tab = 'practice'">Practice</button>
+          <button type="button" role="tab" :class="{ active: tab === 'documents' }" :aria-selected="tab === 'documents'" @click="tab = 'documents'">Documents</button>
+          <button type="button" role="tab" :class="{ active: tab === 'operations' }" :aria-selected="tab === 'operations'" @click="tab = 'operations'">Operations</button>
+          <button type="button" role="tab" :class="{ active: tab === 'finance' }" :aria-selected="tab === 'finance'" @click="tab = 'finance'">Finance</button>
+          <button type="button" role="tab" :class="{ active: tab === 'governance' }" :aria-selected="tab === 'governance'" @click="tab = 'governance'">Governance</button>
+        </div>
+
+        <div class="feature-catalog">
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'practice'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div>
+                <div class="feature-catalog-icon"><i class="ph ph-scales"></i></div>
+              </div>
+              <span class="feature-badge">Practice</span>
+            </div>
+            <h3>End-to-end case management</h3>
+            <p>Structured matter records from intake through closure with ownership, stages, and live status for every advocate on the team.</p>
+            <ul>
+              <li>Matter timelines</li>
+              <li>Conflict checks</li>
+              <li>Stage ownership</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="matter-management">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'documents'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-folder-lock"></i></div>
+              <span class="feature-badge">Documents</span>
+            </div>
+            <h3>Secure document vault</h3>
+            <p>Version-controlled pleadings, evidence, and drafts with tags, approvals, and controlled sharing to clients and co-counsel.</p>
+            <ul>
+              <li>Version history</li>
+              <li>Evidence tagging</li>
+              <li>Encrypted storage</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="document-vault">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'operations'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-calendar-check"></i></div>
+              <span class="feature-badge">Operations</span>
+            </div>
+            <h3>Court calendar &amp; tasks</h3>
+            <p>Hearings, mentions, and filing deadlines with cascading reminders, conflict detection, and hearing prep checklists.</p>
+            <ul>
+              <li>Court-aware alerts</li>
+              <li>Task dependencies</li>
+              <li>Team escalation</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="court-calendar">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'finance'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-receipt"></i></div>
+              <span class="feature-badge">Finance</span>
+            </div>
+            <h3>Billing engine</h3>
+            <p>Convert tracked effort into invoices, manage retainers and disbursements, and follow up on collections from one financial view.</p>
+            <ul>
+              <li>Time &amp; expense</li>
+              <li>Aging reports</li>
+              <li>M-Pesa ready</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="billing-engine">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'operations'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-device-mobile-camera"></i></div>
+              <span class="feature-badge">Operations</span>
+            </div>
+            <h3>Client portal</h3>
+            <p>Give clients approved visibility into matter progress, shared documents, and secure messaging &mdash; without exposing internal workflows.</p>
+            <ul>
+              <li>Status updates</li>
+              <li>Doc sharing</li>
+              <li>Secure messaging</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="client-portal">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'governance'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-fingerprint"></i></div>
+              <span class="feature-badge">Governance</span>
+            </div>
+            <h3>Audit trail</h3>
+            <p>Every material action captured with actor, timestamp, and change context &mdash; supporting compliance checks and partner oversight.</p>
+            <ul>
+              <li>Action logging</li>
+              <li>Change history</li>
+              <li>Export ready</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="audit-trail">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'governance'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-lock-key"></i></div>
+              <span class="feature-badge">Governance</span>
+            </div>
+            <h3>Access control</h3>
+            <p>Role-based permissions aligned to legal duties &mdash; partners, associates, clerks, and finance each see exactly what they need.</p>
+            <ul>
+              <li>Role templates</li>
+              <li>Matter-level rules</li>
+              <li>Least privilege</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="access-control">Open visual brief &rarr;</button>
+          </article>
+
+          <article class="feature-catalog-card" data-aos="fade-up"
+            x-show="tab === 'all' || tab === 'governance'"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="feature-catalog-top">
+              <div class="feature-catalog-icon"><i class="ph ph-chart-line-up"></i></div>
+              <span class="feature-badge">Governance</span>
+            </div>
+            <h3>Performance analytics</h3>
+            <p>Dashboards for throughput, utilization, collection health, and bottlenecks &mdash; so partners make decisions with real data.</p>
+            <ul>
+              <li>Cycle-time metrics</li>
+              <li>Revenue views</li>
+              <li>Risk signals</li>
+            </ul>
+            <button type="button" class="module-open-btn" data-module="performance-analytics">Open visual brief &rarr;</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive module tree -->
+    <section class="section system-tree-section" id="module-architecture">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">System Architecture</p>
+          <h2>How every module connects</h2>
+          <p>Click any branch to see how data flows between intake, operations, finance, and governance layers.</p>
+        </div>
+
+        <div class="tree-legend" data-aos="fade-up">
           <span><i class="ph ph-tree-evergreen"></i> Core trunk</span>
           <span><i class="ph ph-arrows-down-up"></i> Data flow</span>
           <span><i class="ph ph-cursor-click"></i> Click a node to explore</span>
         </div>
 
-        <div class="module-tree tree-stage">
+        <div class="module-tree tree-stage" data-aos="fade-up">
           <div class="tree-spark spark-1"></div>
           <div class="tree-spark spark-2"></div>
           <div class="tree-spark spark-3"></div>
@@ -122,7 +360,7 @@
                 <li>Conflict checks</li>
                 <li>Matter opening wizard</li>
               </ul>
-              <button type="button" class="module-open-btn" data-module="matter-management">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="matter-management">Open visual brief &rarr;</button>
             </article>
             <article class="tree-node tree-click node-work" data-tree-node="work">
               <h3><i class="ph ph-files"></i> Work Layer</h3>
@@ -131,7 +369,7 @@
                 <li>Hearing calendar + tasks</li>
                 <li>Team collaboration logs</li>
               </ul>
-              <button type="button" class="module-open-btn" data-module="document-vault">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="document-vault">Open visual brief &rarr;</button>
             </article>
             <article class="tree-node tree-click node-finance" data-tree-node="finance">
               <h3><i class="ph ph-receipt"></i> Finance Layer</h3>
@@ -140,7 +378,7 @@
                 <li>Disbursement control</li>
                 <li>Collections tracking</li>
               </ul>
-              <button type="button" class="module-open-btn" data-module="billing-engine">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="billing-engine">Open visual brief &rarr;</button>
             </article>
           </div>
 
@@ -150,85 +388,242 @@
             <article class="tree-node tree-click node-portal" data-tree-node="portal">
               <h4>Client Portal</h4>
               <p>Secure status and document sharing.</p>
-              <button type="button" class="module-open-btn" data-module="client-portal">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="client-portal">Open visual brief &rarr;</button>
             </article>
             <article class="tree-node tree-click node-audit" data-tree-node="audit">
               <h4>Audit Trail</h4>
               <p>Action-level transparency across modules.</p>
-              <button type="button" class="module-open-btn" data-module="audit-trail">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="audit-trail">Open visual brief &rarr;</button>
             </article>
             <article class="tree-node tree-click node-access" data-tree-node="access">
               <h4>Access Control</h4>
               <p>Role-based controls by function and matter.</p>
-              <button type="button" class="module-open-btn" data-module="access-control">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="access-control">Open visual brief &rarr;</button>
             </article>
             <article class="tree-node tree-click node-analytics" data-tree-node="analytics">
               <h4>Analytics</h4>
               <p>Performance and operational intelligence.</p>
-              <button type="button" class="module-open-btn" data-module="performance-analytics">Open visual brief â†’</button>
+              <button type="button" class="module-open-btn" data-module="performance-analytics">Open visual brief &rarr;</button>
             </article>
           </div>
         </div>
 
-        <div class="module-detail-panel">
+        <div class="module-detail-panel" data-aos="fade-up">
           <article data-tree-panel="intake">
-            <h3><i class="ph ph-user-plus"></i> Intake Layer â€” detailed module functions</h3>
-            <p>This module governs how new legal instructions are accepted, validated, and transformed into structured matter records ready for execution.</p>
+            <h3><i class="ph ph-user-plus"></i> Intake Layer &mdash; detailed module functions</h3>
+            <p>Governs how new legal instructions are accepted, validated, and transformed into structured matter records.</p>
             <ul>
-              <li><strong>Inputs:</strong> client identity data, matter description, urgency level, instruction documents.</li>
-              <li><strong>Core functions:</strong> conflict prompts, onboarding checklists, advocate assignment rules, initial court metadata setup.</li>
-              <li><strong>Outputs:</strong> approved matter record, initial timeline, required document task list.</li>
+              <li><strong>Inputs:</strong> client identity, matter description, urgency, instruction documents.</li>
+              <li><strong>Core functions:</strong> conflict prompts, onboarding checklists, advocate assignment, court metadata.</li>
+              <li><strong>Outputs:</strong> approved matter record, initial timeline, document task list.</li>
             </ul>
           </article>
           <article data-tree-panel="work" hidden>
-            <h3><i class="ph ph-files"></i> Work Layer â€” detailed module functions</h3>
-            <p>This is the operational engine where advocates and support teams prepare filings, manage evidence, and coordinate hearing readiness.</p>
+            <h3><i class="ph ph-files"></i> Work Layer &mdash; detailed module functions</h3>
+            <p>The operational engine for filings, evidence management, and hearing readiness.</p>
             <ul>
-              <li><strong>Inputs:</strong> active matters, uploaded files, hearing schedules, team assignments.</li>
-              <li><strong>Core functions:</strong> document version control, tagged evidence indexing, task dependencies, deadline escalations.</li>
-              <li><strong>Outputs:</strong> hearing-ready files, completion logs, status updates for internal and client use.</li>
+              <li><strong>Inputs:</strong> active matters, files, hearing schedules, team assignments.</li>
+              <li><strong>Core functions:</strong> version control, evidence indexing, task dependencies, escalations.</li>
+              <li><strong>Outputs:</strong> hearing-ready files, completion logs, status updates.</li>
             </ul>
           </article>
           <article data-tree-panel="finance" hidden>
-            <h3><i class="ph ph-receipt"></i> Finance Layer â€” detailed module functions</h3>
-            <p>This module converts legal work into measurable financial outcomes while preserving billing transparency and accountability.</p>
+            <h3><i class="ph ph-receipt"></i> Finance Layer &mdash; detailed module functions</h3>
+            <p>Converts legal work into measurable financial outcomes with full billing transparency.</p>
             <ul>
-              <li><strong>Inputs:</strong> billable activity, disbursements, retainer balances, approved milestones.</li>
-              <li><strong>Core functions:</strong> invoice generation, aging analysis, collection follow-up queues, matter-level financial visibility.</li>
-              <li><strong>Outputs:</strong> invoices, payment tracking statuses, collection actions, revenue reports.</li>
+              <li><strong>Inputs:</strong> billable activity, disbursements, retainer balances, milestones.</li>
+              <li><strong>Core functions:</strong> invoicing, aging analysis, collection queues, financial visibility.</li>
+              <li><strong>Outputs:</strong> invoices, payment statuses, collection actions, revenue reports.</li>
             </ul>
           </article>
           <article data-tree-panel="portal" hidden>
             <h3><i class="ph ph-device-mobile-camera"></i> Client Portal</h3>
-            <p>Provides controlled transparency: clients can track approved progress without exposing sensitive internal workflows.</p>
+            <p>Controlled transparency for clients to track approved progress without exposing internal workflows.</p>
           </article>
           <article data-tree-panel="audit" hidden>
             <h3><i class="ph ph-fingerprint"></i> Audit Trail</h3>
-            <p>Every material action is captured with actor, time, and change context to support legal governance and compliance checks.</p>
+            <p>Every material action captured with actor, time, and change context for governance and compliance.</p>
           </article>
           <article data-tree-panel="access" hidden>
             <h3><i class="ph ph-lock-key"></i> Access Control</h3>
-            <p>Permission controls define exactly what partners, associates, clerks, and finance users can view or modify.</p>
+            <p>Permission controls for partners, associates, clerks, and finance users by function and matter.</p>
           </article>
           <article data-tree-panel="analytics" hidden>
             <h3><i class="ph ph-chart-line-up"></i> Analytics</h3>
-            <p>Performance dashboards expose operational bottlenecks, turnaround patterns, and collection risks for better decision-making.</p>
+            <p>Dashboards exposing bottlenecks, turnaround patterns, and collection risks for better decisions.</p>
           </article>
         </div>
       </div>
     </section>
 
+    <!-- Deep-dive spotlights -->
+    <section class="section features-spotlights">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Feature Spotlights</p>
+          <h2>Capabilities that change how firms work</h2>
+          <p>Three areas where SHERIA CENTRIC delivers the most immediate impact for East African advocates.</p>
+        </div>
+
+        <div class="spotlight-list">
+          <article class="spotlight-card" data-aos="fade-up">
+            <div class="spotlight-media">
+              <img src="https://images.unsplash.com/photo-1521791055366-0d553872952f?w=1200&auto=format&q=80" alt="Court calendar with hearing reminders">
+              <span class="spotlight-tag">Never miss a date</span>
+            </div>
+            <div class="spotlight-copy">
+              <h3><i class="ph ph-calendar-check"></i> Court-aware calendar</h3>
+              <p>Hearings, mentions, and filing deadlines feed a shared calendar with cascading reminders. When a date moves, every dependent task updates automatically.</p>
+              <ul>
+                <li>Conflict detection across advocates</li>
+                <li>Hearing prep checklists per matter type</li>
+                <li>SMS and email escalation rules</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="spotlight-card" data-aos="fade-up">
+            <div class="spotlight-media">
+              <img src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1200&auto=format&q=80" alt="Document management workspace">
+              <span class="spotlight-tag">Find any file instantly</span>
+            </div>
+            <div class="spotlight-copy">
+              <h3><i class="ph ph-folder-lock"></i> Evidence-grade document vault</h3>
+              <p>Every pleading, affidavit, and draft lives in a version-controlled vault with tags, matter links, and approval workflows built for legal governance.</p>
+              <ul>
+                <li>Full version history with diff tracking</li>
+                <li>Tagged evidence indexing for hearings</li>
+                <li>Controlled sharing to clients and co-counsel</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="spotlight-card" data-aos="fade-up">
+            <div class="spotlight-media">
+              <img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1200&auto=format&q=80" alt="Billing and financial dashboard">
+              <span class="spotlight-tag">Bill the day work happens</span>
+            </div>
+            <div class="spotlight-copy">
+              <h3><i class="ph ph-receipt"></i> Billing that runs itself</h3>
+              <p>Tracked time, disbursements, and retainer balances flow directly into invoices. Finance teams see aging, collections queues, and matter-level profitability in one view.</p>
+              <ul>
+                <li>One-click invoice generation from activity</li>
+                <li>M-Pesa and bank reconciliation ready</li>
+                <li>Collection follow-up automation</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features by role -->
+    <section class="section features-by-role">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">By Role</p>
+          <h2>Built for everyone in the firm</h2>
+          <p>Each team member gets the tools and visibility relevant to their function &mdash; nothing more, nothing less.</p>
+        </div>
+        <div class="role-grid">
+          <article class="role-card" data-aos="fade-up">
+            <i class="ph ph-crown"></i>
+            <h3>Partners</h3>
+            <p>Firm-wide visibility without micromanaging.</p>
+            <ul>
+              <li>Matter pipeline overview</li>
+              <li>Revenue &amp; utilization dashboards</li>
+              <li>Compliance &amp; audit reports</li>
+            </ul>
+          </article>
+          <article class="role-card" data-aos="fade-up" data-aos-delay="60">
+            <i class="ph ph-scales"></i>
+            <h3>Associates</h3>
+            <p>Focus on advocacy, not admin.</p>
+            <ul>
+              <li>Personal matter workspace</li>
+              <li>Hearing prep checklists</li>
+              <li>Document drafting &amp; filing</li>
+            </ul>
+          </article>
+          <article class="role-card" data-aos="fade-up" data-aos-delay="120">
+            <i class="ph ph-clipboard-text"></i>
+            <h3>Clerks</h3>
+            <p>Structured tasks with clear deadlines.</p>
+            <ul>
+              <li>Task queues by matter</li>
+              <li>Filing &amp; document indexing</li>
+              <li>Calendar coordination</li>
+            </ul>
+          </article>
+          <article class="role-card" data-aos="fade-up" data-aos-delay="180">
+            <i class="ph ph-calculator"></i>
+            <h3>Finance</h3>
+            <p>Billing accuracy without chasing advocates.</p>
+            <ul>
+              <li>Invoice generation &amp; aging</li>
+              <li>Disbursement tracking</li>
+              <li>Collections workflow</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Before / after comparison -->
+    <section class="section features-compare">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">The difference</p>
+          <h2>What changes when you switch</h2>
+        </div>
+        <div class="compare-grid" data-aos="fade-up">
+          <div class="compare-col old">
+            <h3><i class="ph ph-folder-simple"></i> Without SHERIA CENTRIC</h3>
+            <ul>
+              <li>Matters tracked in spreadsheets and WhatsApp</li>
+              <li>Documents scattered across email and USB drives</li>
+              <li>Court dates on sticky notes and memory</li>
+              <li>Invoices drafted weeks after work is done</li>
+              <li>No audit trail when something goes wrong</li>
+            </ul>
+          </div>
+          <div class="compare-col new">
+            <h3><i class="ph ph-sparkle"></i> With SHERIA CENTRIC</h3>
+            <ul>
+              <li>Every matter in one structured workspace</li>
+              <li>Version-controlled vault with instant search</li>
+              <li>Automated reminders with escalation rules</li>
+              <li>Billable activity converts to invoices same-day</li>
+              <li>Full action history across every module</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="features-cta section" id="features-cta">
+      <div class="container" data-aos="fade-up">
+        <h2>See these features in action</h2>
+        <p>Book a walkthrough tailored to your firm&rsquo;s practice areas, or start a free 30-day trial and explore every module yourself.</p>
+        <div class="hero-ctas">
+          <a href="/contact" class="btn btn-primary">Book a live demo</a>
+          <a href="/pricing" class="btn btn-secondary">View pricing</a>
+        </div>
+      </div>
+    </section>
   </main>
 
+  <!-- Module detail modal -->
   <div class="module-modal-overlay" id="module-modal-overlay" hidden>
     <div class="module-modal" role="dialog" aria-modal="true" aria-labelledby="module-modal-title" aria-describedby="module-modal-description">
       <div class="module-modal-header">
         <p class="eyebrow" id="module-modal-tag">MODULE</p>
         <button type="button" class="module-modal-close" id="module-modal-close" aria-label="Close module details">
-          Close <span aria-hidden="true">Ã—</span>
+          Close <span aria-hidden="true">&times;</span>
         </button>
       </div>
-
       <div class="module-modal-grid">
         <figure class="module-modal-media">
           <img id="module-modal-image" src="" alt="">
@@ -237,9 +632,7 @@
           <h3 id="module-modal-title">Module details</h3>
           <p id="module-modal-description">Detailed explanation appears here.</p>
           <h4 class="module-subhead">Key Functions</h4>
-          <ul id="module-modal-points">
-            <li>Function detail appears here.</li>
-          </ul>
+          <ul id="module-modal-points"><li>Function detail appears here.</li></ul>
           <div class="module-modal-meta-grid">
             <article>
               <h4 class="module-subhead">Primary Workflows</h4>
@@ -251,7 +644,7 @@
             </article>
           </div>
           <div class="module-io">
-            <h4 class="module-subhead">Input â†’ Output</h4>
+            <h4 class="module-subhead">Input &rarr; Output</h4>
             <div class="module-io-grid">
               <div>
                 <p class="io-label">Input</p>
@@ -272,8 +665,52 @@
     </div>
   </div>
 
-  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/platform">Platform</a><a href="/pricing">Pricing</a><a href="/contact">Contact</a></div></div></footer>
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
+        <p>Building the future of legal practice in Africa.</p>
+        <div class="socials">
+          <a href="#" aria-label="LinkedIn"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="#" aria-label="X / Twitter"><i class="ph ph-x-logo"></i></a>
+          <a href="#" aria-label="Facebook"><i class="ph ph-facebook-logo"></i></a>
+        </div>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <a href="/platform">Platform</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/security">Security</a>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <a href="/contact">Contact</a>
+        <a href="/">Home</a>
+        <a href="/client_login">Client Login</a>
+        <a href="/login">Employee Login</a>
+      </div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <p>Monthly product updates &amp; legal-tech insights for East African firms.</p>
+        <form class="newsletter" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';">
+          <label for="newsletter-email" class="skip-link">Email address</label>
+          <input id="newsletter-email" type="email" placeholder="you@firm.co.ke" required>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container bottom-wrap">
+        <p>&copy; 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <div>
+          <a href="/security">Privacy</a>
+          <a href="/security">Terms</a>
+          <a href="/contact">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
   <script type="module" src="/static/main.js"></script>
 </body>
 </html>
-

@@ -3,27 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Security & Compliance | SHERIA CENTRIC</title>
-  <meta name="description" content="Learn how SHERIA CENTRIC protects legal data with encryption, access controls, and compliance-ready audit trails.">
-  {# PWA: manifest, icons, theme-color, service worker registration. #}
+  <title>Security &amp; Compliance | SHERIA CENTRIC</title>
+  <meta name="description" content="Learn how SHERIA CENTRIC protects legal data with encryption, access controls, audit trails, and compliance-ready governance.">
   {% include "_pwa_head.html" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <style>
+    body { margin: 0; }
+    .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
+    .skip-link:focus { top: 16px; }
+  </style>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+<body class="security-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" id="site-header" x-data="{open:false}">
     <div class="container nav-wrap">
       <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
           <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
         </svg>
         <span>SHERIA CENTRIC</span>
       </a>
-      <nav class="desktop-nav"><a href="/platform" class="nav-link">Platform</a><a href="/features" class="nav-link">Features</a><a href="/pricing" class="nav-link">Pricing</a><a href="/security" class="nav-link">Security</a><a href="/contact" class="nav-link">Contact</a></nav>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="/platform" class="nav-link">Platform</a>
+        <a href="/features" class="nav-link">Features</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        <a href="/security" class="nav-link">Security</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </nav>
       <div class="nav-actions">
         <details class="login-dropdown">
           <summary class="login-summary" aria-label="Login menu">
@@ -36,14 +52,14 @@
             <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
           </div>
         </details>
-        <a href="/contact" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-label="Toggle navigation">
+        <a href="#security-cta" class="btn btn-demo">Request Demo</a>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
           <i class="ph ph-list" x-show="!open"></i>
           <i class="ph ph-x" x-show="open" style="display:none"></i>
         </button>
       </div>
     </div>
-    <div class="mobile-menu" x-show="open" x-transition.origin.top>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
       <span class="mobile-section-label">Navigate</span>
       <a href="/platform" @click="open=false">Platform</a>
       <a href="/features" @click="open=false">Features</a>
@@ -53,38 +69,276 @@
       <span class="mobile-section-label">Account</span>
       <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
       <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-      <a href="/contact" @click="open=false" class="btn btn-demo">Request Demo</a>
+      <a href="#security-cta" @click="open=false" class="btn btn-demo">Request Demo</a>
     </div>
   </header>
-  <main class="inner-page">
-    <section class="page-hero section">
-      <div class="container hero-split">
-        <div>
-          <p class="eyebrow">SECURITY & COMPLIANCE</p>
-          <h1>Enterprise-grade safeguards for confidential legal data</h1>
-          <p>SHERIA CENTRIC is designed for legal confidentiality requirements, operational resilience, and auditability across teams and offices.</p>
+
+  <main id="main-content">
+    <!-- Hero -->
+    <section class="security-hero section" id="hero">
+      <div class="container security-hero-grid">
+        <div class="security-hero-copy" data-aos="fade-right">
+          <p class="eyebrow" style="color: #5eead4;">Security &amp; Compliance</p>
+          <h1>Enterprise-grade <em>protection</em> for legal data</h1>
+          <p class="security-hero-lead">
+            SHERIA CENTRIC is designed for legal confidentiality requirements, operational resilience, and auditability &mdash; so your firm&rsquo;s most sensitive data stays protected at every layer.
+          </p>
+          <div class="security-hero-badges">
+            <span><i class="ph ph-lock"></i> AES-256 at rest</span>
+            <span><i class="ph ph-shield-check"></i> TLS 1.2+ in transit</span>
+            <span><i class="ph ph-fingerprint"></i> Full audit trail</span>
+          </div>
+          <div class="hero-ctas">
+            <a href="#security-depth" class="btn btn-primary">See our safeguards</a>
+            <a href="/contact" class="btn btn-secondary">Request security brief</a>
+          </div>
         </div>
-        <div class="hero-split-media">
-          <img src="https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1000&auto=format&q=80" alt="Cybersecurity monitoring dashboard">
-          <span class="hero-chip chip-a">256-bit encryption</span>
-          <span class="hero-chip chip-b">Audit-ready logs</span>
+
+        <div class="security-shield-visual" aria-hidden="true" data-aos="fade-left">
+          <div class="shield-ring r1"></div>
+          <div class="shield-ring r2"></div>
+          <div class="shield-ring r3"></div>
+          <div class="shield-core"><i class="ph ph-shield-check"></i></div>
+          <span class="shield-node n1"><i class="ph ph-lock-key"></i> Encryption</span>
+          <span class="shield-node n2"><i class="ph ph-users-three"></i> RBAC</span>
+          <span class="shield-node n3"><i class="ph ph-fingerprint"></i> Audit logs</span>
+          <span class="shield-node n4"><i class="ph ph-database"></i> Backups</span>
         </div>
       </div>
     </section>
-    <section class="section">
-      <div class="container security-matrix">
-        <article><h3><i class="ph ph-lock-key icon-pulse-soft"></i> Encryption and transport security</h3><p>Data is encrypted in transit and at rest using modern cryptographic standards. Sensitive workflows are protected with role controls and secure session handling.</p></article>
-        <article><h3><i class="ph ph-users-three icon-pulse-soft"></i> Role-based access control</h3><p>Define precise permissions for partners, associates, clerks, and finance personnel. Limit access to only what each role needs to see or change.</p></article>
-        <article><h3><i class="ph ph-fingerprint icon-pulse-soft"></i> Audit-ready traceability</h3><p>Every major action is logged with actor and timestamp details so firms can review changes and support compliance audits with confidence.</p></article>
-        <article><h3><i class="ph ph-database icon-pulse-soft"></i> Backup and business continuity</h3><p>Regular backups and recovery workflows support continuity in case of accidental deletion, operational issues, or unexpected outages.</p></article>
+
+    <!-- Metrics -->
+    <section class="security-metrics" aria-label="Security standards">
+      <div class="container security-metrics-grid">
+        <article data-aos="fade-up"><strong>AES-256</strong><span>Encryption at rest</span></article>
+        <article data-aos="fade-up" data-aos-delay="60"><strong>TLS 1.2+</strong><span>Encryption in transit</span></article>
+        <article data-aos="fade-up" data-aos-delay="120"><strong>Daily</strong><span>Automated backups</span></article>
+        <article data-aos="fade-up" data-aos-delay="180"><strong>100%</strong><span>Action audit coverage</span></article>
       </div>
-      <div class="container trust-strip">
-        <strong>Compliance focus:</strong> SHERIA CENTRIC is engineered to support legal confidentiality obligations with clear governance controls and defensible operational history.
+    </section>
+
+    <!-- Core controls -->
+    <section class="section security-controls">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Core safeguards</p>
+          <h2>How we protect your firm&rsquo;s data</h2>
+          <p>Every layer of SHERIA CENTRIC is built with legal confidentiality and defensible governance in mind.</p>
+        </div>
+        <div class="controls-grid">
+          <article class="control-card" data-aos="fade-up">
+            <i class="ph ph-lock-key"></i>
+            <h3>Encryption &amp; transport security</h3>
+            <p>Data is encrypted in transit and at rest using modern cryptographic standards. Sensitive workflows are protected with role controls and secure session handling.</p>
+          </article>
+          <article class="control-card" data-aos="fade-up" data-aos-delay="80">
+            <i class="ph ph-users-three"></i>
+            <h3>Role-based access control</h3>
+            <p>Define precise permissions for partners, associates, clerks, and finance personnel. Limit access to only what each role needs to see or change.</p>
+          </article>
+          <article class="control-card" data-aos="fade-up" data-aos-delay="160">
+            <i class="ph ph-fingerprint"></i>
+            <h3>Audit-ready traceability</h3>
+            <p>Every major action is logged with actor and timestamp details so firms can review changes and support compliance audits with confidence.</p>
+          </article>
+          <article class="control-card" data-aos="fade-up" data-aos-delay="240">
+            <i class="ph ph-database"></i>
+            <h3>Backup &amp; business continuity</h3>
+            <p>Regular backups and recovery workflows support continuity in case of accidental deletion, operational issues, or unexpected outages.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Defense in depth -->
+    <section class="section security-depth-section" id="security-depth">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow" style="color: #5eead4;">Defense in depth</p>
+          <h2>Four layers of protection</h2>
+          <p>Security isn&rsquo;t a single feature &mdash; it&rsquo;s woven through every part of the platform stack.</p>
+        </div>
+        <div class="depth-grid">
+          <article class="depth-card depth-teal" data-aos="fade-up">
+            <div class="depth-card-head">
+              <i class="ph ph-globe"></i>
+              <h3>Network</h3>
+            </div>
+            <p>Secure transport, session management, and infrastructure hardening.</p>
+            <ul>
+              <li>TLS 1.2+ everywhere</li>
+              <li>Secure cookie handling</li>
+              <li>DDoS protection</li>
+            </ul>
+          </article>
+          <article class="depth-card depth-purple" data-aos="fade-up" data-aos-delay="60">
+            <div class="depth-card-head">
+              <i class="ph ph-app-window"></i>
+              <h3>Application</h3>
+            </div>
+            <p>Role-aware access and permission controls at every touchpoint.</p>
+            <ul>
+              <li>RBAC by role &amp; matter</li>
+              <li>Session timeouts</li>
+              <li>Input validation</li>
+            </ul>
+          </article>
+          <article class="depth-card depth-blue" data-aos="fade-up" data-aos-delay="120">
+            <div class="depth-card-head">
+              <i class="ph ph-hard-drives"></i>
+              <h3>Data</h3>
+            </div>
+            <p>Encryption, versioning, and controlled sharing for all legal records.</p>
+            <ul>
+              <li>AES-256 at rest</li>
+              <li>Document version control</li>
+              <li>Scoped client sharing</li>
+            </ul>
+          </article>
+          <article class="depth-card depth-green" data-aos="fade-up" data-aos-delay="180">
+            <div class="depth-card-head">
+              <i class="ph ph-scales"></i>
+              <h3>Governance</h3>
+            </div>
+            <p>Audit trails and compliance reporting for legal accountability.</p>
+            <ul>
+              <li>Full action logging</li>
+              <li>Export-ready reports</li>
+              <li>LSK-aligned controls</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Compliance -->
+    <section class="section security-compliance">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Regional compliance</p>
+          <h2>Built for East African legal standards</h2>
+          <p>Designed around LSK practice standards and compliance requirements across Kenya, Uganda, and Tanzania.</p>
+        </div>
+        <div class="compliance-grid">
+          <article class="compliance-card" data-aos="fade-up">
+            <div class="compliance-flag" aria-hidden="true">🇰🇪</div>
+            <div>
+              <h3>Kenya</h3>
+              <p>Aligned with LSK practice standards, Data Protection Act requirements, and advocate confidentiality obligations.</p>
+            </div>
+          </article>
+          <article class="compliance-card" data-aos="fade-up" data-aos-delay="80">
+            <div class="compliance-flag" aria-hidden="true">🇺🇬</div>
+            <div>
+              <h3>Uganda</h3>
+              <p>Supports Uganda Law Society guidelines with audit-ready records and role-based matter access controls.</p>
+            </div>
+          </article>
+          <article class="compliance-card" data-aos="fade-up" data-aos-delay="160">
+            <div class="compliance-flag" aria-hidden="true">🇹🇿</div>
+            <div>
+              <h3>Tanzania</h3>
+              <p>Built for Tanganyika Law Society compliance with secure document governance and operational transparency.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trust banner -->
+    <section class="security-trust-banner" data-aos="fade-up">
+      <div class="container">
+        <p><strong>Compliance focus:</strong> SHERIA CENTRIC is engineered to support legal confidentiality obligations with clear governance controls and defensible operational history.</p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section security-faq" id="security-faq">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Security FAQ</p>
+          <h2>Common security questions</h2>
+        </div>
+        <div class="faq-list" data-aos="fade-up">
+          <details>
+            <summary>Where is our data stored? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Data is hosted on secure cloud infrastructure with encryption at rest and in transit. Backups are performed daily and stored in geographically redundant locations.</p>
+          </details>
+          <details>
+            <summary>Can we control who sees what? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Yes. Role-based access control lets you define permissions by role and matter. Partners, associates, clerks, and finance each see only what their function requires.</p>
+          </details>
+          <details>
+            <summary>What happens if someone deletes a file? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Document version history preserves prior versions, and the audit trail logs who deleted what and when. Daily backups provide an additional recovery layer.</p>
+          </details>
+          <details>
+            <summary>Can we export our data if we leave? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Absolutely. You can export all matters, clients, and documents at any time. Your data belongs to your firm, not to us.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="security-cta section" id="security-cta">
+      <div class="container" data-aos="fade-up">
+        <h2>Need a detailed security review?</h2>
+        <p>Request our security brief or schedule a call with our team to walk through encryption, access controls, and compliance features.</p>
+        <div class="hero-ctas">
+          <a href="/contact" class="btn btn-primary">Request security brief</a>
+          <a href="/pricing" class="btn btn-outline">View pricing</a>
+        </div>
       </div>
     </section>
   </main>
-  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/features">Features</a><a href="/pricing">Pricing</a><a href="/contact">Contact</a></div></div></footer>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
+        <p>Building the future of legal practice in Africa.</p>
+        <div class="socials">
+          <a href="#" aria-label="LinkedIn"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="#" aria-label="X / Twitter"><i class="ph ph-x-logo"></i></a>
+          <a href="#" aria-label="Facebook"><i class="ph ph-facebook-logo"></i></a>
+        </div>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <a href="/platform">Platform</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/security">Security</a>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <a href="/contact">Contact</a>
+        <a href="#security-faq">Security FAQ</a>
+        <a href="/client_login">Client Login</a>
+        <a href="/login">Employee Login</a>
+      </div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <p>Monthly product updates &amp; legal-tech insights for East African firms.</p>
+        <form class="newsletter" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';">
+          <label for="newsletter-email" class="skip-link">Email address</label>
+          <input id="newsletter-email" type="email" placeholder="you@firm.co.ke" required>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container bottom-wrap">
+        <p>&copy; 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <div>
+          <a href="/security">Privacy</a>
+          <a href="/security">Terms</a>
+          <a href="/contact">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
   <script type="module" src="/static/main.js"></script>
 </body>
 </html>
-

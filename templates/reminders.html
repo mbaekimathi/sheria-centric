@@ -10,7 +10,61 @@
             <i class="fas fa-bell mr-3"></i>
             Reminders
         </h1>
-        <p class="text-orange-100">Case reminders and all active matters in one place</p>
+        <p class="text-orange-100">Case reminders, task due intervals, and all active matters in one place</p>
+    </div>
+
+    <!-- ── Task due-interval reminders ───────────────────────────────── -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 sm:p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-900 mb-5 flex items-center gap-2">
+            <i class="fas fa-clock text-orange-600"></i>
+            Task Due Reminders
+            <span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold">{{ (task_due_reminders or [])|length }}</span>
+        </h2>
+        {% if task_due_reminders and task_due_reminders|length > 0 %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Interval</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Task</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Assignee</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Due</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fired</th>
+                        <th class="px-3 py-2 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for rem in task_due_reminders %}
+                    <tr class="hover:bg-orange-50 transition-colors">
+                        <td class="px-3 py-3 whitespace-nowrap">
+                            <span class="px-2 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800">{{ rem.interval_label }}</span>
+                        </td>
+                        <td class="px-3 py-3">
+                            <div class="text-sm font-semibold text-gray-900">{{ rem.task_title }}</div>
+                            <div class="text-xs text-gray-500">{{ rem.reference_label or '—' }}</div>
+                        </td>
+                        <td class="px-3 py-3 text-sm text-gray-700">{{ rem.assignee_name or '—' }}</td>
+                        <td class="px-3 py-3 text-sm tabular-nums text-gray-900">{{ rem.due_at or '—' }}</td>
+                        <td class="px-3 py-3 text-sm tabular-nums text-gray-600">{{ rem.fired_at or '—' }}</td>
+                        <td class="px-3 py-3 text-right">
+                            {% if rem.link_path %}
+                            <a href="{{ rem.link_path }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">Open</a>
+                            {% else %}
+                            <a href="{{ url_for('my_tasks', view=rem.task_id) }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">Open</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+            <i class="fas fa-hourglass-half text-gray-300 text-3xl mb-2"></i>
+            <p class="text-gray-600 font-semibold">No task due reminders fired yet</p>
+            <p class="text-gray-500 text-sm mt-1">When a task timeline reaches a selected interval (10m, 1h, 1d…), it appears here and on Notifications.</p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- ── Case Reminders Section ─────────────────────────────────────── -->
@@ -124,7 +178,7 @@
                         {% elif matter.status == 'In Progress' %}border-blue-500
                         {% elif matter.status == 'Open' %}border-green-500
                         {% else %}border-purple-400{% endif %}
-                        cursor-pointer" onclick="window.location.href='/other_matters/{{ matter.id }}'">
+                        cursor-pointer" onclick="window.location.href='/non_litigation_matters/{{ matter.id }}'">
                         <td class="px-3 py-3 whitespace-nowrap">
                             <div class="text-sm font-semibold text-purple-700">{{ matter.matter_reference_number }}</div>
                         </td>

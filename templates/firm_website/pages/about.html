@@ -1,0 +1,67 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">About us</p>
+    <h1>{{ page_seo.h1_heading or 'About Us' }}</h1>
+    {% if seo_about.meta_description %}
+    <p class="firm-page-lead">{{ seo_about.meta_description }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container firm-about-grid">
+    <div class="firm-reveal">
+      {% if firm.get('mission_statement') %}
+      <h2 class="firm-section-title">Our mission</h2>
+      <div class="firm-prose">{{ firm.mission_statement }}</div>
+      {% endif %}
+      {% if firm.get('firm_history') %}
+      <h2 class="firm-section-title" style="margin-top:2rem;">Our story</h2>
+      <div class="firm-prose">{{ firm.firm_history }}</div>
+      {% endif %}
+      {% if firm.get('core_values') %}
+      <h2 class="firm-section-title" style="margin-top:2rem;">Core values</h2>
+      <div class="firm-prose">{{ firm.core_values }}</div>
+      {% endif %}
+    </div>
+    <aside class="firm-reveal">
+      <div class="firm-card">
+        <h3>At a glance</h3>
+        <ul class="firm-meta-list">
+          {% if firm.get('year_established') %}
+          <li><strong>Established</strong><span>{{ firm.year_established }}</span></li>
+          {% endif %}
+          {% if firm.get('years_collective_experience') %}
+          <li><strong>Experience</strong><span>{{ firm.years_collective_experience }}+ years</span></li>
+          {% endif %}
+          {% if firm.get('cases_handled_count') %}
+          <li><strong>Cases handled</strong><span>{{ firm.cases_handled_count }}+</span></li>
+          {% endif %}
+          {% if firm_address %}
+          <li><strong>Office</strong><span>{{ firm_address }}</span></li>
+          {% endif %}
+          {% if business_hours %}
+          <li><strong>Hours</strong><span>{{ business_hours }}</span></li>
+          {% endif %}
+        </ul>
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary" style="margin-top:1.25rem;">Book a consultation</a>
+      </div>
+      {% if awards %}
+      <div class="firm-card" style="margin-top:1rem;">
+        <h3>Recognition</h3>
+        <ul class="firm-awards-list">
+          {% for award in awards %}
+          <li>{{ award.title }}{% if award.year %} <span>({{ award.year }})</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

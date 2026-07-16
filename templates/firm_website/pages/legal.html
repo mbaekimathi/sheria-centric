@@ -1,0 +1,27 @@
+{% extends 'firm_website/base.html' %}
+
+{% block content %}
+{% include 'firm_website/_breadcrumbs.html' %}
+
+<section class="firm-page-hero firm-section-alt">
+  <div class="container firm-reveal">
+    <h1>{{ page_seo.h1_heading or legal_page_title }}</h1>
+    {% if page_seo.meta_description %}
+    <p class="firm-page-lead">{{ page_seo.meta_description }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="firm-section">
+  <div class="container firm-reveal">
+    {% if legal_content %}
+    <div class="firm-prose firm-legal-doc">{{ legal_content }}</div>
+    {% else %}
+    <p class="firm-empty-state">This page has not been configured yet. Add content in System Settings.</p>
+    {% endif %}
+    {% if site_last_updated %}
+    <p class="firm-updated">Last updated: {{ site_last_updated }}</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

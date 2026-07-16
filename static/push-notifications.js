@@ -32,9 +32,27 @@
   }
 
   function urlBase64ToUint8Array(base64String) {
-    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-    const rawData = atob(base64);
+    const raw = String(base64String || "").trim().replace(/\s+/g, "");
+    if (raw.length < 80) {
+      throw new Error(
+        "Push public key is invalid on the server. Ask IT Support to generate or import VAPID keys in System Settings → Notifications."
+      );
+    }
+    const padding = "=".repeat((4 - (raw.length % 4)) % 4);
+    const base64 = (raw + padding).replace(/-/g, "+").replace(/_/g, "/");
+    let rawData;
+    try {
+      rawData = atob(base64);
+    } catch (err) {
+      throw new Error(
+        "Push public key is invalid on the server. Ask IT Support to generate or import VAPID keys in System Settings → Notifications."
+      );
+    }
+    if (rawData.length !== 65 || rawData.charCodeAt(0) !== 0x04) {
+      throw new Error(
+        "Push public key is invalid on the server. Ask IT Support to generate or import VAPID keys in System Settings → Notifications."
+      );
+    }
     const outputArray = new Uint8Array(rawData.length);
     for (let i = 0; i < rawData.length; ++i) {
       outputArray[i] = rawData.charCodeAt(i);

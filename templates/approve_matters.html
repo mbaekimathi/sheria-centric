@@ -3,174 +3,231 @@
 {% block title %}Approve Matters - SHERIA CENTRIC{% endblock %}
 
 {% block content %}
+<style>
+  .am-row { transition: background-color 0.15s ease; }
+  .am-row:hover { background-color: #f0fdf4; }
+  @media (max-width: 767px) {
+    .am-desktop-table { display: none !important; }
+  }
+  @media (min-width: 768px) {
+    .am-mobile-list { display: none !important; }
+  }
+</style>
+
 <div class="max-w-6xl mx-auto">
-    <!-- Page Header -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center">
-                    <i class="fas fa-check-circle text-green-600 mr-3"></i>
+    <!-- Compact header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-check-circle text-emerald-600"></i>
                     Approve Matters
                 </h1>
-                <p class="text-gray-600">Review, allocate, and approve pending matter registrations</p>
+                {% if matters and matters|length > 0 %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                    {{ matters|length }} pending
+                </span>
+                {% endif %}
             </div>
+            <p class="text-sm text-gray-500 mt-0.5">Review, allocate, and approve pending registrations</p>
         </div>
-    </div>
-
-    <!-- Pending Matters Table -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        {% if matters and matters|length > 0 %}
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gradient-to-r from-gray-50 to-green-50 border-b border-gray-200">
-                    <tr>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Reference Number</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Matter Title</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Client</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Category</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Allocated To</th>
-                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for matter in matters %}
-                    <tr class="hover:bg-green-50 transition-colors matter-row" data-matter-id="{{ matter.id }}">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-semibold text-gray-900">{{ matter.matter_reference_number or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-900 font-semibold">{{ matter.matter_title or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                <div class="font-semibold">{{ matter.client_full_name or matter.client_name or 'N/A' }}</div>
-                                {% if matter.client_phone_number or matter.client_phone %}
-                                <div class="text-gray-500 text-xs">{{ matter.client_phone_number or matter.client_phone }}</div>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ matter.matter_category or 'N/A' }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900" id="allocated-to-{{ matter.id }}">
-                                {{ matter.assigned_employee_name or 'Not Allocated' }}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                <i class="fas fa-circle text-xs mr-1 mt-0.5"></i>
-                                Pending Approval
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                            <div class="flex items-center justify-center space-x-2">
-                                <button 
-                                    onclick="viewMatterDetails({{ matter.id }})"
-                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold"
-                                >
-                                    <i class="fas fa-eye mr-1"></i>View
-                                </button>
-                                <button 
-                                    onclick="allocateMatter({{ matter.id }})"
-                                    class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold"
-                                >
-                                    <i class="fas fa-user-plus mr-1"></i>Allocate
-                                </button>
-                                <button 
-                                    onclick="approveMatter({{ matter.id }})"
-                                    class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
-                                    id="approve-btn-{{ matter.id }}"
-                                >
-                                    <i class="fas fa-check mr-1"></i>Approve
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="p-12 text-center">
-            <i class="fas fa-check-circle text-gray-300 text-5xl mb-4"></i>
-            <p class="text-gray-600 font-semibold mb-2">No Pending Matters Found</p>
-            <p class="text-gray-500 text-sm">There are no matters pending approval at this time.</p>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Back Button -->
-    <div class="mt-6">
-        <a href="{{ url_for('other_matters') }}" class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl">
-            <i class="fas fa-arrow-left mr-2"></i>Back to Other Matters
+        <a href="{{ url_for('other_matters') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-blue-700 transition-colors shrink-0">
+            <i class="fas fa-arrow-left"></i>
+            Back to matters
         </a>
     </div>
+
+    {% if matters and matters|length > 0 %}
+    <!-- Desktop table (no bulky card) -->
+    <div class="am-desktop-table overflow-x-auto rounded-lg border border-gray-200 bg-white">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Reference</th>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Title</th>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Allocated</th>
+                    <th class="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                    <th class="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for matter in matters %}
+                <tr class="am-row matter-row" data-matter-id="{{ matter.id }}">
+                    <td class="px-3 py-2.5 whitespace-nowrap font-semibold text-gray-900">
+                        {{ matter.matter_reference_number or 'N/A' }}
+                    </td>
+                    <td class="px-3 py-2.5 text-gray-800 max-w-[180px] truncate" title="{{ matter.matter_title or '' }}">
+                        {{ matter.matter_title or 'N/A' }}
+                    </td>
+                    <td class="px-3 py-2.5 whitespace-nowrap">
+                        <div class="font-medium text-gray-900">{{ matter.client_full_name or matter.client_name or 'N/A' }}</div>
+                        {% if matter.client_phone_number or matter.client_phone %}
+                        <div class="text-xs text-gray-500">{{ matter.client_phone_number or matter.client_phone }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-2.5 whitespace-nowrap text-gray-700">{{ matter.matter_category or 'N/A' }}</td>
+                    <td class="px-3 py-2.5 whitespace-nowrap text-gray-700" id="allocated-to-{{ matter.id }}"
+                        data-allocated-id="{{ matter.assigned_employee_id or '' }}">
+                        {{ matter.assigned_employee_name or '—' }}
+                    </td>
+                    <td class="px-3 py-2.5 whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800">
+                            Pending
+                        </span>
+                    </td>
+                    <td class="px-3 py-2.5 whitespace-nowrap text-right">
+                        <div class="inline-flex items-center gap-1">
+                            <button type="button" onclick="viewMatterDetails({{ matter.id }})"
+                                class="inline-flex items-center justify-center w-8 h-8 rounded-md text-blue-600 hover:bg-blue-50 transition-colors" title="View">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button type="button" onclick="allocateMatter({{ matter.id }})"
+                                class="inline-flex items-center justify-center w-8 h-8 rounded-md text-indigo-600 hover:bg-indigo-50 transition-colors" title="Allocate">
+                                <i class="fas fa-user-plus"></i>
+                            </button>
+                            <button type="button" onclick="approveMatter({{ matter.id }})" id="approve-btn-{{ matter.id }}"
+                                class="inline-flex items-center gap-1 px-2.5 h-8 rounded-md text-xs font-semibold transition-colors {% if matter.assigned_employee_id %}bg-emerald-600 hover:bg-emerald-700 text-white{% else %}bg-gray-200 text-gray-400 cursor-not-allowed{% endif %}"
+                                title="{% if matter.assigned_employee_id %}Approve{% else %}Allocate first, then approve{% endif %}"
+                                {% if not matter.assigned_employee_id %}disabled aria-disabled="true"{% endif %}>
+                                <i class="fas fa-check"></i>
+                                <span class="hidden lg:inline">Approve</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Mobile compact list -->
+    <div class="am-mobile-list space-y-2">
+        {% for matter in matters %}
+        <div class="border border-gray-200 rounded-lg bg-white px-3 py-3 matter-row" data-matter-id="{{ matter.id }}">
+            <div class="flex items-start justify-between gap-2 mb-1.5">
+                <div class="min-w-0">
+                    <div class="text-sm font-bold text-gray-900 truncate">{{ matter.matter_reference_number or 'N/A' }}</div>
+                    <div class="text-sm text-gray-700 truncate">{{ matter.matter_title or 'N/A' }}</div>
+                </div>
+                <span class="shrink-0 inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800">Pending</span>
+            </div>
+            <div class="text-xs text-gray-500 space-y-0.5 mb-2.5">
+                <div><span class="text-gray-400">Client</span> · {{ matter.client_full_name or matter.client_name or 'N/A' }}</div>
+                <div><span class="text-gray-400">Category</span> · {{ matter.matter_category or 'N/A' }}</div>
+                <div><span class="text-gray-400">Allocated</span> · <span id="allocated-to-m-{{ matter.id }}" data-allocated-id="{{ matter.assigned_employee_id or '' }}">{{ matter.assigned_employee_name or '—' }}</span></div>
+            </div>
+            <div class="flex items-center gap-2 border-t border-gray-100 pt-2">
+                <button type="button" onclick="viewMatterDetails({{ matter.id }})"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-700 bg-blue-50 rounded-md hover:bg-blue-100">
+                    <i class="fas fa-eye"></i>View
+                </button>
+                <button type="button" onclick="allocateMatter({{ matter.id }})"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100">
+                    <i class="fas fa-user-plus"></i>Allocate
+                </button>
+                <button type="button" onclick="approveMatter({{ matter.id }})" id="approve-btn-m-{{ matter.id }}"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-md {% if matter.assigned_employee_id %}text-white bg-emerald-600 hover:bg-emerald-700{% else %}text-gray-400 bg-gray-100 cursor-not-allowed{% endif %}"
+                    title="{% if matter.assigned_employee_id %}Approve{% else %}Allocate first, then approve{% endif %}"
+                    {% if not matter.assigned_employee_id %}disabled aria-disabled="true"{% endif %}>
+                    <i class="fas fa-check"></i>Approve
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="rounded-lg border border-dashed border-gray-200 bg-white px-4 py-10 text-center">
+        <i class="fas fa-check-circle text-gray-300 text-3xl mb-2"></i>
+        <p class="text-sm font-semibold text-gray-700">No pending matters</p>
+        <p class="text-xs text-gray-500 mt-1">Nothing waiting for approval right now.</p>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Matter Details Modal -->
 <div id="matterDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="sticky top-0 bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-2xl flex items-center justify-between">
-            <h2 class="text-2xl font-bold flex items-center">
-                <i class="fas fa-folder-open mr-3"></i>
+    <div class="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-emerald-600 text-white px-5 py-3.5 rounded-t-xl flex items-center justify-between">
+            <h2 class="text-lg font-bold flex items-center gap-2">
+                <i class="fas fa-folder-open"></i>
                 Matter Details
             </h2>
-            <button onclick="closeMatterDetailsModal()" class="text-white hover:text-gray-200 transition-colors">
-                <i class="fas fa-times text-2xl"></i>
+            <button type="button" onclick="closeMatterDetailsModal()" class="text-white/90 hover:text-white p-1" aria-label="Close">
+                <i class="fas fa-times text-lg"></i>
             </button>
         </div>
-        <div class="p-6" id="matterDetailsContent">
+        <div class="p-5" id="matterDetailsContent">
             <div class="text-center py-8">
-                <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
-                <p class="mt-4 text-gray-600">Loading matter details...</p>
+                <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+                <p class="mt-3 text-sm text-gray-600">Loading matter details...</p>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Allocate Matter Modal -->
-<div id="allocateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full">
-        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-2xl flex items-center justify-between">
-            <h2 class="text-xl font-bold flex items-center">
-                <i class="fas fa-user-plus mr-3"></i>
-                Allocate Matter
-            </h2>
-            <button onclick="closeAllocateModal()" class="text-white hover:text-gray-200 transition-colors">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="p-6">
-            <div class="mb-4">
-                <label for="employeeSearch" class="block text-sm font-semibold text-gray-700 mb-2">
-                    Search Employee
-                </label>
-                <div class="relative">
-                    <input 
-                        type="text" 
-                        id="employeeSearch" 
-                        placeholder="Type employee name or code..."
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        oninput="searchEmployees(this.value)"
-                    >
-                    <div id="employeeDropdown" class="hidden absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+<div id="allocateModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 transform transition-all relative">
+        <div class="px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white flex items-start justify-between gap-3 rounded-t-2xl">
+            <div class="min-w-0">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                        <i class="fas fa-user-plus"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 leading-tight">Allocate Matter</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Assign a Managing Partner or Associate Advocate</p>
                     </div>
                 </div>
             </div>
+            <button type="button" onclick="closeAllocateModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-2 transition-colors shrink-0" aria-label="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="p-5 space-y-4 relative">
+            <div class="relative z-30">
+                <label for="employeeSearch" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                    Assign to <span class="text-rose-500">*</span>
+                </label>
+                <div class="relative" id="employeeCombobox">
+                    <div class="relative flex items-center">
+                        <i class="fas fa-search absolute left-3 text-slate-400 text-sm pointer-events-none"></i>
+                        <input
+                            type="text"
+                            id="employeeSearch"
+                            placeholder="Search Managing Partner or Associate…"
+                            autocomplete="off"
+                            class="w-full pl-9 pr-10 py-2.5 text-sm border border-slate-200 bg-slate-50 rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400 transition-all"
+                        />
+                        <button type="button" id="employeeDropdownToggle" title="Show eligible assignees"
+                            class="absolute right-1.5 w-8 h-8 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"
+                            aria-label="Toggle employee list" aria-expanded="false">
+                            <i class="fas fa-chevron-down text-xs transition-transform duration-200" id="employeeChevron"></i>
+                        </button>
+                    </div>
+                    <div id="employeeDropdown"
+                        class="hidden absolute left-0 right-0 top-full z-50 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto overscroll-contain">
+                    </div>
+                </div>
+                <p id="allocateEmpSelected" class="hidden mt-2 text-sm text-emerald-700 font-medium flex items-center gap-2">
+                    <i class="fas fa-user-check"></i>
+                    <span id="allocateEmpSelectedName"></span>
+                </p>
+            </div>
             <input type="hidden" id="selectedEmployeeId">
-            <div class="flex justify-end space-x-3 mt-6">
-                <button 
-                    onclick="closeAllocateModal()"
-                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                >
+
+            <div class="relative z-10 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+                <button type="button" onclick="closeAllocateModal()"
+                    class="px-4 py-2.5 text-sm bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors font-semibold">
                     Cancel
                 </button>
-                <button 
-                    onclick="confirmAllocateMatter()"
-                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
+                <button type="button" id="confirmAllocateBtn" onclick="confirmAllocateMatter()"
+                    class="px-4 py-2.5 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors font-semibold inline-flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fas fa-check"></i>
                     Allocate
                 </button>
             </div>
@@ -178,136 +235,251 @@
     </div>
 </div>
 
+<!-- Approve Matter Modal (requires prior allocation; creates matter task) -->
+<div id="approveMatterModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[92vh] flex flex-col">
+        <div class="bg-gradient-to-r from-emerald-600 to-green-700 text-white p-5 rounded-t-2xl flex items-center justify-between shrink-0">
+            <div class="min-w-0 pr-2">
+                <h2 class="text-lg font-bold flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    Approve Matter
+                </h2>
+                <p class="text-sm text-emerald-100 mt-1 truncate">Ref: <span id="approveMatterModalRef" class="font-semibold"></span></p>
+            </div>
+            <button type="button" onclick="closeApproveMatterModal()" class="text-white/90 hover:text-white p-1 shrink-0" aria-label="Close">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-5 overflow-y-auto flex-1 space-y-4">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-1">Allocated To</p>
+                <p id="approveMatterAllocatedName" class="text-sm font-semibold text-emerald-900">—</p>
+                <input type="hidden" id="approveMatterEmpId" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Instructions / Brief</label>
+                <textarea id="approveMatterInstructions" rows="4"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                    placeholder="Enter instructions or brief for the allocated employee..."></textarea>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-4">
+                <p class="text-sm font-semibold text-blue-800 flex items-center">
+                    <i class="fas fa-tasks mr-2"></i>
+                    Matter task <span class="font-normal text-blue-600 ml-1">(created on approve)</span>
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Timeline / due date <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" id="approveMatterDueDate"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Reminder intervals <span class="text-red-500">*</span></label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="10m" class="mr-2">10 minutes before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="30m" class="mr-2">30 minutes before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="1h" class="mr-2">1 hour before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="6h" class="mr-2">6 hours before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="12h" class="mr-2">12 hours before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="1d" class="mr-2" checked>1 day before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="2d" class="mr-2">2 days before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_matter_reminder_intervals" value="7d" class="mr-2">1 week before
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Task access permissions</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">View matter details</span>
+                        <input type="checkbox" id="approveMatterAllowViewDetails" class="h-4 w-4 text-emerald-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">Edit matter details</span>
+                        <input type="checkbox" id="approveMatterAllowEditDetails" class="h-4 w-4 text-emerald-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">View documents</span>
+                        <input type="checkbox" id="approveMatterAllowViewDocs" class="h-4 w-4 text-emerald-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">Upload documents</span>
+                        <input type="checkbox" id="approveMatterAllowUploadDocs" class="h-4 w-4 text-emerald-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg sm:col-span-2">
+                        <span class="text-sm text-gray-700">Download matter documents</span>
+                        <input type="checkbox" id="approveMatterAllowDownloadDocs" class="h-4 w-4 text-emerald-600 border-gray-300 rounded" checked>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">These permissions apply to the allocated employee, and only while the task is active.</p>
+            </div>
+        </div>
+
+        <div class="px-5 py-4 border-t border-gray-200 flex items-center justify-end gap-3 shrink-0">
+            <button type="button" onclick="closeApproveMatterModal()"
+                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-semibold">
+                Cancel
+            </button>
+            <button type="button" id="approveMatterSubmitBtn" onclick="submitApproveMatter()"
+                class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-semibold inline-flex items-center gap-2">
+                <i class="fas fa-check"></i>
+                Approve
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 let currentMatterId = null;
 let currentAllocateMatterId = null;
+let currentApproveMatterId = null;
+let allActiveEmployees = [];
+let employeesLoadPromise = null;
+let allocateSearchTimeout = null;
+const APPROVE_MATTER_TASKS_REDIRECT_URL = {{ role_url('matter_task_management')|tojson }};
 
-function viewMatterDetails(matterId) {
-    currentMatterId = matterId;
-    const modal = document.getElementById('matterDetailsModal');
-    const content = document.getElementById('matterDetailsContent');
-    
-    modal.classList.remove('hidden');
-    content.innerHTML = `
-        <div class="text-center py-8">
-            <i class="fas fa-spinner fa-spin text-4xl text-gray-400"></i>
-            <p class="mt-4 text-gray-600">Loading matter details...</p>
-        </div>
-    `;
-    
-    fetch(`/api/matter/${matterId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                content.innerHTML = `
-                    <div class="text-center py-8 text-red-600">
-                        <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
-                        <p>${data.error}</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const matterData = data.matter;
-            content.innerHTML = `
-                <div class="space-y-6">
-                    <!-- Matter Information -->
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <i class="fas fa-info-circle text-green-600 mr-2"></i>
-                            Matter Information
-                        </h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Reference Number</p>
-                                <p class="text-gray-900">${matterData.matter_reference_number || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Matter Title</p>
-                                <p class="text-gray-900">${matterData.matter_title || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Category</p>
-                                <p class="text-gray-900">${matterData.matter_category || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Date Opened</p>
-                                <p class="text-gray-900">${matterData.date_opened || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Status</p>
-                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    ${matterData.status || 'N/A'}
-                                </span>
-                            </div>
-                        </div>
-                        ${matterData.client_instructions ? `
-                            <div class="mt-4">
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Client Instructions</p>
-                                <p class="text-gray-900 whitespace-pre-wrap">${matterData.client_instructions}</p>
-                            </div>
-                        ` : ''}
-                    </div>
-                    
-                    <!-- Client Information -->
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <i class="fas fa-user text-green-600 mr-2"></i>
-                            Client Information
-                        </h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Client Name</p>
-                                <p class="text-gray-900">${matterData.client_full_name || matterData.client_name || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Phone Number</p>
-                                <p class="text-gray-900">${matterData.client_phone_number || matterData.client_phone || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Email</p>
-                                <p class="text-gray-900">${matterData.client_email || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Client Type</p>
-                                <p class="text-gray-900">${matterData.client_type || 'N/A'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Employee Information -->
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <i class="fas fa-user-tie text-green-600 mr-2"></i>
-                            Employee Information
-                        </h3>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Assigned To</p>
-                                <p class="text-gray-900">${matterData.assigned_employee_name || 'Not Allocated'}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-500 mb-1">Created By</p>
-                                <p class="text-gray-900">${matterData.created_by_name || 'N/A'}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            content.innerHTML = `
-                <div class="text-center py-8 text-red-600">
-                    <i class="fas fa-exclamation-circle text-4xl mb-4"></i>
-                    <p>An error occurred while loading matter details.</p>
-                </div>
-            `;
-        });
+function escapeHtml(str) {
+    if (str == null) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
 }
 
-function closeMatterDetailsModal() {
-    document.getElementById('matterDetailsModal').classList.add('hidden');
+function loadActiveEmployees() {
+    if (allActiveEmployees.length) return Promise.resolve(allActiveEmployees);
+    if (employeesLoadPromise) return employeesLoadPromise;
+
+    employeesLoadPromise = fetch('/api/allocation_eligible_employees')
+        .then(r => r.json())
+        .then(data => {
+            if (data.employees && data.employees.length) {
+                allActiveEmployees = data.employees;
+            } else {
+                // Fallback: same role filter via matters approvers search
+                return fetch('/api/matters/approvers/search?q=')
+                    .then(r2 => r2.json())
+                    .then(d2 => {
+                        allActiveEmployees = d2.employees || [];
+                        return allActiveEmployees;
+                    });
+            }
+            return allActiveEmployees;
+        })
+        .catch(() =>
+            fetch('/api/matters/approvers/search?q=')
+                .then(r => r.json())
+                .then(d => {
+                    allActiveEmployees = d.employees || [];
+                    return allActiveEmployees;
+                })
+                .catch(() => {
+                    allActiveEmployees = [];
+                    return allActiveEmployees;
+                })
+        )
+        .finally(() => { employeesLoadPromise = null; });
+
+    return employeesLoadPromise;
+}
+
+function setDropdownOpen(open) {
+    const dropdown = document.getElementById('employeeDropdown');
+    const chevron = document.getElementById('employeeChevron');
+    const toggle = document.getElementById('employeeDropdownToggle');
+    if (!dropdown) return;
+    dropdown.classList.toggle('hidden', !open);
+    if (chevron) chevron.classList.toggle('rotate-180', open);
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function selectEmployee(emp) {
+    const name = emp.full_name || '';
+    const role = emp.role || '';
+    document.getElementById('selectedEmployeeId').value = emp.id;
+    document.getElementById('employeeSearch').value = name;
+    const selectedWrap = document.getElementById('allocateEmpSelected');
+    const selectedName = document.getElementById('allocateEmpSelectedName');
+    if (selectedWrap && selectedName) {
+        selectedName.textContent = name + (role ? ' · ' + role : '');
+        selectedWrap.classList.remove('hidden');
+    }
+    setDropdownOpen(false);
+}
+
+function renderEmployeeDropdown(list, query) {
+    const dropdown = document.getElementById('employeeDropdown');
+    dropdown.innerHTML = '';
+    const selectedId = document.getElementById('selectedEmployeeId').value;
+
+    if (!list.length) {
+        dropdown.innerHTML = `<div class="px-4 py-6 text-center text-sm text-slate-500">
+            <i class="fas fa-user-slash text-slate-300 text-lg mb-2 block"></i>
+            ${query ? 'No matches for Managing Partners / Associates' : 'No Managing Partners or Associates found'}
+        </div>`;
+        setDropdownOpen(true);
+        return;
+    }
+
+    const header = document.createElement('div');
+    header.className = 'sticky top-0 z-10 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-50 border-b border-slate-100';
+    header.textContent = query ? `${list.length} match${list.length === 1 ? '' : 'es'}` : `Managing Partners & Associates (${list.length})`;
+    dropdown.appendChild(header);
+
+    list.forEach(emp => {
+        const name = emp.full_name || '';
+        const role = emp.role || 'Active';
+        const isSelected = String(selectedId) === String(emp.id);
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = `w-full text-left px-3 py-2.5 flex items-center gap-3 border-b border-slate-50 last:border-0 transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`;
+        const initial = (name.charAt(0) || '?').toUpperCase();
+        item.innerHTML = `
+            <span class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold shrink-0">${escapeHtml(initial)}</span>
+            <span class="min-w-0 flex-1">
+                <span class="block text-sm font-semibold text-slate-900 truncate">${escapeHtml(name)}</span>
+                <span class="block text-xs text-slate-500 truncate">${escapeHtml(role)}</span>
+            </span>
+            ${isSelected ? '<i class="fas fa-check text-indigo-600 shrink-0"></i>' : ''}
+        `;
+        item.addEventListener('click', () => selectEmployee(emp));
+        dropdown.appendChild(item);
+    });
+    setDropdownOpen(true);
+}
+
+function filterAndShowEmployees(query) {
+    const q = (query || '').trim().toLowerCase();
+    loadActiveEmployees().then(employees => {
+        let list = employees || [];
+        if (q) {
+            list = list.filter(e => {
+                const name = String(e.full_name || '').toLowerCase();
+                const code = String(e.employee_code || '').toLowerCase();
+                const role = String(e.role || '').toLowerCase();
+                return name.includes(q) || code.includes(q) || role.includes(q);
+            });
+        }
+        renderEmployeeDropdown(list, q);
+    });
 }
 
 function allocateMatter(matterId) {
@@ -315,71 +487,111 @@ function allocateMatter(matterId) {
     document.getElementById('employeeSearch').value = '';
     document.getElementById('selectedEmployeeId').value = '';
     document.getElementById('employeeDropdown').innerHTML = '';
-    document.getElementById('employeeDropdown').classList.add('hidden');
+    const selectedWrap = document.getElementById('allocateEmpSelected');
+    if (selectedWrap) selectedWrap.classList.add('hidden');
+    setDropdownOpen(false);
     document.getElementById('allocateModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    loadActiveEmployees();
+    setTimeout(() => document.getElementById('employeeSearch').focus(), 50);
 }
 
 function closeAllocateModal() {
     document.getElementById('allocateModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    setDropdownOpen(false);
     currentAllocateMatterId = null;
 }
 
 function searchEmployees(query) {
+    clearTimeout(allocateSearchTimeout);
+    allocateSearchTimeout = setTimeout(() => filterAndShowEmployees(query), 150);
+}
+
+document.getElementById('employeeSearch').addEventListener('input', function() {
+    document.getElementById('selectedEmployeeId').value = '';
+    const selectedWrap = document.getElementById('allocateEmpSelected');
+    if (selectedWrap) selectedWrap.classList.add('hidden');
+    searchEmployees(this.value);
+});
+
+document.getElementById('employeeSearch').addEventListener('focus', function() {
+    filterAndShowEmployees(this.value);
+});
+
+document.getElementById('employeeDropdownToggle').addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
     const dropdown = document.getElementById('employeeDropdown');
-    
-    if (query.length < 2) {
-        dropdown.classList.add('hidden');
-        return;
+    const isOpen = dropdown && !dropdown.classList.contains('hidden');
+    if (isOpen) {
+        setDropdownOpen(false);
+    } else {
+        document.getElementById('employeeSearch').focus();
+        filterAndShowEmployees(document.getElementById('employeeSearch').value);
     }
-    
-    fetch(`/api/matters/employees/search?q=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            dropdown.innerHTML = '';
-            
-            if (data.error || !data.employees || data.employees.length === 0) {
-                dropdown.innerHTML = '<div class="px-4 py-2 text-gray-500">No employees found</div>';
-                dropdown.classList.remove('hidden');
-                return;
-            }
-            
-            data.employees.forEach(employee => {
-                const item = document.createElement('div');
-                item.className = 'px-4 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100';
-                const name = employee.full_name || '';
-                const code = employee.employee_code || '';
-                item.textContent = `${name}${code ? ' (' + code + ')' : ''}`;
-                item.onclick = () => {
-                    document.getElementById('employeeSearch').value = `${name}${code ? ' (' + code + ')' : ''}`;
-                    document.getElementById('selectedEmployeeId').value = employee.id;
-                    dropdown.classList.add('hidden');
-                };
-                dropdown.appendChild(item);
-            });
-            
-            dropdown.classList.remove('hidden');
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            dropdown.innerHTML = '<div class="px-4 py-2 text-red-500">Error searching employees</div>';
-            dropdown.classList.remove('hidden');
-        });
+});
+
+function markMatterAllocated(matterId, employeeId, employeeName) {
+    const desktop = document.getElementById(`allocated-to-${matterId}`);
+    if (desktop) {
+        desktop.textContent = employeeName;
+        desktop.dataset.allocatedId = String(employeeId || '');
+    }
+    const mobile = document.getElementById(`allocated-to-m-${matterId}`);
+    if (mobile) {
+        mobile.textContent = employeeName;
+        mobile.dataset.allocatedId = String(employeeId || '');
+    }
+    enableApproveButtons(matterId);
+}
+
+function enableApproveButtons(matterId) {
+    ['approve-btn-', 'approve-btn-m-'].forEach(prefix => {
+        const btn = document.getElementById(prefix + matterId);
+        if (!btn) return;
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
+        btn.title = 'Approve';
+        if (prefix === 'approve-btn-m-') {
+            btn.className = 'flex-1 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-md text-white bg-emerald-600 hover:bg-emerald-700';
+        } else {
+            btn.className = 'inline-flex items-center gap-1 px-2.5 h-8 rounded-md text-xs font-semibold transition-colors bg-emerald-600 hover:bg-emerald-700 text-white';
+        }
+    });
+}
+
+function isMatterAllocated(matterId) {
+    const el = document.getElementById(`allocated-to-${matterId}`) || document.getElementById(`allocated-to-m-${matterId}`);
+    if (!el) return false;
+    if (el.dataset.allocatedId) return true;
+    const text = (el.textContent || '').trim();
+    return text && text !== '—' && text.toLowerCase() !== 'not allocated';
 }
 
 function confirmAllocateMatter() {
     const employeeId = document.getElementById('selectedEmployeeId').value;
-    
+
     if (!employeeId) {
         scAlert('Please select an employee');
         return;
     }
-    
+
     if (!currentAllocateMatterId) {
         scAlert('Matter ID is missing');
         return;
     }
-    
-    fetch(`/api/allocate_matter/${currentAllocateMatterId}`, {
+
+    const btn = document.getElementById('confirmAllocateBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Allocating…';
+    }
+
+    const matterId = currentAllocateMatterId;
+    const employeeName = document.getElementById('employeeSearch').value;
+
+    fetch(`/api/allocate_matter/${matterId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -391,13 +603,7 @@ function confirmAllocateMatter() {
         if (data.success) {
             scAlert(data.message || 'Matter allocated successfully!');
             closeAllocateModal();
-            // Update the allocated-to display
-            const allocatedToElement = document.getElementById(`allocated-to-${currentAllocateMatterId}`);
-            if (allocatedToElement) {
-                const employeeName = document.getElementById('employeeSearch').value;
-                allocatedToElement.textContent = employeeName;
-            }
-            location.reload();
+            markMatterAllocated(matterId, employeeId, employeeName);
         } else {
             scAlert(data.error || 'Error allocating matter');
         }
@@ -405,53 +611,266 @@ function confirmAllocateMatter() {
     .catch(error => {
         console.error('Error:', error);
         scAlert('An error occurred while allocating the matter.');
+    })
+    .finally(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> Allocate';
+        }
     });
 }
 
 function approveMatter(matterId) {
-    if (confirm('Are you sure you want to approve this matter? This will change the status to Open.')) {
-        fetch(`/api/approve_matter/${matterId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
+    if (!isMatterAllocated(matterId)) {
+        scAlert('Allocate this matter to a Managing Partner or Associate Advocate before approving.');
+        return;
+    }
+
+    const allocatedEl = document.getElementById(`allocated-to-${matterId}`) || document.getElementById(`allocated-to-m-${matterId}`);
+    const allocatedName = (allocatedEl && allocatedEl.textContent || '').trim() || 'Allocated employee';
+    const allocatedId = (allocatedEl && allocatedEl.dataset.allocatedId) || '';
+
+    const row = document.querySelector(`.matter-row[data-matter-id="${matterId}"]`);
+    let refText = 'Matter #' + matterId;
+    if (row) {
+        const refCell = row.querySelector('td') || row.querySelector('.text-sm.font-bold');
+        if (refCell) refText = (refCell.textContent || '').trim() || refText;
+    }
+
+    currentApproveMatterId = matterId;
+    document.getElementById('approveMatterModalRef').textContent = refText;
+    document.getElementById('approveMatterAllocatedName').textContent = allocatedName;
+    document.getElementById('approveMatterEmpId').value = allocatedId;
+    document.getElementById('approveMatterInstructions').value = '';
+    document.getElementById('approveMatterDueDate').value = '';
+    document.getElementById('approveMatterAllowViewDetails').checked = true;
+    document.getElementById('approveMatterAllowEditDetails').checked = true;
+    document.getElementById('approveMatterAllowViewDocs').checked = true;
+    document.getElementById('approveMatterAllowUploadDocs').checked = true;
+    document.getElementById('approveMatterAllowDownloadDocs').checked = true;
+    document.querySelectorAll('input[name="approve_matter_reminder_intervals"]').forEach(cb => {
+        cb.checked = cb.value === '1d';
+    });
+
+    document.getElementById('approveMatterModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeApproveMatterModal() {
+    document.getElementById('approveMatterModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    currentApproveMatterId = null;
+}
+
+function submitApproveMatter() {
+    if (!currentApproveMatterId) return;
+    if (!isMatterAllocated(currentApproveMatterId)) {
+        scAlert('Allocate this matter before approving.');
+        return;
+    }
+
+    const dueDate = document.getElementById('approveMatterDueDate').value.trim();
+    if (!dueDate) {
+        scAlert('Please set a timeline / due date for the matter task.');
+        return;
+    }
+    const reminderIntervals = Array.from(
+        document.querySelectorAll('input[name="approve_matter_reminder_intervals"]:checked')
+    ).map(cb => cb.value);
+    if (!reminderIntervals.length) {
+        scAlert('Select at least one reminder interval.');
+        return;
+    }
+
+    const empIdRaw = document.getElementById('approveMatterEmpId').value;
+    const payload = {
+        instructions: document.getElementById('approveMatterInstructions').value.trim(),
+        allocation_description: document.getElementById('approveMatterInstructions').value.trim(),
+        due_date: dueDate,
+        timeline: reminderIntervals.join(','),
+        allocation_timeline: reminderIntervals.join(','),
+        reminder_intervals: reminderIntervals,
+        allow_view_case_details: document.getElementById('approveMatterAllowViewDetails').checked,
+        allow_edit_case_details: document.getElementById('approveMatterAllowEditDetails').checked,
+        allow_view_case_documents: document.getElementById('approveMatterAllowViewDocs').checked,
+        allow_upload_case_documents: document.getElementById('approveMatterAllowUploadDocs').checked,
+        allow_download_case_documents: document.getElementById('approveMatterAllowDownloadDocs').checked
+    };
+    if (empIdRaw) {
+        payload.allocated_employee_id = parseInt(empIdRaw, 10);
+    }
+
+    const btn = document.getElementById('approveMatterSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing…';
+
+    fetch(`/api/approve_matter/${currentApproveMatterId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeApproveMatterModal();
+            scAlert(data.message || 'Matter approved successfully!');
+            const redirectUrl = data.redirect_url || APPROVE_MATTER_TASKS_REDIRECT_URL;
+            setTimeout(() => { window.location.href = redirectUrl; }, 800);
+        } else {
+            scAlert(data.error || 'Error approving matter');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        scAlert('An error occurred while approving the matter.');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Approve';
+    });
+}
+
+function viewMatterDetails(matterId) {
+    currentMatterId = matterId;
+    const modal = document.getElementById('matterDetailsModal');
+    const content = document.getElementById('matterDetailsContent');
+
+    modal.classList.remove('hidden');
+    content.innerHTML = `
+        <div class="text-center py-8">
+            <i class="fas fa-spinner fa-spin text-3xl text-gray-400"></i>
+            <p class="mt-3 text-sm text-gray-600">Loading matter details...</p>
+        </div>
+    `;
+
+    fetch(`/api/matter/${matterId}`)
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                scAlert('Matter approved successfully!');
-                location.reload();
-            } else {
-                scAlert(data.error || 'Error approving matter');
+            if (data.error) {
+                content.innerHTML = `
+                    <div class="text-center py-8 text-red-600">
+                        <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
+                        <p class="text-sm">${data.error}</p>
+                    </div>
+                `;
+                return;
             }
+
+            const matterData = data.matter;
+            content.innerHTML = `
+                <div class="space-y-5 text-sm">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <i class="fas fa-info-circle text-emerald-600"></i>
+                            Matter Information
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Reference Number</p>
+                                <p class="text-gray-900">${matterData.matter_reference_number || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Matter Title</p>
+                                <p class="text-gray-900">${matterData.matter_title || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Category</p>
+                                <p class="text-gray-900">${matterData.matter_category || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Date Opened</p>
+                                <p class="text-gray-900">${matterData.date_opened || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Status</p>
+                                <span class="px-2 py-0.5 inline-flex text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800">
+                                    ${matterData.status || 'N/A'}
+                                </span>
+                            </div>
+                        </div>
+                        ${matterData.client_instructions ? `
+                            <div class="mt-3">
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Client Instructions</p>
+                                <p class="text-gray-900 whitespace-pre-wrap">${matterData.client_instructions}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-4">
+                        <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <i class="fas fa-user text-emerald-600"></i>
+                            Client Information
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Client Name</p>
+                                <p class="text-gray-900">${matterData.client_full_name || matterData.client_name || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Phone Number</p>
+                                <p class="text-gray-900">${matterData.client_phone_number || matterData.client_phone || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Email</p>
+                                <p class="text-gray-900">${matterData.client_email || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Client Type</p>
+                                <p class="text-gray-900">${matterData.client_type || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-100 pt-4">
+                        <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                            <i class="fas fa-user-tie text-emerald-600"></i>
+                            Employee Information
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Assigned To</p>
+                                <p class="text-gray-900">${matterData.assigned_employee_name || 'Not Allocated'}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold text-gray-500 mb-0.5">Created By</p>
+                                <p class="text-gray-900">${matterData.created_by_name || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
         })
         .catch(error => {
             console.error('Error:', error);
-            scAlert('An error occurred while approving the matter.');
+            content.innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
+                    <p class="text-sm">An error occurred while loading matter details.</p>
+                </div>
+            `;
         });
-    }
 }
 
-// Close modals when clicking outside
+function closeMatterDetailsModal() {
+    document.getElementById('matterDetailsModal').classList.add('hidden');
+}
+
 document.getElementById('matterDetailsModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeMatterDetailsModal();
-    }
+    if (e.target === this) closeMatterDetailsModal();
 });
 
 document.getElementById('allocateModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeAllocateModal();
-    }
+    if (e.target === this) closeAllocateModal();
 });
 
-// Close dropdown when clicking outside
+document.getElementById('approveMatterModal').addEventListener('click', function(e) {
+    if (e.target === this) closeApproveMatterModal();
+});
+
 document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('employeeDropdown');
-    const searchInput = document.getElementById('employeeSearch');
-    
-    if (dropdown && searchInput && !dropdown.contains(event.target) && event.target !== searchInput) {
-        dropdown.classList.add('hidden');
+    const combobox = document.getElementById('employeeCombobox');
+    if (combobox && !combobox.contains(event.target)) {
+        setDropdownOpen(false);
     }
 });
 </script>

@@ -5,26 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contact | SHERIA CENTRIC</title>
   <meta name="description" content="Request a SHERIA CENTRIC demo and talk to our legal-tech specialists in Nairobi.">
-  {# PWA: manifest, icons, theme-color, service worker registration. #}
   {% include "_pwa_head.html" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
+  <style>
+    body { margin: 0; }
+    .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
+    .skip-link:focus { top: 16px; }
+  </style>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+<body class="contact-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" id="site-header" x-data="{open:false}">
     <div class="container nav-wrap">
       <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
           <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
         </svg>
         <span>SHERIA CENTRIC</span>
       </a>
-      <nav class="desktop-nav"><a href="/platform" class="nav-link">Platform</a><a href="/features" class="nav-link">Features</a><a href="/pricing" class="nav-link">Pricing</a><a href="/security" class="nav-link">Security</a><a href="/contact" class="nav-link">Contact</a></nav>
+      <nav class="desktop-nav" aria-label="Primary navigation">
+        <a href="/platform" class="nav-link">Platform</a>
+        <a href="/features" class="nav-link">Features</a>
+        <a href="/pricing" class="nav-link">Pricing</a>
+        <a href="/security" class="nav-link">Security</a>
+        <a href="/contact" class="nav-link">Contact</a>
+      </nav>
       <div class="nav-actions">
         <details class="login-dropdown">
           <summary class="login-summary" aria-label="Login menu">
@@ -37,14 +52,14 @@
             <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
           </div>
         </details>
-        <a href="/contact" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-label="Toggle navigation">
+        <a href="#contact-form" class="btn btn-demo">Request Demo</a>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
           <i class="ph ph-list" x-show="!open"></i>
           <i class="ph ph-x" x-show="open" style="display:none"></i>
         </button>
       </div>
     </div>
-    <div class="mobile-menu" x-show="open" x-transition.origin.top>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
       <span class="mobile-section-label">Navigate</span>
       <a href="/platform" @click="open=false">Platform</a>
       <a href="/features" @click="open=false">Features</a>
@@ -54,59 +69,319 @@
       <span class="mobile-section-label">Account</span>
       <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
       <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-      <a href="/contact" @click="open=false" class="btn btn-demo">Request Demo</a>
+      <a href="#contact-form" @click="open=false" class="btn btn-demo">Request Demo</a>
     </div>
   </header>
-  <main class="inner-page">
-    <section class="page-hero section">
-      <div class="container hero-split">
-        <div>
-          <p class="eyebrow">CONTACT</p>
-          <h1>Book a live walkthrough with our product team</h1>
-          <p>Tell us your firm size, workflow pain points, and priorities. We will tailor a practical demo around your current legal operations.</p>
-          <div class="glass-stat-grid">
-            <article class="glass-stat"><strong>30 min</strong><span>Typical live demo session</span></article>
-            <article class="glass-stat"><strong>1 day</strong><span>Average response time</span></article>
-            <article class="glass-stat"><strong>14 days</strong><span>Free trial setup support</span></article>
+
+  <main id="main-content">
+    <!-- Hero -->
+    <section class="contact-hero section" id="hero">
+      <div class="container contact-hero-grid">
+        <div class="contact-hero-copy" data-aos="fade-right">
+          <p class="eyebrow" style="color: #FDCB6E;">Get in touch</p>
+          <h1>Book a live walkthrough with our <em>product team</em></h1>
+          <p class="contact-hero-lead">
+            Tell us your firm size, workflow pain points, and priorities. We&rsquo;ll tailor a practical demo around your current legal operations &mdash; no generic pitch decks.
+          </p>
+          <div class="contact-hero-badges">
+            <span><i class="ph ph-video-camera"></i> Live product demo</span>
+            <span><i class="ph ph-handshake"></i> Tailored to your firm</span>
+            <span><i class="ph ph-gift"></i> 14-day trial support</span>
+          </div>
+          <div class="hero-ctas">
+            <a href="#contact-form" class="btn btn-primary">Request a demo</a>
+            <a href="/pricing" class="btn btn-secondary">View pricing</a>
           </div>
         </div>
-        <div class="hero-split-media">
-          <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1000&auto=format&q=80" alt="Client success team in a professional meeting">
-          <span class="hero-chip chip-a">Guided onboarding</span>
-          <span class="hero-chip chip-b">Dedicated legal-tech support</span>
+
+        <div class="contact-hub-visual" aria-hidden="true" data-aos="fade-left">
+          <div class="hub-ring r1"></div>
+          <div class="hub-ring r2"></div>
+          <div class="hub-ring r3"></div>
+          <div class="hub-core"><i class="ph ph-chats-circle"></i></div>
+          <span class="hub-node n1"><i class="ph ph-envelope"></i> Email</span>
+          <span class="hub-node n2"><i class="ph ph-phone"></i> Phone</span>
+          <span class="hub-node n3"><i class="ph ph-video-camera"></i> Video demo</span>
+          <span class="hub-node n4"><i class="ph ph-map-pin"></i> Nairobi HQ</span>
         </div>
       </div>
     </section>
-    <section class="section">
-      <div class="container contact-grid">
-        <article class="info-card">
-          <h3>Talk to SHERIA CENTRIC</h3>
-          <p>Email: hello@sheriacentric.com</p>
-          <p>Phone: +254 700 000 000</p>
-          <p>Office: Nairobi, Kenya</p>
-          <p>Response time: Within 1 business day</p>
-          <div class="trust-strip">
+
+    <!-- Metrics -->
+    <section class="contact-metrics" aria-label="Response standards">
+      <div class="container contact-metrics-grid">
+        <article data-aos="fade-up"><strong>30 min</strong><span>Typical live demo session</span></article>
+        <article data-aos="fade-up" data-aos-delay="60"><strong>1 day</strong><span>Average response time</span></article>
+        <article data-aos="fade-up" data-aos-delay="120"><strong>14 days</strong><span>Free trial setup support</span></article>
+        <article data-aos="fade-up" data-aos-delay="180"><strong>100%</strong><span>Tailored to your workflows</span></article>
+      </div>
+    </section>
+
+    <!-- Form + contact info -->
+    <section class="section contact-main" id="contact-form">
+      <div class="container contact-main-grid">
+        <aside class="contact-info-panel" data-aos="fade-right">
+          <div class="section-head contact-info-head">
+            <p class="eyebrow">Talk to us</p>
+            <h2>We&rsquo;re here to help your firm move faster</h2>
+            <p>Whether you&rsquo;re evaluating case management, billing, or a full platform migration &mdash; our team responds with practical guidance, not sales pressure.</p>
+          </div>
+
+          <div class="contact-channel-list">
+            <article class="contact-channel">
+              <i class="ph ph-envelope-simple"></i>
+              <div>
+                <h3>Email</h3>
+                <a href="mailto:hello@sheriacentric.com">hello@sheriacentric.com</a>
+              </div>
+            </article>
+            <article class="contact-channel">
+              <i class="ph ph-phone"></i>
+              <div>
+                <h3>Phone</h3>
+                <a href="tel:+254700000000">+254 700 000 000</a>
+              </div>
+            </article>
+            <article class="contact-channel">
+              <i class="ph ph-map-pin"></i>
+              <div>
+                <h3>Office</h3>
+                <p>Nairobi, Kenya</p>
+              </div>
+            </article>
+            <article class="contact-channel">
+              <i class="ph ph-clock"></i>
+              <div>
+                <h3>Response time</h3>
+                <p>Within 1 business day</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="contact-trust-strip">
             <strong>What to expect:</strong> a practical, tailored walkthrough based on your current workflows, pain points, and firm structure.
           </div>
-        </article>
-        <form class="info-card contact-form" x-data="{sent:false}" @submit.prevent="sent=true">
+        </aside>
+
+        <form class="contact-form-card contact-form" x-data="{sent:false}" @submit.prevent="sent=true" data-aos="fade-left">
+          <h3>Request a demo</h3>
+          <p class="contact-form-intro">Fill in your details and we&rsquo;ll schedule a session that fits your calendar.</p>
           <div class="split">
-            <label>Full name<input type="text" required></label>
-            <label>Work email<input type="email" required></label>
+            <label>Full name<input type="text" required autocomplete="name"></label>
+            <label>Work email<input type="email" required autocomplete="email"></label>
           </div>
           <div class="split">
-            <label>Firm size<select required><option value="">Select</option><option>1-5 users</option><option>6-20 users</option><option>21-50 users</option><option>50+ users</option></select></label>
-            <label>Primary focus<select required><option value="">Select</option><option>Case management</option><option>Document control</option><option>Billing and collections</option><option>Client portal</option><option>Security and compliance</option></select></label>
+            <label>Firm size
+              <select required>
+                <option value="">Select</option>
+                <option>1&ndash;5 users</option>
+                <option>6&ndash;20 users</option>
+                <option>21&ndash;50 users</option>
+                <option>50+ users</option>
+              </select>
+            </label>
+            <label>Primary focus
+              <select required>
+                <option value="">Select</option>
+                <option>Case management</option>
+                <option>Document control</option>
+                <option>Billing and collections</option>
+                <option>Client portal</option>
+                <option>Security and compliance</option>
+              </select>
+            </label>
           </div>
           <label>What do you want to improve first?<textarea rows="4" placeholder="Case tracking, documents, billing, client portal..."></textarea></label>
-          <button type="submit" class="btn btn-primary">Request Demo</button>
-          <p x-show="sent" class="form-success">Thanks. Our team will contact you shortly.</p>
+          <button type="submit" class="btn btn-primary btn-block">Request Demo</button>
+          <p x-show="sent" x-transition class="form-success"><i class="ph ph-check-circle"></i> Thanks. Our team will contact you shortly.</p>
         </form>
       </div>
     </section>
+
+    <!-- Journey -->
+    <section class="section contact-journey-section">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">What happens next</p>
+          <h2>From first message to live demo</h2>
+          <p>A straightforward process designed for busy legal teams.</p>
+        </div>
+        <div class="contact-journey-track">
+          <article class="contact-journey-step" data-aos="fade-up">
+            <span class="journey-num">01</span>
+            <div>
+              <h3>We review your request</h3>
+              <p>Our team reads your priorities and assigns the right specialist for your firm size and practice area.</p>
+              <div class="journey-tags">
+                <span>Same-day acknowledgment</span>
+                <span>No spam</span>
+              </div>
+            </div>
+          </article>
+          <article class="contact-journey-step" data-aos="fade-up" data-aos-delay="80">
+            <span class="journey-num">02</span>
+            <div>
+              <h3>Live tailored demo</h3>
+              <p>A 30-minute walkthrough focused on your actual workflows &mdash; matters, documents, billing, or client portal.</p>
+              <div class="journey-tags">
+                <span>Screen share</span>
+                <span>Q&amp;A included</span>
+              </div>
+            </div>
+          </article>
+          <article class="contact-journey-step" data-aos="fade-up" data-aos-delay="160">
+            <span class="journey-num">03</span>
+            <div>
+              <h3>Trial &amp; onboarding support</h3>
+              <p>Start a 14-day trial with guided setup so your team can evaluate SHERIA CENTRIC on real matters.</p>
+              <div class="journey-tags">
+                <span>14-day trial</span>
+                <span>Dedicated support</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Outreach channels -->
+    <section class="section contact-channels-section">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow" style="color: #FDCB6E;">How we can help</p>
+          <h2>Choose the right conversation</h2>
+        </div>
+        <div class="contact-channels-grid">
+          <article class="channel-card channel-gold" data-aos="fade-up">
+            <div class="channel-card-head">
+              <i class="ph ph-presentation"></i>
+              <h3>Product demo</h3>
+            </div>
+            <p>See SHERIA CENTRIC in action with a walkthrough tailored to your firm&rsquo;s size and practice areas.</p>
+            <ul>
+              <li>Live screen share</li>
+              <li>Workflow-focused</li>
+              <li>Free, no obligation</li>
+            </ul>
+            <a href="#contact-form" class="channel-link">Book a demo <i class="ph ph-arrow-right"></i></a>
+          </article>
+          <article class="channel-card channel-purple" data-aos="fade-up" data-aos-delay="60">
+            <div class="channel-card-head">
+              <i class="ph ph-headset"></i>
+              <h3>Existing customer support</h3>
+            </div>
+            <p>Already using SHERIA CENTRIC? Our support team helps with configuration, training, and technical questions.</p>
+            <ul>
+              <li>Priority response</li>
+              <li>Training resources</li>
+              <li>Technical assistance</li>
+            </ul>
+            <a href="mailto:hello@sheriacentric.com" class="channel-link">Email support <i class="ph ph-arrow-right"></i></a>
+          </article>
+          <article class="channel-card channel-teal" data-aos="fade-up" data-aos-delay="120">
+            <div class="channel-card-head">
+              <i class="ph ph-handshake"></i>
+              <h3>Partnerships</h3>
+            </div>
+            <p>Interested in integrating, reselling, or collaborating? Let&rsquo;s explore how we can work together across East Africa.</p>
+            <ul>
+              <li>Integration partners</li>
+              <li>Bar associations</li>
+              <li>Legal-tech alliances</li>
+            </ul>
+            <a href="mailto:hello@sheriacentric.com" class="channel-link">Start a conversation <i class="ph ph-arrow-right"></i></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section contact-faq" id="contact-faq">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Contact FAQ</p>
+          <h2>Common questions before you reach out</h2>
+        </div>
+        <div class="faq-list" data-aos="fade-up">
+          <details>
+            <summary>Is the demo really free? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Yes. There&rsquo;s no cost and no obligation. We focus on showing you how SHERIA CENTRIC fits your firm&rsquo;s actual workflows.</p>
+          </details>
+          <details>
+            <summary>How long does a demo take? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Most sessions run about 30 minutes. We can extend if you want to dive deeper into billing, documents, or the client portal.</p>
+          </details>
+          <details>
+            <summary>Do you support firms outside Kenya? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>Absolutely. We serve legal practices across Kenya, Uganda, and Tanzania with region-aware compliance and billing support.</p>
+          </details>
+          <details>
+            <summary>Can we start a trial without a demo? <i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+            <p>We recommend a quick demo first so setup is tailored, but you can request a trial directly through the form and we&rsquo;ll guide you through onboarding.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="contact-cta section">
+      <div class="container" data-aos="fade-up">
+        <h2>Ready to modernize your legal practice?</h2>
+        <p>Join firms across East Africa who are running matters, documents, and billing on one secure platform.</p>
+        <div class="hero-ctas">
+          <a href="#contact-form" class="btn btn-primary">Request a demo</a>
+          <a href="/features" class="btn btn-outline">Explore features</a>
+        </div>
+      </div>
+    </section>
   </main>
-  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/platform">Platform</a><a href="/features">Features</a><a href="/pricing">Pricing</a></div></div></footer>
+
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
+        <p>Building the future of legal practice in Africa.</p>
+        <div class="socials">
+          <a href="#" aria-label="LinkedIn"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="#" aria-label="X / Twitter"><i class="ph ph-x-logo"></i></a>
+          <a href="#" aria-label="Facebook"><i class="ph ph-facebook-logo"></i></a>
+        </div>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <a href="/platform">Platform</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/security">Security</a>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <a href="/contact">Contact</a>
+        <a href="#contact-faq">Contact FAQ</a>
+        <a href="/client_login">Client Login</a>
+        <a href="/login">Employee Login</a>
+      </div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <p>Monthly product updates &amp; legal-tech insights for East African firms.</p>
+        <form class="newsletter" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';">
+          <label for="newsletter-email" class="skip-link">Email address</label>
+          <input id="newsletter-email" type="email" placeholder="you@firm.co.ke" required>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container bottom-wrap">
+        <p>&copy; 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <div>
+          <a href="/security">Privacy</a>
+          <a href="/security">Terms</a>
+          <a href="/contact">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
   <script type="module" src="/static/main.js"></script>
 </body>
 </html>
-

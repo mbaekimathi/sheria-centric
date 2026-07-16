@@ -1,31 +1,751 @@
-<div id="section-2" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="settings-section-header">
-                <h2 class="settings-section-title">
-                    <i class="fas fa-address-book settings-section-icon"></i>
-                    2. Contact Information
-                </h2>
-                <p class="settings-section-subtitle">Used for communication with clients.</p>
+{% set firm_testimonials = firm_testimonials or [] %}
+{% from 'system_settings/_field_helpers.html' import req, tip %}
+{% set GBP_PRIMARY_CATEGORIES = GBP_PRIMARY_CATEGORIES or [] %}
+{% set gbp_secondary_items = gbp_secondary_items or [] %}
+{% set gbp_service_area_items = gbp_service_area_items or [] %}
+
+
+
+{# 1. Contact details #}
+
+<div id="section-contact" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+
+    <div class="settings-section-header">
+
+        <h2 class="settings-section-title">
+
+            <i class="fas fa-address-book settings-section-icon"></i>
+
+            1. Contact Details
+
+        </h2>
+
+        <p class="settings-section-subtitle">Phone numbers, email, and M-Pesa payment details for client communication.</p>
+
+    </div>
+
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Official Email Address {{ req() }}</label>
+
+            <input type="email" name="email" value="{{ cs.get('email') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Customer Support Email</label>
+
+            <input type="email" name="customer_support_email" value="{{ cs.get('customer_support_email') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number {{ req() }} {{ tip('Used in your website header, footer, and Google structured data — keep it consistent everywhere.') }}</label>
+
+            <input type="text" name="contact_number" value="{{ cs.get('contact_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Alternative Phone Number</label>
+
+            <input type="text" name="alternative_phone" value="{{ cs.get('alternative_phone') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+
+            <p class="text-xs text-gray-500 mb-1">Personal or general WhatsApp line (may be the same as phone).</p>
+
+            <input type="text" name="whatsapp_number" value="{{ cs.get('whatsapp_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. +254 7XX XXX XXX">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Business Number</label>
+
+            <p class="text-xs text-gray-500 mb-1">Official WhatsApp Business account — separate from personal WhatsApp or phone.</p>
+
+            <input type="text" name="whatsapp_business_number" value="{{ cs.get('whatsapp_business_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. +254 1XX XXX XXX">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">M-Pesa Till Number</label>
+
+            <input type="text" name="mpesa_till_number" value="{{ cs.get('mpesa_till_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 123456">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">M-Pesa Paybill Number</label>
+
+            <input type="text" name="mpesa_paybill_number" value="{{ cs.get('mpesa_paybill_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 400200">
+
+        </div>
+
+        <div class="md:col-span-2">
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">M-Pesa Paybill Account Number</label>
+
+            <p class="text-xs text-gray-500 mb-1">Account number clients enter after the Paybill (if applicable).</p>
+
+            <input type="text" name="mpesa_paybill_account" value="{{ cs.get('mpesa_paybill_account') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 10045 or client matter reference format">
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+{# 2. Business hours #}
+
+<div id="section-hours" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+
+    <div class="settings-section-header">
+
+        <h2 class="settings-section-title">
+
+            <i class="fas fa-clock settings-section-icon"></i>
+
+            2. Business Hours
+
+        </h2>
+
+        <p class="settings-section-subtitle">When the firm is open — used for appointment scheduling and Google Business Profile.</p>
+
+    </div>
+
+    <div class="p-6 space-y-6">
+
+        <div>
+
+            <p class="text-sm font-medium text-gray-700 mb-2">Regular opening hours</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                <div>
+
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Opening Time</label>
+
+                    <input type="time" name="opening_time" value="{{ cs.get('opening_time') or '08:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+                </div>
+
+                <div>
+
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Closing Time</label>
+
+                    <input type="time" name="closing_time" value="{{ cs.get('closing_time') or '17:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+                </div>
+
             </div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Official Email Address</label>
-                    <input type="email" name="email" value="{{ cs.get('email') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-2">Working Days</label>
+
+            {% set wd_list = (cs.get('working_days') or '').split(',') %}
+
+            <div class="flex flex-wrap gap-4">
+
+                {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+
+                <label class="inline-flex items-center gap-2 cursor-pointer">
+
+                    <input type="checkbox" name="working_days" value="{{ day }}" {% if day in wd_list %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+
+                    <span class="text-sm text-gray-700">{{ day }}</span>
+
+                </label>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-2">Public Holiday Status</label>
+
+            <select name="public_holiday_status" id="contact_public_holiday_status" class="w-full md:max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+
+                <option value="">— Select —</option>
+
+                <option value="Closed" {% if cs.get('public_holiday_status') == 'Closed' %}selected{% endif %}>Closed</option>
+
+                <option value="Open" {% if cs.get('public_holiday_status') == 'Open' %}selected{% endif %}>Open</option>
+
+                <option value="Reduced hours" {% if cs.get('public_holiday_status') == 'Reduced hours' %}selected{% endif %}>Reduced hours</option>
+
+            </select>
+
+            <div id="contact_when_open_times" class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 {% if cs.get('public_holiday_status') not in ['Open', 'Reduced hours'] %}hidden{% endif %}">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <div>
+
+                        <label class="block text-xs font-medium text-gray-600 mb-1">From (time)</label>
+
+                        <input type="time" name="public_holiday_open_time" value="{{ cs.get('public_holiday_open_time') or '09:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+                    </div>
+
+                    <div>
+
+                        <label class="block text-xs font-medium text-gray-600 mb-1">To (time)</label>
+
+                        <input type="time" name="public_holiday_close_time" value="{{ cs.get('public_holiday_close_time') or '13:00' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+                    </div>
+
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                    <input type="text" name="contact_number" value="{{ cs.get('contact_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+{# 3. Google Business Profile & Maps #}
+
+<div id="section-gbp" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+
+    <div class="settings-section-header">
+
+        <h2 class="settings-section-title">
+
+            <i class="fab fa-google settings-section-icon"></i>
+
+            3. Google Business Profile &amp; Maps
+
+        </h2>
+
+        <p class="settings-section-subtitle">Local SEO and Google Maps visibility — critical for ranking in Kenya and East Africa.</p>
+
+    </div>
+
+    <div class="p-6 space-y-4">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">GBP Primary Category {{ tip('Choose the single most specific category — this is the #1 local search ranking factor on Google.') }}</label>
+                <select name="gbp_primary_category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">— Select primary category —</option>
+                    {% for cat in GBP_PRIMARY_CATEGORIES or [] %}
+                    <option value="{{ cat }}" {% if cs.get('gbp_primary_category') == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                    {% if cs.get('gbp_primary_category') and cs.get('gbp_primary_category') not in (GBP_PRIMARY_CATEGORIES or []) %}
+                    <option value="{{ cs.get('gbp_primary_category') }}" selected>{{ cs.get('gbp_primary_category') }} (legacy)</option>
+                    {% endif %}
+                </select>
+
+            </div>
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">GBP Verification Status</label>
+
+                <select name="gbp_verification_status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+
+                    <option value="">— Select —</option>
+
+                    <option value="Verified" {% if cs.get('gbp_verification_status') == 'Verified' %}selected{% endif %}>Verified</option>
+
+                    <option value="Pending" {% if cs.get('gbp_verification_status') == 'Pending' %}selected{% endif %}>Pending</option>
+
+                    <option value="Not Started" {% if cs.get('gbp_verification_status') == 'Not Started' %}selected{% endif %}>Not Started</option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">GBP Secondary Categories</label>
+            <p class="text-xs text-gray-500 mb-2">Additional Google categories — one per entry.</p>
+            <div id="gbp-secondary-list" class="space-y-2">
+                {% for item in gbp_secondary_items or [] %}
+                <div class="gbp-secondary-row flex gap-2">
+                    <input type="text" name="gbp_secondary_category_{{ loop.index0 }}" value="{{ item }}" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law Attorney">
+                    <button type="button" class="remove-gbp-secondary-btn text-red-600 px-3"><i class="fas fa-trash-alt"></i></button>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
-                    <input type="text" name="whatsapp_number" value="{{ cs.get('whatsapp_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Alternative Phone Number</label>
-                    <input type="text" name="alternative_phone" value="{{ cs.get('alternative_phone') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Customer Support Email</label>
-                    <input type="email" name="customer_support_email" value="{{ cs.get('customer_support_email') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-gbp-secondary-btn" class="mt-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900"><i class="fas fa-plus mr-1"></i>Add category</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Maps Pin — Latitude</label>
+
+                <input type="text" name="latitude" value="{{ cs.get('latitude') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. -1.3678">
+
+            </div>
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Maps Pin — Longitude</label>
+
+                <input type="text" name="longitude" value="{{ cs.get('longitude') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 36.7476">
+
             </div>
         </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Pick location on map</label>
+            <p class="text-xs text-gray-500 mb-2">Click the map to set your Google Maps pin (uses OpenStreetMap — no API key required).</p>
+            <div id="gbp-map-picker" class="w-full h-64 rounded-xl border border-gray-300 overflow-hidden bg-gray-100"></div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Service Areas</label>
+            <p class="text-xs text-gray-500 mb-2">Towns and regions you serve.</p>
+            <div id="gbp-service-list" class="space-y-2">
+                {% for item in gbp_service_area_items or [] %}
+                <div class="gbp-service-row flex gap-2">
+                    <input type="text" name="gbp_service_area_{{ loop.index0 }}" value="{{ item }}" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Kiserian">
+                    <button type="button" class="remove-gbp-service-btn text-red-600 px-3"><i class="fas fa-trash-alt"></i></button>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-gbp-service-btn" class="mt-2 text-sm font-semibold text-indigo-700 hover:text-indigo-900"><i class="fas fa-plus mr-1"></i>Add service area</button>
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">GBP Business Description</label>
+
+            <p class="text-xs text-gray-500 mb-2">Up to 750 characters — for Google Business Profile only (separate from website About).</p>
+
+            <textarea name="gbp_business_description" rows="5" maxlength="750" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Describe your firm for Google search and Maps…">{{ cs.get('gbp_business_description') or '' }}</textarea>
+
+            <p class="text-xs text-gray-400 mt-1"><span id="gbp-desc-count">{{ (cs.get('gbp_business_description') or '')|length }}</span> / 750 characters</p>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+{# 4. Reviews & reputation #}
+
+<div id="section-reviews" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+
+    <div class="settings-section-header">
+
+        <h2 class="settings-section-title">
+
+            <i class="fas fa-star settings-section-icon"></i>
+
+            4. Reviews &amp; Reputation
+
+        </h2>
+
+        <p class="settings-section-subtitle">Track reviews and showcase client testimonials (with consent).</p>
+
+    </div>
+
+    <div class="p-6 space-y-6">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div class="md:col-span-2">
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Review Collection Link / QR Code URL</label>
+
+                <input type="url" name="review_collection_link" value="{{ cs.get('review_collection_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://g.page/r/...">
+
+            </div>
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Current Review Count</label>
+
+                <input type="number" name="review_count" min="0" value="{{ cs.get('review_count') if cs.get('review_count') is not none else '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="0">
+
+            </div>
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Current Average Rating</label>
+
+                <input type="text" name="review_average_rating" value="{{ cs.get('review_average_rating') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 4.8">
+
+            </div>
+
+            <div>
+
+                <label class="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+
+                <select name="review_platform" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+
+                    <option value="">— Select —</option>
+
+                    <option value="Google" {% if cs.get('review_platform') == 'Google' %}selected{% endif %}>Google</option>
+
+                    <option value="Facebook" {% if cs.get('review_platform') == 'Facebook' %}selected{% endif %}>Facebook</option>
+
+                    <option value="Other" {% if cs.get('review_platform') == 'Other' %}selected{% endif %}>Other</option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+
+        <div>
+
+            <p class="text-sm font-semibold text-gray-800 mb-3">Testimonials</p>
+
+            <div id="testimonials-list" class="space-y-4">
+
+                {% for t in firm_testimonials %}
+
+                <div class="testimonial-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">
+
+                    <div class="flex items-start justify-between gap-3">
+
+                        <p class="text-sm font-semibold text-gray-800">Testimonial {{ loop.index }}</p>
+
+                        <button type="button" class="remove-testimonial-btn text-sm text-red-600 hover:text-red-800 font-medium">
+
+                            <i class="fas fa-trash-alt mr-1"></i>Remove
+
+                        </button>
+
+                    </div>
+
+                    <input type="hidden" name="testimonial_id_{{ loop.index0 }}" value="{{ t.id }}">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        <div>
+
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>
+
+                            <input type="text" name="testimonial_client_name_{{ loop.index0 }}" value="{{ t.client_name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Anonymous">
+
+                        </div>
+
+                        <div>
+
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+
+                            <input type="text" name="testimonial_date_{{ loop.index0 }}" value="{{ t.testimonial_date or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Jan 2026">
+
+                        </div>
+
+                    </div>
+
+                    <div>
+
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quote</label>
+
+                        <textarea name="testimonial_quote_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ t.quote or '' }}</textarea>
+
+                    </div>
+
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+
+                        <input type="checkbox" name="testimonial_consent_{{ loop.index0 }}" value="on" {% if t.consent_confirmed %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+
+                        <span class="text-sm text-gray-700">Client consent confirmed to publish this testimonial</span>
+
+                    </label>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+            <button type="button" id="add-testimonial-btn" class="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+
+                <i class="fas fa-plus"></i> Add testimonial
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+{# 5. Social media #}
+
+<div id="section-social" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+
+    <div class="settings-section-header">
+
+        <h2 class="settings-section-title">
+
+            <i class="fas fa-share-alt settings-section-icon"></i>
+
+            5. Social Media &amp; Web
+
+        </h2>
+
+        <p class="settings-section-subtitle">Website and social profiles — used for SEO sameAs schema and visibility.</p>
+
+    </div>
+
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <div class="md:col-span-2">
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+
+            <input type="url" name="website_url" value="{{ cs.get('website_url') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Facebook</label>
+
+            <input type="url" name="fb_link" value="{{ cs.get('fb_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn</label>
+
+            <input type="url" name="linkedin_link" value="{{ cs.get('linkedin_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Twitter / X</label>
+
+            <input type="url" name="twitter_link" value="{{ cs.get('twitter_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+        <div>
+
+            <label class="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
+
+            <input type="url" name="instagram_link" value="{{ cs.get('instagram_link') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+
+        </div>
+
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+
+(function() {
+    function bindRemove(btn, rowSelector) {
+        if (!btn || btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', function() { var row = btn.closest(rowSelector); if (row) row.remove(); });
+    }
+
+    var secList = document.getElementById('gbp-secondary-list');
+    var addSecBtn = document.getElementById('add-gbp-secondary-btn');
+    var secIdx = secList ? secList.querySelectorAll('.gbp-secondary-row').length : 0;
+    if (secList && addSecBtn) {
+        secList.querySelectorAll('.remove-gbp-secondary-btn').forEach(function(b) { bindRemove(b, '.gbp-secondary-row'); });
+        addSecBtn.addEventListener('click', function() {
+            var row = document.createElement('div');
+            row.className = 'gbp-secondary-row flex gap-2';
+            row.innerHTML = '<input type="text" name="gbp_secondary_category_' + secIdx + '" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg" placeholder="Category">'
+                + '<button type="button" class="remove-gbp-secondary-btn text-red-600 px-3"><i class="fas fa-trash-alt"></i></button>';
+            secList.appendChild(row);
+            bindRemove(row.querySelector('.remove-gbp-secondary-btn'), '.gbp-secondary-row');
+            secIdx += 1;
+        });
+    }
+
+    var svcList = document.getElementById('gbp-service-list');
+    var addSvcBtn = document.getElementById('add-gbp-service-btn');
+    var svcIdx = svcList ? svcList.querySelectorAll('.gbp-service-row').length : 0;
+    if (svcList && addSvcBtn) {
+        svcList.querySelectorAll('.remove-gbp-service-btn').forEach(function(b) { bindRemove(b, '.gbp-service-row'); });
+        addSvcBtn.addEventListener('click', function() {
+            var row = document.createElement('div');
+            row.className = 'gbp-service-row flex gap-2';
+            row.innerHTML = '<input type="text" name="gbp_service_area_' + svcIdx + '" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg" placeholder="Town or region">'
+                + '<button type="button" class="remove-gbp-service-btn text-red-600 px-3"><i class="fas fa-trash-alt"></i></button>';
+            svcList.appendChild(row);
+            bindRemove(row.querySelector('.remove-gbp-service-btn'), '.gbp-service-row');
+            svcIdx += 1;
+        });
+    }
+
+    var mapEl = document.getElementById('gbp-map-picker');
+    var latInput = document.querySelector('input[name="latitude"]');
+    var lngInput = document.querySelector('input[name="longitude"]');
+    if (mapEl && typeof L !== 'undefined') {
+        var startLat = parseFloat(latInput && latInput.value) || -1.3678;
+        var startLng = parseFloat(lngInput && lngInput.value) || 36.7476;
+        var map = L.map('gbp-map-picker').setView([startLat, startLng], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+        var marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
+        function syncCoords(lat, lng) {
+            if (latInput) latInput.value = lat.toFixed(6);
+            if (lngInput) lngInput.value = lng.toFixed(6);
+        }
+        marker.on('dragend', function() { var p = marker.getLatLng(); syncCoords(p.lat, p.lng); });
+        map.on('click', function(e) { marker.setLatLng(e.latlng); syncCoords(e.latlng.lat, e.latlng.lng); });
+        function syncFromInputs() {
+            var la = parseFloat(latInput && latInput.value);
+            var lo = parseFloat(lngInput && lngInput.value);
+            if (!isNaN(la) && !isNaN(lo)) { marker.setLatLng([la, lo]); map.panTo([la, lo]); }
+        }
+        if (latInput) latInput.addEventListener('change', syncFromInputs);
+        if (lngInput) lngInput.addEventListener('change', syncFromInputs);
+        setTimeout(function() { map.invalidateSize(); }, 300);
+    }
+
+    var sel = document.getElementById('contact_public_holiday_status');
+
+    var block = document.getElementById('contact_when_open_times');
+
+    if (sel && block) {
+
+        function toggle() {
+
+            block.classList.toggle('hidden', sel.value !== 'Open' && sel.value !== 'Reduced hours');
+
+        }
+
+        sel.addEventListener('change', toggle);
+
+        toggle();
+
+    }
+
+
+
+    var gbpDesc = document.querySelector('textarea[name="gbp_business_description"]');
+
+    var gbpCount = document.getElementById('gbp-desc-count');
+
+    if (gbpDesc && gbpCount) {
+
+        function updateCount() { gbpCount.textContent = (gbpDesc.value || '').length; }
+
+        gbpDesc.addEventListener('input', updateCount);
+
+        updateCount();
+
+    }
+
+
+
+    var tList = document.getElementById('testimonials-list');
+
+    var addTBtn = document.getElementById('add-testimonial-btn');
+
+    var tNextIndex = tList ? tList.querySelectorAll('.testimonial-row').length : 0;
+
+
+
+    function testimonialRowHtml(idx) {
+
+        return ''
+
+            + '<div class="testimonial-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">'
+
+            + '  <div class="flex items-start justify-between gap-3">'
+
+            + '    <p class="text-sm font-semibold text-gray-800">Testimonial</p>'
+
+            + '    <button type="button" class="remove-testimonial-btn text-sm text-red-600 hover:text-red-800 font-medium">'
+
+            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
+
+            + '    </button>'
+
+            + '  </div>'
+
+            + '  <input type="hidden" name="testimonial_id_' + idx + '" value="">'
+
+            + '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">'
+
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Client Name</label>'
+
+            + '    <input type="text" name="testimonial_client_name_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Anonymous"></div>'
+
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label>'
+
+            + '    <input type="text" name="testimonial_date_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Jan 2026"></div>'
+
+            + '  </div>'
+
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Quote</label>'
+
+            + '  <textarea name="testimonial_quote_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea></div>'
+
+            + '  <label class="inline-flex items-center gap-2 cursor-pointer">'
+
+            + '    <input type="checkbox" name="testimonial_consent_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">'
+
+            + '    <span class="text-sm text-gray-700">Client consent confirmed to publish this testimonial</span>'
+
+            + '  </label>'
+
+            + '</div>';
+
+    }
+
+
+
+    if (tList && addTBtn) {
+
+        addTBtn.addEventListener('click', function() {
+
+            var wrap = document.createElement('div');
+
+            wrap.innerHTML = testimonialRowHtml(tNextIndex);
+
+            tList.appendChild(wrap.firstElementChild);
+
+            tNextIndex += 1;
+
+        });
+
+    }
+
+})();
+
+</script>
+
+

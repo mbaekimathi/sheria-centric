@@ -4,30 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Platform | SHERIA CENTRIC</title>
-  <meta name="description" content="Explore the SHERIA CENTRIC platform and how it powers legal workflows from intake to case closure.">
-  {# PWA: manifest, icons, theme-color, service worker registration. #}
+  <meta name="description" content="Explore the SHERIA CENTRIC platform — the legal operating system that powers workflows from intake to case closure.">
   {% include "_pwa_head.html" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/typed.js/2.1.0/typed.umd.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/countup.js/2.8.0/countUp.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phosphor-icons/2.0.0/phosphor.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+  <style>
+    body { margin: 0; }
+    .skip-link { position: absolute; left: 16px; top: -60px; background: #fff; color: #1E1A4E; padding: 10px 16px; border-radius: 8px; z-index: 1200; }
+    .skip-link:focus { top: 16px; }
+  </style>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <header class="site-header scrolled" id="site-header" x-data="{open:false}">
+<body class="platform-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="site-header" id="site-header" x-data="{open:false}">
     <div class="container nav-wrap">
       <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
           <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
         </svg>
@@ -52,14 +52,14 @@
             <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
           </div>
         </details>
-        <a href="/contact" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-label="Toggle navigation">
+        <a href="#platform-cta" class="btn btn-demo">Request Demo</a>
+        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
           <i class="ph ph-list" x-show="!open"></i>
           <i class="ph ph-x" x-show="open" style="display:none"></i>
         </button>
       </div>
     </div>
-    <div class="mobile-menu" x-show="open" x-transition.origin.top>
+    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
       <span class="mobile-section-label">Navigate</span>
       <a href="/platform" @click="open=false">Platform</a>
       <a href="/features" @click="open=false">Features</a>
@@ -69,58 +69,285 @@
       <span class="mobile-section-label">Account</span>
       <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
       <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-      <a href="/contact" @click="open=false" class="btn btn-demo">Request Demo</a>
+      <a href="#platform-cta" @click="open=false" class="btn btn-demo">Request Demo</a>
     </div>
   </header>
 
-  <main class="inner-page">
-    <section class="page-hero section">
-      <div class="container hero-split">
-        <div>
-          <p class="eyebrow">PLATFORM</p>
-          <h1>The legal operating system built for real firm workflows</h1>
-          <p>SHERIA CENTRIC connects intake, document operations, hearings, tasks, billing, and client communication in one platform so your entire team works with shared context.</p>
-          <div class="glass-stat-grid">
-            <article class="glass-stat"><strong>40%</strong><span>Less admin overhead</span></article>
-            <article class="glass-stat"><strong>3x</strong><span>Faster file retrieval</span></article>
-            <article class="glass-stat"><strong>98%</strong><span>On-time hearing preparation</span></article>
+  <main id="main-content">
+    <!-- Hero -->
+    <section class="platform-hero section" id="hero">
+      <div class="container platform-hero-grid">
+        <div class="platform-hero-copy" data-aos="fade-right">
+          <p class="eyebrow" style="color: var(--color-accent-light);">Platform</p>
+          <h1>The legal <em>operating system</em> for modern firms</h1>
+          <p class="platform-hero-lead">
+            SHERIA CENTRIC connects intake, document operations, hearings, tasks, billing, and client communication in one platform &mdash; so your entire team works with shared context from day one.
+          </p>
+          <div class="platform-hero-stats">
+            <article><strong>40%</strong><span>Less admin overhead</span></article>
+            <article><strong>3&times;</strong><span>Faster file retrieval</span></article>
+            <article><strong>98%</strong><span>On-time hearing prep</span></article>
+          </div>
+          <div class="hero-ctas">
+            <a href="#platform-layers" class="btn btn-primary">Explore the stack</a>
+            <a href="/features" class="btn btn-secondary">View all features</a>
           </div>
         </div>
-        <div class="hero-split-media" data-aos="zoom-in">
-          <img src="https://images.unsplash.com/photo-1528740561666-dc2479dc08ab?w=1000&auto=format&q=80" alt="Professional legal operations dashboard">
-          <span class="hero-chip chip-a">Live matter timeline</span>
-          <span class="hero-chip chip-b">Workflow automation active</span>
+
+        <div class="platform-stack-visual" aria-label="Platform layer stack" data-aos="fade-left">
+          <div class="stack-layer core">
+            <i class="ph ph-git-branch"></i>
+            <div>
+              <strong>SHERIA CENTRIC Core</strong>
+              <span>Unified data model for all modules</span>
+            </div>
+          </div>
+          <div class="stack-connector" aria-hidden="true"></div>
+          <div class="stack-layer intake">
+            <i class="ph ph-user-plus"></i>
+            <div>
+              <strong>Intake Layer</strong>
+              <span>Client onboarding &amp; matter opening</span>
+            </div>
+          </div>
+          <div class="stack-connector" aria-hidden="true"></div>
+          <div class="stack-layer work">
+            <i class="ph ph-files"></i>
+            <div>
+              <strong>Work Layer</strong>
+              <span>Documents, calendar &amp; collaboration</span>
+            </div>
+          </div>
+          <div class="stack-connector" aria-hidden="true"></div>
+          <div class="stack-layer finance">
+            <i class="ph ph-receipt"></i>
+            <div>
+              <strong>Finance Layer</strong>
+              <span>Billing, collections &amp; reporting</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="section">
-      <div class="container showcase-grid">
-        <article class="showcase-card" data-aos="fade-up"><div class="showcase-icon icon-pulse-soft" style="background:#EEF2FF;"><i class="ph ph-rows-plus-top"></i></div><h3>Unified matter workspace</h3><p>Each matter has one structured workspace where advocates track milestones, court events, filings, and evidence with shared visibility.</p></article>
-        <article class="showcase-card" data-aos="fade-up" data-aos-delay="100"><div class="showcase-icon icon-pulse-soft" style="background:#ECFDF5;"><i class="ph ph-users-three"></i></div><h3>Role-aware operations</h3><p>Partners, associates, clerks, and finance teams see controls relevant to their function, reducing errors while improving delivery speed.</p></article>
-        <article class="showcase-card" data-aos="fade-up" data-aos-delay="200"><div class="showcase-icon icon-pulse-soft" style="background:#FFF7ED;"><i class="ph ph-globe-hemisphere-west"></i></div><h3>Built for East Africa</h3><p>Designed around legal practices in Kenya, Uganda, and Tanzania with region-aware workflows and practical compliance readiness.</p></article>
+    <!-- Metrics -->
+    <section class="platform-metrics" aria-label="Platform impact metrics">
+      <div class="container platform-metrics-grid">
+        <article data-aos="fade-up"><strong>1</strong><span>Unified workspace</span></article>
+        <article data-aos="fade-up" data-aos-delay="60"><strong>8</strong><span>Connected modules</span></article>
+        <article data-aos="fade-up" data-aos-delay="120"><strong>3</strong><span>Countries supported</span></article>
+        <article data-aos="fade-up" data-aos-delay="180"><strong>24/7</strong><span>Cloud availability</span></article>
       </div>
     </section>
 
-    <section class="section section-alt">
+    <!-- Pillars -->
+    <section class="section platform-pillars">
       <div class="container">
-        <div class="section-head">
-          <h2>How SHERIA CENTRIC drives better outcomes</h2>
-          <p>Instead of juggling disconnected software, your team follows one operational journey from first briefing to final invoice.</p>
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Why this platform</p>
+          <h2>Built for how firms actually operate</h2>
+          <p>Not another generic tool &mdash; a purpose-built legal operating system for East African advocates.</p>
         </div>
-        <div class="timeline-list">
-          <article data-aos="fade-right"><h3>1. Intake and triage</h3><p>Capture matter type, client profile, urgency, and key dates. Assign owners and create a consistent opening checklist.</p></article>
-          <article data-aos="fade-left"><h3>2. Evidence and drafting</h3><p>Store and tag documents, track versions, and collaborate securely with full edit history and audit visibility.</p></article>
-          <article data-aos="fade-right"><h3>3. Hearing execution</h3><p>Coordinate court deadlines, tasks, and reminders to reduce missed dates and improve preparation quality.</p></article>
-          <article data-aos="fade-left"><h3>4. Billing and closure</h3><p>Convert tracked effort into invoices, reconcile payments, and archive matter records for future reference.</p></article>
+        <div class="pillar-grid">
+          <article class="pillar-card" data-aos="fade-up">
+            <div class="pillar-icon" style="background:#EEF2FF; color:#4338ca;"><i class="ph ph-rows-plus-top"></i></div>
+            <h3>Unified matter workspace</h3>
+            <p>Each matter has one structured workspace where advocates track milestones, court events, filings, and evidence with shared visibility.</p>
+          </article>
+          <article class="pillar-card" data-aos="fade-up" data-aos-delay="80">
+            <div class="pillar-icon" style="background:#ECFDF5; color:#059669;"><i class="ph ph-users-three"></i></div>
+            <h3>Role-aware operations</h3>
+            <p>Partners, associates, clerks, and finance teams see controls relevant to their function, reducing errors while improving delivery speed.</p>
+          </article>
+          <article class="pillar-card" data-aos="fade-up" data-aos-delay="160">
+            <div class="pillar-icon" style="background:#FFF7ED; color:#ea580c;"><i class="ph ph-globe-hemisphere-west"></i></div>
+            <h3>Built for East Africa</h3>
+            <p>Designed around legal practices in Kenya, Uganda, and Tanzania with region-aware workflows and practical compliance readiness.</p>
+          </article>
         </div>
-        <div class="trust-strip" data-aos="fade-up"><strong>Outcome:</strong> firms gain one professional command center where legal, operational, and financial decisions are visible in real time.</div>
+      </div>
+    </section>
+
+    <!-- Journey -->
+    <section class="section platform-journey" id="platform-journey">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow">Operational journey</p>
+          <h2>From first briefing to final invoice</h2>
+          <p>One connected flow replaces disconnected spreadsheets, email threads, and folder mazes.</p>
+        </div>
+        <div class="journey-track">
+          <article class="journey-step" data-aos="fade-up">
+            <span class="journey-num">01</span>
+            <h3>Intake &amp; triage</h3>
+            <p>Capture matter type, client profile, urgency, and key dates. Assign owners and create a consistent opening checklist.</p>
+            <div class="journey-tags">
+              <span>Conflict checks</span>
+              <span>KYC</span>
+              <span>Matter wizard</span>
+            </div>
+          </article>
+          <article class="journey-step" data-aos="fade-up" data-aos-delay="80">
+            <span class="journey-num">02</span>
+            <h3>Evidence &amp; drafting</h3>
+            <p>Store and tag documents, track versions, and collaborate securely with full edit history and audit visibility.</p>
+            <div class="journey-tags">
+              <span>Version control</span>
+              <span>Evidence tags</span>
+              <span>Approvals</span>
+            </div>
+          </article>
+          <article class="journey-step" data-aos="fade-up" data-aos-delay="160">
+            <span class="journey-num">03</span>
+            <h3>Hearing execution</h3>
+            <p>Coordinate court deadlines, tasks, and reminders to reduce missed dates and improve preparation quality.</p>
+            <div class="journey-tags">
+              <span>Court calendar</span>
+              <span>Escalations</span>
+              <span>Prep checklists</span>
+            </div>
+          </article>
+          <article class="journey-step" data-aos="fade-up" data-aos-delay="240">
+            <span class="journey-num">04</span>
+            <h3>Billing &amp; closure</h3>
+            <p>Convert tracked effort into invoices, reconcile payments, and archive matter records for future reference.</p>
+            <div class="journey-tags">
+              <span>Invoicing</span>
+              <span>Collections</span>
+              <span>Archive</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Platform layers -->
+    <section class="section platform-layers-section" id="platform-layers">
+      <div class="container">
+        <div class="section-head" data-aos="fade-up">
+          <p class="eyebrow" style="color: var(--color-accent-light);">Architecture</p>
+          <h2>Four layers, one connected stack</h2>
+          <p>Every module shares the same data model &mdash; so nothing falls through the cracks between intake and invoice.</p>
+        </div>
+        <div class="layer-cards-grid">
+          <article class="layer-card layer-gold" data-aos="fade-up">
+            <div class="layer-card-head">
+              <i class="ph ph-git-branch"></i>
+              <h3>Core</h3>
+            </div>
+            <p>Unified data model for matters, documents, events, tasks, clients, and billing.</p>
+            <ul>
+              <li>Single source of truth</li>
+              <li>Cross-module sync</li>
+              <li>Audit-ready records</li>
+            </ul>
+          </article>
+          <article class="layer-card layer-purple" data-aos="fade-up" data-aos-delay="60">
+            <div class="layer-card-head">
+              <i class="ph ph-user-plus"></i>
+              <h3>Intake</h3>
+            </div>
+            <p>Accept, validate, and transform new instructions into structured matter records.</p>
+            <ul>
+              <li>Client registration</li>
+              <li>Conflict checks</li>
+              <li>Matter opening</li>
+            </ul>
+          </article>
+          <article class="layer-card layer-blue" data-aos="fade-up" data-aos-delay="120">
+            <div class="layer-card-head">
+              <i class="ph ph-files"></i>
+              <h3>Work</h3>
+            </div>
+            <p>The operational engine for filings, evidence, hearings, and team coordination.</p>
+            <ul>
+              <li>Document vault</li>
+              <li>Court calendar</li>
+              <li>Task management</li>
+            </ul>
+          </article>
+          <article class="layer-card layer-teal" data-aos="fade-up" data-aos-delay="180">
+            <div class="layer-card-head">
+              <i class="ph ph-receipt"></i>
+              <h3>Finance</h3>
+            </div>
+            <p>Convert legal work into invoices, track collections, and report on firm performance.</p>
+            <ul>
+              <li>Billing engine</li>
+              <li>Retainer tracking</li>
+              <li>Revenue analytics</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Outcome -->
+    <section class="platform-outcome" data-aos="fade-up">
+      <div class="container">
+        <p><strong>Outcome:</strong> firms gain one professional command center where legal, operational, and financial decisions are visible in real time.</p>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="platform-cta section" id="platform-cta">
+      <div class="container" data-aos="fade-up">
+        <h2>See the platform in action</h2>
+        <p>Book a walkthrough tailored to your firm&rsquo;s practice areas, or explore features and pricing at your own pace.</p>
+        <div class="hero-ctas">
+          <a href="/contact" class="btn btn-primary">Book a live demo</a>
+          <a href="/pricing" class="btn btn-outline">View pricing</a>
+        </div>
       </div>
     </section>
   </main>
 
-  <footer><div class="container bottom-wrap"><p>Â© 2026 SHERIA CENTRIC Technologies Ltd.</p><div><a href="/pricing">Pricing</a><a href="/security">Security</a><a href="/contact">Contact</a></div></div></footer>
+  <footer>
+    <div class="container footer-grid">
+      <div>
+        <a href="/" class="brand footer-brand"><span>SHERIA CENTRIC</span></a>
+        <p>Building the future of legal practice in Africa.</p>
+        <div class="socials">
+          <a href="#" aria-label="LinkedIn"><i class="ph ph-linkedin-logo"></i></a>
+          <a href="#" aria-label="X / Twitter"><i class="ph ph-x-logo"></i></a>
+          <a href="#" aria-label="Facebook"><i class="ph ph-facebook-logo"></i></a>
+        </div>
+      </div>
+      <div>
+        <h3>Product</h3>
+        <a href="/platform">Platform</a>
+        <a href="/features">Features</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/security">Security</a>
+      </div>
+      <div>
+        <h3>Company</h3>
+        <a href="/contact">Contact</a>
+        <a href="/">Home</a>
+        <a href="/client_login">Client Login</a>
+        <a href="/login">Employee Login</a>
+      </div>
+      <div>
+        <h3>Stay in the loop</h3>
+        <p>Monthly product updates &amp; legal-tech insights for East African firms.</p>
+        <form class="newsletter" onsubmit="event.preventDefault(); this.querySelector('button').textContent='Subscribed';">
+          <label for="newsletter-email" class="skip-link">Email address</label>
+          <input id="newsletter-email" type="email" placeholder="you@firm.co.ke" required>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container bottom-wrap">
+        <p>&copy; 2026 SHERIA CENTRIC Technologies Ltd. All rights reserved.</p>
+        <div>
+          <a href="/security">Privacy</a>
+          <a href="/security">Terms</a>
+          <a href="/contact">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
   <script type="module" src="/static/main.js"></script>
 </body>
 </html>
-

@@ -7,286 +7,390 @@
   .cm-accordion > summary { list-style: none; }
   .cm-accordion > summary::-webkit-details-marker { display: none; }
   .cm-accordion[open] .cm-chevron { transform: rotate(180deg); }
+  .cm-accordion {
+    animation: cmFadeInUp 0.35s ease both;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  }
+  .cm-accordion:hover {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    border-color: #c7d2fe;
+  }
+  .cm-accordion > summary {
+    transition: background-color 0.2s ease;
+  }
+  .cm-accordion > summary:hover { background-color: #f8fafc; }
+  .cm-accordion[open] > summary {
+    background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+  }
+  .cm-accordion .cm-chevron {
+    transition: transform 0.25s ease;
+  }
+  .cm-accordion[open] .cm-panel {
+    animation: cmPanelIn 0.28s ease both;
+  }
+  .cm-avatar {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .cm-accordion:hover .cm-avatar {
+    transform: scale(1.06);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  }
+  .cm-count {
+    transition: transform 0.2s ease;
+  }
+  .cm-accordion:hover .cm-count {
+    transform: scale(1.05);
+  }
+  @keyframes cmFadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cmPanelIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cm-accordion,
+    .cm-accordion[open] .cm-panel,
+    .cm-avatar,
+    .cm-count,
+    .cm-chevron { animation: none !important; transition: none !important; }
+  }
 </style>
-<div class="max-w-7xl mx-auto">
-    <!-- Page Header -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2 flex items-center flex-wrap gap-2">
+
+<!-- Header + filters (single card) -->
+<div class="bg-white rounded-xl shadow border border-gray-100 px-4 py-3.5 sm:px-5 sm:py-4 mb-4">
+    <div class="flex flex-col gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
                     {% if pending_only %}
-                    <i class="fas fa-clipboard-check text-amber-600 mr-2"></i>
-                    Approve registered cases
+                    <i class="fas fa-clipboard-check text-amber-600"></i>
+                    Approve Registered Cases
                     {% else %}
-                    <i class="fas fa-users text-blue-600 mr-2"></i>
-                    Litigation matters
+                    <i class="fas fa-gavel text-blue-600"></i>
+                    Litigation Matters
                     {% endif %}
                 </h1>
-                <p class="text-gray-600">
+                <p class="text-sm text-gray-500 mt-0.5 hidden sm:block">
                     {% if pending_only %}
-                    Review newly registered cases, allocate them to an advocate, and approve.
-                    {% elif user_role == 'Managing Partner' %}
-                    Search by client name or phone, then open each client to view their matters.
+                    Review newly registered cases: allocate first, then approve.
                     {% else %}
                     Search by client name or phone, then open each client to view their matters.
                     {% endif %}
                 </p>
             </div>
-            {% if user_role in ['Firm Administrator', 'Associate Advocate'] %}
-            <a href="{{ url_for('register_case') }}" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors flex items-center shrink-0">
-                <i class="fas fa-plus-circle mr-2"></i>
+            {% if user_role in ['Firm Administrator', 'Associate Advocate'] and not pending_only %}
+            <a href="{{ url_for('register_case') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shrink-0">
+                <i class="fas fa-plus-circle"></i>
                 Register Case
             </a>
             {% endif %}
         </div>
-    </div>
 
-    <!-- Search Form -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <i class="fas fa-search text-green-600 mr-2"></i>
-            {% if pending_only %}Filter pending cases{% else %}Search clients (name or phone){% endif %}
-        </h2>
-        <div class="flex flex-col md:flex-row gap-4">
-            <div class="flex-1">
-                <label for="client_search" class="block text-sm font-semibold text-gray-700 mb-2">
-                    {% if user_role == 'Managing Partner' %}
-                    Client name or phone number (leave empty for all your active cases)
-                    {% else %}
-                    Client name or phone number (leave empty for all cases)
-                    {% endif %}
-                </label>
-                <div class="relative">
-                    <input 
-                        type="text" 
-                        id="client_search" 
-                        name="client_search"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="e.g. Hausa Media, 0703…, or part of a name"
-                        autocomplete="off"
-                    />
-                    <i class="fas fa-search absolute right-3 top-4 text-gray-400"></i>
-                </div>
-                <p class="text-xs text-gray-500 mt-2">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Matches client <strong>full name</strong> or <strong>phone number</strong>. Leave empty to load every matter you can access.
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Loading Indicator -->
-    <div id="loadingIndicator" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
-        <div class="flex flex-col items-center">
-            <i class="fas fa-spinner fa-spin text-green-600 text-3xl mb-4"></i>
-            <p class="text-gray-600">Loading cases...</p>
-        </div>
-    </div>
-
-    <!-- Client Information -->
-    <div id="clientInfo" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-        <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <i class="fas fa-user text-indigo-600 mr-2"></i>
-            Client Information
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="clientDetails">
-            <!-- Client details will be populated here -->
-        </div>
-    </div>
-
-    <!-- Clients / matters (accordion or flat table) -->
-    <div id="casesContainer" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 sm:p-6 mb-6">
-        <div class="flex flex-col gap-4 mb-5">
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div>
-                    <h2 id="casesSectionHeading" class="text-xl sm:text-2xl font-bold text-gray-900 flex items-center flex-wrap gap-2">
-                        <i id="headingIcon" class="fas fa-users text-blue-600"></i>
-                        <span id="headingLabel">Clients with Matters:</span>
-                        <span id="groupCountDisplay" class="text-green-600">0</span>
-                    </h2>
-                    <p id="casesSubheading" class="text-sm text-gray-500 mt-1">
-                        <span id="casesCount">0</span> matter(s) total
-                    </p>
-                </div>
-                <div class="flex flex-col xs:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
-                    <label for="groupBySelect" class="sr-only">Group by</label>
-                    <div class="relative w-full sm:w-auto sm:min-w-[200px]">
-                        <select id="groupBySelect" name="group_by"
-                            class="w-full appearance-none pl-4 pr-10 py-2.5 border border-gray-300 rounded-xl bg-white text-sm font-semibold text-gray-800 shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-                            aria-label="How to group cases">
-                            <option value="client" selected>By client (accordion)</option>
-                            <option value="court_rank">By court rank (accordion)</option>
-                            <option value="flat">Flat table</option>
-                        </select>
-                        <i class="fas fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                    </div>
-                    <button 
-                        type="button"
-                        onclick="loadAllCases()"
-                        class="px-4 py-2.5 bg-gray-100 text-gray-800 rounded-xl hover:bg-gray-200 transition-colors duration-200 font-semibold text-sm border border-gray-200"
-                    >
-                        <i class="fas fa-refresh mr-2"></i>Refresh
+        <div class="border-t border-gray-100 pt-3 flex flex-col lg:flex-row lg:items-center gap-2.5 lg:gap-3">
+            {% if not pending_only %}
+            <div class="flex items-center gap-2 shrink-0">
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap">View</span>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
+                    <button type="button" id="viewByClientBtn" data-group="client"
+                        class="cm-group-btn px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center">
+                        <i class="fas fa-users mr-1.5"></i>Client
+                    </button>
+                    <button type="button" id="viewByCourtBtn" data-group="court_rank"
+                        class="cm-group-btn px-3 py-1.5 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-semibold flex items-center">
+                        <i class="fas fa-landmark mr-1.5"></i>Court Rank
                     </button>
                 </div>
             </div>
-        </div>
-
-        <!-- Accordion layout (by client or by court rank) -->
-        <div id="accordionCaseWrap" class="space-y-3">
-            <!-- Populated by JS -->
-        </div>
-
-        <!-- Flat table -->
-        <div id="flatCaseTableWrap" class="hidden overflow-x-auto rounded-xl border border-gray-200">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tracking #</th>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filing Date</th>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Station</th>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        <th class="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                    </tr>
-                </thead>
-                <tbody id="casesTableBody" class="bg-white divide-y divide-gray-200">
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- No Results Message -->
-    <div id="noResults" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
-        <div class="max-w-md mx-auto">
-            <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
-            <h3 class="text-xl font-bold text-gray-900 mb-2">No Cases Found</h3>
-            <p class="text-gray-600" id="noResultsMessage">No cases found for this search.</p>
-        </div>
-    </div>
-
-    <!-- Error Message -->
-    <div id="errorMessage" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
-
-    <!-- Allocation description & timeline popup -->
-    <div id="allocationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 class="text-lg font-bold text-gray-900 flex items-center">
-                    <i class="fas fa-info-circle text-indigo-600 mr-2"></i>
-                    <span id="allocationModalTracking">Case</span> – Brief & Timeline
-                </h3>
-                <button type="button" onclick="closeAllocationModal()" class="text-gray-400 hover:text-gray-600 p-1">
-                    <i class="fas fa-times text-xl"></i>
+            {% endif %}
+            <div class="flex-1 min-w-0 flex items-center gap-2">
+                <label for="client_search" class="sr-only" id="searchLabel">{% if pending_only %}Filter pending cases{% else %}Search Clients{% endif %}</label>
+                <div class="relative flex-1 min-w-0">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                    <input
+                        type="text"
+                        id="client_search"
+                        name="client_search"
+                        class="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 bg-gray-50 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+                        placeholder="{% if pending_only %}Name, phone, or tracking #…{% else %}Search by client name or phone…{% endif %}"
+                        autocomplete="off"
+                    />
+                    <button
+                        type="button"
+                        id="clearSearchBtn"
+                        class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                        title="Clear search"
+                        aria-label="Clear search"
+                    >
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    onclick="loadAllCases()"
+                    class="inline-flex items-center justify-center w-9 h-9 sm:w-auto sm:px-3 sm:h-9 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-800 transition-colors text-sm font-semibold shrink-0"
+                    title="Refresh"
+                >
+                    <i class="fas fa-sync-alt"></i>
+                    <span class="hidden sm:inline ml-1.5">Refresh</span>
                 </button>
             </div>
-            <div class="px-6 py-4 overflow-y-auto max-h-[60vh]">
-                <div class="mb-4">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Brief description</p>
-                    <p id="allocationModalDescription" class="text-gray-800 whitespace-pre-wrap"></p>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Reminder Interval</p>
-                    <p id="allocationModalTimeline" class="text-gray-800"></p>
-                </div>
-            </div>
-            <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-                <button type="button" onclick="closeAllocationModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">Close</button>
-            </div>
         </div>
     </div>
+</div>
 
-    <!-- Approve & Allocate Modal (Firm Administrator / Managing Partner only) -->
-    <div id="approveModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col">
-            <!-- Header -->
-            <div class="px-6 py-5 border-b border-gray-200 flex items-center justify-between shrink-0">
-                <div>
-                    <h3 class="text-xl font-bold text-gray-900 flex items-center">
-                        <i class="fas fa-check-circle text-green-600 mr-3"></i>
-                        Approve &amp; Allocate Case
-                    </h3>
-                    <p class="text-sm text-gray-500 mt-1">Tracking: <span id="approveModalTracking" class="font-semibold text-gray-700"></span></p>
-                </div>
-                <button type="button" onclick="closeApproveModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
+<select id="groupBySelect" name="group_by" class="sr-only" aria-hidden="true" tabindex="-1">
+    <option value="client" selected>By client (accordion)</option>
+    <option value="court_rank">By court rank (accordion)</option>
+</select>
+
+<!-- Loading Indicator -->
+<div id="loadingIndicator" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+    <div class="flex items-center justify-center">
+        <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mr-3"></i>
+        <span class="text-gray-700">Loading cases...</span>
+    </div>
+</div>
+
+<!-- Client Information -->
+<div id="clientInfo" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+        <i class="fas fa-user text-blue-600 mr-2"></i>
+        Client Information
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="clientDetails"></div>
+</div>
+
+<!-- Clients / matters -->
+<div id="casesContainer" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+    <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-2">
+        <h3 class="text-xl font-bold text-gray-900 flex items-center flex-wrap gap-2">
+            <i id="headingIcon" class="fas fa-users text-blue-600"></i>
+            <span id="headingLabel">Clients with Matters:</span>
+            <span id="groupCountDisplay" class="text-green-600">0</span>
+        </h3>
+        <p id="casesSubheading" class="text-sm text-gray-500">
+            <span id="casesCount">0</span> matter(s) total
+        </p>
+    </div>
+
+    <div id="accordionCaseWrap" class="space-y-4"></div>
+
+    <div id="flatCaseTableWrap" class="hidden overflow-x-auto rounded-lg border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Tracking # / Filing Date</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Station</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="casesTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- No Results Message -->
+<div id="noResults" class="hidden bg-white rounded-2xl shadow-lg border border-gray-100 p-8 mb-6 text-center">
+    <div class="max-w-md mx-auto">
+        <i class="fas fa-inbox text-gray-400 text-5xl mb-4"></i>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">No Cases Found</h3>
+        <p class="text-gray-600" id="noResultsMessage">No cases found for this search.</p>
+    </div>
+</div>
+
+<!-- Error Message -->
+<div id="errorMessage" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+<!-- Allocation description & timeline popup -->
+<div id="allocationModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                <span id="allocationModalTracking">Case</span> – Brief & Timeline
+            </h3>
+            <button type="button" onclick="closeAllocationModal()" class="text-gray-400 hover:text-gray-600 p-1">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="px-6 py-4 overflow-y-auto max-h-[60vh]">
+            <div class="mb-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Brief description</p>
+                <p id="allocationModalDescription" class="text-gray-800 whitespace-pre-wrap"></p>
             </div>
-
-            <!-- Body -->
-            <div class="px-6 py-5 overflow-y-auto flex-1 space-y-5">
-                <!-- Employee Selector -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        Allocate To <span class="text-red-500">*</span>
-                        <span class="text-xs font-normal text-gray-400 ml-1">(Any active employee)</span>
-                    </label>
-                    <div class="relative">
-                        <input type="text" id="approveEmpSearch"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent pr-10"
-                            placeholder="Search employee name..."
-                            autocomplete="off" />
-                        <i class="fas fa-search absolute right-3 top-4 text-gray-400 pointer-events-none"></i>
-                        <input type="hidden" id="approveEmpId" />
-                        <div id="approveEmpDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-52 overflow-y-auto"></div>
-                    </div>
-                    <p id="approveEmpSelected" class="hidden mt-2 text-sm text-green-700 font-medium flex items-center">
-                        <i class="fas fa-user-check mr-2"></i><span id="approveEmpSelectedName"></span>
-                    </p>
-                </div>
-
-                <!-- Instructions -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        Instructions / Brief
-                    </label>
-                    <textarea id="approveInstructions" rows="4"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                        placeholder="Enter instructions or brief for the allocated employee..."></textarea>
-                </div>
-
-                <!-- Due Date & Timeline (Optional) -->
-                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <p class="text-sm font-semibold text-blue-800 mb-3 flex items-center">
-                        <i class="fas fa-calendar-alt mr-2"></i>
-                        Calendar &amp; Reminder <span class="font-normal text-blue-600 ml-1">(Optional)</span>
-                    </p>
-                    <p class="text-xs text-blue-600 mb-3">If you set a date, a calendar entry and reminder will be created for the allocated employee.</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Due Date</label>
-                            <input type="date" id="approveDueDate"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Reminder Interval</label>
-                            <select id="approveTimeline"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white">
-                                <option value="">— No reminder —</option>
-                                <option value="Daily">Daily</option>
-                                <option value="Every 2 Days">Every 2 Days</option>
-                                <option value="Weekly">Weekly</option>
-                                <option value="Every 2 Weeks">Every 2 Weeks</option>
-                                <option value="Monthly">Monthly</option>
-                                <option value="Every 3 Months">Every 3 Months</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+            <div>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Reminder Interval</p>
+                <p id="allocationModalTimeline" class="text-gray-800"></p>
             </div>
+        </div>
+        <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+            <button type="button" onclick="closeAllocationModal()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">Close</button>
+        </div>
+    </div>
+</div>
 
-            <!-- Footer -->
-            <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 shrink-0">
-                <button type="button" onclick="closeApproveModal()"
-                    class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition-colors">
+<!-- Allocate Case Modal -->
+<div id="allocateCaseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full">
+        <div class="bg-gradient-to-r from-indigo-600 to-blue-700 text-white p-5 rounded-t-2xl flex items-center justify-between">
+            <div class="min-w-0 pr-2">
+                <h2 class="text-lg font-bold flex items-center">
+                    <i class="fas fa-user-plus mr-2"></i>
+                    Allocate Case
+                </h2>
+                <p class="text-sm text-indigo-100 mt-1 truncate">Tracking: <span id="allocateCaseModalTracking" class="font-semibold"></span></p>
+            </div>
+            <button type="button" onclick="closeAllocateCaseModal()" class="text-white hover:text-gray-200 transition-colors p-1 shrink-0">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div class="p-5 space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Allocate To <span class="text-red-500">*</span>
+                    <span class="text-xs font-normal text-gray-400 ml-1">(Managing Partners &amp; Associates only)</span>
+                </label>
+                <div class="relative">
+                    <input type="text" id="allocateCaseEmpSearch"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        placeholder="Search Managing Partner or Associate..."
+                        autocomplete="off" />
+                    <input type="hidden" id="allocateCaseEmpId" />
+                    <div id="allocateCaseEmpDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-52 overflow-y-auto"></div>
+                </div>
+                <p id="allocateCaseEmpSelected" class="hidden mt-2 text-sm text-indigo-700 font-medium flex items-center">
+                    <i class="fas fa-user-check mr-2"></i><span id="allocateCaseEmpSelectedName"></span>
+                </p>
+            </div>
+            <div class="flex justify-end gap-2 pt-1">
+                <button type="button" onclick="closeAllocateCaseModal()"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-semibold">
                     Cancel
                 </button>
-                <button type="button" id="approveSubmitBtn" onclick="submitApproval()"
-                    class="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 font-semibold shadow transition-all flex items-center gap-2">
-                    <i class="fas fa-check-circle"></i>
-                    Approve &amp; Allocate
+                <button type="button" id="allocateCaseSubmitBtn" onclick="submitCaseAllocation()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold inline-flex items-center gap-2">
+                    <i class="fas fa-check"></i>
+                    Allocate
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Approve Case Modal (requires prior allocation) -->
+<div id="approveModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[92vh] flex flex-col">
+        <div class="bg-gradient-to-r from-green-600 to-emerald-700 text-white p-6 rounded-t-2xl flex items-center justify-between shrink-0">
+            <div class="min-w-0 pr-2">
+                <h2 class="text-xl font-bold flex items-center">
+                    <i class="fas fa-check-circle mr-3"></i>
+                    Approve Case
+                </h2>
+                <p class="text-sm text-green-100 mt-1 truncate">Tracking: <span id="approveModalTracking" class="font-semibold"></span></p>
+            </div>
+            <button type="button" onclick="closeApproveModal()" class="text-white hover:text-gray-200 transition-colors p-1 shrink-0">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1 space-y-4">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-1">Allocated To</p>
+                <p id="approveAllocatedName" class="text-sm font-semibold text-emerald-900">—</p>
+                <input type="hidden" id="approveEmpId" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Instructions / Brief</label>
+                <textarea id="approveInstructions" rows="4"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                    placeholder="Enter instructions or brief for the allocated employee..."></textarea>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-4">
+                <p class="text-sm font-semibold text-blue-800 flex items-center">
+                    <i class="fas fa-tasks mr-2"></i>
+                    Case task <span class="font-normal text-blue-600 ml-1">(created on approve)</span>
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Timeline / due date <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" id="approveDueDate"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">Reminder intervals <span class="text-red-500">*</span></label>
+                    <div id="approveReminderOptions" class="grid grid-cols-2 gap-2">
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="10m" class="mr-2">10 minutes before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="30m" class="mr-2">30 minutes before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="1h" class="mr-2">1 hour before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="6h" class="mr-2">6 hours before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="12h" class="mr-2">12 hours before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="1d" class="mr-2" checked>1 day before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="2d" class="mr-2">2 days before
+                        </label>
+                        <label class="inline-flex items-center px-3 py-2 border border-blue-100 bg-white rounded-lg text-sm text-gray-700">
+                            <input type="checkbox" name="approve_reminder_intervals" value="7d" class="mr-2">1 week before
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Task access permissions</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">View case details</span>
+                        <input type="checkbox" id="approveAllowViewDetails" class="h-4 w-4 text-green-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">Edit case details</span>
+                        <input type="checkbox" id="approveAllowEditDetails" class="h-4 w-4 text-green-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">View documents</span>
+                        <input type="checkbox" id="approveAllowViewDocs" class="h-4 w-4 text-green-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg">
+                        <span class="text-sm text-gray-700">Upload documents</span>
+                        <input type="checkbox" id="approveAllowUploadDocs" class="h-4 w-4 text-green-600 border-gray-300 rounded" checked>
+                    </label>
+                    <label class="flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg sm:col-span-2">
+                        <span class="text-sm text-gray-700">Download case documents</span>
+                        <input type="checkbox" id="approveAllowDownloadDocs" class="h-4 w-4 text-green-600 border-gray-300 rounded" checked>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">These permissions apply to the allocated employee, and only while the task is active.</p>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-end gap-3 shrink-0">
+            <button type="button" onclick="closeApproveModal()"
+                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                Cancel
+            </button>
+            <button type="button" id="approveSubmitBtn" onclick="submitApproval()"
+                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                <i class="fas fa-check"></i>
+                Approve
+            </button>
         </div>
     </div>
 </div>
@@ -296,9 +400,9 @@ let searchTimeout;
 
 /** How to organise the table: 'flat' | 'client' | 'court_rank' */
 let groupByMode = localStorage.getItem('caseManagementGroupBy') || 'client';
-if (groupByMode === 'category') {
-    groupByMode = 'court_rank';
-    localStorage.setItem('caseManagementGroupBy', 'court_rank');
+if (groupByMode === 'category' || groupByMode === 'flat') {
+    groupByMode = groupByMode === 'category' ? 'court_rank' : 'client';
+    localStorage.setItem('caseManagementGroupBy', groupByMode);
 }
 
 function setGroupByMode(mode) {
@@ -306,6 +410,7 @@ function setGroupByMode(mode) {
     groupByMode = mode;
     localStorage.setItem('caseManagementGroupBy', mode);
     syncGroupBySelect();
+    syncGroupByButtons();
     displayCases(displayedCases);
 }
 
@@ -317,9 +422,100 @@ function syncGroupBySelect() {
     }
 }
 
-/**
- * Split cases into groups for display (stable order within each group = API order).
- */
+function syncGroupByButtons() {
+    const activeCls = 'cm-group-btn px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center';
+    const idleCls = 'cm-group-btn px-3 py-1.5 text-gray-700 rounded-md hover:bg-white transition-colors text-sm font-semibold flex items-center';
+    document.querySelectorAll('.cm-group-btn').forEach((btn) => {
+        btn.className = btn.getAttribute('data-group') === groupByMode ? activeCls : idleCls;
+    });
+}
+
+/** Court hierarchy (highest first) — matches COURT_RANK_OPTIONS in app.py */
+const COURT_HIERARCHY = [
+    { name: "Supreme Court", icon: "fa-balance-scale", bg: "bg-amber-100", text: "text-amber-700", count: "text-amber-600", ring: "ring-amber-200", level: 1, hint: "Apex court" },
+    { name: "Court of Appeal", icon: "fa-university", bg: "bg-violet-100", text: "text-violet-700", count: "text-violet-600", ring: "ring-violet-200", level: 2, hint: "Appellate" },
+    { name: "High Court", icon: "fa-landmark", bg: "bg-indigo-100", text: "text-indigo-700", count: "text-indigo-600", ring: "ring-indigo-200", level: 3, hint: "Superior court" },
+    { name: "Environment and Land Court", icon: "fa-tree", bg: "bg-emerald-100", text: "text-emerald-700", count: "text-emerald-600", ring: "ring-emerald-200", level: 4, hint: "Specialized superior" },
+    { name: "Employment and Labour Relations Court", icon: "fa-briefcase", bg: "bg-sky-100", text: "text-sky-700", count: "text-sky-600", ring: "ring-sky-200", level: 4, hint: "Specialized superior" },
+    { name: "Magistrates' Courts", icon: "fa-gavel", bg: "bg-blue-100", text: "text-blue-700", count: "text-blue-600", ring: "ring-blue-200", level: 5, hint: "Subordinate court" },
+    { name: "Kadhi's Courts", icon: "fa-mosque", bg: "bg-teal-100", text: "text-teal-700", count: "text-teal-600", ring: "ring-teal-200", level: 6, hint: "Subordinate court" },
+    { name: "Courts Martial", icon: "fa-shield-alt", bg: "bg-slate-200", text: "text-slate-700", count: "text-slate-600", ring: "ring-slate-300", level: 6, hint: "Military tribunal" },
+    { name: "Small Claims Court", icon: "fa-file-invoice-dollar", bg: "bg-orange-100", text: "text-orange-700", count: "text-orange-600", ring: "ring-orange-200", level: 7, hint: "Subordinate court" },
+    { name: "Tribunals", icon: "fa-users", bg: "bg-rose-100", text: "text-rose-700", count: "text-rose-600", ring: "ring-rose-200", level: 8, hint: "Specialized forum" },
+];
+
+const COURT_META_BY_NAME = Object.fromEntries(COURT_HIERARCHY.map((c) => [c.name.toLowerCase(), c]));
+const COURT_FALLBACK = { icon: "fa-building", bg: "bg-gray-100", text: "text-gray-600", count: "text-gray-500", ring: "ring-gray-200", level: 99, hint: "Court rank" };
+
+const CLIENT_PALETTES = [
+    { bg: "bg-blue-100", text: "text-blue-700", count: "text-blue-600", icon: "fa-user", ring: "ring-blue-200" },
+    { bg: "bg-emerald-100", text: "text-emerald-700", count: "text-emerald-600", icon: "fa-user-tie", ring: "ring-emerald-200" },
+    { bg: "bg-violet-100", text: "text-violet-700", count: "text-violet-600", icon: "fa-id-card", ring: "ring-violet-200" },
+    { bg: "bg-amber-100", text: "text-amber-700", count: "text-amber-600", icon: "fa-user-graduate", ring: "ring-amber-200" },
+    { bg: "bg-rose-100", text: "text-rose-700", count: "text-rose-600", icon: "fa-user-circle", ring: "ring-rose-200" },
+    { bg: "bg-sky-100", text: "text-sky-700", count: "text-sky-600", icon: "fa-address-card", ring: "ring-sky-200" },
+    { bg: "bg-teal-100", text: "text-teal-700", count: "text-teal-600", icon: "fa-user-check", ring: "ring-teal-200" },
+    { bg: "bg-orange-100", text: "text-orange-700", count: "text-orange-600", icon: "fa-user-tag", ring: "ring-orange-200" },
+    { bg: "bg-indigo-100", text: "text-indigo-700", count: "text-indigo-600", icon: "fa-briefcase", ring: "ring-indigo-200" },
+    { bg: "bg-fuchsia-100", text: "text-fuchsia-700", count: "text-fuchsia-600", icon: "fa-building", ring: "ring-fuchsia-200" },
+];
+
+function hashString(str) {
+    let h = 0;
+    const s = String(str || '');
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+    return Math.abs(h);
+}
+
+function getClientPalette(key, clientType) {
+    const type = String(clientType || '').toLowerCase();
+    if (type.includes('corporate') || type.includes('company') || type.includes('organisation') || type.includes('organization')) {
+        return { bg: "bg-slate-200", text: "text-slate-700", count: "text-slate-600", icon: "fa-building", ring: "ring-slate-300" };
+    }
+    return CLIENT_PALETTES[hashString(key) % CLIENT_PALETTES.length];
+}
+
+function getCourtMeta(rankLabel) {
+    const key = String(rankLabel || '').trim().toLowerCase();
+    if (!key || key === 'court rank not specified') return { ...COURT_FALLBACK, name: rankLabel };
+    return { ...(COURT_META_BY_NAME[key] || COURT_FALLBACK), name: rankLabel };
+}
+
+/** Resolve client/employee profile picture to a usable image URL. */
+function profilePictureSrc(pic) {
+    const value = (pic || '').toString().trim();
+    if (!value) return '';
+    if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) return value;
+    if (value.startsWith('/static/')) return value;
+    if (value.startsWith('static/')) return '/' + value;
+    if (value.startsWith('uploads/')) return '/static/' + value;
+    return '/static/uploads/profile_pictures/' + value.replace(/^\/+/, '');
+}
+
+function clientAvatarHtml(pic, name, palette, sizeClass) {
+    const size = sizeClass || 'h-12 w-12';
+    const src = profilePictureSrc(pic);
+    const ring = palette.ring || 'ring-blue-200';
+    const fallback = `<div class="cm-avatar ${size} rounded-full ${palette.bg} flex items-center justify-center ring-2 ring-offset-1 ${ring}">
+                <i class="fas ${palette.icon} ${palette.text} text-xl"></i>
+            </div>`;
+    if (!src) return fallback;
+    const safeSrc = String(src).replace(/"/g, '&quot;');
+    return `<span class="cm-avatar-wrap relative inline-flex flex-shrink-0">
+                <img class="cm-avatar ${size} rounded-full object-cover ring-2 ring-offset-1 ${ring}" src="${safeSrc}" alt="${escapeHtml(name || 'Client')}"
+                    onerror="this.classList.add('hidden');var fb=this.nextElementSibling;if(fb)fb.classList.remove('hidden');">
+                <div class="cm-avatar ${size} rounded-full ${palette.bg} hidden flex items-center justify-center ring-2 ring-offset-1 ${ring}">
+                    <i class="fas ${palette.icon} ${palette.text} text-xl"></i>
+                </div>
+            </span>`;
+}
+
+function courtHierarchyIndex(rankLabel) {
+    const key = String(rankLabel || '').trim().toLowerCase();
+    const idx = COURT_HIERARCHY.findIndex((c) => c.name.toLowerCase() === key);
+    return idx === -1 ? 900 : idx;
+}
+
 function buildCaseGroups(cases, mode) {
     if (!cases || !cases.length || mode === 'flat') {
         return [{ label: null, sublabel: null, cases: cases || [] }];
@@ -347,13 +543,17 @@ function buildCaseGroups(cases, mode) {
         map.get(key).cases.push(c);
     }
     const groups = Array.from(map.values());
-    groups.sort((a, b) => {
-        const aLast = a.key === '__unspecified_rank__';
-        const bLast = b.key === '__unspecified_rank__';
-        if (aLast && !bLast) return 1;
-        if (!aLast && bLast) return -1;
-        return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
-    });
+    if (mode === 'court_rank') {
+        groups.sort((a, b) => {
+            if (a.key === '__unspecified_rank__') return 1;
+            if (b.key === '__unspecified_rank__') return -1;
+            const hi = courtHierarchyIndex(a.label) - courtHierarchyIndex(b.label);
+            if (hi !== 0) return hi;
+            return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+        });
+    } else {
+        groups.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+    }
     return groups;
 }
 
@@ -419,15 +619,35 @@ function loadPendingApprovalCases() {
         });
 }
 
-// Load all cases on page load
 document.addEventListener('DOMContentLoaded', function() {
     syncGroupBySelect();
+    syncGroupByButtons();
     const groupSel = document.getElementById('groupBySelect');
     if (groupSel) {
         groupSel.addEventListener('change', function() {
             setGroupByMode(this.value);
         });
     }
+    document.querySelectorAll('.cm-group-btn').forEach((btn) => {
+        btn.addEventListener('click', function() {
+            setGroupByMode(this.getAttribute('data-group'));
+        });
+    });
+
+    const searchInput = document.getElementById('client_search');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    if (searchInput && clearBtn) {
+        const syncClear = () => clearBtn.classList.toggle('hidden', !searchInput.value.trim());
+        searchInput.addEventListener('input', syncClear);
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            syncClear();
+            if (PENDING_ONLY) filterPendingCases('');
+            else searchCases('');
+            searchInput.focus();
+        });
+    }
+
     if (PENDING_ONLY) {
         if (groupSel) {
             groupSel.value = 'flat';
@@ -439,7 +659,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Live search as user types
 document.getElementById('client_search').addEventListener('input', function(e) {
     clearTimeout(searchTimeout);
     const term = e.target.value.trim();
@@ -453,35 +672,31 @@ document.getElementById('client_search').addEventListener('input', function(e) {
 });
 
 function searchCases(searchTerm) {
-    // Show loading indicator
     document.getElementById('loadingIndicator').classList.remove('hidden');
     document.getElementById('casesContainer').classList.add('hidden');
     document.getElementById('noResults').classList.add('hidden');
     document.getElementById('clientInfo').classList.add('hidden');
-    
-    // Build URL (q = name or phone)
-    const url = searchTerm 
+
+    const url = searchTerm
         ? `/api/cases/search?q=${encodeURIComponent(searchTerm)}`
         : '/api/cases/search';
-    
-    // Search for cases
+
     fetch(url)
         .then(response => response.json())
         .then(data => {
             document.getElementById('loadingIndicator').classList.add('hidden');
-            
+
             if (data.error) {
                 showError(data.error);
                 return;
             }
-            
-            // Display client information if found
+
             if (data.client) {
                 displayClientInfo(data.client);
             } else {
                 document.getElementById('clientInfo').classList.add('hidden');
             }
-            
+
             if (data.cases && data.cases.length > 0) {
                 displayCases(data.cases);
                 document.getElementById('casesContainer').classList.remove('hidden');
@@ -502,6 +717,8 @@ function searchCases(searchTerm) {
 
 function loadAllCases() {
     document.getElementById('client_search').value = '';
+    const clearBtn = document.getElementById('clearSearchBtn');
+    if (clearBtn) clearBtn.classList.add('hidden');
     if (PENDING_ONLY) {
         loadPendingApprovalCases();
         return;
@@ -511,51 +728,38 @@ function loadAllCases() {
 
 function displayClientInfo(client) {
     const clientDetails = document.getElementById('clientDetails');
-    const profilePicture = client.profile_picture 
-        ? `<img src="${client.profile_picture}" alt="Profile" class="w-16 h-16 rounded-full object-cover border-2 border-green-500">`
-        : `<div class="w-16 h-16 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-2xl font-bold border-2 border-green-500">${(client.full_name || 'C')[0].toUpperCase()}</div>`;
-    
+    const palette = getClientPalette(client.full_name || client.id || 'c', client.client_type || '');
+    const profilePicture = clientAvatarHtml(client.profile_picture, client.full_name || 'Client', palette, 'w-16 h-16');
+
     clientDetails.innerHTML = `
         <div class="md:col-span-4 flex items-center space-x-4 mb-4 pb-4 border-b border-gray-200">
-            <div>
-                ${profilePicture}
-            </div>
+            <div>${profilePicture}</div>
             <div class="flex-1">
-                <h4 class="text-lg font-bold text-gray-900">${client.full_name || 'N/A'}</h4>
-                <p class="text-sm text-gray-500">${client.client_type || 'N/A'} Client</p>
+                <h4 class="text-lg font-bold text-gray-900">${escapeHtml(client.full_name || 'N/A')}</h4>
+                <p class="text-sm text-gray-500">${escapeHtml(client.client_type || 'N/A')} Client</p>
             </div>
         </div>
         <div>
-            <p class="text-sm text-gray-500 mb-1">
-                <i class="fas fa-phone mr-2"></i>Phone Number
-            </p>
-            <p class="font-semibold text-gray-900">${client.phone_number || 'N/A'}</p>
+            <p class="text-sm text-gray-500 mb-1"><i class="fas fa-phone mr-2"></i>Phone Number</p>
+            <p class="font-semibold text-gray-900">${escapeHtml(client.phone_number || 'N/A')}</p>
         </div>
         <div>
-            <p class="text-sm text-gray-500 mb-1">
-                <i class="fas fa-envelope mr-2"></i>Email
-            </p>
-            <p class="font-semibold text-gray-900">${client.email || 'N/A'}</p>
+            <p class="text-sm text-gray-500 mb-1"><i class="fas fa-envelope mr-2"></i>Email</p>
+            <p class="font-semibold text-gray-900">${escapeHtml(client.email || 'N/A')}</p>
         </div>
         <div>
-            <p class="text-sm text-gray-500 mb-1">
-                <i class="fas fa-user-tag mr-2"></i>Client Type
-            </p>
-            <p class="font-semibold text-gray-900">${client.client_type || 'N/A'}</p>
+            <p class="text-sm text-gray-500 mb-1"><i class="fas fa-user-tag mr-2"></i>Client Type</p>
+            <p class="font-semibold text-gray-900">${escapeHtml(client.client_type || 'N/A')}</p>
         </div>
         <div>
-            <p class="text-sm text-gray-500 mb-1">
-                <i class="fas fa-info-circle mr-2"></i>Status
-            </p>
+            <p class="text-sm text-gray-500 mb-1"><i class="fas fa-info-circle mr-2"></i>Status</p>
             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${client.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                ${client.status || 'N/A'}
+                ${escapeHtml(client.status || 'N/A')}
             </span>
         </div>
         ${client.created_at ? `
         <div>
-            <p class="text-sm text-gray-500 mb-1">
-                <i class="fas fa-calendar mr-2"></i>Registered
-            </p>
+            <p class="text-sm text-gray-500 mb-1"><i class="fas fa-calendar mr-2"></i>Registered</p>
             <p class="font-semibold text-gray-900 text-sm">${new Date(client.created_at).toLocaleDateString()}</p>
         </div>
         ` : ''}
@@ -565,11 +769,8 @@ function displayClientInfo(client) {
 
 let displayedCases = [];
 
-function createCaseRow(caseItem) {
-    const row = document.createElement('tr');
-    row.className = 'hover:bg-gray-50';
-
-    const statusColors = {
+function statusClass(status) {
+    const map = {
         'Active': 'bg-green-100 text-green-800',
         'Closed': 'bg-gray-100 text-gray-800',
         'Archived': 'bg-blue-100 text-blue-800',
@@ -578,54 +779,69 @@ function createCaseRow(caseItem) {
         'Consolidated': 'bg-purple-100 text-purple-800',
         'Pending Approval': 'bg-red-100 text-red-800'
     };
-    const statusColor = statusColors[caseItem.status] || 'bg-gray-100 text-gray-800';
+    return map[status] || 'bg-gray-100 text-gray-800';
+}
 
-    let actionHtml = '';
+function buildActionHtml(caseItem) {
     if (caseItem.status !== 'Pending Approval') {
-        actionHtml = `
-            <button onclick="openAllocationModal(${caseItem.id})" class="text-gray-500 hover:text-indigo-600 mr-2" title="Brief description & timeline">
+        return `
+            <button type="button" onclick="event.stopPropagation(); openAllocationModal(${caseItem.id})" class="text-gray-500 hover:text-blue-600 mr-2" title="Brief description & timeline">
                 <i class="fas fa-info-circle"></i>
             </button>
-            <a href="/case_management/${caseItem.id}" class="text-indigo-600 hover:text-indigo-900 inline-flex items-center" title="View details">
-                <i class="fas fa-eye"></i>
-            </a>`;
-    } else {
-        const tn = (caseItem.tracking_number || '').replace(/'/g, "\\'");
-        actionHtml = `
-            <button onclick="openApproveModal(${caseItem.id}, '${tn}')"
-                class="inline-flex items-center px-3 py-1.5 bg-amber-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg mr-2 transition-colors" title="Approve & Allocate case">
-                <i class="fas fa-check-circle mr-1"></i>Approve
-            </button>
-            <a href="/case_management/${caseItem.id}" class="text-indigo-600 hover:text-indigo-900 inline-flex items-center gap-1 text-xs font-semibold" title="Pending approval — view details">
-                <i class="fas fa-clipboard-check"></i>
-                <span>View</span>
+            <a href="/case_management/${caseItem.id}" onclick="event.stopPropagation()" class="text-blue-600 hover:text-blue-800 inline-flex items-center" title="View details">
+                <i class="fas fa-eye mr-1"></i> View
             </a>`;
     }
+    const tn = (caseItem.tracking_number || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const allocatedName = (caseItem.filled_by_name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const isAllocated = !!caseItem.filled_by_id;
+    const approveBtn = isAllocated
+        ? `<button type="button" onclick="event.stopPropagation(); openApproveModal(${caseItem.id}, '${tn}', ${caseItem.filled_by_id}, '${allocatedName}')"
+            class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm" title="Approve case">
+            <i class="fas fa-check-circle mr-1"></i>Approve
+        </button>`
+        : `<button type="button" disabled aria-disabled="true"
+            class="inline-flex items-center px-3 py-1.5 bg-gray-200 text-gray-400 text-xs font-semibold rounded-lg cursor-not-allowed" title="Allocate first, then approve">
+            <i class="fas fa-check-circle mr-1"></i>Approve
+        </button>`;
+    return `
+        <button type="button" onclick="event.stopPropagation(); openAllocateCaseModal(${caseItem.id}, '${tn}')"
+            class="inline-flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg mr-2 transition-colors shadow-sm" title="Allocate case">
+            <i class="fas fa-user-plus mr-1"></i>Allocate
+        </button>
+        ${approveBtn}
+        <a href="/case_management/${caseItem.id}" onclick="event.stopPropagation()" class="ml-2 text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 text-xs font-semibold" title="Pending approval — view details">
+            <i class="fas fa-clipboard-check"></i>
+            <span>View</span>
+        </a>`;
+}
+
+function createCaseRow(caseItem) {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50';
 
     row.innerHTML = `
-        <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm font-semibold text-gray-900">${caseItem.tracking_number || 'N/A'}</div>
+        <td class="px-4 py-3 whitespace-nowrap">
+            <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" onclick="window.location.href='/case_management/${caseItem.id}'">${escapeHtml(caseItem.tracking_number || 'N/A')}</div>
+            <div class="text-xs text-gray-500 mt-1">${escapeHtml(caseItem.filing_date || 'N/A')}</div>
         </td>
-        <td class="px-6 py-4">
-            <div class="text-sm font-medium text-gray-900">${caseItem.client_full_name || caseItem.client_name || 'N/A'}</div>
-            <div class="text-sm text-gray-500 mt-1">${caseItem.client_phone || 'N/A'}</div>
+        <td class="px-4 py-3">
+            <div class="text-sm text-gray-900">${escapeHtml(caseItem.client_full_name || caseItem.client_name || 'N/A')}</div>
+            <div class="text-sm text-gray-500 mt-1">${escapeHtml(caseItem.client_phone || 'N/A')}</div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm text-gray-900">${caseItem.case_category || 'N/A'}</div>
+        <td class="px-4 py-3 whitespace-nowrap">
+            <div class="text-sm text-gray-900">${escapeHtml(caseItem.case_category || 'N/A')}</div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm text-gray-900">${caseItem.filing_date || 'N/A'}</div>
+        <td class="px-4 py-3 whitespace-nowrap">
+            <div class="text-sm text-gray-900">${escapeHtml(caseItem.station || 'N/A')}</div>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm text-gray-900">${caseItem.station || 'N/A'}</div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">
-                ${caseItem.status || 'N/A'}
+        <td class="px-4 py-3 whitespace-nowrap">
+            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass(caseItem.status)}">
+                ${escapeHtml(caseItem.status || 'N/A')}
             </span>
         </td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-            ${actionHtml}
+        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+            ${buildActionHtml(caseItem)}
         </td>
     `;
     return row;
@@ -640,13 +856,13 @@ function updateSectionHeading(groupCount) {
     if (!labelEl || !iconEl || !gc) return;
 
     if (groupByMode === 'flat') {
-        labelEl.textContent = 'All matters:';
+        labelEl.textContent = 'All Matters:';
         iconEl.className = 'fas fa-list text-blue-600';
         gc.textContent = String(total);
         if (sub) sub.classList.add('hidden');
     } else if (groupByMode === 'court_rank') {
-        labelEl.textContent = 'Court ranks:';
-        iconEl.className = 'fas fa-gavel text-blue-600';
+        labelEl.textContent = 'Court Ranks:';
+        iconEl.className = 'fas fa-landmark text-blue-600';
         gc.textContent = String(groupCount != null ? groupCount : 0);
         if (sub) sub.classList.remove('hidden');
     } else {
@@ -662,51 +878,55 @@ function buildAccordionSummaryHtml(g, mode) {
     if (mode === 'client') {
         const first = g.cases[0] || {};
         const name = (first.client_full_name || first.client_name || g.label || 'Unknown client').trim();
-        const phone = (first.client_phone || g.sublabel || '').trim() || '—';
-        const email = (first.client_email || '').trim() || '—';
+        const phone = (first.client_phone || g.sublabel || '').trim() || 'No phone';
+        const email = (first.client_email || '').trim();
         const pic = first.client_profile_picture;
-        const initial = (name.charAt(0) || '?').toUpperCase();
-        const safePic = pic ? String(pic).replace(/"/g, '&quot;') : '';
-        const avatar = pic
-            ? `<img src="${safePic}" alt="" class="w-12 h-12 rounded-full object-cover border-2 border-blue-100 shadow-sm flex-shrink-0">`
-            : `<div class="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white text-lg font-bold shadow-inner flex-shrink-0" aria-hidden="true">${escapeHtml(initial)}</div>`;
+        const clientType = first.client_type || '';
+        const palette = getClientPalette(g.key || name, clientType);
+        const avatar = clientAvatarHtml(pic, name, palette);
 
         return `
-            <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left">
-                ${avatar}
+            <div class="flex items-center space-x-4 min-w-0 flex-1 text-left">
+                <div class="flex-shrink-0">${avatar}</div>
                 <div class="min-w-0">
-                    <div class="font-bold text-gray-900 text-base leading-tight truncate">${escapeHtml(name)}</div>
-                    <div class="text-sm text-gray-500 mt-0.5 truncate">${escapeHtml(phone)} <span class="text-gray-300">•</span> ${escapeHtml(email)}</div>
+                    <div class="text-lg font-semibold text-gray-900 truncate">${escapeHtml(name)}</div>
+                    <div class="text-sm text-gray-500 truncate">${escapeHtml(phone)}${email ? ' • ' + escapeHtml(email) : ''}</div>
                 </div>
             </div>
-            <div class="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+            <div class="flex items-center space-x-4 flex-shrink-0">
                 <div class="text-right">
-                    <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Matters</div>
-                    <div class="text-2xl font-bold text-gray-900 leading-none tabular-nums">${count}</div>
+                    <div class="text-sm text-gray-500">Matters</div>
+                    <div class="cm-count text-2xl font-bold ${palette.count}">${count}</div>
                 </div>
-                <i class="fas fa-chevron-down cm-chevron text-gray-400 text-sm transition-transform duration-200" aria-hidden="true"></i>
+                <i class="fas fa-chevron-down cm-chevron text-gray-400" aria-hidden="true"></i>
             </div>
         `;
     }
 
-    /* court_rank */
+    const meta = getCourtMeta(g.label);
     const rankLabel = escapeHtml(g.label || 'Court rank not specified');
+    const levelBadge = meta.level && meta.level < 99
+        ? `<span class="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide ${meta.text} bg-white px-2 py-0.5 rounded-full border border-gray-200">L${meta.level} · ${escapeHtml(meta.hint)}</span>`
+        : `<span class="text-sm text-gray-500">${escapeHtml(meta.hint || 'Court Rank')}</span>`;
+
     return `
-        <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 text-left">
-            <div class="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-inner flex-shrink-0" aria-hidden="true">
-                <i class="fas fa-gavel text-lg"></i>
+        <div class="flex items-center space-x-4 min-w-0 flex-1 text-left">
+            <div class="flex-shrink-0">
+                <div class="cm-avatar h-12 w-12 rounded-full ${meta.bg} flex items-center justify-center ring-2 ring-offset-1 ${meta.ring}">
+                    <i class="fas ${meta.icon} ${meta.text} text-xl"></i>
+                </div>
             </div>
             <div class="min-w-0">
-                <div class="font-bold text-gray-900 text-base leading-tight truncate">${rankLabel}</div>
-                <div class="text-sm text-gray-500 mt-0.5">${count} matter${count === 1 ? '' : 's'}</div>
+                <div class="text-lg font-semibold text-gray-900 truncate">${rankLabel}</div>
+                <div class="mt-0.5">${levelBadge}</div>
             </div>
         </div>
-        <div class="flex items-center gap-3 sm:gap-5 flex-shrink-0">
+        <div class="flex items-center space-x-4 flex-shrink-0">
             <div class="text-right">
-                <div class="text-[10px] uppercase tracking-wide text-gray-500 font-semibold">Matters</div>
-                <div class="text-2xl font-bold text-gray-900 leading-none tabular-nums">${count}</div>
+                <div class="text-sm text-gray-500">Matters</div>
+                <div class="cm-count text-2xl font-bold ${meta.count}">${count}</div>
             </div>
-            <i class="fas fa-chevron-down cm-chevron text-gray-400 text-sm transition-transform duration-200" aria-hidden="true"></i>
+            <i class="fas fa-chevron-down cm-chevron text-gray-400" aria-hidden="true"></i>
         </div>
     `;
 }
@@ -724,12 +944,7 @@ function displayCases(cases) {
     if (!total) {
         if (tbody) tbody.innerHTML = '';
         if (accordionWrap) {
-            accordionWrap.innerHTML = `
-                <div class="text-center py-12 px-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 text-gray-500">
-                    <i class="fas fa-inbox text-3xl mb-3 text-gray-300"></i>
-                    <p class="font-medium">No matters found</p>
-                </div>
-            `;
+            accordionWrap.innerHTML = '<div class="text-center text-gray-500 py-8">No matters found</div>';
         }
         updateSectionHeading(0);
         if (flatWrap) flatWrap.classList.add('hidden');
@@ -751,7 +966,6 @@ function displayCases(cases) {
         return;
     }
 
-    /* Accordion: by client or court rank */
     if (flatWrap) flatWrap.classList.add('hidden');
     if (accordionWrap) accordionWrap.classList.remove('hidden');
     if (tbody) tbody.innerHTML = '';
@@ -762,34 +976,33 @@ function displayCases(cases) {
     accordionWrap.innerHTML = '';
     groups.forEach((g, idx) => {
         const det = document.createElement('details');
-        det.className = 'cm-accordion border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden transition-shadow hover:shadow-md';
-        if (idx === 0) det.open = true;
+        det.className = 'cm-accordion border border-gray-200 rounded-xl bg-white overflow-hidden';
+        det.style.animationDelay = `${Math.min(idx, 12) * 0.045}s`;
 
         const sum = document.createElement('summary');
-        sum.className = 'flex items-center justify-between gap-3 px-4 sm:px-5 py-4 cursor-pointer select-none bg-white hover:bg-slate-50/90';
+        sum.className = 'flex items-center justify-between gap-3 p-4 cursor-pointer select-none bg-white';
         sum.innerHTML = buildAccordionSummaryHtml(g, groupByMode);
 
         const panel = document.createElement('div');
-        panel.className = 'border-t border-gray-100 bg-slate-50/60';
+        panel.className = 'cm-panel border-t border-gray-200 bg-gray-50';
         const inner = document.createElement('div');
-        inner.className = 'overflow-x-auto';
+        inner.className = 'p-4 overflow-x-auto';
         const table = document.createElement('table');
         table.className = 'min-w-full divide-y divide-gray-200';
         table.innerHTML = `
-            <thead class="bg-gray-100/80">
+            <thead class="bg-gray-100">
                 <tr>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Tracking #</th>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Filing Date</th>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Station</th>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th class="px-4 sm:px-6 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Tracking # / Filing Date</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Client</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Station</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
         `;
         const tb = document.createElement('tbody');
-        tb.className = 'bg-white divide-y divide-gray-100';
+        tb.className = 'bg-white divide-y divide-gray-200';
         g.cases.forEach((caseItem) => tb.appendChild(createCaseRow(caseItem)));
         table.appendChild(tb);
         inner.appendChild(table);
@@ -830,35 +1043,161 @@ document.getElementById('allocationModal').addEventListener('click', function(e)
     if (e.target === this) closeAllocationModal();
 });
 
-// ── Approve & Allocate Modal ────────────────────────────────────────────────
 let approveCaseId = null;
+let allocateCaseId = null;
 let allEmployees = [];
 
-function openApproveModal(caseId, trackingNumber) {
+const APPROVE_TASKS_REDIRECT_URL = {{ role_url('case_task_management')|tojson }};
+
+function resetApprovePermissionDefaults() {
+    document.getElementById('approveAllowViewDetails').checked = true;
+    document.getElementById('approveAllowEditDetails').checked = true;
+    document.getElementById('approveAllowViewDocs').checked = true;
+    document.getElementById('approveAllowUploadDocs').checked = true;
+    document.getElementById('approveAllowDownloadDocs').checked = true;
+    document.querySelectorAll('input[name="approve_reminder_intervals"]').forEach(cb => {
+        cb.checked = cb.value === '1d';
+    });
+}
+
+function ensureAllocationEmployeesLoaded() {
+    if (allEmployees.length) return Promise.resolve(allEmployees);
+    return fetch('/api/allocation_eligible_employees')
+        .then(r => r.json())
+        .then(data => {
+            allEmployees = data.employees || [];
+            return allEmployees;
+        })
+        .catch(() => {
+            allEmployees = [];
+            return allEmployees;
+        });
+}
+
+function openAllocateCaseModal(caseId, trackingNumber) {
+    allocateCaseId = caseId;
+    document.getElementById('allocateCaseModalTracking').textContent = trackingNumber || ('Case #' + caseId);
+    document.getElementById('allocateCaseEmpId').value = '';
+    document.getElementById('allocateCaseEmpSearch').value = '';
+    document.getElementById('allocateCaseEmpSelected').classList.add('hidden');
+    document.getElementById('allocateCaseEmpDropdown').classList.add('hidden');
+    document.getElementById('allocateCaseModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    ensureAllocationEmployeesLoaded();
+}
+
+function closeAllocateCaseModal() {
+    document.getElementById('allocateCaseModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    allocateCaseId = null;
+}
+
+document.getElementById('allocateCaseModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAllocateCaseModal();
+});
+
+function renderAllocateCaseDropdown(query) {
+    const dropdown = document.getElementById('allocateCaseEmpDropdown');
+    dropdown.innerHTML = '';
+    const q = (query || '').trim().toLowerCase();
+    const filtered = q
+        ? allEmployees.filter(e => (e.full_name || '').toLowerCase().includes(q) || (e.role || '').toLowerCase().includes(q))
+        : allEmployees;
+    if (!filtered.length) {
+        dropdown.classList.add('hidden');
+        return;
+    }
+    filtered.forEach(emp => {
+        const item = document.createElement('div');
+        item.className = 'px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100';
+        item.innerHTML = `
+            <div class="font-semibold text-gray-900 text-sm">${escapeHtml(emp.full_name)}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(emp.role || '')}</div>
+        `;
+        item.addEventListener('click', () => {
+            document.getElementById('allocateCaseEmpId').value = emp.id;
+            document.getElementById('allocateCaseEmpSearch').value = emp.full_name;
+            document.getElementById('allocateCaseEmpSelectedName').textContent = emp.full_name + ' (' + (emp.role || '') + ')';
+            document.getElementById('allocateCaseEmpSelected').classList.remove('hidden');
+            dropdown.classList.add('hidden');
+        });
+        dropdown.appendChild(item);
+    });
+    dropdown.classList.remove('hidden');
+}
+
+document.getElementById('allocateCaseEmpSearch').addEventListener('input', function() {
+    ensureAllocationEmployeesLoaded().then(() => renderAllocateCaseDropdown(this.value));
+});
+
+document.getElementById('allocateCaseEmpSearch').addEventListener('focus', function() {
+    ensureAllocationEmployeesLoaded().then(() => renderAllocateCaseDropdown(this.value));
+});
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#allocateCaseEmpSearch') && !e.target.closest('#allocateCaseEmpDropdown')) {
+        const dd = document.getElementById('allocateCaseEmpDropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+});
+
+function submitCaseAllocation() {
+    const empId = document.getElementById('allocateCaseEmpId').value;
+    if (!empId) {
+        showError('Please select a Managing Partner or Associate Advocate to allocate the case to.');
+        return;
+    }
+    if (!allocateCaseId) return;
+
+    const btn = document.getElementById('allocateCaseSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Allocating...';
+
+    fetch(`/api/allocate_case/${allocateCaseId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employee_id: parseInt(empId) })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            closeAllocateCaseModal();
+            showSuccess(data.message || 'Case allocated successfully. You can now approve it.');
+            if (PENDING_ONLY) {
+                loadPendingApprovalCases();
+            } else {
+                loadAllCases();
+            }
+        } else {
+            showError(data.error || 'Could not allocate case');
+        }
+    })
+    .catch(() => showError('Error allocating case. Please try again.'))
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i>Allocate';
+    });
+}
+
+function openApproveModal(caseId, trackingNumber, filledById, filledByName) {
+    const caseRow = displayedCases.find(x => String(x.id) === String(caseId));
+    const allocId = filledById || (caseRow && caseRow.filled_by_id);
+    const allocName = filledByName || (caseRow && caseRow.filled_by_name) || '';
+    if (!allocId) {
+        showError('Allocate this case to a Managing Partner or Associate Advocate before approving.');
+        return;
+    }
+
     approveCaseId = caseId;
     document.getElementById('approveModalTracking').textContent = trackingNumber || ('Case #' + caseId);
-    document.getElementById('approveEmpId').value = '';
-    document.getElementById('approveEmpSearch').value = '';
-    document.getElementById('approveEmpSelected').classList.add('hidden');
+    document.getElementById('approveEmpId').value = allocId;
+    document.getElementById('approveAllocatedName').textContent = allocName || ('Employee #' + allocId);
     document.getElementById('approveInstructions').value = '';
     document.getElementById('approveDueDate').value = '';
-    document.getElementById('approveTimeline').selectedIndex = 0;
-    document.getElementById('approveEmpDropdown').classList.add('hidden');
+    resetApprovePermissionDefaults();
 
     document.getElementById('approveModal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-
-    // Load employees (any active employee) once
-    if (allEmployees.length === 0) {
-        fetch('/api/get_active_employees')
-            .then(r => r.json())
-            .then(data => {
-                if (data.employees) {
-                    allEmployees = data.employees;
-                }
-            })
-            .catch(() => {});
-    }
 }
 
 function closeApproveModal() {
@@ -871,65 +1210,39 @@ document.getElementById('approveModal').addEventListener('click', function(e) {
     if (e.target === this) closeApproveModal();
 });
 
-// Employee search inside approve modal
-document.getElementById('approveEmpSearch').addEventListener('input', function() {
-    const q = this.value.trim().toLowerCase();
-    const dropdown = document.getElementById('approveEmpDropdown');
-    dropdown.innerHTML = '';
-
-    const filtered = q
-        ? allEmployees.filter(e => e.full_name.toLowerCase().includes(q) || (e.role || '').toLowerCase().includes(q))
-        : allEmployees;
-
-    if (!filtered.length) {
-        dropdown.classList.add('hidden');
-        return;
-    }
-
-    filtered.forEach(emp => {
-        const item = document.createElement('div');
-        item.className = 'px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-100';
-        item.innerHTML = `
-            <div class="font-semibold text-gray-900 text-sm">${emp.full_name}</div>
-            <div class="text-xs text-gray-500">${emp.role || ''}</div>
-        `;
-        item.addEventListener('click', () => {
-            document.getElementById('approveEmpId').value = emp.id;
-            document.getElementById('approveEmpSearch').value = emp.full_name;
-            document.getElementById('approveEmpSelectedName').textContent = emp.full_name + ' (' + (emp.role || '') + ')';
-            document.getElementById('approveEmpSelected').classList.remove('hidden');
-            dropdown.classList.add('hidden');
-        });
-        dropdown.appendChild(item);
-    });
-    dropdown.classList.remove('hidden');
-});
-
-// Show all employees on focus if empty
-document.getElementById('approveEmpSearch').addEventListener('focus', function() {
-    if (!this.value.trim()) this.dispatchEvent(new Event('input'));
-});
-
-// Close dropdown on outside click
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('#approveEmpSearch') && !e.target.closest('#approveEmpDropdown')) {
-        document.getElementById('approveEmpDropdown').classList.add('hidden');
-    }
-});
-
 function submitApproval() {
     const empId = document.getElementById('approveEmpId').value;
     if (!empId) {
-        showError('Please select an employee to allocate the case to.');
+        showError('Allocate this case before approving.');
         return;
     }
     if (!approveCaseId) return;
 
+    const dueDate = document.getElementById('approveDueDate').value.trim();
+    if (!dueDate) {
+        showError('Please set a timeline / due date for the case task.');
+        return;
+    }
+    const reminderIntervals = Array.from(
+        document.querySelectorAll('input[name="approve_reminder_intervals"]:checked')
+    ).map(cb => cb.value);
+    if (!reminderIntervals.length) {
+        showError('Select at least one reminder interval.');
+        return;
+    }
+
+    const caseIdForRedirect = approveCaseId;
     const payload = {
         employee_id: parseInt(empId),
         instructions: document.getElementById('approveInstructions').value.trim(),
-        due_date: document.getElementById('approveDueDate').value.trim(),
-        timeline: document.getElementById('approveTimeline').value.trim()
+        due_date: dueDate,
+        timeline: reminderIntervals.join(','),
+        reminder_intervals: reminderIntervals,
+        allow_view_case_details: document.getElementById('approveAllowViewDetails').checked,
+        allow_edit_case_details: document.getElementById('approveAllowEditDetails').checked,
+        allow_view_case_documents: document.getElementById('approveAllowViewDocs').checked,
+        allow_upload_case_documents: document.getElementById('approveAllowUploadDocs').checked,
+        allow_download_case_documents: document.getElementById('approveAllowDownloadDocs').checked
     };
 
     const btn = document.getElementById('approveSubmitBtn');
@@ -945,12 +1258,9 @@ function submitApproval() {
     .then(data => {
         if (data.success) {
             closeApproveModal();
-            showSuccess(data.message || 'Case approved and allocated successfully');
-            if (PENDING_ONLY) {
-                loadPendingApprovalCases();
-            } else {
-                searchCases(document.getElementById('client_search').value.trim());
-            }
+            const redirectUrl = data.redirect_url
+                || (APPROVE_TASKS_REDIRECT_URL + (APPROVE_TASKS_REDIRECT_URL.includes('?') ? '&' : '?') + 'case_id=' + caseIdForRedirect);
+            window.location.href = redirectUrl;
         } else {
             showError(data.error || 'Could not approve case');
         }
@@ -958,7 +1268,7 @@ function submitApproval() {
     .catch(() => showError('Error approving case. Please try again.'))
     .finally(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Approve & Allocate';
+        btn.innerHTML = '<i class="fas fa-check mr-2"></i>Approve';
     });
 }
 
@@ -968,7 +1278,7 @@ function showError(message) {
     errorDiv.innerHTML = `
         <div class="flex items-center">
             <i class="fas fa-exclamation-circle mr-3 text-xl"></i>
-            <span>${message}</span>
+            <span>${escapeHtml(message)}</span>
         </div>
     `;
     errorDiv.classList.remove('hidden');
@@ -981,7 +1291,7 @@ function showSuccess(message) {
     errorDiv.innerHTML = `
         <div class="flex items-center">
             <i class="fas fa-check-circle mr-3 text-xl"></i>
-            <span>${message}</span>
+            <span>${escapeHtml(message)}</span>
         </div>
     `;
     errorDiv.classList.remove('hidden');

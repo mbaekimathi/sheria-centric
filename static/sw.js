@@ -14,7 +14,7 @@
  *   uploads). These must always hit the network.
  */
 
-const VERSION = "sheria-centric-pwa-v3";
+const VERSION = "sheria-centric-pwa-v4";
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -68,6 +68,30 @@ function isNetworkOnly(url) {
   return NETWORK_ONLY_PATTERNS.some((re) => re.test(url.pathname));
 }
 
+/* Navigation requests use redirect:"manual". If we follow a 302 (e.g. / →
+   /dashboard → /managing-partner/dashboard) and return that Response as-is,
+   Chrome rejects it: "a redirected response was used for a request whose
+   redirect mode is not follow" — which our catch treated as offline. */
+async function cleanRedirectedResponse(response) {
+  if (!response || !response.redirected) return response;
+  return new Response(await response.blob(), {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+async function networkFirstNavigation(req) {
+  const fresh = await fetch(req.url, {
+    method: "GET",
+    headers: req.headers,
+    credentials: "same-origin",
+    redirect: "follow",
+    cache: "no-store",
+  });
+  return cleanRedirectedResponse(fresh);
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -80,8 +104,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         try {
-          const fresh = await fetch(req);
-          return fresh;
+          return await networkFirstNavigation(req);
         } catch (err) {
           const cached = await caches.match(req);
           if (cached) return cached;

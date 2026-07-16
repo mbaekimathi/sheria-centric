@@ -136,8 +136,8 @@
 </div>
 
 <!-- Role Assignment & Approval Modal -->
-<div id="approveModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+<div id="approveModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[220] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         <div class="p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6">
             <div class="flex items-center justify-between mb-4 sm:mb-5">
                 <h3 class="text-lg sm:text-xl font-bold text-gray-900">Approve Employee</h3>
@@ -146,7 +146,7 @@
                 </button>
             </div>
             <p class="text-gray-600 text-sm mb-4">Assign a role and approve <strong id="approve-emp-name" class="text-gray-900"></strong>.</p>
-            <div class="mb-5">
+            <div class="mb-4">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">Assign Role</label>
                 <select id="roleSelect" class="input-modern w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white">
                     <option value="">Keep current role</option>
@@ -159,11 +159,55 @@
                     <option value="Employee">Employee</option>
                 </select>
             </div>
+
+            <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-3">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Personal email</p>
+                    <p id="approve-personal-email" class="text-sm font-medium text-gray-900 break-all mt-0.5">—</p>
+                </div>
+
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="allocateWorkEmail" class="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" checked onchange="toggleWorkEmailFields()">
+                    <span class="text-sm text-gray-800">
+                        <span class="font-semibold">Allocate work email</span>
+                        <span class="block text-xs text-gray-500 mt-0.5">Create a firm mailbox on @{{ email_domain }}</span>
+                    </span>
+                </label>
+
+                <div id="workEmailFields" class="space-y-3 pl-7">
+                    <div id="existingWorkEmailNotice" class="hidden text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                        Already has firm work email: <strong id="approve-existing-work-email" class="break-all"></strong>
+                    </div>
+                    <div id="newWorkEmailFields">
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">Work email username</label>
+                        <div class="flex items-stretch rounded-xl border border-gray-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-green-500 focus-within:border-transparent">
+                            <input type="text" id="workEmailLocal" autocomplete="off" spellcheck="false"
+                                class="flex-1 min-w-0 px-3 py-2.5 text-sm border-0 focus:outline-none focus:ring-0"
+                                placeholder="first.last">
+                            <span class="inline-flex items-center px-3 text-xs sm:text-sm text-gray-500 bg-gray-50 border-l border-gray-200 whitespace-nowrap">@{{ email_domain }}</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-1.5">Suggested from their name; edit if needed.</p>
+                    </div>
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="linkPersonalEmail" class="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500" checked>
+                        <span class="text-sm text-gray-800">
+                            <span class="font-semibold">Link with personal email</span>
+                            <span class="block text-xs text-gray-500 mt-0.5">Forward mail from the work address to their personal inbox</span>
+                        </span>
+                    </label>
+                </div>
+                {% if not email_configured %}
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    Email settings are not configured. Approval will still work, but work email cannot be created until Communication Settings are saved.
+                </p>
+                {% endif %}
+            </div>
+
             <div class="flex gap-3">
                 <button onclick="closeApproveModal()" class="btn-touch flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors font-semibold text-sm">
                     Cancel
                 </button>
-                <button onclick="confirmApproval()" class="btn-touch flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md">
+                <button onclick="confirmApproval()" id="confirmApproveBtn" class="btn-touch flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md">
                     <i class="fas fa-check mr-2"></i>Approve
                 </button>
             </div>
@@ -171,54 +215,37 @@
     </div>
 </div>
 
-<!-- Employee Onboarding Details Modal (full-screen on mobile, centered on desktop) -->
-<div id="employeeDetailsModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="details-modal-panel absolute inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-4xl sm:max-h-[90vh] sm:rounded-2xl bg-white flex flex-col overflow-hidden">
-        <!-- Sticky Header -->
-        <div class="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 flex-shrink-0 bg-white shadow-sm">
-            <h3 class="text-base sm:text-xl font-bold text-gray-900 flex items-center min-w-0 truncate pr-2">
-                <i class="fas fa-user-check text-green-600 mr-2 sm:mr-3 flex-shrink-0"></i>
-                <span class="truncate" id="employeeDetailsModalTitle">Employee Onboarding Details</span>
-            </h3>
-            <button onclick="closeEmployeeDetailsModal()" class="btn-touch flex-shrink-0 p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-                <i class="fas fa-times text-lg sm:text-xl"></i>
-            </button>
-        </div>
-
-        <!-- Scrollable Content -->
-        <div id="employeeDetailsContent" class="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6"></div>
-
-        <!-- Sticky Footer -->
-        <div id="employeeDetailsFooter" class="flex flex-wrap justify-end gap-2 sm:gap-3 p-4 sm:p-5 border-t border-gray-200 flex-shrink-0 bg-gray-50/50">
-            <button onclick="closeEmployeeDetailsModal()" class="btn-touch px-4 sm:px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm shadow-sm">
-                Close
-            </button>
-            <button id="editOnboardingBtn" type="button" onclick="switchToEditMode()" class="btn-touch px-4 sm:px-5 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors font-semibold text-sm shadow-md hidden">
-                <i class="fas fa-edit mr-1.5 sm:mr-2"></i>Edit
-            </button>
-            <button id="approveFromModalBtn" onclick="approveFromModal()" class="btn-touch px-4 sm:px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md hidden">
-                <i class="fas fa-check mr-1.5 sm:mr-2"></i>Approve
-            </button>
-        </div>
-        <!-- Edit mode footer (hidden by default) -->
-        <div id="employeeDetailsEditFooter" class="hidden flex flex-wrap justify-end gap-2 sm:gap-3 p-4 sm:p-5 border-t border-gray-200 flex-shrink-0 bg-gray-50/50">
-            <button type="button" onclick="cancelEditMode()" class="btn-touch px-4 sm:px-5 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold text-sm shadow-sm">
-                Cancel
-            </button>
-            <button type="button" id="saveOnboardingBtn" onclick="saveOnboardingEdits()" class="btn-touch px-4 sm:px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 active:bg-green-800 transition-colors font-semibold text-sm shadow-md">
-                <i class="fas fa-save mr-1.5 sm:mr-2"></i>Save
-            </button>
-        </div>
-    </div>
-</div>
-
 <script>
 let allEmployees = [];
 let currentFilter = 'all';
-let currentEmployeeId = null;
-let currentEmployeeData = null;
 let approveTargetId = null;
 let approveTargetName = '';
+const approvalsBaseUrl = {{ role_url('onboarding_approvals')|tojson }};
+const emailDomain = {{ email_domain|tojson }};
+const emailConfigured = {{ email_configured|tojson }};
+
+function employeeDetailUrl(id) {
+    return `${approvalsBaseUrl}/${id}`;
+}
+
+function suggestWorkEmailLocal(fullName) {
+    const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    const slug = (s) => (s || '')
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    const first = slug(parts[0]);
+    const last = parts.length > 1 ? slug(parts[parts.length - 1]) : '';
+    if (!first) return '';
+    return last && last !== first ? `${first}.${last}` : first;
+}
+
+function firmDomainOf(email) {
+    if (!email || !email.includes('@')) return '';
+    return email.split('@').pop().toLowerCase();
+}
 
 const ROLE_COLORS = {
     'Firm Administrator': 'bg-purple-100 text-purple-800',
@@ -335,7 +362,6 @@ function renderEmployees() {
         const onboardingBadge = emp.onboarding_completed
             ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700"><i class="fas fa-check-circle mr-1"></i>Complete</span>'
             : '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"><i class="fas fa-clock mr-1"></i>In Progress</span>';
-        const escapedName = emp.full_name.replace(/'/g, "\\'");
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50/80 transition-colors group">
                 <td class="py-4 pl-5"><div class="flex items-center gap-3">
@@ -354,8 +380,8 @@ function renderEmployees() {
                 <td class="py-4">${onboardingBadge}</td>
                 <td class="py-4"><p class="text-sm text-gray-500">${formatDate(emp.created_at)}</p></td>
                 <td class="py-4 pr-4"><div class="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <button onclick="viewEmployeeDetails(${emp.id})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="View Details"><i class="fas fa-eye"></i></button>
-                    <button onclick="openApproveModal(${emp.id}, '${escapedName}')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors ${emp.onboarding_completed ? '' : 'opacity-30 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled title="Onboarding must be completed first"'} title="Approve"><i class="fas fa-check-circle"></i></button>
+                    <a href="${employeeDetailUrl(emp.id)}" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center justify-center" title="View Details"><i class="fas fa-eye"></i></a>
+                    <button onclick="openApproveModal(${emp.id})" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors ${emp.onboarding_completed ? '' : 'opacity-30 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled title="Onboarding must be completed first"'} title="Approve"><i class="fas fa-check-circle"></i></button>
                     <button onclick="rejectEmployee(${emp.id})" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Reject"><i class="fas fa-times-circle"></i></button>
                 </div></td>
             </tr>`;
@@ -369,7 +395,6 @@ function renderEmployees() {
         const onboardingBadge = emp.onboarding_completed
             ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700"><i class="fas fa-check-circle mr-1"></i>Complete</span>'
             : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700"><i class="fas fa-clock mr-1"></i>Pending</span>';
-        const escapedName = emp.full_name.replace(/'/g, "\\'");
         return `
             <div class="card-employee bg-white rounded-xl p-4 border border-gray-200 mb-3 shadow-sm">
                 <div class="flex items-start gap-3">
@@ -396,8 +421,8 @@ function renderEmployees() {
                         <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                             <p class="text-[10px] text-gray-400">${formatDate(emp.created_at)}</p>
                             <div class="flex items-center gap-1">
-                                <button onclick="viewEmployeeDetails(${emp.id})" class="btn-touch p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-xl transition-colors" title="View Details"><i class="fas fa-eye text-sm"></i></button>
-                                <button onclick="openApproveModal(${emp.id}, '${escapedName}')" class="btn-touch p-2.5 text-green-600 hover:bg-green-50 active:bg-green-100 rounded-xl transition-colors ${emp.onboarding_completed ? '' : 'opacity-30 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled'} title="Approve"><i class="fas fa-check-circle text-sm"></i></button>
+                                <a href="${employeeDetailUrl(emp.id)}" class="btn-touch p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-xl transition-colors inline-flex items-center justify-center" title="View Details"><i class="fas fa-eye text-sm"></i></a>
+                                <button onclick="openApproveModal(${emp.id})" class="btn-touch p-2.5 text-green-600 hover:bg-green-50 active:bg-green-100 rounded-xl transition-colors ${emp.onboarding_completed ? '' : 'opacity-30 cursor-not-allowed'}" ${emp.onboarding_completed ? '' : 'disabled'} title="Approve"><i class="fas fa-check-circle text-sm"></i></button>
                                 <button onclick="rejectEmployee(${emp.id})" class="btn-touch p-2.5 text-red-600 hover:bg-red-50 active:bg-red-100 rounded-xl transition-colors" title="Reject"><i class="fas fa-times-circle text-sm"></i></button>
                             </div>
                         </div>
@@ -422,11 +447,40 @@ function filterEmployees(filter) {
 function applySearch() { renderEmployees(); }
 
 /* ---- Approve Modal ---- */
-function openApproveModal(id, name) {
-    approveTargetId = id;
-    approveTargetName = name;
-    document.getElementById('approve-emp-name').textContent = name;
+function toggleWorkEmailFields() {
+    const allocate = document.getElementById('allocateWorkEmail').checked;
+    const fields = document.getElementById('workEmailFields');
+    fields.classList.toggle('hidden', !allocate);
+    fields.querySelectorAll('input').forEach((el) => { el.disabled = !allocate; });
+}
+
+function openApproveModal(id) {
+    const emp = allEmployees.find((e) => String(e.id) === String(id));
+    if (!emp) return;
+    approveTargetId = emp.id;
+    approveTargetName = emp.full_name || '';
+    document.getElementById('approve-emp-name').textContent = approveTargetName;
     document.getElementById('roleSelect').value = '';
+
+    const personal = emp.personal_email || '';
+    document.getElementById('approve-personal-email').textContent = personal || 'No personal email on file';
+
+    const existingWork = (emp.work_email || '').trim();
+    const alreadyFirm = existingWork && firmDomainOf(existingWork) === String(emailDomain || '').toLowerCase();
+    const existingNotice = document.getElementById('existingWorkEmailNotice');
+    const newFields = document.getElementById('newWorkEmailFields');
+    document.getElementById('approve-existing-work-email').textContent = existingWork;
+    existingNotice.classList.toggle('hidden', !alreadyFirm);
+    newFields.classList.toggle('hidden', !!alreadyFirm);
+
+    document.getElementById('allocateWorkEmail').checked = true;
+    document.getElementById('allocateWorkEmail').disabled = !emailConfigured && !alreadyFirm;
+    document.getElementById('linkPersonalEmail').checked = !!personal;
+    document.getElementById('workEmailLocal').value = alreadyFirm
+        ? (existingWork.split('@')[0] || '')
+        : suggestWorkEmailLocal(approveTargetName);
+    toggleWorkEmailFields();
+
     document.getElementById('approveModal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
@@ -438,8 +492,22 @@ function closeApproveModal() {
 function confirmApproval() {
     if (!approveTargetId) return;
     const role = document.getElementById('roleSelect').value;
-    const payload = { employee_id: approveTargetId };
+    const allocate = document.getElementById('allocateWorkEmail').checked;
+    const linkPersonal = document.getElementById('linkPersonalEmail').checked;
+    const localPart = (document.getElementById('workEmailLocal').value || '').trim().toLowerCase();
+    const payload = {
+        employee_id: approveTargetId,
+        allocate_work_email: allocate,
+        link_personal_email: allocate && linkPersonal,
+    };
     if (role) payload.role = role;
+    if (allocate && localPart) payload.work_email_local = localPart;
+
+    const approveBtn = document.getElementById('confirmApproveBtn');
+    if (approveBtn) {
+        approveBtn.disabled = true;
+        approveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Approving…';
+    }
 
     fetch('{{ url_for("assign_role_and_approve") }}', {
         method: 'POST',
@@ -457,387 +525,13 @@ function confirmApproval() {
             showToast(data.error || 'Error approving employee', 'error');
         }
     })
-    .catch(() => { closeApproveModal(); showToast('An error occurred while approving.', 'error'); });
-}
-
-/* ---- Employee Details Modal ---- */
-function viewEmployeeDetails(id) {
-    currentEmployeeId = id;
-    const modal = document.getElementById('employeeDetailsModal');
-    const content = document.getElementById('employeeDetailsContent');
-    const approveBtn = document.getElementById('approveFromModalBtn');
-
-    content.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-gray-400 text-3xl mb-4"></i><p class="text-gray-500">Loading details...</p></div>';
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-
-    fetch(`{{ url_for('get_employee_onboarding_details') }}?id=${id}`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                content.innerHTML = `<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>${data.error}</p></div>`;
-                return;
-            }
-            const emp = data.employee;
-            currentEmployeeData = emp;
-            const roleClass = ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-700';
-            document.getElementById('employeeDetailsModalTitle').textContent = emp.full_name ? `${emp.full_name} – Onboarding Details` : 'Employee Onboarding Details';
-
-            const paymentLabel = (emp.payment_method === 'Bank') ? 'Bank' : (emp.payment_method === 'Mobile Money' ? 'Mobile Money' : '—');
-            const paymentDetail = emp.payment_method === 'Bank'
-                ? (emp.bank_name ? `Bank: ${emp.bank_name}` : 'Bank (no name provided)')
-                : emp.payment_method === 'Mobile Money'
-                    ? (emp.mobile_money_company ? `Provider: ${emp.mobile_money_company}` : 'Mobile Money (no provider)')
-                    : '—';
-
-            let html = `<div class="space-y-4 sm:space-y-5">
-                ${!emp.onboarding_completed ? `
-                <div class="section-card bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5 flex items-center gap-3">
-                    <i class="fas fa-hourglass-half text-amber-600 text-xl flex-shrink-0"></i>
-                    <p class="text-sm text-amber-800 font-medium">Onboarding not yet complete. Details and documents will appear once the employee submits their onboarding form.</p>
-                </div>` : ''}
-
-                <!-- Basic Information -->
-                <div class="section-card bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-5 lg:p-6 border border-blue-200/80">
-                    <h4 class="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center">
-                        <i class="fas fa-user text-blue-600 mr-2"></i>Basic Information
-                    </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Full Name</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.full_name || 'N/A'}</p></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Employee Code</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.employee_code || 'N/A'}</p></div>
-                        <div>
-                            <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">
-                                <i class="fas fa-envelope mr-1 text-gray-400"></i>Personal Email
-                            </p>
-                            <p class="text-xs sm:text-sm font-semibold text-gray-900 break-all">${emp.personal_email || 'N/A'}</p>
-                        </div>
-                        <div>
-                            <p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">
-                                <i class="fas fa-briefcase mr-1 text-gray-400"></i>Work Email
-                            </p>
-                            ${emp.work_email
-                                ? `<p class="text-xs sm:text-sm font-semibold text-gray-900 break-all">${emp.work_email}</p>`
-                                : `<p class="text-xs sm:text-sm font-semibold text-amber-600"><i class="fas fa-clock mr-1"></i>Pending allocation</p>`
-                            }
-                        </div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Phone</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.phone_number || 'N/A'}</p></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Role</p><span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold ${roleClass}">${emp.role || 'N/A'}</span></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Status</p><span class="inline-flex items-center px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-yellow-100 text-yellow-800">${emp.status || 'N/A'}</span></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Onboarding</p>
-                            <p class="text-xs sm:text-sm font-semibold ${emp.onboarding_completed ? 'text-green-600' : 'text-amber-600'}">
-                                ${emp.onboarding_completed ? '<i class="fas fa-check-circle mr-1"></i>Completed' : '<i class="fas fa-clock mr-1"></i>In Progress'}
-                            </p>
-                        </div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Registered</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${formatDate(emp.created_at)}</p></div>
-                    </div>
-                </div>
-
-                <!-- Payroll & Compensation -->
-                <div class="section-card bg-white rounded-xl p-4 sm:p-5 lg:p-6 border border-gray-200 shadow-sm">
-                    <h4 class="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center">
-                        <i class="fas fa-money-bill-wave text-green-600 mr-2"></i>Payroll & Compensation
-                    </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Payment Method</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${paymentLabel}</p></div>
-                        ${paymentDetail !== '—' ? `<div class="sm:col-span-2"><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Payment Details</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${paymentDetail}</p></div>` : ''}
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Account Number</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.account_number || 'N/A'}</p></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Account Name</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.account_name || 'N/A'}</p></div>
-                        <div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Pay Frequency</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.pay_frequency || 'N/A'}</p></div>
-                        ${emp.salary ? `<div><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Salary</p><p class="text-xs sm:text-sm font-semibold text-gray-900">${emp.salary}</p></div>` : ''}
-                        ${emp.salary_components ? `<div class="sm:col-span-2 lg:col-span-3"><p class="text-[10px] sm:text-xs text-gray-500 font-medium mb-0.5">Salary Components</p><p class="text-xs sm:text-sm text-gray-900 whitespace-pre-wrap">${emp.salary_components}</p></div>` : ''}
-                    </div>
-                </div>
-
-                <!-- Uploaded Documents -->
-                <div class="section-card bg-white rounded-xl p-4 sm:p-5 lg:p-6 border border-gray-200 shadow-sm">
-                    <h4 class="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 flex items-center">
-                        <i class="fas fa-file-alt text-purple-600 mr-2"></i>Uploaded Documents
-                    </h4>
-                    <p class="text-xs text-gray-500 mb-4">View or download documents submitted during onboarding. Opens in a new tab.</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                        ${emp.employment_contract
-                            ? `<a href="/static/uploads/profile_pictures/${emp.employment_contract}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50/80 transition-all duration-200 group shadow-sm">
-                                <div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0 group-hover:bg-red-200 transition-colors"><i class="fas fa-file-pdf text-red-600 text-xl"></i></div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-gray-900">Employment Contract</p>
-                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
-                                </div>
-                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
-                               </a>`
-                            : `<div class="flex items-center gap-3 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-                                <div class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0"><i class="fas fa-file text-gray-400 text-xl"></i></div>
-                                <div><p class="text-sm font-medium text-gray-500">Employment Contract</p><p class="text-xs text-gray-400">Not uploaded</p></div>
-                               </div>`}
-                        ${emp.id_front
-                            ? `<a href="/static/uploads/profile_pictures/${emp.id_front}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group">
-                                <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors"><i class="fas fa-id-card text-blue-600 text-xl"></i></div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-gray-900">National ID or Passport</p>
-                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
-                                </div>
-                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
-                               </a>`
-                            : `<div class="flex items-center gap-3 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-                                <div class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0"><i class="fas fa-id-card text-gray-400 text-xl"></i></div>
-                                <div><p class="text-sm font-medium text-gray-500">National ID or Passport</p><p class="text-xs text-gray-400">Not uploaded</p></div>
-                               </div>`}
-                        ${emp.kra_pin_document
-                            ? `<a href="/static/uploads/profile_pictures/${emp.kra_pin_document}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group">
-                                <div class="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition-colors"><i class="fas fa-file-invoice text-amber-600 text-xl"></i></div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-gray-900">KRA PIN Certificate</p>
-                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
-                                </div>
-                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
-                               </a>`
-                            : `<div class="flex items-center gap-3 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-                                <div class="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0"><i class="fas fa-file-invoice text-gray-400 text-xl"></i></div>
-                                <div><p class="text-sm font-medium text-gray-500">KRA PIN Certificate</p><p class="text-xs text-gray-400">Not uploaded</p></div>
-                               </div>`}
-                        ${emp.id_back
-                            ? `<a href="/static/uploads/profile_pictures/${emp.id_back}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group">
-                                <div class="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-200 transition-colors"><i class="fas fa-id-card text-indigo-600 text-xl"></i></div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-gray-900">ID Back (legacy)</p>
-                                    <p class="text-xs text-gray-500 mt-0.5">View / Download</p>
-                                </div>
-                                <i class="fas fa-external-link-alt text-gray-400 group-hover:text-green-600 flex-shrink-0"></i>
-                               </a>`
-                            : ''}
-                    </div>
-                </div>
-            </div>`;
-
-            content.innerHTML = html;
-            document.getElementById('employeeDetailsFooter').classList.remove('hidden');
-            document.getElementById('employeeDetailsEditFooter').classList.add('hidden');
-            document.getElementById('editOnboardingBtn').classList.remove('hidden');
-            if (emp.onboarding_completed) { approveBtn.classList.remove('hidden'); } else { approveBtn.classList.add('hidden'); }
-        })
-        .catch(() => {
-            content.innerHTML = '<div class="text-center py-8 text-red-600"><i class="fas fa-exclamation-circle text-3xl mb-4"></i><p>Error loading details</p></div>';
-        });
-}
-
-function switchToEditMode() {
-    if (!currentEmployeeData || !currentEmployeeId) return;
-    const e = currentEmployeeData;
-    const content = document.getElementById('employeeDetailsContent');
-    document.getElementById('employeeDetailsModalTitle').textContent = (e.full_name || 'Employee') + ' – Edit';
-    document.getElementById('employeeDetailsFooter').classList.add('hidden');
-    document.getElementById('employeeDetailsEditFooter').classList.remove('hidden');
-
-    const pm = (e.payment_method || '').toString();
-    const showBank = pm === 'Bank';
-    const showMobile = pm === 'Mobile Money';
-
-    const docLink = (filename) => filename ? `<a href="/static/uploads/profile_pictures/${filename}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-xs font-medium inline-flex items-center gap-1"><i class="fas fa-external-link-alt text-[10px]"></i>View current</a>` : '<span class="text-gray-400 text-xs">None uploaded</span>';
-
-    content.innerHTML = `
-    <form id="onboardingEditForm" class="edit-popup-form space-y-5 sm:space-y-6">
-        <input type="hidden" name="employee_id" value="${currentEmployeeId}">
-        <input type="hidden" name="role" value="${(e.role || '').replace(/"/g, '&quot;')}">
-        <input type="hidden" name="status" value="${(e.status || '').replace(/"/g, '&quot;')}">
-
-        <div class="edit-section edit-section-basic">
-            <div class="edit-section-header">
-                <span class="edit-section-icon"><i class="fas fa-user"></i></span>
-                <h4 class="edit-section-title">Basic Information</h4>
-            </div>
-            <div class="edit-section-body">
-                <div class="edit-grid">
-                    <div class="edit-field">
-                        <label class="edit-label">Full Name <span class="text-red-500">*</span></label>
-                        <input type="text" name="full_name" value="${(e.full_name || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="Full name">
-                    </div>
-                    <div class="edit-field">
-                        <label class="edit-label">Employee Code</label>
-                        <input type="text" name="employee_code" value="${(e.employee_code || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Optional">
-                    </div>
-                    <div class="edit-field">
-                        <label class="edit-label"><i class="fas fa-envelope mr-1 text-gray-400"></i>Personal Email <span class="text-red-500">*</span></label>
-                        <input type="email" name="personal_email" value="${(e.personal_email || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="personal@example.com">
-                        <p class="edit-hint">Used for approval &amp; password-reset notifications.</p>
-                    </div>
-                    <div class="edit-field">
-                        <label class="edit-label"><i class="fas fa-briefcase mr-1 text-gray-400"></i>Work Email</label>
-                        <input type="email" name="work_email" value="${(e.work_email || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Allocated on approval">
-                        <p class="edit-hint">${e.work_email ? 'Firm-domain address.' : 'Allocated automatically when you approve this employee.'}</p>
-                    </div>
-                    <div class="edit-field">
-                        <label class="edit-label">Phone <span class="text-red-500">*</span></label>
-                        <input type="text" name="phone_number" value="${(e.phone_number || '').replace(/"/g, '&quot;')}" required class="edit-input" placeholder="Phone number">
-                    </div>
-                    <div class="edit-field">
-                        <label class="edit-label">Role</label>
-                        <div class="edit-readonly">${(e.role || '—')}</div>
-                        <p class="edit-hint">Locked; use Approve to change role</p>
-                    </div>
-                    <div class="edit-field">
-                        <label class="edit-label">Status</label>
-                        <div class="edit-readonly">${(e.status || '—')}</div>
-                        <p class="edit-hint">Locked</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="edit-section edit-section-payroll">
-            <div class="edit-section-header">
-                <span class="edit-section-icon edit-section-icon-green"><i class="fas fa-money-bill-wave"></i></span>
-                <h4 class="edit-section-title">Payment & Account</h4>
-            </div>
-            <div class="edit-section-body space-y-4">
-                <div class="edit-field">
-                    <label class="edit-label">Payment Method</label>
-                    <select name="payment_method" onchange="toggleEditPayrollSections(this)" class="edit-input edit-select">
-                        <option value="">— Select method —</option>
-                        <option value="Bank" ${pm === 'Bank' ? 'selected' : ''}>Bank</option>
-                        <option value="Mobile Money" ${pm === 'Mobile Money' ? 'selected' : ''}>Mobile Money</option>
-                    </select>
-                </div>
-
-                <div id="edit-bank-section" class="edit-subsection edit-subsection-bank ${showBank ? '' : 'hidden'}">
-                    <div class="edit-subsection-title"><i class="fas fa-university mr-2 text-blue-600"></i>Bank Details</div>
-                    <div class="edit-field">
-                        <label class="edit-label">Bank Name</label>
-                        <input type="text" name="bank_name" value="${(e.bank_name || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="e.g. Equity Bank, KCB">
-                    </div>
-                </div>
-
-                <div id="edit-mobile-section" class="edit-subsection edit-subsection-mobile ${showMobile ? '' : 'hidden'}">
-                    <div class="edit-subsection-title"><i class="fas fa-mobile-alt mr-2 text-purple-600"></i>Mobile Money Details</div>
-                    <div class="edit-field">
-                        <label class="edit-label">Provider</label>
-                        <input type="text" name="mobile_money_company" value="${(e.mobile_money_company || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="e.g. M-Pesa, Airtel Money">
-                    </div>
-                </div>
-
-                <div id="edit-account-section" class="edit-subsection edit-subsection-account ${showBank || showMobile ? '' : 'hidden'}">
-                    <div class="edit-subsection-title"><i class="fas fa-wallet mr-2 text-gray-600"></i>Account Details</div>
-                    <div class="edit-grid edit-grid-2">
-                        <div class="edit-field">
-                            <label class="edit-label">Account Name</label>
-                            <input type="text" name="account_name" value="${(e.account_name || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="Account holder name">
-                        </div>
-                        <div class="edit-field">
-                            <label class="edit-label">Account Number <span id="edit-account-number-label" class="text-gray-500 font-normal">${showMobile ? '(Phone)' : ''}</span></label>
-                            <input type="text" name="account_number" value="${(e.account_number || '').replace(/"/g, '&quot;')}" class="edit-input" placeholder="${showMobile ? 'e.g. 07XXXXXXXX' : 'Account number'}">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="edit-section edit-section-docs">
-            <div class="edit-section-header">
-                <span class="edit-section-icon edit-section-icon-purple"><i class="fas fa-file-alt"></i></span>
-                <h4 class="edit-section-title">Documents</h4>
-            </div>
-            <div class="edit-section-body">
-                <p class="edit-docs-intro">Current files are linked below. Upload a new file only to replace; leave empty to keep current.</p>
-                <div class="edit-docs-grid">
-                    <div class="edit-doc-card">
-                        <div class="edit-doc-card-header">
-                            <i class="fas fa-file-pdf text-red-500"></i>
-                            <span class="edit-doc-card-title">Employment Contract</span>
-                        </div>
-                        <p class="edit-doc-current">Current: ${e.employment_contract ? docLink(e.employment_contract) : '<span class="text-gray-400">None</span>'}</p>
-                        <input type="file" name="employment_contract" accept=".pdf,.doc,.docx" class="edit-file-input" title="Replace (optional)">
-                    </div>
-                    <div class="edit-doc-card">
-                        <div class="edit-doc-card-header">
-                            <i class="fas fa-id-card text-blue-500"></i>
-                            <span class="edit-doc-card-title">National ID or Passport</span>
-                        </div>
-                        <p class="edit-doc-current">Current: ${e.id_front ? docLink(e.id_front) : '<span class="text-gray-400">None</span>'}</p>
-                        <input type="file" name="id_front" accept="image/*,.pdf" class="edit-file-input" title="Replace (optional)">
-                    </div>
-                    <div class="edit-doc-card">
-                        <div class="edit-doc-card-header">
-                            <i class="fas fa-file-invoice text-amber-500"></i>
-                            <span class="edit-doc-card-title">KRA PIN Certificate</span>
-                        </div>
-                        <p class="edit-doc-current">Current: ${e.kra_pin_document ? docLink(e.kra_pin_document) : '<span class="text-gray-400">None</span>'}</p>
-                        <input type="file" name="kra_pin_document" accept="image/*,.pdf,.doc,.docx" class="edit-file-input" title="Replace (optional)">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>`;
-    toggleEditPayrollSections(document.querySelector('#onboardingEditForm select[name="payment_method"]'));
-}
-
-function toggleEditPayrollSections(selectEl) {
-    if (!selectEl) return;
-    const val = (selectEl.value || '').trim();
-    const bankSection = document.getElementById('edit-bank-section');
-    const mobileSection = document.getElementById('edit-mobile-section');
-    const accountSection = document.getElementById('edit-account-section');
-    const accountLabel = document.getElementById('edit-account-number-label');
-    const accountInput = document.querySelector('#onboardingEditForm input[name="account_number"]');
-    if (bankSection) bankSection.classList.toggle('hidden', val !== 'Bank');
-    if (mobileSection) mobileSection.classList.toggle('hidden', val !== 'Mobile Money');
-    const showAccount = val === 'Bank' || val === 'Mobile Money';
-    if (accountSection) accountSection.classList.toggle('hidden', !showAccount);
-    if (accountLabel) accountLabel.textContent = val === 'Mobile Money' ? '(Phone)' : '';
-    if (accountInput) accountInput.placeholder = val === 'Mobile Money' ? 'e.g. 07XXXXXXXX' : '';
-}
-
-function cancelEditMode() {
-    if (!currentEmployeeId) return;
-    document.getElementById('employeeDetailsEditFooter').classList.add('hidden');
-    document.getElementById('employeeDetailsFooter').classList.remove('hidden');
-    viewEmployeeDetails(currentEmployeeId);
-}
-
-function saveOnboardingEdits() {
-    const form = document.getElementById('onboardingEditForm');
-    if (!form || !currentEmployeeId) return;
-    const btn = document.getElementById('saveOnboardingBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
-    const formData = new FormData(form);
-    fetch('{{ url_for("update_employee_onboarding") }}', {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(r => r.json())
-    .then(data => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save mr-1 sm:mr-2"></i>Save';
-        if (data.success) {
-            showToast(data.message || 'Details updated successfully', 'success');
-            document.getElementById('employeeDetailsEditFooter').classList.add('hidden');
-            document.getElementById('employeeDetailsFooter').classList.remove('hidden');
-            loadPendingApprovals();
-            viewEmployeeDetails(currentEmployeeId);
-        } else {
-            showToast(data.error || 'Update failed', 'error');
+    .catch(() => { closeApproveModal(); showToast('An error occurred while approving.', 'error'); })
+    .finally(() => {
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Approve';
         }
-    })
-    .catch(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save mr-1 sm:mr-2"></i>Save';
-        showToast('An error occurred', 'error');
     });
-}
-
-function closeEmployeeDetailsModal() {
-    document.getElementById('employeeDetailsModal').classList.add('hidden');
-    document.body.style.overflow = 'auto';
-    currentEmployeeId = null;
-    currentEmployeeData = null;
-}
-
-function approveFromModal() {
-    if (!currentEmployeeId) return;
-    const id = currentEmployeeId;
-    const emp = currentEmployeeData || allEmployees.find(e => e.id === currentEmployeeId);
-    const name = (emp && emp.full_name) ? emp.full_name : 'Employee';
-    closeEmployeeDetailsModal();
-    openApproveModal(id, name);
 }
 
 /* ---- Reject / Delete ---- */
@@ -866,15 +560,14 @@ function showToast(message, type) {
 }
 
 /* ---- Close modals on outside click / Escape ---- */
-document.addEventListener('click', function(e) {
-    if (e.target === document.getElementById('approveModal')) closeApproveModal();
-    if (e.target === document.getElementById('employeeDetailsModal')) closeEmployeeDetailsModal();
-});
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         if (!document.getElementById('approveModal').classList.contains('hidden')) closeApproveModal();
-        if (!document.getElementById('employeeDetailsModal').classList.contains('hidden')) closeEmployeeDetailsModal();
     }
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target === document.getElementById('approveModal')) closeApproveModal();
 });
 
 document.addEventListener('DOMContentLoaded', loadPendingApprovals);
@@ -882,17 +575,18 @@ document.addEventListener('DOMContentLoaded', loadPendingApprovals);
 
 <style>
 @keyframes slide-up { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes details-in {
+    from { opacity: 0; transform: translateY(18px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
 .animate-slide-up { animation: slide-up 0.3s ease-out; }
+.animate-details-in { animation: details-in 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Modern responsive enhancements */
-@media (max-width: 640px) {
-    .details-modal-panel { border-radius: 1rem 1rem 0 0; }
-    #employeeDetailsContent { padding-left: 1rem; padding-right: 1rem; padding-bottom: env(safe-area-inset-bottom, 1rem); }
-}
 #employeeDetailsContent { -webkit-overflow-scrolling: touch; }
-.details-modal-panel { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+.details-modal-panel { box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35); }
 .stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
 @media (min-width: 640px) {
     .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); }
@@ -913,6 +607,268 @@ document.addEventListener('DOMContentLoaded', loadPendingApprovals);
 .file-zone { transition: border-color 0.2s, background-color 0.2s; }
 .file-zone:focus-within { border-color: rgb(59 130 246); background-color: rgb(239 246 255); }
 
+/* Details modal – view mode */
+.details-stack { display: flex; flex-direction: column; gap: 0.875rem; }
+@media (min-width: 640px) { .details-stack { gap: 1.125rem; } }
+.detail-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+    border-radius: 1rem;
+    padding: 0.95rem 1rem;
+    border: 1px solid transparent;
+}
+.detail-banner--warn { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fde68a; }
+.detail-banner--ok { background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-color: #a7f3d0; }
+.detail-banner-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.95rem;
+}
+.detail-banner--warn .detail-banner-icon { background: #f59e0b; color: #fff; }
+.detail-banner--ok .detail-banner-icon { background: #059669; color: #fff; }
+
+/* Profile summary with dropdown details */
+.profile-card {
+    background: #fff;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 1.05rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+}
+.profile-card-main {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 1rem 1rem 1.05rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+@media (max-width: 639px) {
+    .profile-card-main {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+    .profile-toggle { margin-left: auto; }
+}
+.profile-avatar {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #059669, #0d9488);
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 8px 18px -10px rgba(5, 150, 105, 0.7);
+}
+.profile-name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    color: rgb(15 23 42);
+    letter-spacing: -0.02em;
+    max-width: 100%;
+}
+.profile-email {
+    margin: 0.2rem 0 0;
+    font-size: 0.8rem;
+    color: rgb(100 116 139);
+}
+.profile-quick-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.85rem;
+    margin-top: 0.45rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgb(71 85 105);
+}
+.profile-quick-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.profile-quick-meta i {
+    font-size: 0.65rem;
+    opacity: 0.75;
+}
+.profile-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: 0.8rem;
+    border: 1px solid rgb(203 213 225);
+    background: #fff;
+    color: rgb(51 65 85);
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.profile-toggle:hover {
+    background: rgb(241 245 249);
+    border-color: rgb(148 163 184);
+}
+.profile-toggle.is-open {
+    background: rgb(15 23 42);
+    border-color: rgb(15 23 42);
+    color: #fff;
+}
+.profile-toggle-icon {
+    font-size: 0.65rem;
+    transition: transform 0.2s ease;
+}
+.profile-toggle.is-open .profile-toggle-icon {
+    transform: rotate(180deg);
+}
+.profile-details-panel {
+    padding: 0.95rem 1rem 1.1rem;
+    border-top: 1px solid rgb(226 232 240);
+    background: #fff;
+    animation: profile-panel-in 0.2s ease;
+}
+@keyframes profile-panel-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.detail-card {
+    background: #fff;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 1.05rem;
+    padding: 1rem 1rem 1.1rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+@media (min-width: 640px) {
+    .detail-card { padding: 1.15rem 1.25rem 1.25rem; }
+}
+.detail-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.95rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgb(241 245 249);
+}
+.detail-card-icon {
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+.detail-card-icon--blue { background: linear-gradient(135deg, #2563eb, #4f46e5); }
+.detail-card-icon--green { background: linear-gradient(135deg, #059669, #0d9488); }
+.detail-card-icon--violet { background: linear-gradient(135deg, #7c3aed, #6366f1); }
+.detail-card-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: rgb(15 23 42);
+    letter-spacing: -0.01em;
+}
+.detail-card-sub {
+    margin: 0.1rem 0 0;
+    font-size: 0.72rem;
+    color: rgb(100 116 139);
+}
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem 1rem;
+}
+@media (min-width: 640px) { .detail-grid { grid-template-columns: repeat(2, 1fr); gap: 0.9rem 1.15rem; } }
+@media (min-width: 1024px) { .detail-grid { grid-template-columns: repeat(3, 1fr); } }
+.detail-field {
+    min-width: 0;
+    background: rgb(248 250 252);
+    border: 1px solid rgb(241 245 249);
+    border-radius: 0.85rem;
+    padding: 0.7rem 0.8rem;
+}
+.detail-label {
+    margin: 0 0 0.25rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(100 116 139);
+}
+.detail-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(15 23 42);
+    line-height: 1.35;
+    word-break: break-word;
+}
+.doc-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+@media (min-width: 640px) { .doc-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .doc-grid { grid-template-columns: repeat(3, 1fr); } }
+.doc-tile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 0.95rem;
+    border-radius: 0.95rem;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252);
+    transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    min-height: 4.5rem;
+}
+.doc-tile--ready {
+    background: #fff;
+    cursor: pointer;
+    text-decoration: none;
+}
+.doc-tile--ready:hover {
+    border-color: rgb(52 211 153);
+    background: rgb(236 253 245);
+    box-shadow: 0 8px 18px -12px rgba(16, 185, 129, 0.55);
+    transform: translateY(-1px);
+}
+.doc-tile--empty {
+    border-style: dashed;
+    opacity: 0.92;
+}
+.doc-tile-icon {
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.05rem;
+}
+.doc-tile-icon--red { background: #fee2e2; color: #dc2626; }
+.doc-tile-icon--blue { background: #dbeafe; color: #2563eb; }
+.doc-tile-icon--amber { background: #fef3c7; color: #d97706; }
+.doc-tile-icon--indigo { background: #e0e7ff; color: #4f46e5; }
+.doc-tile-icon--muted { background: #e2e8f0; color: #94a3b8; }
+
+@media (max-width: 639px) {
+    .details-modal-panel { border-radius: 1.35rem 1.35rem 0 0; }
+}
+
 /* Edit popup – advanced appearance */
 .edit-popup-form { max-width: 100%; }
 .edit-section {
@@ -922,7 +878,7 @@ document.addEventListener('DOMContentLoaded', loadPendingApprovals);
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
-.edit-section:focus-within { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); border-color: rgb(191 219 254); }
+.edit-section:focus-within { box-shadow: 0 0 0 2px rgba(59, 130, 246,.2); border-color: rgb(191 219 254); }
 .edit-section-basic { background: linear-gradient(135deg, rgb(239 246 255) 0%, rgb(224 231 255) 100%); border-color: rgb(191 219 254); }
 .edit-section-payroll { background: #fff; }
 .edit-section-docs { background: #fff; }

@@ -678,8 +678,14 @@ def ensure_employee_notification_views_table(cursor, connection=None):
         print(f"[WARNING] ensure_employee_notification_views_table: {e}")
 
 
+_task_allocation_events_schema_ready = False
+
+
 def ensure_task_allocation_events_table(cursor, connection=None):
     """Lifecycle events for allocated tasks (received / rejected / submitted)."""
+    global _task_allocation_events_schema_ready
+    if _task_allocation_events_schema_ready:
+        return
     try:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS task_allocation_events (
@@ -711,6 +717,7 @@ def ensure_task_allocation_events_table(cursor, connection=None):
             pass
         if connection:
             connection.commit()
+        _task_allocation_events_schema_ready = True
     except Exception as e:
         print(f"[WARNING] ensure_task_allocation_events_table: {e}")
 
@@ -830,8 +837,18 @@ def verify_core_tables_present():
         connection.close()
 
 
+_task_management_schema_ready = False
+
+
 def ensure_task_management_table(cursor, connection=None):
-    """Ensure task management table exists for case/matter tasks."""
+    """Ensure task management table exists for case/matter tasks.
+
+    Schema DDL runs at most once per process. Calling ALTER on every request
+    caused MySQL metadata-lock pileups that froze notifications/reminders.
+    """
+    global _task_management_schema_ready
+    if _task_management_schema_ready:
+        return
     try:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS task_management (
@@ -860,48 +877,58 @@ def ensure_task_management_table(cursor, connection=None):
                 INDEX idx_assigned_to_id (assigned_to_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """)
-        # Keep status enum compatible with newly added "Submitted" state.
+
+        # Only ALTER when the live enum is missing 'Submitted' (or similar drift).
+        needs_enum_fix = True
         try:
-            cursor.execute("""
-                ALTER TABLE task_management
-                MODIFY COLUMN task_status ENUM('Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending'
-            """)
-        except Exception as enum_err:
-            print(f"[WARNING] ensure_task_management_table enum update: {enum_err}")
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN assigned_to_id INT NULL")
+            cursor.execute(
+                """
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'task_management'
+                  AND COLUMN_NAME = 'task_status'
+                LIMIT 1
+                """
+            )
+            col = cursor.fetchone()
+            col_type = ''
+            if isinstance(col, dict):
+                col_type = (col.get('COLUMN_TYPE') or '').lower()
+            elif col:
+                col_type = (col[0] or '').lower()
+            if 'submitted' in col_type:
+                needs_enum_fix = False
         except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN assigned_to_name VARCHAR(255) NULL")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD INDEX idx_assigned_to_id (assigned_to_id)")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_view_case_details TINYINT(1) DEFAULT 1")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_edit_case_details TINYINT(1) DEFAULT 1")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_view_case_documents TINYINT(1) DEFAULT 1")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_upload_case_documents TINYINT(1) DEFAULT 1")
-        except Exception:
-            pass
-        try:
-            cursor.execute("ALTER TABLE task_management ADD COLUMN allow_download_case_documents TINYINT(1) DEFAULT 1")
-        except Exception:
-            pass
+            needs_enum_fix = True
+
+        if needs_enum_fix:
+            try:
+                cursor.execute("""
+                    ALTER TABLE task_management
+                    MODIFY COLUMN task_status ENUM('Pending', 'Received', 'In Progress', 'Submitted', 'Completed', 'Cancelled') DEFAULT 'Pending'
+                """)
+            except Exception as enum_err:
+                print(f"[WARNING] ensure_task_management_table enum update: {enum_err}")
+
+        # Additive columns/indexes — ignore "duplicate" errors.
+        for ddl in (
+            "ALTER TABLE task_management ADD COLUMN assigned_to_id INT NULL",
+            "ALTER TABLE task_management ADD COLUMN assigned_to_name VARCHAR(255) NULL",
+            "ALTER TABLE task_management ADD INDEX idx_assigned_to_id (assigned_to_id)",
+            "ALTER TABLE task_management ADD COLUMN allow_view_case_details TINYINT(1) DEFAULT 1",
+            "ALTER TABLE task_management ADD COLUMN allow_edit_case_details TINYINT(1) DEFAULT 1",
+            "ALTER TABLE task_management ADD COLUMN allow_view_case_documents TINYINT(1) DEFAULT 1",
+            "ALTER TABLE task_management ADD COLUMN allow_upload_case_documents TINYINT(1) DEFAULT 1",
+            "ALTER TABLE task_management ADD COLUMN allow_download_case_documents TINYINT(1) DEFAULT 1",
+        ):
+            try:
+                cursor.execute(ddl)
+            except Exception:
+                pass
+
         if connection:
             connection.commit()
+        _task_management_schema_ready = True
     except Exception as e:
         print(f"[WARNING] ensure_task_management_table: {e}")
 
@@ -6431,6 +6458,34 @@ class _RolePrefixWSGIMiddleware:
 app.wsgi_app = _RolePrefixWSGIMiddleware(app.wsgi_app)
 
 
+def _employee_aware_url_for(endpoint, **values):
+    """Template url_for that emits role-prefixed paths for logged-in employees.
+
+    Avoids an extra 302 on every sidebar/module click (unprefixed → /<role>/...).
+    """
+    from flask import has_request_context
+
+    path = url_for(endpoint, **values)
+    if values.get('_external'):
+        return path
+    if not has_request_context() or 'employee_id' not in session:
+        return path
+    if not isinstance(path, str) or not path.startswith('/'):
+        return path
+    # Absolute external already handled; strip query for prefixability check.
+    path_only = path.split('?', 1)[0]
+    if not _is_role_prefixable(path_only):
+        return path
+    for slug in SLUG_TO_ROLE:
+        if path_only.startswith('/' + slug + '/') or path_only == '/' + slug:
+            return path
+    return '/' + current_role_slug() + path
+
+
+# Prefer prefixed links in Jinja so navigations skip the role-prefix redirect hop.
+app.jinja_env.globals['url_for'] = _employee_aware_url_for
+
+
 @app.before_request
 def _enforce_role_prefix_on_employee_urls():
     """For logged-in employees, ensure all employee URLs include the active
@@ -9992,17 +10047,23 @@ def _task_allocation_event_copy(event_type):
 
 
 def _build_task_allocation_link(task_source, task_type, linked_id, task_id):
-    """Build an in-app path for reviewing an allocation."""
+    """Build an in-app path for reviewing an allocation.
+
+    Uses literal paths (not url_for) so background workers can call this
+    without a request context or SERVER_NAME.
+    """
     try:
         if task_source == 'session_allocation' and linked_id:
-            return url_for('case_details', case_id=int(linked_id))
-        if task_type == 'matter' and linked_id:
-            return url_for('matter_task_management')
+            return f'/case_management/{int(linked_id)}'
+        if task_type == 'matter':
+            return '/non_litigation_matters/tasks'
+        if linked_id and task_id:
+            return f'/case_management/tasks?case_id={int(linked_id)}&edit_task={int(task_id)}'
         if linked_id:
-            return url_for('case_task_management', case_id=int(linked_id), edit_task=int(task_id))
-        return url_for('case_task_management')
+            return f'/case_management/tasks?case_id={int(linked_id)}'
+        return '/case_management/tasks'
     except Exception:
-        return url_for('notifications')
+        return '/notifications'
 
 
 def _record_task_allocation_event(
@@ -12255,12 +12316,14 @@ def start_push_notification_worker():
         time.sleep(15)
         while True:
             try:
-                _process_due_task_reminders()
+                with app.app_context():
+                    _process_due_task_reminders()
             except Exception as exc:
                 print(f"[reminders] worker loop error: {exc}")
             if vapid_ready:
                 try:
-                    _dispatch_all_push_notifications(force=False)
+                    with app.app_context():
+                        _dispatch_all_push_notifications(force=False)
                 except Exception as exc:
                     print(f"[push] worker loop error: {exc}")
             time.sleep(60)
@@ -32245,5 +32308,26 @@ except Exception as e:
     print(f"[WARNING] Push notification worker failed to start: {e}")
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Reloader is opt-in: on Windows it often false-triggers or burns CPU
+    # polling site-packages, which makes every page feel stuck/slow and the
+    # PWA briefly show "You're offline" during restarts.
+    # Enable with: set FLASK_RELOAD=1
+    use_reloader = os.environ.get('FLASK_RELOAD', '').strip().lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    app.run(
+        debug=True,
+        host='0.0.0.0',
+        port=5000,
+        threaded=True,
+        use_reloader=use_reloader,
+        reloader_type='stat',
+        exclude_patterns=[
+            '*site-packages*',
+            '*AppData*',
+            '*.git*',
+            '*__pycache__*',
+            '*static*uploads*',
+        ],
+    )
 

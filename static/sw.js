@@ -5,16 +5,16 @@
  * --------
  * - Precache a small "app shell" of static assets so the installed PWA opens
  *   instantly and survives short network drops.
- * - Network-first for navigation (HTML) requests so logged-in pages always
- *   show fresh data; fall back to the cached offline page if the network
- *   fails.
+ * - Do NOT intercept navigations. Role-prefix 302s + SW redirect cloning was
+ *   causing multi-second hangs and false "You're offline" pages. The browser
+ *   handles HTML navigations natively; we still cache static assets and push.
  * - Cache-first (stale-while-revalidate) for static assets in /static/.
  * - Never cache POST / PUT / DELETE — only GET.
  * - Bypass the cache for anything the app considers sensitive (auth, APIs,
  *   uploads). These must always hit the network.
  */
 
-const VERSION = "sheria-centric-pwa-v4";
+const VERSION = "sheria-centric-pwa-v5";
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -68,30 +68,6 @@ function isNetworkOnly(url) {
   return NETWORK_ONLY_PATTERNS.some((re) => re.test(url.pathname));
 }
 
-/* Navigation requests use redirect:"manual". If we follow a 302 (e.g. / →
-   /dashboard → /managing-partner/dashboard) and return that Response as-is,
-   Chrome rejects it: "a redirected response was used for a request whose
-   redirect mode is not follow" — which our catch treated as offline. */
-async function cleanRedirectedResponse(response) {
-  if (!response || !response.redirected) return response;
-  return new Response(await response.blob(), {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
-}
-
-async function networkFirstNavigation(req) {
-  const fresh = await fetch(req.url, {
-    method: "GET",
-    headers: req.headers,
-    credentials: "same-origin",
-    redirect: "follow",
-    cache: "no-store",
-  });
-  return cleanRedirectedResponse(fresh);
-}
-
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
@@ -100,25 +76,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (isNetworkOnly(url)) return;
 
-  if (req.mode === "navigate" || (req.headers.get("accept") || "").includes("text/html")) {
-    event.respondWith(
-      (async () => {
-        try {
-          return await networkFirstNavigation(req);
-        } catch (err) {
-          const cached = await caches.match(req);
-          if (cached) return cached;
-          const offline = await caches.match("/static/offline.html");
-          if (offline) return offline;
-          return new Response(
-            "<h1>You are offline</h1><p>Try again in a moment.</p>",
-            { headers: { "Content-Type": "text/html; charset=utf-8" }, status: 503 }
-          );
-        }
-      })()
-    );
-    return;
-  }
+  /* Let the browser handle page navigations directly. Intercepting them made
+     every role-prefix 302 go through the SW and feel like a long hang. */
+  if (req.mode === "navigate") return;
 
   if (url.pathname.startsWith("/static/")) {
     event.respondWith(

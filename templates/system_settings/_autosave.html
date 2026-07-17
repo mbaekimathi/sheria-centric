@@ -58,13 +58,14 @@
         saveTimer = setTimeout(saveNow, typeof delay === 'number' ? delay : debounceMs);
     }
 
-    function saveNow() {
+    function saveNow(opts) {
         clearTimeout(saveTimer);
         if (saving) {
             pendingSave = true;
             return;
         }
         saving = true;
+        var reloadOnSuccess = !!(opts && opts.reload);
         setStatus('saving');
 
         var body = new FormData(form);
@@ -91,6 +92,9 @@
                 setStatus('saved', 'Up to date');
             } else {
                 setStatus('saved', result.data.message || 'Saved');
+                if (reloadOnSuccess) {
+                    window.setTimeout(function () { window.location.reload(); }, 350);
+                }
             }
         }).catch(function () {
             setStatus('error', 'Network error — try again');
@@ -118,8 +122,21 @@
         if (!initialized) return;
         var t = e.target;
         if (!t) return;
-        if (t.type === 'file' || t.type === 'checkbox' || t.type === 'color' || t.tagName === 'SELECT') {
-            saveNow();
+        if (t.type === 'file') {
+            saveNow({ reload: true });
+            return;
+        }
+        if (t.type === 'checkbox' || t.type === 'color' || t.tagName === 'SELECT') {
+            var reloadAfter = !!(
+                t.name && t.checked && (
+                    t.name.indexOf('remove_hero_gallery_') === 0 ||
+                    t.name.indexOf('cutout_hero_gallery_') === 0 ||
+                    t.name === 'remove_company_main_image' ||
+                    t.name === 'cutout_company_main_image' ||
+                    t.name === 'cutout_company_logo'
+                )
+            );
+            saveNow(reloadAfter ? { reload: true } : undefined);
         }
     });
 

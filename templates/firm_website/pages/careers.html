@@ -3,22 +3,216 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
-  <div class="container firm-reveal">
-    <p class="firm-eyebrow">Join us</p>
-    <h1>{{ page_seo.h1_heading or 'Careers' }}</h1>
-    {% if page_seo.meta_description %}
-    <p class="firm-page-lead">{{ page_seo.meta_description }}</p>
-    {% endif %}
+{% set careers = careers if careers is defined and careers else {'is_html': true, 'html': careers_content, 'intro': '', 'roles': [], 'apply_text': '', 'apply_email': ''} %}
+{% set role_count = careers.roles|length if careers.roles else 0 %}
+
+<section class="firm-careers-page" aria-labelledby="careers-heading">
+  <div class="firm-careers-atmosphere" aria-hidden="true">
+    <span class="firm-careers-glow"></span>
+    <span class="firm-careers-orb"></span>
+    <span class="firm-careers-orb firm-careers-orb--2"></span>
+    <span class="firm-careers-mesh"></span>
+  </div>
+
+  <div class="container">
+    <header class="firm-careers-hero firm-reveal">
+      <div class="firm-careers-hero-copy">
+        <p class="firm-eyebrow">Join us</p>
+        <h1 id="careers-heading">{{ page_seo.h1_heading or 'Careers' }}</h1>
+        <p class="firm-careers-lead">{{ page_seo.meta_description or 'Build a practice with integrity, clear standards, and meaningful client work.' }}</p>
+        <div class="firm-careers-hero-actions">
+          <a href="#careers-apply" class="firm-btn firm-btn-primary">
+            <span>How to apply</span>
+            <i class="fas fa-arrow-down" aria-hidden="true"></i>
+          </a>
+          {% if attorneys %}
+          <a href="{{ firm_url('team') }}" class="firm-btn firm-btn-ghost">
+            <span>Meet the team</span>
+          </a>
+          {% else %}
+          <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-ghost">
+            <span>Contact chambers</span>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="firm-careers-hero-panel firm-reveal" style="--reveal-delay: 80ms">
+        <div class="firm-careers-hero-panel-glow" aria-hidden="true"></div>
+        <div class="firm-careers-metrics">
+          <div class="firm-careers-metric">
+            <strong>{% if role_count %}{{ '%02d'|format(role_count) }}{% else %}<i class="fas fa-briefcase" aria-hidden="true"></i>{% endif %}</strong>
+            <span>{% if role_count %}{% if role_count == 1 %}Open role{% else %}Open roles{% endif %}{% else %}Opportunities{% endif %}</span>
+          </div>
+          <div class="firm-careers-metric firm-careers-metric--accent">
+            <strong><i class="fas fa-scale-balanced" aria-hidden="true"></i></strong>
+            <span>Integrity first</span>
+          </div>
+        </div>
+        <ul class="firm-careers-hero-points">
+          <li><i class="fas fa-check" aria-hidden="true"></i> Advocates & pupils</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> Legal support roles</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> Clear application path</li>
+        </ul>
+      </div>
+    </header>
+
+    <div class="firm-careers-signals firm-reveal" style="--reveal-delay: 100ms">
+      <article class="firm-careers-signal" style="--careers-accent: 1">
+        <span class="firm-careers-signal-icon" aria-hidden="true"><i class="fas fa-handshake"></i></span>
+        <div>
+          <strong>Client-centred work</strong>
+          <span>Matters handled with care, clarity, and professional resolve.</span>
+        </div>
+      </article>
+      <article class="firm-careers-signal" style="--careers-accent: 2">
+        <span class="firm-careers-signal-icon" aria-hidden="true"><i class="fas fa-seedling"></i></span>
+        <div>
+          <strong>Room to grow</strong>
+          <span>Structured development for advocates, clerks, and support talent.</span>
+        </div>
+      </article>
+      <article class="firm-careers-signal" style="--careers-accent: 3">
+        <span class="firm-careers-signal-icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></span>
+        <div>
+          <strong>Standards that hold</strong>
+          <span>Integrity and accountability guide how we practise every day.</span>
+        </div>
+      </article>
+    </div>
+
+    <div class="firm-careers-shell">
+      <div class="firm-careers-main firm-reveal" style="--reveal-delay: 120ms">
+        {% if careers.is_html %}
+        <div class="firm-careers-prose firm-prose">{{ careers.html | safe }}</div>
+        {% else %}
+          {% if careers.intro %}
+          <div class="firm-careers-intro">
+            {% for para in careers.intro.split('\n\n') %}
+            {% if para.strip() %}
+            <p>{{ para.strip() }}</p>
+            {% endif %}
+            {% endfor %}
+          </div>
+          {% elif careers_content and not careers.roles %}
+          <div class="firm-careers-prose firm-prose">{{ careers_content }}</div>
+          {% endif %}
+
+          {% if careers.roles %}
+          <section class="firm-careers-roles" aria-labelledby="open-roles-heading">
+            <header class="firm-careers-roles-head">
+              <p class="firm-eyebrow">Openings</p>
+              <h2 id="open-roles-heading">Open roles</h2>
+            </header>
+            <div class="firm-careers-roles-list">
+              {% for role in careers.roles %}
+              <article class="firm-careers-role" style="--careers-accent: {{ (loop.index0 % 5) + 1 }}">
+                <span class="firm-careers-role-num" aria-hidden="true">{{ '%02d'|format(loop.index) }}</span>
+                <div class="firm-careers-role-body">
+                  <h3>{{ role.title }}</h3>
+                  {% if role.detail %}<p>{{ role.detail }}</p>{% endif %}
+                </div>
+                <a href="#careers-apply" class="firm-careers-role-go" aria-label="Apply for {{ role.title }}">
+                  Apply <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                </a>
+              </article>
+              {% endfor %}
+            </div>
+          </section>
+          {% endif %}
+        {% endif %}
+
+        {% if core_values_items %}
+        <section class="firm-careers-values" aria-labelledby="careers-values-heading">
+          <header class="firm-careers-roles-head">
+            <p class="firm-eyebrow">Culture</p>
+            <h2 id="careers-values-heading">What we stand for</h2>
+          </header>
+          <div class="firm-careers-values-grid">
+            {% for value in core_values_items[:4] %}
+            <article class="firm-careers-value firm-reveal" style="--reveal-delay: {{ loop.index0 * 60 }}ms">
+              <span class="firm-careers-value-index" aria-hidden="true">{{ '%02d'|format(loop.index) }}</span>
+              <h3>{{ value.title }}</h3>
+              {% if value.detail %}<p>{{ value.detail }}</p>{% endif %}
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+
+      <aside class="firm-careers-aside firm-reveal" style="--reveal-delay: 160ms" id="careers-apply">
+        <div class="firm-careers-aside-card">
+          <p class="firm-eyebrow">Applications</p>
+          <h2 class="firm-careers-aside-title">How to apply</h2>
+          {% if careers.apply_text %}
+          <p class="firm-careers-aside-lead">{{ careers.apply_text }}</p>
+          {% else %}
+          <p class="firm-careers-aside-lead">Send your CV and a brief cover note. Shortlisted candidates will be contacted.</p>
+          {% endif %}
+
+          {% if careers.apply_email %}
+          <a href="mailto:{{ careers.apply_email }}?subject=Careers%20application" class="firm-btn firm-btn-primary">
+            <i class="fas fa-envelope" aria-hidden="true"></i>
+            <span>Email {{ careers.apply_email }}</span>
+          </a>
+          {% else %}
+          <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">
+            <span>Contact chambers</span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </a>
+          {% endif %}
+
+          {% if firm_email and careers.apply_email != firm_email %}
+          <a href="mailto:{{ firm_email }}" class="firm-careers-aside-link">
+            <i class="fas fa-at" aria-hidden="true"></i> {{ firm_email }}
+          </a>
+          {% endif %}
+          {% if whatsapp_url %}
+          <a href="{{ whatsapp_url }}" class="firm-careers-aside-link firm-careers-aside-link--wa" target="_blank" rel="noopener noreferrer">
+            <i class="fab fa-whatsapp" aria-hidden="true"></i> WhatsApp
+          </a>
+          {% endif %}
+
+          <ul class="firm-careers-aside-checklist">
+            <li><i class="fas fa-check" aria-hidden="true"></i> Updated CV</li>
+            <li><i class="fas fa-check" aria-hidden="true"></i> Short cover note</li>
+            <li><i class="fas fa-check" aria-hidden="true"></i> Role of interest</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
   </div>
 </section>
 
-<section class="firm-section">
-  <div class="container firm-reveal">
-    <div class="firm-prose">{{ careers_content | safe }}</div>
-    <p style="margin-top:2rem;">
-      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">Get in touch</a>
-    </p>
+<section class="firm-section firm-section-alt firm-careers-cta">
+  <div class="container">
+    <div class="firm-pa-consult-band firm-reveal">
+      <span class="firm-pa-consult-mark" aria-hidden="true"></span>
+      <div class="firm-pa-consult-copy">
+        <p class="firm-eyebrow firm-eyebrow-on-dark">Ready to apply</p>
+        <h2>Take the next step with us</h2>
+        <p>Tell us about your experience and the role you are interested in. We review every shortlisted application carefully.</p>
+      </div>
+      <div class="firm-pa-consult-actions">
+        {% if careers.apply_email %}
+        <a href="mailto:{{ careers.apply_email }}?subject=Careers%20application" class="firm-btn firm-btn-light">
+          <span>Email your application</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% else %}
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light">
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+        {% if attorneys %}
+        <a href="{{ firm_url('team') }}" class="firm-btn firm-btn-ghost">
+          <span>Meet the team</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </section>
 {% endblock %}

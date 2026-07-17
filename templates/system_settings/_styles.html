@@ -108,6 +108,101 @@
     }
     .settings-char-counter { font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; }
     .settings-char-counter.is-over { color: #dc2626; font-weight: 600; }
+    .firm-settings-slide {
+        border: 1px solid #e5e7eb;
+        border-radius: 1rem;
+        background: #0B1220;
+        overflow: hidden;
+        max-width: 48rem;
+    }
+    .firm-settings-slide-stage {
+        position: relative;
+        min-height: 11rem;
+        display: grid;
+        place-items: center;
+        padding: 1.25rem;
+        gap: 1rem;
+    }
+    .firm-settings-slide-stage--pair {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: end;
+    }
+    .firm-settings-slide-stage--multi {
+        grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+        align-items: end;
+        justify-items: center;
+    }
+    .firm-settings-slide-item {
+        margin: 0;
+        display: grid;
+        justify-items: center;
+        gap: 0.65rem;
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+    }
+    .firm-settings-slide-item img {
+        max-height: 8.5rem;
+        max-width: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        border-radius: 0;
+    }
+    .firm-settings-slide-item figcaption {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.62);
+    }
+    .firm-settings-slide-note {
+        margin: 0;
+        padding: 0 1.25rem 1rem;
+        font-size: 0.75rem;
+        color: rgba(255,255,255,0.55);
+        text-align: center;
+    }
+    .firm-settings-hero-card {
+        max-width: 20rem;
+    }
+    .firm-settings-hero-preview {
+        position: relative;
+        display: block;
+        width: 100%;
+        max-width: none;
+        aspect-ratio: 1 / 1;
+        margin: 0;
+        min-height: 0;
+        padding: 0.75rem;
+        border-radius: 0;
+        background: #0B1220;
+        border: 0;
+        border-bottom: 1px solid #e5e7eb;
+        overflow: hidden;
+    }
+    .firm-settings-hero-preview img {
+        position: absolute;
+        inset: 0.75rem;
+        width: calc(100% - 1.5rem);
+        height: calc(100% - 1.5rem);
+        max-width: none;
+        max-height: none;
+        object-fit: contain;
+        object-position: center;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        border-radius: 0;
+    }
+    .firm-settings-hero-preview-empty {
+        color: rgba(255, 255, 255, 0.55);
+        font-size: 0.8125rem;
+        text-align: center;
+    }
 </style>
 <script>
 (function () {
@@ -137,7 +232,14 @@
     function scan(root) {
         (root || document).querySelectorAll('input[maxlength], textarea[maxlength], .seo-counter-input').forEach(bindCharCounter);
     }
-    scan(document);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { scan(document); });
+    } else {
+        scan(document);
+    }
+    document.addEventListener('htmx:afterSwap', function (e) {
+        scan(e.target);
+    });
     var form = document.getElementById('systemSettingsForm') || document.getElementById('websiteTemplateForm');
     if (form) {
         form.addEventListener('click', function (e) {

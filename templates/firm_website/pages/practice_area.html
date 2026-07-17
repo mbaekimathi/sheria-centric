@@ -3,70 +3,191 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
-  <div class="container firm-reveal">
-    {% if practice_area.image_url %}
-    <div class="firm-page-hero-media">
-      <img src="{{ practice_area.image_url }}" alt="{{ practice_area.image_alt or practice_area.name }}" loading="eager" width="960" height="400">
+{% set pa_name = page_seo.h1_heading or practice_area.name %}
+{% set pa_lead = (practice_area.short_description or '')|trim %}
+{% set pa_body_raw = (practice_area.long_description or practice_area.description or '')|trim %}
+{% set pa_body = pa_body_raw if pa_body_raw and pa_body_raw != pa_lead else '' %}
+{% set pa_subs_raw = (practice_area.sub_specialties or '').strip() %}
+{% set pa_subs = pa_subs_raw.splitlines() if pa_subs_raw else [] %}
+{% set related_areas = (practice_areas or []) | rejectattr('id', 'equalto', practice_area.id) | list %}
+
+<section class="firm-pa-detail" aria-labelledby="pa-detail-heading">
+  <div class="firm-pa-detail-atmosphere" aria-hidden="true">
+    <span class="firm-pa-detail-glow"></span>
+    <span class="firm-pa-detail-orb"></span>
+    <span class="firm-pa-detail-grid"></span>
+  </div>
+
+  <div class="container">
+    <div class="firm-pa-detail-split">
+      <div class="firm-pa-detail-visual firm-reveal">
+        <span class="firm-pa-detail-index" aria-hidden="true">PA</span>
+        <article class="firm-practice-card firm-pa-detail-card">
+          <div class="firm-practice-card-media{% if not practice_area.image_url %} firm-practice-card-media--fallback{% endif %}"
+               {% if practice_area.image_url %}style="--pa-image: url('{{ practice_area.image_url }}')"{% endif %}
+               role="img"
+               aria-label="{{ practice_area.image_alt or practice_area.name }}">
+            {% if practice_area.image_url %}
+            <span class="firm-practice-card-bg" aria-hidden="true"></span>
+            {% endif %}
+            <span class="firm-pa-detail-shine" aria-hidden="true"></span>
+          </div>
+        </article>
+        <span class="firm-pa-detail-frame" aria-hidden="true"></span>
+        <span class="firm-pa-detail-dot" aria-hidden="true"></span>
+      </div>
+
+      <div class="firm-pa-detail-copy firm-reveal" style="--reveal-delay: 90ms">
+        <p class="firm-eyebrow">Practice area{% if local_office %} · {{ local_office.city or local_office.label }}{% endif %}</p>
+        <h1 id="pa-detail-heading" class="firm-pa-detail-title">{{ pa_name }}</h1>
+
+        {% if consultation_fee_label or response_time_label or practice_area.free_consultation %}
+        <ul class="firm-pa-detail-signals" aria-label="Consultation details">
+          {% if consultation_fee_label %}
+          <li><i class="fas fa-tag" aria-hidden="true"></i> {{ consultation_fee_label }}</li>
+          {% endif %}
+          {% if response_time_label %}
+          <li><i class="fas fa-clock" aria-hidden="true"></i> {{ response_time_label }}</li>
+          {% endif %}
+          {% if practice_area.free_consultation and not consultation_fee_label %}
+          <li><i class="fas fa-handshake" aria-hidden="true"></i> Free consultation</li>
+          {% endif %}
+        </ul>
+        {% endif %}
+
+        {% if local_office %}
+        <p class="firm-pa-detail-lead">Serving clients from our {{ local_office.label }}{% if local_office.city %} in {{ local_office.city }}{% endif %}.</p>
+        {% elif pa_lead %}
+        <p class="firm-pa-detail-lead">{{ pa_lead }}</p>
+        {% endif %}
+
+        <div class="firm-pa-detail-actions">
+          <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary" data-firm-magnetic>
+            <span>{{ practice_area.cta_label or hero_cta_label }}</span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </a>
+          {% if whatsapp_url %}
+          <a href="{{ whatsapp_url }}" class="firm-pa-wa" target="_blank" rel="noopener noreferrer">
+            <i class="fab fa-whatsapp" aria-hidden="true"></i>
+            <span>Chat on WhatsApp</span>
+          </a>
+          {% endif %}
+        </div>
+        <a href="{{ firm_url('practice-areas') }}" class="firm-pa-detail-back">
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          All practice areas
+        </a>
+      </div>
     </div>
-    {% endif %}
-    <p class="firm-eyebrow">Practice area</p>
-    <h1>{{ page_seo.h1_heading or practice_area.name }}</h1>
-    {% if practice_area.short_description %}
-    <p class="firm-page-lead">{{ practice_area.short_description }}</p>
-    {% endif %}
   </div>
 </section>
 
-<section class="firm-section">
-  <div class="container firm-about-grid">
-    <div class="firm-reveal">
-      {% if practice_area.description %}
-      <div class="firm-prose">{{ practice_area.description }}</div>
-      {% endif %}
-      {% if practice_area.last_updated_display %}
-      <p class="firm-updated">Last updated: {{ practice_area.last_updated_display }}</p>
-      {% endif %}
+{% if pa_body or pa_subs %}
+<section class="firm-section firm-pa-body-section">
+  <div class="container firm-pa-body-grid">
+    {% if pa_body %}
+    <div class="firm-pa-overview firm-reveal">
+      <div class="firm-pa-overview-head">
+        <p class="firm-eyebrow">Overview</p>
+        <h2 class="firm-pa-overview-title">How we help</h2>
+      </div>
+      <div class="firm-prose firm-pa-detail-prose">{{ pa_body }}</div>
     </div>
-    <aside class="firm-reveal">
-      <div class="firm-card">
-        <h2>Request a consultation</h2>
-        <p>Speak with our team about your {{ practice_area.name | lower }} matter.</p>
-        {% if consultation_fee_label %}
-        <p class="firm-consult-fee"><i class="fas fa-tag" aria-hidden="true"></i> {{ consultation_fee_label }}</p>
+    {% endif %}
+
+    {% if pa_subs %}
+    <aside class="firm-pa-focus firm-reveal" style="--reveal-delay: 80ms">
+      <p class="firm-eyebrow">Focus areas</p>
+      <h2 class="firm-pa-focus-title">What this covers</h2>
+      <ol class="firm-pa-focus-list">
+        {% for sub in pa_subs %}
+        {% if sub.strip() %}
+        <li>
+          <span class="firm-pa-focus-num" aria-hidden="true">{{ '%02d'|format(loop.index) }}</span>
+          <span class="firm-pa-focus-text">{{ sub.strip() }}</span>
+        </li>
         {% endif %}
-        {% if response_time_label %}
-        <p class="firm-consult-fee"><i class="fas fa-clock" aria-hidden="true"></i> {{ response_time_label }}</p>
+        {% endfor %}
+      </ol>
+    </aside>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if firm_offices and firm_offices|length > 1 and not local_office %}
+<section class="firm-section firm-pa-locales" style="padding-top:0;padding-bottom:clamp(2rem,4vw,3rem);">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Also available in</p>
+    <div class="firm-pa-locale-row">
+      {% for office in firm_offices %}
+      <a href="{{ firm_url('practice-areas/' ~ (practice_area.url_slug or practice_area.id) ~ '/' ~ office.slug) }}" class="firm-pa-locale-chip">
+        <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+        {{ office.city or office.label }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="firm-section firm-section-alt firm-pa-consult-section">
+  <div class="container">
+    <div class="firm-pa-consult-band firm-reveal">
+      <span class="firm-pa-consult-mark" aria-hidden="true"></span>
+      <div class="firm-pa-consult-copy">
+        <p class="firm-eyebrow firm-eyebrow-on-dark">Next step</p>
+        <h2>Ready to discuss your {{ practice_area.name | lower }} matter?</h2>
+        <p>Tell us what you need. We will advise on process, timelines, and the right advocate for your case.</p>
+        {% if consultation_fee_label or response_time_label %}
+        <ul class="firm-pa-consult-meta">
+          {% if consultation_fee_label %}<li><i class="fas fa-tag" aria-hidden="true"></i> {{ consultation_fee_label }}</li>{% endif %}
+          {% if response_time_label %}<li><i class="fas fa-clock" aria-hidden="true"></i> {{ response_time_label }}</li>{% endif %}
+        </ul>
         {% endif %}
-        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">{{ hero_cta_label }}</a>
+      </div>
+      <div class="firm-pa-consult-actions">
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light" data-firm-magnetic>
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
         {% if whatsapp_url %}
-        <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-outline" style="margin-top:0.75rem;" target="_blank" rel="noopener noreferrer">
-          <i class="fab fa-whatsapp" aria-hidden="true"></i> WhatsApp
+        <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-ghost" target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp" aria-hidden="true"></i>
+          <span>WhatsApp</span>
         </a>
         {% endif %}
       </div>
-    </aside>
+    </div>
   </div>
 </section>
 
 {% if area_attorneys %}
-<section class="firm-section firm-section-alt" aria-labelledby="pa-team-heading">
+<section class="firm-section" aria-labelledby="pa-team-heading">
   <div class="container">
-    <div class="firm-section-head firm-reveal">
-      <h2 id="pa-team-heading" class="firm-section-title">Advocates in this area</h2>
+    <div class="firm-section-head firm-section-head-split firm-reveal">
+      <div>
+        <p class="firm-eyebrow">Our team</p>
+        <h2 id="pa-team-heading" class="firm-section-title">Advocates in this area</h2>
+      </div>
+      <a href="{{ firm_url('team') }}" class="firm-text-link">View full team <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
     </div>
-    <div class="firm-grid-3">
+    <div class="firm-pa-team-grid">
       {% for emp in area_attorneys %}
-      <article class="firm-card firm-team-card firm-reveal">
-        {% if emp.profile_picture_url %}
-        <div class="firm-team-photo">
-          <img src="{{ emp.profile_picture_url }}" alt="{{ emp.full_name }}" loading="lazy" width="120" height="120">
+      <a href="{{ firm_url('team/' ~ (emp.url_slug or emp.id)) }}" class="firm-pa-team-card firm-reveal" style="--reveal-delay: {{ loop.index0 * 70 }}ms">
+        <div class="firm-pa-team-photo">
+          {% if emp.profile_picture_url %}
+          <img src="{{ emp.profile_picture_url }}" alt="" loading="lazy" width="96" height="96">
+          {% else %}
+          <span class="firm-pa-team-initial">{{ (emp.full_name or '?')[:1] | upper }}</span>
+          {% endif %}
         </div>
-        {% endif %}
-        <h3>{{ emp.full_name }}</h3>
-        <p class="firm-team-role">{{ emp.professional_title or emp.role or 'Attorney' }}</p>
-        <a href="{{ firm_url('team/' ~ (emp.url_slug or emp.id)) }}" class="firm-card-link">View profile</a>
-      </article>
+        <div class="firm-pa-team-body">
+          <strong>{{ emp.full_name }}</strong>
+          <span>{{ emp.professional_title or emp.role or 'Attorney' }}</span>
+        </div>
+        <span class="firm-pa-team-go" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+      </a>
       {% endfor %}
     </div>
   </div>
@@ -74,13 +195,42 @@
 {% endif %}
 
 {% if faqs %}
-<section class="firm-section" aria-labelledby="pa-faq-heading">
+<section class="firm-section firm-section-alt" aria-labelledby="pa-faq-heading">
   <div class="container">
     <div class="firm-section-head firm-reveal">
+      <p class="firm-eyebrow">FAQ</p>
       <h2 id="pa-faq-heading" class="firm-section-title">Common questions</h2>
     </div>
-    <div class="firm-reveal">
+    <div class="firm-reveal firm-pa-faq">
       {% include 'firm_website/_faq_accordion.html' %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if related_areas %}
+<section class="firm-section firm-pa-related" aria-labelledby="pa-related-heading">
+  <div class="container">
+    <div class="firm-section-head firm-section-head-split firm-reveal">
+      <div>
+        <p class="firm-eyebrow">Explore more</p>
+        <h2 id="pa-related-heading" class="firm-section-title">Related practice areas</h2>
+      </div>
+      <a href="{{ firm_url('practice-areas') }}" class="firm-text-link">See all <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <div class="firm-pa-related-grid">
+      {% for pa in related_areas[:3] %}
+      <a href="{{ firm_url('practice-areas/' ~ (pa.url_slug or pa.id)) }}" class="firm-pa-related-card firm-reveal" style="--reveal-delay: {{ loop.index0 * 70 }}ms{% if pa.image_url %}; --pa-image: url('{{ pa.image_url }}'){% endif %}">
+        <span class="firm-pa-related-media{% if not pa.image_url %} firm-pa-related-media--fallback{% endif %}">
+          {% if pa.image_url %}<span class="firm-pa-related-bg" aria-hidden="true"></span>{% endif %}
+        </span>
+        <span class="firm-pa-related-body">
+          <strong>{{ pa.h1_heading or pa.name }}</strong>
+          {% set blurb = pa.short_description or pa.description %}
+          {% if blurb %}<span>{{ blurb | truncate(90) }}</span>{% endif %}
+        </span>
+      </a>
+      {% endfor %}
     </div>
   </div>
 </section>

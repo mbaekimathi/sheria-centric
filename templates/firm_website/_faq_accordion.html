@@ -1,12 +1,43 @@
 {% if faqs %}
+{% set faq_icons = [
+  'fa-scale-balanced',
+  'fa-comments',
+  'fa-briefcase',
+  'fa-file-contract',
+  'fa-handshake',
+  'fa-clock',
+  'fa-building-columns',
+  'fa-user-tie',
+  'fa-gavel',
+  'fa-shield-halved'
+] %}
 <div class="firm-faq-list" data-firm-faq>
   {% for faq in faqs %}
-  <div class="firm-faq-item{% if loop.first %} is-open{% endif %}">
-    <button type="button" class="firm-faq-question" aria-expanded="{% if loop.first %}true{% else %}false{% endif %}">
-      <span>{{ faq.question }}</span>
-      <i class="fas fa-chevron-down" aria-hidden="true"></i>
+  {% set icon = faq_icons[(loop.index0) % (faq_icons|length)] %}
+  <div class="firm-faq-item{% if loop.first %} is-open{% endif %}"
+       style="--faq-accent: {{ (loop.index0 % 5) + 1 }}"
+       data-faq-text="{{ ((faq.question or '') ~ ' ' ~ (faq.answer or '')) | lower | e }}">
+    <button type="button"
+            class="firm-faq-question"
+            aria-expanded="{% if loop.first %}true{% else %}false{% endif %}"
+            id="faq-q-{{ faq.id or loop.index }}"
+            aria-controls="faq-a-{{ faq.id or loop.index }}">
+      <span class="firm-faq-icon" aria-hidden="true">
+        <i class="fas {{ icon }}"></i>
+      </span>
+      <span class="firm-faq-q-copy">
+        <span class="firm-faq-num" aria-hidden="true">{{ '%02d'|format(loop.index) }}</span>
+        <span class="firm-faq-q-text">{{ faq.question }}</span>
+      </span>
+      <span class="firm-faq-toggle" aria-hidden="true">
+        <i class="fas fa-plus"></i>
+      </span>
     </button>
-    <div class="firm-faq-answer">{{ faq.answer }}</div>
+    <div class="firm-faq-answer" id="faq-a-{{ faq.id or loop.index }}" role="region" aria-labelledby="faq-q-{{ faq.id or loop.index }}">
+      <div class="firm-faq-answer-inner">
+        <div class="firm-faq-answer-body">{{ faq.answer }}</div>
+      </div>
+    </div>
   </div>
   {% endfor %}
 </div>

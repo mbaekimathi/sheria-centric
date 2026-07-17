@@ -1,0 +1,7 @@
+{# Applies System Settings → Branding Text Size preset to public pages.
+   Must load AFTER static/style.css so --app-base-font-size overrides the default. #}
+<style id="branding-font-base">
+  :root {
+    --app-base-font-size: {{ app_base_font_size|default('16px') }};
+  }
+</style>

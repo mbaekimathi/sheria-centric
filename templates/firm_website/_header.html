@@ -1,42 +1,103 @@
 <header class="firm-header" data-firm-header>
-  <div class="container firm-header-inner">
-    <a href="{{ url_for('login') }}" class="firm-brand" aria-label="{{ firm_name }} employee login">
+  {# Desktop: brand left · nav center · Book + Client Login right #}
+  <div class="firm-header-float">
+    <a href="{{ firm_url('') }}" class="firm-brand firm-brand-float" aria-label="{{ firm_name }} home">
       {% if firm_logo_url %}
-      <img src="{{ firm_logo_url }}" alt="{{ firm_logo_alt or firm_name }}" width="44" height="44" loading="eager">
+      <img class="firm-brand-logo" src="{{ firm_logo_url }}" alt="{{ firm_logo_alt or firm_name }}" width="320" height="140" loading="eager" decoding="async">
       {% else %}
-      <span class="firm-brand-icon" aria-hidden="true"><i class="fas fa-scale-balanced"></i></span>
+      <span class="firm-brand-mark" aria-hidden="true">{{ firm_name[:1] }}</span>
       {% endif %}
-      <span>{{ firm_name }}</span>
+      <span class="firm-brand-name">{{ firm_name }}</span>
     </a>
-    <nav class="firm-nav-desktop" aria-label="Primary">
-      {% for item in firm_nav %}
-      <a href="{{ item.url }}" class="firm-nav-link{% if current_page == item.key or (current_page == 'practice_area' and item.key == 'practice_areas') or (current_page == 'attorney' and item.key == 'team') or (current_page == 'blog_post' and item.key == 'blog') %} is-active{% endif %}">{{ item.label }}</a>
-      {% endfor %}
+
+    <nav class="firm-nav-desktop" aria-label="Primary" data-firm-nav-desktop>
+      <div class="firm-nav-track" data-firm-nav-track>
+        {% for item in firm_nav %}
+        <a href="{{ item.url }}" class="firm-nav-link{% if current_page == item.key or (current_page == 'practice_area' and item.key == 'practice_areas') or (current_page == 'attorney' and item.key == 'team') or (current_page == 'blog_post' and item.key == 'blog') %} is-active{% endif %}" data-firm-nav-item data-nav-key="{{ item.key }}"><span>{{ item.label }}</span></a>
+        {% endfor %}
+      </div>
+      <div class="firm-nav-more" data-firm-nav-more hidden>
+        <button type="button" class="firm-nav-link firm-nav-more-toggle" data-firm-nav-more-toggle aria-expanded="false" aria-haspopup="true">
+          <span>More</span>
+          <i class="fas fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div class="firm-nav-more-menu" data-firm-nav-more-menu role="menu"></div>
+      </div>
     </nav>
-    <div class="firm-header-actions">
-      {% if firm_phone %}
-      <a href="tel:{{ firm_phone }}" class="firm-header-phone" aria-label="Call {{ firm_name }}">
-        <i class="fas fa-phone" aria-hidden="true"></i>
-        <span>{{ firm_phone }}</span>
+
+    <div class="firm-header-float-right">
+      <a href="{{ hero_cta_url }}" class="firm-btn firm-header-cta" data-firm-header-cta>
+        <span>{{ hero_cta_label }}</span>
       </a>
-      {% endif %}
-      <a href="{{ url_for('client_login') }}" class="firm-client-login">
+      <a href="{{ url_for('client_login') }}" class="firm-client-login firm-client-login-float" title="Client Login">
         <i class="fas fa-user" aria-hidden="true"></i>
         <span>Client Login</span>
       </a>
-      <a href="{{ hero_cta_url }}" class="firm-btn firm-btn-primary firm-header-cta">{{ hero_cta_label }}</a>
-      <button type="button" class="firm-menu-toggle" data-firm-menu-toggle aria-expanded="false" aria-controls="firm-mobile-nav" aria-label="Open menu">
-        <i class="fas fa-bars" aria-hidden="true"></i>
-      </button>
     </div>
   </div>
-  <nav id="firm-mobile-nav" class="firm-mobile-nav" data-firm-mobile-nav aria-label="Mobile">
-    {% for item in firm_nav %}
-    <a href="{{ item.url }}">{{ item.label }}</a>
-    {% endfor %}
-    {% if firm_phone %}
-    <a href="tel:{{ firm_phone }}"><i class="fas fa-phone" aria-hidden="true"></i> {{ firm_phone }}</a>
-    {% endif %}
-    <a href="{{ url_for('client_login') }}"><i class="fas fa-user" aria-hidden="true"></i> Client Login</a>
-  </nav>
+
+  {# Mobile bar #}
+  <div class="firm-header-shell">
+    <div class="container firm-header-bar">
+      <a href="{{ firm_url('') }}" class="firm-brand firm-brand-inline" aria-label="{{ firm_name }} home">
+        {% if firm_logo_url %}
+        <img src="{{ firm_logo_url }}" alt="{{ firm_logo_alt or firm_name }}" height="48" loading="eager">
+        {% else %}
+        <span class="firm-brand-mark" aria-hidden="true">{{ firm_name[:1] }}</span>
+        {% endif %}
+        <span class="firm-brand-name">{{ firm_name }}</span>
+      </a>
+      <div class="firm-header-actions">
+        <a href="{{ url_for('client_login') }}" class="firm-client-login firm-client-login-inline" title="Client Login">
+          <i class="fas fa-user" aria-hidden="true"></i>
+          <span>Client Login</span>
+        </a>
+        <button type="button" class="firm-menu-toggle" data-firm-menu-toggle aria-expanded="false" aria-controls="firm-mobile-nav" aria-label="Open menu">
+          <span class="firm-menu-toggle-bars" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="firm-mobile-nav-shell" data-firm-mobile-shell hidden>
+    <button type="button" class="firm-mobile-backdrop" data-firm-menu-close aria-label="Close menu"></button>
+    <nav id="firm-mobile-nav" class="firm-mobile-nav" data-firm-mobile-nav aria-label="Mobile">
+      <div class="firm-mobile-nav-head">
+        <div class="firm-mobile-nav-brand">
+          {% if firm_logo_url %}
+          <img src="{{ firm_logo_url }}" alt="" height="32">
+          {% else %}
+          <span class="firm-brand-mark firm-brand-mark-sm" aria-hidden="true">{{ firm_name[:1] }}</span>
+          {% endif %}
+          <span>{{ firm_name }}</span>
+        </div>
+        <button type="button" class="firm-mobile-close" data-firm-menu-close aria-label="Close menu">
+          <i class="fas fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <a href="{{ url_for('client_login') }}" class="firm-mobile-login-top">
+        <i class="fas fa-user" aria-hidden="true"></i>
+        <span>Client Login</span>
+        <i class="fas fa-arrow-right firm-mobile-login-go" aria-hidden="true"></i>
+      </a>
+
+      <p class="firm-mobile-nav-label">Menu</p>
+      <div class="firm-mobile-nav-links">
+        {% for item in firm_nav %}
+        <a href="{{ item.url }}" style="--i: {{ loop.index0 }}">
+          <span class="firm-mobile-nav-num" aria-hidden="true">{{ '%02d'|format(loop.index) }}</span>
+          <span class="firm-mobile-nav-text">{{ item.label }}</span>
+        </a>
+        {% endfor %}
+      </div>
+
+      <div class="firm-mobile-nav-cta">
+        <a href="{{ hero_cta_url }}" class="firm-btn firm-btn-light">{{ hero_cta_label }}</a>
+        {% if firm_phone %}
+        <a href="tel:{{ firm_phone }}" class="firm-btn firm-btn-ghost"><i class="fas fa-phone" aria-hidden="true"></i> {{ firm_phone }}</a>
+        {% endif %}
+      </div>
+    </nav>
+  </div>
 </header>

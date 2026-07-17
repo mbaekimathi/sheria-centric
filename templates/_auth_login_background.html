@@ -1,0 +1,98 @@
+{# Login page visual backdrop — priority:
+   1) Branding → Login Page Background
+   2) Company logo
+   3) Default auth gradient (no custom layer)
+#}
+{% set _cs = company_settings if company_settings is defined and company_settings else {} %}
+{% set _bg_stored = _cs.get('login_page_background') %}
+{% set _logo_stored = _cs.get('company_logo') %}
+{% set _bg_path = company_asset_static_path(_bg_stored) if _bg_stored else none %}
+{% set _logo_path = company_asset_static_path(_logo_stored) if _logo_stored else none %}
+{% set _firm_name = (_cs.get('company_name') or 'Firm')|trim %}
+{% if _bg_path %}
+  {% set _auth_asset_path = _bg_path %}
+  {% set _auth_asset_mode = 'photo' %}
+  {% set _auth_asset_alt = (_cs.get('login_page_background_alt') or (_firm_name ~ ' login background'))|trim %}
+{% elif _logo_path %}
+  {% set _auth_asset_path = _logo_path %}
+  {% set _auth_asset_mode = 'logo' %}
+  {% set _auth_asset_alt = (_cs.get('company_logo_alt') or (_firm_name ~ ' logo'))|trim %}
+{% else %}
+  {% set _auth_asset_path = none %}
+  {% set _auth_asset_mode = none %}
+  {% set _auth_asset_alt = '' %}
+{% endif %}
+{% if _auth_asset_path %}
+<style>
+    /* Custom backdrop — photo or logo. Default gradient stays when neither is set. */
+    body {
+        background: #0f0d2e !important;
+        background-image: none !important;
+    }
+    body::before {
+        display: none !important;
+    }
+    .auth-login-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        overflow: hidden;
+        background:
+            radial-gradient(circle at 18% 20%, rgba(108, 92, 231, 0.35), transparent 45%),
+            radial-gradient(circle at 82% 78%, rgba(162, 155, 254, 0.22), transparent 50%),
+            linear-gradient(145deg, #17123f 0%, #2b2374 55%, #3b2f8f 100%);
+    }
+    .auth-login-bg img {
+        display: block;
+    }
+    .auth-login-bg--photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+    }
+    .auth-login-bg--logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .auth-login-bg--logo img {
+        width: min(42vw, 280px);
+        height: auto;
+        max-height: 42vh;
+        object-fit: contain;
+        opacity: 0.22;
+        filter: drop-shadow(0 12px 40px rgba(0, 0, 0, 0.35));
+    }
+    .auth-login-bg::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(135deg, rgba(15, 13, 46, 0.58) 0%, rgba(30, 26, 78, 0.42) 45%, rgba(15, 13, 46, 0.55) 100%);
+    }
+    .auth-login-bg--logo::after {
+        background:
+            linear-gradient(135deg, rgba(15, 13, 46, 0.35) 0%, rgba(30, 26, 78, 0.28) 45%, rgba(15, 13, 46, 0.4) 100%);
+    }
+    .app-header,
+    header.app-header,
+    header,
+    main,
+    .auth-page,
+    .app-footer,
+    footer {
+        position: relative;
+        z-index: 1;
+    }
+    .app-header,
+    header.app-header {
+        z-index: 50;
+    }
+</style>
+<div class="auth-login-bg auth-login-bg--{{ _auth_asset_mode }}">
+    <img src="{{ url_for('static', filename=_auth_asset_path) }}"
+         alt="{{ _auth_asset_alt or 'Login page background' }}">
+</div>
+{% endif %}

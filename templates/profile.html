@@ -42,7 +42,7 @@
                             <i class="fas fa-user-tag mr-2"></i>{{ employee.role }}
                         </span>
                         <span class="px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold">
-                            <i class="fas fa-building mr-2"></i>{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}
+                            <i class="fas fa-building mr-2"></i>{{ company_settings.company_name if company_settings else 'SHERIA LAW FIRM' }}
                         </span>
                         <span class="px-4 py-1.5 rounded-full text-sm font-semibold {% if employee.status == 'Active' %}bg-green-500 text-white{% elif employee.status == 'Pending Approval' %}bg-yellow-500 text-white{% else %}bg-red-500 text-white{% endif %}">
                             {{ employee.status }}
@@ -154,7 +154,7 @@
                     </div>
                     <div class="flex-1">
                         <p class="text-xs text-gray-500 font-medium mb-1">Company</p>
-                        <p class="text-lg font-semibold text-gray-900">{{ company_settings.company_name if company_settings else 'BAUNI LAW GROUP' }}</p>
+                        <p class="text-lg font-semibold text-gray-900">{{ company_settings.company_name if company_settings else 'SHERIA LAW FIRM' }}</p>
                     </div>
                 </div>
                 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if swahili_enabled %} lang="en"{% endif %}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,23 +11,119 @@
   {% endfor %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700{% if theme.font_body != 'Inter' %}&family={{ theme.font_body | replace(' ', '+') }}:wght@400;500;600;700{% endif %}{% if theme.font_heading != 'Inter' and theme.font_heading != 'Playfair Display' %}&family={{ theme.font_heading | replace(' ', '+') }}:wght@500;600;700{% endif %}&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400{% if theme.font_body not in ['Figtree', 'Source Sans 3', 'Inter'] %}&family={{ theme.font_body | replace(' ', '+') }}:wght@400;500;600;700{% endif %}{% if theme.font_heading not in ['Instrument Serif', 'Cormorant Garamond', 'Playfair Display'] %}&family={{ theme.font_heading | replace(' ', '+') }}:wght@400;500;600;700{% endif %}&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='firm_website.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='firm_website.css') }}?v=home-advance-1">
   <style>
     :root {
       --color-primary: {{ theme.primary }};
       --color-accent: {{ theme.secondary }};
       --color-accent-light: {{ theme.tertiary }};
       --color-dark: {{ theme.primary }};
-      --font-heading: "{{ theme.font_heading }}", Georgia, serif;
-      --font-body: "{{ theme.font_body }}", system-ui, sans-serif;
+      --color-highlight: {{ theme.tertiary }};
+      --color-white: #ffffff;
+      --color-bg: #F4F5F2;
+      --color-bg-alt: #E8EAE4;
+      --color-surface: #FCFCFB;
+      --color-ink: #0B1220;
+      --color-text: #121925;
+      --color-text-muted: #5E6775;
+      --color-border: color-mix(in srgb, {{ theme.primary }} 12%, transparent);
+      --font-heading: "{{ theme.font_heading }}", "Instrument Serif", Georgia, serif;
+      --font-body: "{{ theme.font_body }}", "Figtree", system-ui, sans-serif;
+      --container-width: 1180px;
+      --container-padding: 0 clamp(1.25rem, 4vw, 2rem);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 28px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 1px 2px color-mix(in srgb, {{ theme.primary }} 6%, transparent);
+      --shadow-md: 0 18px 50px color-mix(in srgb, {{ theme.primary }} 12%, transparent);
+      --shadow-lg: 0 30px 80px color-mix(in srgb, {{ theme.primary }} 16%, transparent);
+      --shadow-accent: 0 14px 36px color-mix(in srgb, {{ theme.secondary }} 28%, transparent);
+      --transition: 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --app-base-font-size: {{ theme.base_font_size|default(app_base_font_size|default('16px')) }};
+      --app-font-scale: 1;
+      --firm-hero-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+      --header-offset: 0px;
+    }
+    html {
+      font-size: calc(var(--app-base-font-size) * var(--app-font-scale));
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      scroll-behavior: smooth;
+    }
+    @media (max-width: 1024px) { :root { --app-font-scale: 0.9375; } }
+    @media (max-width: 640px) { :root { --app-font-scale: 0.875; } }
+    @media (max-width: 400px) { :root { --app-font-scale: 0.8125; } }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
     }
   </style>
+  {% set _has_analytics = ga4_measurement_id or gtm_container_id or meta_pixel_id %}
+  <script type="application/json" id="firm-analytics-config">{{ {
+    'consentRequired': true if cookie_consent_enabled else false,
+    'ga4': ga4_measurement_id or '',
+    'gtm': gtm_container_id or '',
+    'meta': meta_pixel_id or ''
+  } | tojson }}</script>
+  <script>
+  (function () {
+    try {
+      var el = document.getElementById('firm-analytics-config');
+      if (!el) return;
+      var cfg = JSON.parse(el.textContent || '{}');
+      var key = 'firm_cookie_consent';
+      var legacy = localStorage.getItem('firm_cookie_ok');
+      var choice = localStorage.getItem(key);
+      if (!choice && legacy === '1') {
+        choice = 'accepted';
+        localStorage.setItem(key, choice);
+      }
+      window.__firmAnalytics = { cfg: cfg, choice: choice || null, loaded: false };
+      if (cfg.consentRequired && choice !== 'accepted') return;
+      if (!cfg.ga4 && !cfg.gtm && !cfg.meta) return;
+      window.__firmLoadAnalytics = true;
+    } catch (e) {}
+  })();
+  </script>
+  {% if not cookie_consent_enabled %}
+  {% if gtm_container_id %}
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer',{{ gtm_container_id|tojson }});</script>
+  {% endif %}
+  {% if ga4_measurement_id %}
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga4_measurement_id }}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', {{ ga4_measurement_id|tojson }});
+  </script>
+  {% endif %}
+  {% if meta_pixel_id %}
+  <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', {{ meta_pixel_id|tojson }});
+    fbq('track', 'PageView');
+  </script>
+  {% endif %}
+  {% endif %}
   {% block head_extra %}{% endblock %}
 </head>
-<body class="firm-site{% if preview_mode %} firm-site-preview{% endif %}">
+<body class="firm-site{% if preview_mode %} firm-site-preview{% endif %}{% if current_page %} firm-page-{{ current_page }}{% endif %}">
+  {% if not cookie_consent_enabled and gtm_container_id %}
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ gtm_container_id }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  {% endif %}
   <a href="#main-content" class="firm-skip-link">Skip to main content</a>
   {% if preview_mode %}
   <div class="firm-preview-banner" role="status">
@@ -45,7 +141,37 @@
     <i class="fab fa-whatsapp" aria-hidden="true"></i>
   </a>
   {% endif %}
-  <script src="{{ url_for('static', filename='firm_website.js') }}" defer></script>
+  {% if cookie_consent_enabled %}
+  {% set privacy_item = (legal_nav or []) | selectattr('key', 'equalto', 'privacy') | list %}
+  <div
+    id="firm-cookie-banner"
+    class="firm-cookie-banner"
+    role="dialog"
+    aria-labelledby="firm-cookie-title"
+    aria-describedby="firm-cookie-copy"
+    hidden
+    data-firm-cookie-banner
+  >
+    <div class="firm-cookie-banner-inner">
+      <div class="firm-cookie-banner-copy">
+        <p id="firm-cookie-title" class="firm-cookie-banner-title">Cookies</p>
+        <p id="firm-cookie-copy">{{ cookie_consent_message }}</p>
+        {% if privacy_item %}
+        <a href="{{ privacy_item[0].url }}" class="firm-cookie-banner-link">Privacy Policy</a>
+        {% endif %}
+      </div>
+      <div class="firm-cookie-banner-actions">
+        <button type="button" class="firm-btn firm-btn-ghost firm-cookie-decline" data-firm-cookie-decline>
+          Essential only
+        </button>
+        <button type="button" class="firm-btn firm-btn-light firm-cookie-accept" data-firm-cookie-accept>
+          Accept
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  <script src="{{ url_for('static', filename='firm_website.js') }}?v=home-advance-1" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

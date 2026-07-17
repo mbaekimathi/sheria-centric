@@ -197,8 +197,8 @@
                                     id="sender_name" 
                                     name="sender_name"
                                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                    placeholder="BAUNI LAW GROUP"
-                                    value="{% if email_settings %}{{ email_settings.sender_name }}{% else %}BAUNI LAW GROUP{% endif %}"
+                                    placeholder="SHERIA LAW FIRM"
+                                    value="{% if email_settings %}{{ email_settings.sender_name }}{% else %}SHERIA LAW FIRM{% endif %}"
                                 />
                             </div>
                         </div>
@@ -1092,7 +1092,7 @@ function saveEmailSettings() {
         imap_host: formData.get('imap_host') || 'mail.baunilawgroup.com',
         imap_port: formData.get('imap_port') || 993,
         imap_use_ssl: formData.get('imap_use_ssl'),
-        sender_name: formData.get('sender_name') || 'BAUNI LAW GROUP'
+        sender_name: formData.get('sender_name') || 'SHERIA LAW FIRM'
     };
     
     showMessage('Saving email settings...', 'info');

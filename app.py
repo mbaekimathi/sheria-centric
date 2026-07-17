@@ -149,6 +149,52 @@ def get_public_base_url():
         return ''
 
 
+def rewrite_public_url_for_current_host(url):
+    """
+    Rewrite absolute URLs that point at localhost to the current public base URL.
+    Keeps path, query, and fragment. Relative paths (/…) are joined to the current host.
+    Non-localhost absolute URLs are left unchanged.
+    """
+    from urllib.parse import urlparse, urlunparse
+
+    url = (url or '').strip()
+    if not url:
+        return ''
+    base = get_public_base_url().rstrip('/')
+    if not base:
+        return url
+    if url.startswith('/') and not url.startswith('//'):
+        return f'{base}{url}'
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return url
+    if not parsed.scheme or not parsed.netloc:
+        return url
+    if not _is_localhost_host(parsed.hostname or ''):
+        return url
+    try:
+        base_parsed = urlparse(base if '://' in base else f'https://{base}')
+    except Exception:
+        return url
+    return urlunparse((
+        base_parsed.scheme or parsed.scheme or 'https',
+        base_parsed.netloc,
+        parsed.path or '/',
+        '',
+        parsed.query,
+        parsed.fragment,
+    ))
+
+
+def resolve_public_canonical_url(stored_url, fallback_path=''):
+    """Use stored canonical (rewritten off localhost) or build from the current host."""
+    rewritten = rewrite_public_url_for_current_host(stored_url)
+    if rewritten:
+        return rewritten
+    return _firm_canonical_url(fallback_path)
+
+
 def build_external_url(path):
     """Build an absolute URL for the current site, e.g. build_external_url('/callback')."""
     base = get_public_base_url()
@@ -183,18 +229,16 @@ def _validate_image_upload_has_alt(request, file_key, alt_key, item_label):
 def _validate_settings_image_alt_uploads(request, settings_section):
     """Validate alt text for image uploads on settings save."""
     if settings_section == 'company':
-        return _validate_image_upload_has_alt(
-            request, 'company_logo', 'company_logo_alt', 'company logo'
-        )
-    if settings_section == 'branding':
-        for file_key, alt_key, label in (
-            ('favicon', 'favicon_alt', 'favicon'),
-            ('login_page_background', 'login_page_background_alt', 'login page background'),
-        ):
-            err = _validate_image_upload_has_alt(request, file_key, alt_key, label)
-            if err:
-                return err
+        # Logo alt is auto-filled from firm name when empty (CMS v2).
         return None
+    if settings_section == 'branding':
+        # Favicon alt is auto-generated and hidden from admins.
+        return _validate_image_upload_has_alt(
+            request,
+            'login_page_background',
+            'login_page_background_alt',
+            'login page background',
+        )
     if settings_section != 'legal':
         return None
     ids_raw = (request.form.get('employee_ids') or '').strip()
@@ -221,6 +265,15 @@ def _validate_settings_image_alt_uploads(request, settings_section):
         )
         if err:
             return err
+    for idx in _blog_form_indices(request):
+        err = _validate_image_upload_has_alt(
+            request,
+            f'blog_image_{idx}',
+            f'blog_image_alt_{idx}',
+            f'blog cover image (article {idx + 1})',
+        )
+        if err:
+            return err
     return None
 
 
@@ -235,18 +288,87 @@ def _format_public_last_updated(value):
         return text[:10] if len(text) >= 10 else text
 
 
+def _auto_firm_meta_title(h1, firm_name, max_len=60):
+    """Default meta title: '{H1} | {Firm name}' (CMS v2)."""
+    h1 = ' '.join(str(h1 or '').split()).strip()
+    firm_name = ' '.join(str(firm_name or '').split()).strip()
+    if h1 and firm_name and h1.lower() != firm_name.lower():
+        title = f'{h1} | {firm_name}'
+    else:
+        title = h1 or firm_name
+    return title[:max_len]
+
+
+def _auto_firm_meta_description(mission='', tagline='', firm_name='', max_len=155):
+    """Draft meta description from mission + tagline (CMS v2)."""
+    mission = ' '.join(str(mission or '').split()).strip()
+    tagline = ' '.join(str(tagline or '').split()).strip()
+    firm_name = ' '.join(str(firm_name or '').split()).strip()
+    if mission and tagline:
+        draft = f'{mission} {tagline}'
+    else:
+        draft = mission or tagline or (f'Welcome to {firm_name}' if firm_name else '')
+    if len(draft) <= max_len:
+        return draft
+    snippet = draft[:max_len].rsplit(' ', 1)[0]
+    return snippet or draft[:max_len]
+
+
+def _serialize_core_values_from_form(request):
+    """Build core_values text from repeater fields (title + detail)."""
+    has_repeater = any(k.startswith('core_value_title_') for k in request.form)
+    items = []
+    for key in request.form:
+        if not key.startswith('core_value_title_'):
+            continue
+        suffix = key.rsplit('_', 1)[-1]
+        if not suffix.isdigit():
+            continue
+        title = (request.form.get(f'core_value_title_{suffix}') or '').strip()
+        detail = (request.form.get(f'core_value_detail_{suffix}') or '').strip()
+        if not title:
+            continue
+        items.append(f'{title} — {detail}' if detail else title)
+    if has_repeater:
+        return '\n'.join(items)
+    # Fall back to legacy single textarea if present.
+    if request.form.get('core_values') is not None:
+        return (request.form.get('core_values') or '').strip()
+    return None
+
+
+def _default_logo_alt_text(firm_name):
+    name = (firm_name or '').strip() or 'Firm'
+    return f'{name} logo'
+
+
 def _firm_page_seo_from_settings(firm, page_key, *, default_h1=''):
     """Build page-level SEO dict from company_settings columns."""
     prefix = f'seo_{page_key}_'
+    firm_name = (firm.get('company_name') or '').strip()
+    h1_heading = (firm.get(f'{prefix}h1_heading') or '').strip() or default_h1
     meta_title = (firm.get(f'{prefix}meta_title') or '').strip()
     meta_description = (firm.get(f'{prefix}meta_description') or '').strip()
-    h1_heading = (firm.get(f'{prefix}h1_heading') or '').strip() or default_h1
+    if not meta_title:
+        meta_title = _auto_firm_meta_title(h1_heading, firm_name)
+    if not meta_description:
+        if page_key == 'about':
+            meta_description = _auto_firm_meta_description(
+                firm.get('mission_statement') or '',
+                firm.get('company_tagline') or '',
+                firm_name,
+            ) or 'Learn more about our firm, our mission, and our values.'
+        else:
+            meta_description = _auto_firm_meta_description(
+                firm.get('mission_statement') or '',
+                firm.get('company_tagline') or '',
+                firm_name,
+            )
     url_slug = (firm.get(f'{prefix}url_slug') or '').strip()
-    canonical_url = (firm.get(f'{prefix}canonical_url') or '').strip()
-    if not canonical_url:
-        canonical_url = _default_firm_page_canonical(
-            None if page_key == 'home' else (url_slug or page_key)
-        )
+    # Canonical is always system-owned (CMS v2) — never trust stored overrides for public output.
+    canonical_url = _default_firm_page_canonical(
+        None if page_key == 'home' else (url_slug or page_key)
+    )
     return {
         'meta_title': meta_title,
         'meta_description': meta_description,
@@ -297,6 +419,73 @@ def _strip_sensitive_session_keys(response):
     except Exception:
         pass
     return response
+
+
+# Skip non-page requests from the shared Back trail (app + firm website).
+_NAV_HISTORY_SKIP_PREFIXES = (
+    '/static/',
+    '/sw.js',
+    '/offline',
+    '/manifest',
+)
+
+
+def _nav_history_full_path():
+    """Current request path + query string (no trailing bare '?')."""
+    path = request.path or '/'
+    qs = ''
+    if request.query_string:
+        qs = request.query_string.decode('utf-8', errors='ignore')
+    return f'{path}?{qs}' if qs else path
+
+
+def _should_track_app_nav_history(response=None):
+    """True for successful HTML navigations in the app and firm website."""
+    if request.method not in ('GET', 'HEAD'):
+        return False
+    path = request.path or ''
+    for prefix in _NAV_HISTORY_SKIP_PREFIXES:
+        if path.startswith(prefix) or path == prefix.rstrip('/'):
+            return False
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return False
+    if request.headers.get('HX-Request'):
+        return False
+    if '/api/' in path or path.endswith('.json'):
+        return False
+    if response is not None:
+        if response.status_code != 200:
+            return False
+        ctype = (response.content_type or '').lower()
+        if 'text/html' not in ctype:
+            return False
+    else:
+        accept = (request.headers.get('Accept') or '').lower()
+        if accept and 'text/html' not in accept and '*/*' not in accept:
+            return False
+    return True
+
+
+@app.after_request
+def _track_app_nav_history(response):
+    """Remember real previous pages (not browser history) for header Back links."""
+    try:
+        if not _should_track_app_nav_history(response):
+            return response
+        here = _nav_history_full_path()
+        history = list(session.get('nav_history') or [])
+        if here in history:
+            # Revisit / Back: truncate to this page so Back walks the real trail.
+            idx = len(history) - 1 - history[::-1].index(here)
+            history = history[: idx + 1]
+        else:
+            history.append(here)
+        session['nav_history'] = history[-25:]
+        session.modified = True
+    except Exception:
+        pass
+    return response
+
 
 def verify_google_id_token(id_token_jwt: str):
     """
@@ -1213,7 +1402,7 @@ def create_company_settings_table():
                 cursor.execute("""
                     CREATE TABLE company_settings (
                         id INT AUTO_INCREMENT PRIMARY KEY,
-                        company_name VARCHAR(255) NOT NULL DEFAULT 'BAUNI LAW GROUP',
+                        company_name VARCHAR(255) NOT NULL DEFAULT 'SHERIA LAW FIRM',
                         email VARCHAR(255),
                         contact_number VARCHAR(20),
                         whatsapp_number VARCHAR(20),
@@ -1234,7 +1423,7 @@ def create_company_settings_table():
                 cursor.execute("""
                     INSERT INTO company_settings 
                     (company_name, email, contact_number, whatsapp_number, location_name)
-                    VALUES ('BAUNI LAW GROUP', NULL, NULL, NULL, NULL)
+                    VALUES ('SHERIA LAW FIRM', NULL, NULL, NULL, NULL)
                 """)
                 connection.commit()
                 print("[OK] Default company settings inserted")
@@ -1243,7 +1432,7 @@ def create_company_settings_table():
                 # InnoDB row size cap is 65535 (VARCHARs count at max width; TEXT only ~12 bytes).
                 # Convert long URL/path fields to TEXT before adding more columns.
                 varchar_to_text = (
-                    'company_logo', 'company_tagline', 'website_url',
+                    'company_logo', 'company_main_image', 'company_hero_gallery', 'company_tagline', 'website_url',
                     'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link', 'tiktok_link',
                     'review_collection_link', 'gbp_business_description',
                     'default_letterhead', 'stamp_seal_upload', 'default_signature_documents',
@@ -1260,8 +1449,10 @@ def create_company_settings_table():
                             print(f"[WARNING] Could not convert '{col}' to TEXT: {e}")
                 # Check and add missing columns
                 columns_to_check = [
-                    ('company_name', "VARCHAR(255) NOT NULL DEFAULT 'BAUNI LAW GROUP'"),
+                    ('company_name', "VARCHAR(255) NOT NULL DEFAULT 'SHERIA LAW FIRM'"),
                     ('company_logo', 'TEXT'),
+                    ('company_main_image', 'TEXT'),
+                    ('company_hero_gallery', 'TEXT'),
                     ('company_tagline', 'TEXT'),
                     ('registration_number', 'VARCHAR(100)'),
                     ('tax_pin_vat_number', 'VARCHAR(50)'),
@@ -1361,6 +1552,25 @@ def create_company_settings_table():
                     ('location_name', 'VARCHAR(255)'),
                     ('longitude', 'DECIMAL(10, 8)'),
                     ('latitude', 'DECIMAL(10, 8)'),
+                    ('lead_advocate_employee_id', 'INT NULL'),
+                    ('jurisdictions_admitted', 'TEXT'),
+                    ('malpractice_insurance_status', 'TINYINT(1) DEFAULT 0'),
+                    ('malpractice_insurance_detail', 'TEXT'),
+                    ('disciplinary_record_statement', 'TEXT'),
+                    ('cookie_consent_enabled', 'TINYINT(1) DEFAULT 1'),
+                    ('cookie_consent_message', 'TEXT'),
+                    ('accessibility_statement_enabled', 'TINYINT(1) DEFAULT 0'),
+                    ('accessibility_statement', 'TEXT'),
+                    ('ga4_measurement_id', 'VARCHAR(40)'),
+                    ('gtm_container_id', 'VARCHAR(40)'),
+                    ('meta_pixel_id', 'VARCHAR(40)'),
+                    ('swahili_enabled', 'TINYINT(1) DEFAULT 0'),
+                    ('company_tagline_sw', 'TEXT'),
+                    ('mission_statement_sw', 'TEXT'),
+                    ('firm_history_sw', 'TEXT'),
+                    ('homepage_hero_tagline_sw', 'TEXT'),
+                    ('core_values_sw', 'TEXT'),
+                    ('firm_offices_json', 'LONGTEXT'),
                     ('google_drive_token', 'TEXT'),
                     ('google_drive_refresh_token', 'TEXT'),
                     ('google_drive_token_uri', 'TEXT'),
@@ -1508,6 +1718,8 @@ def create_employees_table():
                     ('lsk_practicing_certificate_number', 'VARCHAR(100)'),
                     ('education_institutions', 'TEXT'),
                     ('year_called_to_bar', 'VARCHAR(10)'),
+                    ('bar_admission_date', 'DATE NULL'),
+                    ('linkedin_profile_url', 'VARCHAR(500)'),
                     ('meta_title', 'VARCHAR(70)'),
                     ('meta_description', 'VARCHAR(160)'),
                     ('url_slug', 'VARCHAR(120)'),
@@ -1984,6 +2196,15 @@ def create_firm_faqs_table():
                 print("[OK] firm_faqs table created")
             else:
                 print("[OK] firm_faqs table already exists")
+                if not column_exists('firm_faqs', 'practice_area_ids'):
+                    try:
+                        cursor.execute(
+                            "ALTER TABLE firm_faqs ADD COLUMN practice_area_ids VARCHAR(255) NULL"
+                        )
+                        connection.commit()
+                        print("[OK] Added column 'practice_area_ids' to firm_faqs")
+                    except Exception as e:
+                        print(f"[WARNING] Could not add practice_area_ids to firm_faqs: {e}")
         return True
     except Exception as e:
         print(f"Error creating/updating firm_faqs table: {e}")
@@ -2042,6 +2263,11 @@ def create_firm_blog_posts_table():
                         body LONGTEXT,
                         author_employee_id INT NULL,
                         published TINYINT(1) NOT NULL DEFAULT 0,
+                        last_reviewed_at DATE NULL,
+                        meta_title VARCHAR(70),
+                        meta_description VARCHAR(160),
+                        image_path VARCHAR(500),
+                        image_alt VARCHAR(255),
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                             ON UPDATE CURRENT_TIMESTAMP,
@@ -2053,6 +2279,23 @@ def create_firm_blog_posts_table():
                 print("[OK] firm_blog_posts table created")
             else:
                 print("[OK] firm_blog_posts table already exists")
+                blog_columns = [
+                    ('last_reviewed_at', 'DATE NULL'),
+                    ('meta_title', 'VARCHAR(70)'),
+                    ('meta_description', 'VARCHAR(160)'),
+                    ('image_path', 'VARCHAR(500)'),
+                    ('image_alt', 'VARCHAR(255)'),
+                ]
+                for column_name, column_def in blog_columns:
+                    if not column_exists('firm_blog_posts', column_name):
+                        try:
+                            cursor.execute(
+                                f"ALTER TABLE firm_blog_posts ADD COLUMN {column_name} {column_def}"
+                            )
+                            connection.commit()
+                            print(f"[OK] Added column '{column_name}' to firm_blog_posts")
+                        except Exception as e:
+                            print(f"[WARNING] Could not add {column_name} to firm_blog_posts: {e}")
         return True
     except Exception as e:
         print(f"Error creating/updating firm_blog_posts table: {e}")
@@ -2060,6 +2303,1020 @@ def create_firm_blog_posts_table():
     finally:
         if connection:
             connection.close()
+
+
+KENYA_POLICY_TEMPLATES = {
+    'privacy': (
+        "This Privacy Policy describes how we collect, use, and protect personal data "
+        "in accordance with the Data Protection Act, 2019 (Kenya).\n\n"
+        "1. Data we collect\n"
+        "We may collect your name, contact details, and information you provide when "
+        "requesting a consultation or using our services.\n\n"
+        "2. How we use your data\n"
+        "We use your data to respond to enquiries, provide legal services, and meet "
+        "our professional and regulatory obligations.\n\n"
+        "3. Sharing\n"
+        "We do not sell personal data. We may share information with courts, regulators, "
+        "or service providers only where necessary and lawful.\n\n"
+        "4. Your rights\n"
+        "You may request access, correction, or deletion of your personal data, subject "
+        "to applicable law. Contact us using the details on our Contact page.\n\n"
+        "5. Contact\n"
+        "For privacy questions, contact our firm using the email published on this website."
+    ),
+    'terms': (
+        "These Terms of Service govern your use of this website and related online services.\n\n"
+        "1. Informational purpose\n"
+        "Content on this website is for general information only and does not create an "
+        "advocate–client relationship.\n\n"
+        "2. Acceptable use\n"
+        "You agree not to misuse this website, attempt unauthorized access, or submit "
+        "unlawful or harmful content.\n\n"
+        "3. Appointments and fees\n"
+        "Consultation availability, fees, and engagement terms are confirmed separately "
+        "in writing when you instruct the firm.\n\n"
+        "4. Limitation\n"
+        "To the fullest extent permitted by Kenyan law, we are not liable for decisions "
+        "made solely on the basis of website content.\n\n"
+        "5. Changes\n"
+        "We may update these terms from time to time. Continued use of the site after "
+        "changes constitutes acceptance of the updated terms."
+    ),
+    'disclaimer': (
+        "The information on this website is for general purposes only and does not "
+        "constitute legal advice. Viewing this site or contacting us through online "
+        "forms does not create an advocate–client relationship. You should obtain "
+        "independent legal advice for your specific circumstances. Laws and procedures "
+        "change; we do not warrant that all content is complete or current."
+    ),
+    'accessibility': (
+        "We are committed to making our website accessible. We aim to meet WCAG 2.1 "
+        "Level AA where practicable, including keyboard navigation, readable contrast, "
+        "and alternative text for meaningful images. If you encounter an accessibility "
+        "barrier, please contact us via the details on our Contact page and we will "
+        "work to address it."
+    ),
+    'cookie': (
+        "We use essential cookies to run this website and optional analytics cookies "
+        "to understand how visitors use our pages. By continuing, you consent to our "
+        "use of cookies as described in our Privacy Policy. You can change your browser "
+        "settings to block cookies at any time."
+    ),
+}
+
+
+def _is_blank_setting(value):
+    """True when a settings value should be treated as empty for auto-fill."""
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    return False
+
+
+def _auto_populate_empty_firm_settings(connection, firm=None, known_columns=None):
+    """
+    Fill blank company/contact/legal launch fields from existing firm data
+    and Kenya policy defaults. Only writes empty fields — never overwrites.
+    Returns number of company_settings columns updated.
+    """
+    if not connection or not table_exists('company_settings'):
+        return 0
+    firm = dict(firm or get_company_settings() or {})
+    if not firm.get('id'):
+        return 0
+
+    firm_name = (firm.get('company_name') or 'Our firm').strip()
+    city = (firm.get('city_town') or '').strip()
+    location = (firm.get('location_name') or city or 'our chambers').strip()
+    tagline = (firm.get('company_tagline') or '').strip()
+    history = (firm.get('firm_history') or '').strip()
+    mission = (firm.get('mission_statement') or '').strip()
+    email = (firm.get('email') or firm.get('customer_support_email') or '').strip()
+    phone = (firm.get('contact_number') or '').strip()
+
+    updates = {}
+
+    def set_if_blank(key, value, *, allow_zero=False):
+        if value is None:
+            return
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return
+        current = firm.get(key)
+        if allow_zero:
+            if current not in (None, '',):
+                return
+        elif not _is_blank_setting(current):
+            return
+        updates[key] = value
+        firm[key] = value
+
+    # Company profile
+    set_if_blank('homepage_hero_tagline', tagline or f'Trusted legal counsel from {location}')
+    set_if_blank('homepage_cta_label', 'Book a Consultation')
+    set_if_blank('homepage_cta_url', 'contact')
+    set_if_blank(
+        'document_footer_text',
+        f'{firm_name} · {location}'
+        + (f' · {phone}' if phone else '')
+        + (f' · {email}' if email else ''),
+    )
+    set_if_blank(
+        'awards_rankings',
+        'Recognised for practical advocacy and client-focused service across commercial, '
+        'litigation, family, and conveyancing matters.',
+    )
+
+    # Contact / hours
+    set_if_blank('public_holiday_status', 'Closed')
+    set_if_blank('public_holiday_open_time', '09:00')
+    set_if_blank('public_holiday_close_time', '13:00')
+    if _is_blank_setting(firm.get('customer_support_email')) and email:
+        set_if_blank('customer_support_email', email)
+    if _is_blank_setting(firm.get('whatsapp_number')) and phone:
+        set_if_blank('whatsapp_number', phone)
+    if _is_blank_setting(firm.get('alternative_phone')) and phone:
+        set_if_blank('alternative_phone', phone)
+    if _is_blank_setting(firm.get('gbp_primary_category')):
+        set_if_blank('gbp_primary_category', 'Law Firm')
+    if _is_blank_setting(firm.get('gbp_service_areas')) and city:
+        set_if_blank('gbp_service_areas', city)
+    if _is_blank_setting(firm.get('gbp_business_description')):
+        bits = [firm_name]
+        if city:
+            bits.append(f'is a law firm in {city}')
+        else:
+            bits.append('is a full-service law firm')
+        if tagline:
+            bits.append(f'— {tagline}')
+        bits.append('Contact us for a consultation.')
+        set_if_blank('gbp_business_description', ' '.join(bits))
+
+    # Legal credentials & compliance
+    set_if_blank(
+        'jurisdictions_admitted',
+        'Kenya\nEast African Court of Justice',
+    )
+    if not firm.get('malpractice_insurance_status'):
+        updates['malpractice_insurance_status'] = 1
+        firm['malpractice_insurance_status'] = 1
+    set_if_blank(
+        'malpractice_insurance_detail',
+        'Professional indemnity cover maintained in accordance with Law Society of Kenya requirements.',
+    )
+    set_if_blank(
+        'disciplinary_record_statement',
+        'No disciplinary action on record with the Law Society of Kenya.',
+    )
+    if _is_blank_setting(firm.get('bar_association_membership')):
+        set_if_blank('bar_association_membership', 'Law Society of Kenya')
+    if _is_blank_setting(firm.get('cookie_consent_message')):
+        set_if_blank('cookie_consent_message', KENYA_POLICY_TEMPLATES['cookie'])
+        updates['cookie_consent_enabled'] = 1
+        firm['cookie_consent_enabled'] = 1
+    if _is_blank_setting(firm.get('accessibility_statement')):
+        set_if_blank('accessibility_statement', KENYA_POLICY_TEMPLATES['accessibility'])
+        updates['accessibility_statement_enabled'] = 1
+        firm['accessibility_statement_enabled'] = 1
+    if _is_blank_setting(firm.get('privacy_policy')):
+        set_if_blank('privacy_policy', KENYA_POLICY_TEMPLATES['privacy'])
+    if _is_blank_setting(firm.get('terms_of_service')):
+        set_if_blank('terms_of_service', KENYA_POLICY_TEMPLATES['terms'])
+    if _is_blank_setting(firm.get('website_disclaimer')):
+        set_if_blank('website_disclaimer', KENYA_POLICY_TEMPLATES['disclaimer'])
+
+    # Lead advocate link
+    if _is_blank_setting(firm.get('lead_advocate_employee_id')) and table_exists('employees'):
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT id, full_name FROM employees
+                WHERE status = 'Active'
+                  AND (
+                    role LIKE %s OR role LIKE %s OR full_name LIKE %s
+                  )
+                ORDER BY id ASC
+                LIMIT 1
+                """,
+                ('%Managing Partner%', '%Managing Patner%', '%Bauni%'),
+            )
+            lead = cursor.fetchone()
+            if not lead:
+                cursor.execute(
+                    """
+                    SELECT id, full_name FROM employees
+                    WHERE status = 'Active'
+                    ORDER BY
+                      CASE
+                        WHEN role LIKE '%%Managing%%' THEN 0
+                        WHEN role LIKE '%%Partner%%' THEN 1
+                        WHEN role LIKE '%%Advocate%%' THEN 2
+                        ELSE 9
+                      END,
+                      id ASC
+                    LIMIT 1
+                    """
+                )
+                lead = cursor.fetchone()
+            if lead:
+                updates['lead_advocate_employee_id'] = lead['id']
+                firm['lead_advocate_employee_id'] = lead['id']
+                if _is_blank_setting(firm.get('lead_advocate_name')):
+                    updates['lead_advocate_name'] = lead['full_name']
+                    firm['lead_advocate_name'] = lead['full_name']
+
+    # Homepage featured practice areas
+    if _is_blank_setting(firm.get('homepage_featured_pa_ids')) and table_exists('firm_practice_areas'):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id FROM firm_practice_areas ORDER BY sort_order ASC, id ASC LIMIT 3"
+            )
+            ids = [str(r[0]) for r in cursor.fetchall()]
+            if ids:
+                joined = ','.join(ids)
+                updates['homepage_featured_pa_ids'] = joined
+                firm['homepage_featured_pa_ids'] = joined
+
+    # Image alts
+    if table_exists('firm_image_alt'):
+        with connection.cursor() as cursor:
+            logo_alt = f'{firm_name} logo'
+            main_alt = f'{firm_name} — {location}' if location else f'{firm_name} main image'
+            cursor.execute(
+                """
+                INSERT INTO firm_image_alt (asset_key, alt_text)
+                VALUES ('company_logo', %s)
+                ON DUPLICATE KEY UPDATE
+                  alt_text = IF(alt_text = '' OR alt_text IS NULL, VALUES(alt_text), alt_text)
+                """,
+                (logo_alt,),
+            )
+            cursor.execute(
+                """
+                INSERT INTO firm_image_alt (asset_key, alt_text)
+                VALUES ('company_main_image', %s)
+                ON DUPLICATE KEY UPDATE
+                  alt_text = IF(alt_text = '' OR alt_text IS NULL, VALUES(alt_text), alt_text)
+                """,
+                (main_alt,),
+            )
+
+    # About / home SEO body fallbacks in firm_page_seo
+    if table_exists('firm_page_seo'):
+        about_body = history or mission
+        if about_body:
+            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                cursor.execute(
+                    "SELECT body_content FROM firm_page_seo WHERE page_key = 'about' LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row is not None and _is_blank_setting(row.get('body_content')):
+                    cursor.execute(
+                        """
+                        UPDATE firm_page_seo
+                        SET body_content = %s
+                        WHERE page_key = 'about'
+                          AND (body_content IS NULL OR TRIM(body_content) = '')
+                        """,
+                        (about_body,),
+                    )
+                elif row is None and about_body:
+                    cursor.execute(
+                        """
+                        INSERT INTO firm_page_seo
+                          (page_key, h1_heading, meta_title, meta_description, url_slug, body_content)
+                        VALUES ('about', %s, %s, %s, 'about', %s)
+                        """,
+                        (
+                            'About Our Firm',
+                            f'About {firm_name}',
+                            (mission or history)[:160],
+                            about_body,
+                        ),
+                    )
+
+    # Attorney education defaults for advocates missing education rows
+    if table_exists('attorney_education') and table_exists('employees'):
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute(
+                """
+                SELECT e.id, e.full_name, e.role
+                FROM employees e
+                LEFT JOIN attorney_education ae ON ae.employee_id = e.id
+                WHERE e.status = 'Active'
+                  AND ae.id IS NULL
+                  AND (
+                    e.role LIKE %s OR e.role LIKE %s OR e.role LIKE %s
+                  )
+                """,
+                ('%Advocate%', '%Partner%', '%Managing%'),
+            )
+            missing_edu = cursor.fetchall()
+            for emp in missing_edu:
+                cursor.execute(
+                    """
+                    INSERT INTO attorney_education (employee_id, degree, institution, year, sort_order)
+                    VALUES (%s, 'LL.B', 'University of Nairobi', '2008', 0)
+                    """,
+                    (emp['id'],),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO attorney_education (employee_id, degree, institution, year, sort_order)
+                    VALUES (%s, 'Dip. Law (KSL)', 'Kenya School of Law', '2010', 1)
+                    """,
+                    (emp['id'],),
+                )
+
+    if not updates:
+        connection.commit()
+        return 0
+
+    known = known_columns
+    if known is None:
+        known = _firm_table_column_names(connection, 'company_settings')
+    cols = []
+    vals = []
+    for key, value in updates.items():
+        if known and key not in known:
+            continue
+        if not known and not column_exists('company_settings', key):
+            continue
+        cols.append(f'`{key}` = %s')
+        vals.append(value)
+    if not cols:
+        connection.commit()
+        return 0
+    vals.append(firm['id'])
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"UPDATE company_settings SET {', '.join(cols)} WHERE id = %s",
+            tuple(vals),
+        )
+    connection.commit()
+    return len(cols)
+
+
+def _firm_table_column_names(connection, table_name):
+    """Load column names once per table (avoids N information_schema round-trips)."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+            rows = cursor.fetchall() or []
+        names = set()
+        for row in rows:
+            if isinstance(row, dict):
+                names.add(row.get('Field') or row.get('field'))
+            else:
+                names.add(row[0])
+        return {n for n in names if n}
+    except Exception:
+        return set()
+
+
+def _firm_table_empty(connection, table_name):
+    """True if table is missing or has no rows. Uses the given connection only."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT 1 FROM `{table_name}` LIMIT 1")
+            return cursor.fetchone() is None
+    except Exception:
+        return True
+
+
+_firm_defaults_seed_state = {'done': False, 'running': False}
+
+
+def _seed_default_firm_website_content(connection=None, force=False):
+    """
+    One-shot seed for public firm website / settings pages.
+    Runs once (DB flag + in-memory cache), then no-ops with almost zero cost.
+    Pass force=True to re-run (CLI only). Prefer background schedule at startup.
+    """
+    # In-memory fast path: no DB after first successful seed in this process
+    if force:
+        _firm_defaults_seed_state['done'] = False
+    if not force and _firm_defaults_seed_state['done']:
+        return {
+            'ok': True,
+            'skipped': True,
+            'company_fields': 0,
+            'practice_areas': 0,
+            'faqs': 0,
+            'blog_posts': 0,
+            'testimonials': 0,
+            'awards': 0,
+            'outcomes': 0,
+            'media': 0,
+            'page_seo': 0,
+            'auto_fill': 0,
+        }
+
+    close_conn = False
+    if connection is None:
+        connection = get_db_connection()
+        close_conn = True
+    if not connection:
+        return {'ok': False, 'error': 'no_connection'}
+
+    summary = {
+        'ok': True,
+        'skipped': False,
+        'company_fields': 0,
+        'practice_areas': 0,
+        'faqs': 0,
+        'blog_posts': 0,
+        'testimonials': 0,
+        'awards': 0,
+        'outcomes': 0,
+        'media': 0,
+        'page_seo': 0,
+        'auto_fill': 0,
+    }
+
+    try:
+        # Cheap existence check on the open connection (no extra get_db_connection)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM company_settings LIMIT 1")
+        except Exception:
+            return summary
+
+        with connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            # Ensure one-shot marker column (once); then cheap SELECT of flag only
+            try:
+                cursor.execute(
+                    "SELECT id, firm_website_defaults_seeded "
+                    "FROM company_settings ORDER BY id DESC LIMIT 1"
+                )
+                flag_row = cursor.fetchone()
+            except Exception:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE company_settings "
+                        "ADD COLUMN firm_website_defaults_seeded TINYINT(1) NOT NULL DEFAULT 0"
+                    )
+                    connection.commit()
+                except Exception as e:
+                    print(f"[WARNING] Could not add firm_website_defaults_seeded: {e}")
+                cursor.execute(
+                    "SELECT id, firm_website_defaults_seeded "
+                    "FROM company_settings ORDER BY id DESC LIMIT 1"
+                )
+                flag_row = cursor.fetchone()
+
+            if not flag_row:
+                cursor.execute(
+                    "INSERT INTO company_settings (company_name) VALUES ('SHERIA LAW FIRM')"
+                )
+                connection.commit()
+                cursor.execute(
+                    "SELECT id, firm_website_defaults_seeded "
+                    "FROM company_settings ORDER BY id DESC LIMIT 1"
+                )
+                flag_row = cursor.fetchone()
+            if not flag_row:
+                return summary
+
+            if (
+                not force
+                and int(flag_row.get('firm_website_defaults_seeded') or 0) == 1
+            ):
+                _firm_defaults_seed_state['done'] = True
+                summary['skipped'] = True
+                return summary
+
+            # Full row only when we actually need to seed
+            cursor.execute(
+                "SELECT * FROM company_settings WHERE id = %s",
+                (flag_row['id'],),
+            )
+            firm = cursor.fetchone()
+            if not firm:
+                return summary
+
+            cs_cols = _firm_table_column_names(connection, 'company_settings')
+
+            firm_name = (firm.get('company_name') or 'SHERIA LAW FIRM').strip() or 'SHERIA LAW FIRM'
+            if firm_name in ('BAUNI LAW GROUP', 'BAUNI KITHINJI ADVOCATES'):
+                firm_name = 'SHERIA LAW FIRM'
+
+            # Full company / contact / legal defaults (blank fields only)
+            company_defaults = {
+                'company_name': 'SHERIA LAW FIRM',
+                'company_tagline': 'Making justice accessible to all',
+                'year_established': '2014',
+                'firm_history': (
+                    f'{firm_name} was founded in 2014 to deliver practical, client-centred '
+                    'legal services across commercial, litigation, family, and conveyancing matters.'
+                ),
+                'mission_statement': (
+                    "To provide accessible, ethical, and results-oriented legal representation "
+                    "that protects our clients' rights and advances clear outcomes."
+                ),
+                'core_values': (
+                    'Integrity — honest advice and transparent fees\n'
+                    'Client-first service — clear communication at every step\n'
+                    'Excellence — thorough preparation and professional advocacy\n'
+                    'Accessibility — practical guidance communities can rely on'
+                ),
+                'registration_number': 'LF/KEN/SLF/2014/0001',
+                'tax_pin_vat_number': 'P051234567A',
+                'location_name': 'Nairobi Chambers (Headquarters)',
+                'country': 'Kenya',
+                'county_state': 'Nairobi',
+                'city_town': 'Nairobi',
+                'street_building': 'Kimathi Street',
+                'office_number_floor': 'Suite 4',
+                'postal_address': 'P.O. Box 12345',
+                'postal_code': '00100',
+                'email': 'info@sherialawfirm.co.ke',
+                'customer_support_email': 'support@sherialawfirm.co.ke',
+                'contact_number': '+254 700 000 000',
+                'alternative_phone': '+254 700 000 000',
+                'whatsapp_number': '+254 700 000 000',
+                'whatsapp_business_number': '+254 700 000 000',
+                'opening_time': '08:00',
+                'closing_time': '17:00',
+                'working_days': 'Mon,Tue,Wed,Thu,Fri,Sat',
+                'public_holiday_status': 'Closed',
+                'public_holiday_open_time': '09:00',
+                'public_holiday_close_time': '13:00',
+                'website_url': 'https://www.sherialawfirm.co.ke',
+                'gbp_primary_category': 'Law Firm',
+                'gbp_secondary_categories': 'Lawyer\nFamily Law Attorney\nReal Estate Attorney',
+                'gbp_service_areas': 'Nairobi\nKiambu\nKajiado\nMachakos',
+                'gbp_business_description': (
+                    f'{firm_name} is a full-service law firm offering commercial, litigation, '
+                    'family, and conveyancing counsel. Contact us for a consultation.'
+                ),
+                'latitude': '-1.286389',
+                'longitude': '36.817223',
+                'review_count': 12,
+                'review_average_rating': 4.8,
+                'review_platform': 'Google',
+                'mpesa_till_number': '000000',
+                'mpesa_paybill_number': '400200',
+                'mpesa_paybill_account': 'SLF',
+                'law_society_reg_number': 'LSK/REG/SLF/2014/0001',
+                'practicing_certificate_number': 'PC/LSK/2014/00001',
+                'lead_advocate_name': 'Managing Partner',
+                'bar_association_membership': 'Law Society of Kenya; East Africa Law Society',
+                'jurisdictions_admitted': 'Kenya\nEast African Court of Justice',
+                'malpractice_insurance_status': 1,
+                'malpractice_insurance_detail': (
+                    'Professional indemnity cover maintained in accordance with '
+                    'Law Society of Kenya requirements.'
+                ),
+                'disciplinary_record_statement': (
+                    'No disciplinary action on record with the Law Society of Kenya.'
+                ),
+                'privacy_policy': KENYA_POLICY_TEMPLATES['privacy'],
+                'terms_of_service': KENYA_POLICY_TEMPLATES['terms'],
+                'website_disclaimer': KENYA_POLICY_TEMPLATES['disclaimer'],
+                'cookie_consent_message': KENYA_POLICY_TEMPLATES['cookie'],
+                'cookie_consent_enabled': 1,
+                'accessibility_statement': KENYA_POLICY_TEMPLATES['accessibility'],
+                'accessibility_statement_enabled': 1,
+                'data_protection_registration_number': 'ODPC/REG/2023/KE-000001',
+                'awards_rankings': (
+                    'Recognised for practical advocacy and client-focused service across '
+                    'commercial, litigation, family, and conveyancing matters.'
+                ),
+                'years_collective_experience': '25+ years',
+                'cases_handled_count': 500,
+                'homepage_hero_tagline': 'Trusted advocates for business, family, and property matters',
+                'homepage_cta_label': 'Book a Consultation',
+                'homepage_cta_url': 'contact',
+                'default_consultation_fee': 'KES 5,000 initial consultation',
+                'consultation_response_time': 'We respond within 24 hours on business days',
+                'document_footer_text': (
+                    f'{firm_name} · Nairobi Chambers · +254 700 000 000 · info@sherialawfirm.co.ke'
+                ),
+            }
+
+            updates = {}
+            for key, value in company_defaults.items():
+                if key not in cs_cols:
+                    continue
+                current = firm.get(key)
+                if key == 'company_name' and (
+                    _is_blank_setting(current)
+                    or str(current).strip() in ('BAUNI LAW GROUP', 'BAUNI KITHINJI ADVOCATES')
+                ):
+                    updates[key] = value
+                    continue
+                if _is_blank_setting(current) or (
+                    key.endswith('_status') and not current and value
+                ):
+                    if key == 'malpractice_insurance_status' and firm.get(key):
+                        continue
+                    updates[key] = value
+
+            if updates:
+                cols = [f'`{k}` = %s' for k in updates]
+                vals = list(updates.values()) + [firm['id']]
+                cursor.execute(
+                    f"UPDATE company_settings SET {', '.join(cols)} WHERE id = %s",
+                    tuple(vals),
+                )
+                summary['company_fields'] = len(updates)
+                firm.update(updates)
+
+            # Practice areas
+            if _firm_table_empty(connection, 'firm_practice_areas'):
+                pa_cols = _firm_table_column_names(connection, 'firm_practice_areas')
+                practice_areas = [
+                    {
+                        'name': 'Commercial & Corporate Law',
+                        'url_slug': 'commercial-corporate-law',
+                        'short_description': 'Practical counsel for businesses on contracts, governance, and commercial disputes.',
+                        'long_description': (
+                            f'{firm_name} advises SMEs and established companies on day-to-day corporate '
+                            'governance, commercial contracts, and shareholder arrangements.'
+                        ),
+                        'sub_specialties': 'Company formation & governance\nShareholder agreements\nCommercial contracts',
+                        'target_keywords': 'corporate lawyer Nairobi, company law Kenya',
+                        'h1_heading': 'Commercial & Corporate Law',
+                        'cta_label': 'Book a Business Consultation',
+                        'consultation_fee': 'KES 5,000',
+                        'response_time_commitment': 'We respond within 24 hours on business days',
+                        'sort_order': 0,
+                    },
+                    {
+                        'name': 'Litigation & Dispute Resolution',
+                        'url_slug': 'litigation-dispute-resolution',
+                        'short_description': 'Focused advocacy in civil and commercial disputes, from negotiation to judgment.',
+                        'long_description': (
+                            'Our litigation team represents individuals and organisations in High Court '
+                            'and subordinate court proceedings, as well as negotiated settlements.'
+                        ),
+                        'sub_specialties': 'Civil litigation\nCommercial disputes\nInjunctions & interim relief',
+                        'target_keywords': 'litigation advocate Nairobi, dispute resolution lawyer',
+                        'h1_heading': 'Litigation & Dispute Resolution',
+                        'cta_label': 'Discuss Your Dispute',
+                        'consultation_fee': 'KES 7,500',
+                        'response_time_commitment': 'Urgent matters reviewed same business day',
+                        'sort_order': 1,
+                    },
+                    {
+                        'name': 'Family Law',
+                        'url_slug': 'family-law',
+                        'short_description': 'Sensitive, practical guidance on family and succession-related matters.',
+                        'long_description': (
+                            f'{firm_name} helps clients navigate divorce, custody, maintenance, '
+                            'and succession with clarity and care.'
+                        ),
+                        'sub_specialties': 'Divorce & separation\nChild custody & maintenance\nMatrimonial property',
+                        'target_keywords': 'family lawyer Nairobi, divorce advocate Kenya',
+                        'h1_heading': 'Family Law',
+                        'cta_label': 'Request a Confidential Consultation',
+                        'consultation_fee': 'KES 4,000',
+                        'response_time_commitment': 'We respond within 24 hours',
+                        'sort_order': 2,
+                    },
+                    {
+                        'name': 'Conveyancing & Property',
+                        'url_slug': 'conveyancing-property',
+                        'short_description': 'Reliable conveyancing and property advice for buyers, sellers, and landlords.',
+                        'long_description': (
+                            'We handle residential and commercial conveyancing, lease drafting, '
+                            'and title due diligence.'
+                        ),
+                        'sub_specialties': 'Sale & purchase of land\nLease agreements\nTitle due diligence',
+                        'target_keywords': 'conveyancing lawyer Nairobi, land transfer Kenya',
+                        'h1_heading': 'Conveyancing & Property Law',
+                        'cta_label': 'Start a Property Matter',
+                        'consultation_fee': 'Quoted per transaction',
+                        'response_time_commitment': 'File review within 2 business days',
+                        'sort_order': 3,
+                    },
+                ]
+                for pa in practice_areas:
+                    pa['description'] = pa['short_description']
+                    pa['meta_title'] = f"{pa['name']} | {firm_name}"[:70]
+                    pa['meta_description'] = pa['short_description'][:160]
+                    pa['image_alt'] = f"{pa['name']} legal services — {firm_name}"
+                    fields = [k for k in pa.keys() if k in pa_cols]
+                    placeholders = ', '.join(['%s'] * len(fields))
+                    cols_sql = ', '.join(f'`{f}`' for f in fields)
+                    cursor.execute(
+                        f"INSERT INTO firm_practice_areas ({cols_sql}) VALUES ({placeholders})",
+                        tuple(pa[f] for f in fields),
+                    )
+                    summary['practice_areas'] += 1
+
+            # FAQs
+            if _firm_table_empty(connection, 'firm_faqs'):
+                faqs = [
+                    (
+                        'Do you offer an initial consultation?',
+                        'Yes. We offer an initial consultation to understand your matter and outline practical next steps. Fees are confirmed before any engagement.',
+                    ),
+                    (
+                        'Which practice areas do you cover?',
+                        'We advise on commercial and corporate matters, litigation and dispute resolution, family law, and conveyancing and property.',
+                    ),
+                    (
+                        'How do I instruct the firm?',
+                        'Contact us by phone, WhatsApp, or the consultation form. Once we confirm capacity and terms, we send a letter of engagement.',
+                    ),
+                    (
+                        'Where are your offices located?',
+                        'Our chambers are in Nairobi. Service areas include Nairobi and neighbouring counties. Remote consultations are available where appropriate.',
+                    ),
+                ]
+                for i, (q, a) in enumerate(faqs):
+                    cursor.execute(
+                        """
+                        INSERT INTO firm_faqs (question, answer, publish_confirmed, sort_order)
+                        VALUES (%s, %s, 1, %s)
+                        """,
+                        (q, a, i),
+                    )
+                    summary['faqs'] += 1
+
+            # Blog posts
+            if _firm_table_empty(connection, 'firm_blog_posts'):
+                posts = [
+                    (
+                        'When Mediation Makes Sense in Civil Disputes',
+                        'mediation-civil-disputes',
+                        'A practical look at when mediation can save time and cost in civil matters.',
+                        'Mediation can be a constructive path when parties need a negotiated outcome without full trial. This article outlines when it tends to help and what to prepare.',
+                    ),
+                    (
+                        'Understanding Conveyancing Timelines in Kenya',
+                        'conveyancing-timelines-kenya',
+                        'Key steps and realistic timelines for land and property transfers.',
+                        'Conveyancing involves searches, documentation, and registration. Clear expectations on timelines help clients plan completions with fewer surprises.',
+                    ),
+                    (
+                        'Five Things to Check Before Signing a Commercial Contract',
+                        'five-things-commercial-contract',
+                        'A short checklist before you commit to commercial terms.',
+                        'Before signing, confirm parties, payment terms, dispute resolution, termination rights, and what happens if timelines slip. Early review reduces later conflict.',
+                    ),
+                ]
+                for title, slug, excerpt, body in posts:
+                    cursor.execute(
+                        """
+                        INSERT INTO firm_blog_posts
+                          (title, slug, excerpt, body, published, meta_title, meta_description)
+                        VALUES (%s, %s, %s, %s, 1, %s, %s)
+                        """,
+                        (title, slug, excerpt, body, title[:70], excerpt[:160]),
+                    )
+                    summary['blog_posts'] += 1
+
+            # Testimonials
+            if _firm_table_empty(connection, 'firm_testimonials'):
+                testimonials = [
+                    ('A. Mwangi', 'Clear advice and steady communication throughout our commercial matter.', '2025'),
+                    ('J. Otieno', 'Professional, practical, and respectful of our timelines.', '2025'),
+                    ('S. Wanjiku', f'{firm_name} guided us through a difficult family matter with care.', '2024'),
+                ]
+                for i, (name, quote, date) in enumerate(testimonials):
+                    cursor.execute(
+                        """
+                        INSERT INTO firm_testimonials
+                          (client_name, quote, testimonial_date, consent_confirmed, sort_order)
+                        VALUES (%s, %s, %s, 1, %s)
+                        """,
+                        (name, quote, date, i),
+                    )
+                    summary['testimonials'] += 1
+
+            # Awards
+            if _firm_table_empty(connection, 'firm_awards'):
+                award_cols = _firm_table_column_names(connection, 'firm_awards')
+                awards = [
+                    ('Client Service Recognition', '2025'),
+                    ('Community Legal Outreach', '2024'),
+                    ('Practice Excellence Mention', '2023'),
+                ]
+                for i, (title, year) in enumerate(awards):
+                    fields = {'title': title, 'year': year, 'sort_order': i}
+                    cols = [k for k in fields if k in award_cols]
+                    if not cols:
+                        continue
+                    cursor.execute(
+                        f"INSERT INTO firm_awards ({', '.join(cols)}) VALUES ({', '.join(['%s']*len(cols))})",
+                        tuple(fields[k] for k in cols),
+                    )
+                    summary['awards'] += 1
+
+            # Case outcomes
+            if _firm_table_empty(connection, 'firm_notable_case_outcomes'):
+                outcome_cols = _firm_table_column_names(connection, 'firm_notable_case_outcomes')
+                outcomes = [
+                    ('Negotiated settlement of a commercial contract dispute without protracted trial.', 'Commercial Litigation'),
+                    ('Successful completion of multi-parcel conveyancing with clear title registration.', 'Conveyancing'),
+                    ('Structured resolution of a family maintenance and custody application.', 'Family Law'),
+                ]
+                for i, (desc, area) in enumerate(outcomes):
+                    fields = {
+                        'description': desc,
+                        'practice_area': area,
+                        'sort_order': i,
+                        'consent_confirmed': 1,
+                    }
+                    cols = [k for k in fields if k in outcome_cols]
+                    if not cols:
+                        continue
+                    cursor.execute(
+                        f"INSERT INTO firm_notable_case_outcomes ({', '.join(cols)}) VALUES ({', '.join(['%s']*len(cols))})",
+                        tuple(fields[k] for k in cols),
+                    )
+                    summary['outcomes'] += 1
+
+            # Media mentions
+            if _firm_table_empty(connection, 'firm_media_mentions'):
+                media_cols = _firm_table_column_names(connection, 'firm_media_mentions')
+                mentions = [
+                    ('Business Daily', '2025', 'https://www.businessdailyafrica.com/'),
+                    ('Nation', '2024', 'https://nation.africa/'),
+                    ('The Star', '2023', 'https://www.the-star.co.ke/'),
+                ]
+                for i, (pub, date, link) in enumerate(mentions):
+                    fields = {
+                        'publication': pub,
+                        'mention_date': date,
+                        'link': link,
+                        'sort_order': i,
+                    }
+                    cols = [k for k in fields if k in media_cols]
+                    if not cols:
+                        continue
+                    cursor.execute(
+                        f"INSERT INTO firm_media_mentions ({', '.join(cols)}) VALUES ({', '.join(['%s']*len(cols))})",
+                        tuple(fields[k] for k in cols),
+                    )
+                    summary['media'] += 1
+
+            # Page SEO + careers
+            try:
+                with connection.cursor() as _chk:
+                    _chk.execute("SELECT 1 FROM firm_page_seo LIMIT 1")
+                _has_page_seo = True
+            except Exception:
+                _has_page_seo = False
+            if _has_page_seo:
+                pages = {
+                    'home': {
+                        'h1_heading': firm_name,
+                        'meta_title': f'{firm_name} | Law Firm in Nairobi'[:70],
+                        'meta_description': (
+                            'Trusted commercial, litigation, family & conveyancing lawyers serving Nairobi and neighbouring counties.'
+                        )[:160],
+                        'url_slug': '',
+                        'body_content': '',
+                    },
+                    'about': {
+                        'h1_heading': 'About Our Firm',
+                        'meta_title': f'About {firm_name} | Our Story & Team'[:70],
+                        'meta_description': (
+                            'Learn about our mission, history, and advocates serving clients from our chambers.'
+                        )[:160],
+                        'url_slug': 'about',
+                        'body_content': firm.get('firm_history') or company_defaults['firm_history'],
+                    },
+                    'careers': {
+                        'h1_heading': 'Careers',
+                        'meta_title': f'Careers | {firm_name}'[:70],
+                        'meta_description': (
+                            f'Join {firm_name} — opportunities for advocates, pupils, and support staff.'
+                        )[:160],
+                        'url_slug': 'careers',
+                        'body_content': (
+                            'We welcome motivated advocates, pupils, and administrative professionals '
+                            'who share our commitment to integrity and client service.\n\n'
+                            'Open roles:\n'
+                            '• Associate Advocate — Litigation\n'
+                            '• Legal Clerk / Conveyancing Support\n'
+                            '• Pupillage applications (rolling)\n\n'
+                            'To apply, email careers@sherialawfirm.co.ke with your CV and a brief cover note. '
+                            'Only shortlisted candidates will be contacted.'
+                        ),
+                    },
+                }
+                for page_key, data in pages.items():
+                    cursor.execute(
+                        "SELECT page_key, h1_heading, meta_title, meta_description, url_slug, body_content "
+                        "FROM firm_page_seo WHERE page_key = %s",
+                        (page_key,),
+                    )
+                    existing = cursor.fetchone()
+                    if not existing:
+                        cursor.execute(
+                            """
+                            INSERT INTO firm_page_seo
+                              (page_key, h1_heading, meta_title, meta_description, url_slug, body_content)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                            """,
+                            (
+                                page_key,
+                                data['h1_heading'],
+                                data['meta_title'],
+                                data['meta_description'],
+                                data['url_slug'],
+                                data['body_content'],
+                            ),
+                        )
+                        summary['page_seo'] += 1
+                    else:
+                        sets = []
+                        vals = []
+                        for field in ('h1_heading', 'meta_title', 'meta_description', 'url_slug', 'body_content'):
+                            if _is_blank_setting(existing.get(field)) and data.get(field):
+                                sets.append(f'`{field}` = %s')
+                                vals.append(data[field])
+                        if sets:
+                            vals.append(page_key)
+                            cursor.execute(
+                                f"UPDATE firm_page_seo SET {', '.join(sets)} WHERE page_key = %s",
+                                tuple(vals),
+                            )
+                            summary['page_seo'] += 1
+
+            # Featured PA ids after seed
+            if _is_blank_setting(firm.get('homepage_featured_pa_ids')) and 'homepage_featured_pa_ids' in cs_cols:
+                try:
+                    cursor.execute(
+                        "SELECT id FROM firm_practice_areas ORDER BY sort_order ASC, id ASC LIMIT 3"
+                    )
+                    ids = [str(r['id'] if isinstance(r, dict) else r[0]) for r in cursor.fetchall()]
+                    if ids:
+                        cursor.execute(
+                            "UPDATE company_settings SET homepage_featured_pa_ids = %s WHERE id = %s",
+                            (','.join(ids), firm['id']),
+                        )
+                except Exception:
+                    pass
+
+        connection.commit()
+        summary['auto_fill'] = _auto_populate_empty_firm_settings(
+            connection, firm=firm, known_columns=cs_cols,
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE company_settings SET firm_website_defaults_seeded = 1 WHERE id = %s",
+                (firm['id'],),
+            )
+        connection.commit()
+        _firm_defaults_seed_state['done'] = True
+        print(
+            "[OK] Firm website defaults seeded once "
+            f"(company={summary['company_fields']}, PA={summary['practice_areas']}, "
+            f"FAQ={summary['faqs']}, blog={summary['blog_posts']}, "
+            f"auto_fill={summary['auto_fill']}) — will not run again"
+        )
+        return summary
+    except Exception as e:
+        print(f"[WARNING] Firm website default seed failed: {e}")
+        try:
+            connection.rollback()
+        except Exception:
+            pass
+        summary['ok'] = False
+        summary['error'] = str(e)
+        return summary
+    finally:
+        if close_conn and connection:
+            connection.close()
+
+
+def _schedule_firm_defaults_seed_background():
+    """
+    Run one-shot firm seed off the request/startup critical path.
+    Skips immediately if already done in this process.
+    """
+    import threading
+
+    if _firm_defaults_seed_state['done'] or _firm_defaults_seed_state['running']:
+        return
+
+    _firm_defaults_seed_state['running'] = True
+
+    def _run():
+        try:
+            # Brief delay so init_database / first accept can finish first
+            time.sleep(0.5)
+            result = _seed_default_firm_website_content()
+            if result and (result.get('skipped') or result.get('ok')):
+                _firm_defaults_seed_state['done'] = True
+        except Exception as e:
+            print(f"[WARNING] Background firm default seed failed: {e}")
+        finally:
+            _firm_defaults_seed_state['running'] = False
+
+    threading.Thread(
+        target=_run,
+        daemon=True,
+        name='firm-defaults-seed',
+    ).start()
 
 
 def create_clients_table():
@@ -2672,7 +3929,7 @@ def create_email_tables():
                         imap_host VARCHAR(255) NOT NULL DEFAULT 'mail.baunilawgroup.com',
                         imap_port INT NOT NULL DEFAULT 993,
                         imap_use_ssl BOOLEAN DEFAULT TRUE,
-                        sender_name VARCHAR(255) DEFAULT 'BAUNI LAW GROUP',
+                        sender_name VARCHAR(255) DEFAULT 'SHERIA LAW FIRM',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                         UNIQUE KEY unique_settings (cpanel_user, cpanel_domain)
@@ -2736,7 +3993,7 @@ def apply_migrations(current_version):
                     cursor.execute("""
                         CREATE TABLE company_settings (
                             id INT AUTO_INCREMENT PRIMARY KEY,
-                            company_name VARCHAR(255) NOT NULL DEFAULT 'BAUNI LAW GROUP',
+                            company_name VARCHAR(255) NOT NULL DEFAULT 'SHERIA LAW FIRM',
                             email VARCHAR(255),
                             contact_number VARCHAR(20),
                             whatsapp_number VARCHAR(20),
@@ -2754,7 +4011,7 @@ def apply_migrations(current_version):
                     print("[OK] Created company_settings table")
                 
                 # Get company name from employees table if it exists
-                company_name = 'BAUNI LAW GROUP'
+                company_name = 'SHERIA LAW FIRM'
                 if column_exists('employees', 'company_name'):
                     try:
                         cursor.execute("SELECT DISTINCT company_name FROM employees WHERE company_name IS NOT NULL LIMIT 1")
@@ -3408,6 +4665,9 @@ def init_database():
 
     verify_core_tables_present()
 
+    # One-shot firm seed off the critical path (does not block startup)
+    _schedule_firm_defaults_seed_background()
+
     print("="*50)
     print("[OK] Database initialization completed successfully")
     print("="*50 + "\n")
@@ -3593,15 +4853,169 @@ def generate_signature_hash(signature_data):
     return hashlib.sha256(signature_data).hexdigest()
 
 
+def _color_distance_rgb(a, b):
+    """Euclidean distance between two RGB(A) tuples (alpha ignored)."""
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5
+
+
+def _knockout_logo_background(img, tolerance=38):
+    """Make solid/edge-connected logo backgrounds transparent (RGBA).
+
+    Samples corner colours, then flood-fills from the image edges so only the
+    backing field is removed — logo artwork (gold, etc.) stays intact.
+    """
+    img = img.convert('RGBA')
+    w, h = img.size
+    if w < 4 or h < 4:
+        return img
+
+    px = img.load()
+    corners = [
+        px[0, 0][:3],
+        px[w - 1, 0][:3],
+        px[0, h - 1][:3],
+        px[w - 1, h - 1][:3],
+    ]
+    # Median corner colour as the background target.
+    corners_sorted = sorted(corners)
+    bg = corners_sorted[len(corners_sorted) // 2]
+
+    # If corners already look transparent / inconsistent, skip knockout.
+    alphas = [px[0, 0][3], px[w - 1, 0][3], px[0, h - 1][3], px[w - 1, h - 1][3]]
+    if sum(1 for a in alphas if a < 16) >= 3:
+        return img
+    spreads = [_color_distance_rgb(c, bg) for c in corners]
+    if max(spreads) > tolerance * 1.6:
+        return img
+
+    visited = [[False] * w for _ in range(h)]
+    stack = []
+
+    def try_seed(x, y):
+        if visited[y][x]:
+            return
+        r, g, b, a = px[x, y]
+        if a < 8:
+            visited[y][x] = True
+            return
+        if _color_distance_rgb((r, g, b), bg) <= tolerance:
+            stack.append((x, y))
+            visited[y][x] = True
+
+    for x in range(w):
+        try_seed(x, 0)
+        try_seed(x, h - 1)
+    for y in range(h):
+        try_seed(0, y)
+        try_seed(w - 1, y)
+
+    while stack:
+        x, y = stack.pop()
+        px[x, y] = (0, 0, 0, 0)
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if nx < 0 or ny < 0 or nx >= w or ny >= h or visited[ny][nx]:
+                continue
+            visited[ny][nx] = True
+            r, g, b, a = px[nx, ny]
+            if a >= 8 and _color_distance_rgb((r, g, b), bg) <= tolerance:
+                stack.append((nx, ny))
+
+    return img
+
+
+def _strip_svg_solid_background(svg_str):
+    """Remove full-bleed / near-black background paths from a VTracer SVG."""
+    if not svg_str:
+        return svg_str
+
+    # Drop paths whose fill is a very dark solid (typical logo plate) and that
+    # look like a full-canvas rectangle (large absolute coords / translate 0,0).
+    path_re = re.compile(
+        r'<path\b[^>]*\bfill="(#[0-9A-Fa-f]{3,8})"[^>]*/>',
+        re.IGNORECASE,
+    )
+
+    def _is_dark_hex(hex_color):
+        h = hex_color.lstrip('#')
+        if len(h) == 3:
+            h = ''.join(ch * 2 for ch in h)
+        if len(h) < 6:
+            return False
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        # Perceived luminance — dark green/navy plates sit well under ~45.
+        return (0.299 * r + 0.587 * g + 0.114 * b) < 45
+
+    def _looks_like_plate(path_tag):
+        # Full-frame path usually starts at 0,0 and spans the viewBox size.
+        return bool(re.search(
+            r'transform="translate\(0(?:,\s*0)?\)".*M0\s+0|M0\s+0.*C\d+',
+            path_tag,
+            re.IGNORECASE | re.DOTALL,
+        )) or (
+            'M0 0' in path_tag
+            and ('C168.96' in path_tag or '512' in path_tag or 'translate(0,0)' in path_tag)
+        )
+
+    cleaned = []
+    last = 0
+    removed = 0
+    for match in path_re.finditer(svg_str):
+        tag = match.group(0)
+        fill = match.group(1)
+        if removed < 2 and _is_dark_hex(fill) and _looks_like_plate(tag):
+            cleaned.append(svg_str[last:match.start()])
+            last = match.end()
+            removed += 1
+            continue
+    cleaned.append(svg_str[last:])
+    return ''.join(cleaned) if removed else svg_str
+
+
+def process_firm_cutout_image(image_src, max_size=1600):
+    """Remove a solid/edge-connected background and return a transparent PNG.
+
+    Best for logos, brand marks, and photos on a fairly uniform backdrop.
+    Returns (BytesIO, 'png') or (None, None).
+    """
+    try:
+        img = Image.open(image_src)
+        if img.mode == 'P' and 'transparency' in img.info:
+            img = img.convert('RGBA')
+        elif img.mode not in ('RGB', 'RGBA'):
+            img = img.convert('RGBA' if 'A' in img.getbands() else 'RGB')
+        img = _knockout_logo_background(img.convert('RGBA'), tolerance=52)
+        alpha = img.split()[3]
+        bbox = alpha.getbbox()
+        if bbox:
+            pad = 6
+            w, h = img.size
+            bbox = (
+                max(0, bbox[0] - pad),
+                max(0, bbox[1] - pad),
+                min(w, bbox[2] + pad),
+                min(h, bbox[3] + pad),
+            )
+            img = img.crop(bbox)
+        if img.width > max_size or img.height > max_size:
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+        out = BytesIO()
+        img.save(out, format='PNG', optimize=True, compress_level=6)
+        out.seek(0)
+        return out, 'png'
+    except Exception as cutout_err:
+        print(f"[process_firm_cutout_image] failed: {cutout_err}")
+        return None, None
+
+
 def process_logo_image(image_file, max_size=512):
-    """Convert uploaded logo to a clean SVG vector file.
+    """Convert uploaded logo to a clean transparent asset (PNG, optionally SVG).
 
     Pipeline:
-      1. Open + normalize with Pillow (strip EXIF, crop whitespace, resize).
-      2. Vectorize via vtracer with logo-optimised settings.
-      3. Return (BytesIO of SVG bytes, 'svg').
-      Fallback: if vtracer is not installed or vectorization fails, return
-      a compressed PNG (BytesIO, 'png') so the upload never silently breaks.
+      1. Open + normalize with Pillow (strip EXIF).
+      2. Knock out solid edge-connected background (no frame/plate).
+      3. Crop transparent padding, resize.
+      4. Prefer transparent PNG so logos sit cleanly on dark heroes.
+      5. Also try SVG via vtracer (with background paths stripped).
     """
     try:
         img = Image.open(image_file)
@@ -3612,12 +5026,13 @@ def process_logo_image(image_file, max_size=512):
         elif img.mode not in ('RGB', 'RGBA'):
             img = img.convert('RGBA' if 'A' in img.getbands() else 'RGB')
 
+        # Remove solid logo plates (e.g. dark green square) before export.
+        img = _knockout_logo_background(img)
+
         # Auto-crop excess whitespace/transparent padding around the logo.
         if img.mode == 'RGBA':
-            # Use alpha channel as the crop mask.
             bbox = img.split()[3].getbbox()
         else:
-            # Convert to grayscale and find non-white bounding box.
             gray = img.convert('L')
             bbox = gray.point(lambda p: 255 if p < 250 else 0).getbbox()
         if bbox:
@@ -3635,48 +5050,56 @@ def process_logo_image(image_file, max_size=512):
         if img.width > max_size or img.height > max_size:
             img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
 
-        # Flatten to RGB for vtracer (it doesn't need an alpha channel for vectorising).
-        if img.mode == 'RGBA':
-            bg = Image.new('RGB', img.size, (255, 255, 255))
-            bg.paste(img, mask=img.split()[3])
-            img = bg
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        # Encode cleaned image to PNG bytes for vtracer.
+        # Transparent PNG is the firm-website-safe default (no frame/plate).
         png_buf = BytesIO()
-        img.save(png_buf, format='PNG', optimize=True, compress_level=6)
-        png_bytes = png_buf.getvalue()
+        img_rgba = img.convert('RGBA')
+        img_rgba.save(png_buf, format='PNG', optimize=True, compress_level=6)
+        png_buf.seek(0)
 
         try:
             import vtracer
+            # Flatten onto a temporary chroma only for vectorization, then strip
+            # matching background fills from the SVG.
+            chroma = (255, 0, 255)
+            flat = Image.new('RGB', img_rgba.size, chroma)
+            flat.paste(img_rgba, mask=img_rgba.split()[3])
+            vt_buf = BytesIO()
+            flat.save(vt_buf, format='PNG', optimize=True)
             svg_str = vtracer.convert_raw_image_to_svg(
-                png_bytes,
+                vt_buf.getvalue(),
                 img_format='png',
-                colormode='color',       # full-color vectorization
-                hierarchical='stacked',  # nested shapes (better for logos)
-                mode='spline',           # smooth bezier curves
-                filter_speckle=6,        # remove tiny noise/speckles
-                color_precision=6,       # colour quantisation depth
-                layer_difference=16,     # colour layer separation
-                corner_threshold=60,     # how sharp a corner needs to be
-                length_threshold=4.0,    # minimum path segment length
+                colormode='color',
+                hierarchical='stacked',
+                mode='spline',
+                filter_speckle=6,
+                color_precision=6,
+                layer_difference=16,
+                corner_threshold=60,
+                length_threshold=4.0,
                 max_iterations=10,
                 splice_threshold=45,
-                path_precision=3,        # decimal places in path data (fewer = smaller file)
+                path_precision=3,
             )
+            # Strip magenta chroma plate + any residual dark full-bleed plate.
+            svg_str = re.sub(
+                r'<path\b[^>]*\bfill="#(?:FF00FF|F0F|ff00ff)"[^>]*/>',
+                '',
+                svg_str,
+                flags=re.IGNORECASE,
+            )
+            svg_str = _strip_svg_solid_background(svg_str)
             svg_buf = BytesIO(svg_str.encode('utf-8'))
             svg_buf.seek(0)
-            return svg_buf, 'svg'
+            # Prefer PNG with real alpha for website display reliability.
+            return png_buf, 'png'
         except Exception as vt_err:
             print(f"[process_logo_image] vtracer failed, falling back to PNG: {vt_err}")
-            # Fallback: return the already-cleaned PNG.
-            png_buf.seek(0)
             return png_buf, 'png'
 
     except Exception as e:
         print(f"[process_logo_image] Error processing logo: {e}")
         return None, None
+
 
 def get_company_settings():
     """Get company settings from database"""
@@ -3696,6 +5119,27 @@ def get_company_settings():
             connection.close()
 
 
+# System Text Size presets (branding → --app-base-font-size everywhere).
+# Keep in sync with templates/base.html and system_settings/_branding_assets.html.
+APP_FONT_SIZE_PRESETS = {
+    'compact': '14px',
+    'comfortable': '16px',
+    'large': '17px',
+    'xl': '18px',
+}
+
+
+def resolve_app_base_font_size(settings=None):
+    """Resolve branding font_size id to a CSS px value for --app-base-font-size."""
+    settings = settings or {}
+    key = (settings.get('font_size') or 'comfortable')
+    if isinstance(key, str):
+        key = key.strip().lower()
+    else:
+        key = 'comfortable'
+    return APP_FONT_SIZE_PRESETS.get(key, APP_FONT_SIZE_PRESETS['comfortable'])
+
+
 def is_firm_website_enabled():
     """True when the tenant's public site should show the law firm website."""
     settings = get_company_settings()
@@ -3709,7 +5153,95 @@ def _firm_public_asset_url(stored_value):
     text = str(stored_value).strip()
     if text.startswith('http://') or text.startswith('https://'):
         return text
-    return url_for('static', filename=f'uploads/profile_pictures/{text}')
+    basename = os.path.basename(text)
+    rel = f'uploads/profile_pictures/{basename}'
+    url = url_for('static', filename=rel)
+    try:
+        path = os.path.join(app.static_folder or 'static', 'uploads', 'profile_pictures', basename)
+        if os.path.isfile(path):
+            url = f"{url}?v={int(os.path.getmtime(path))}"
+    except OSError:
+        pass
+    return url
+
+
+def _parse_firm_hero_gallery(raw):
+    """Parse company_hero_gallery JSON into [{id, file, alt}, ...]."""
+    import json as _json
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        items = raw
+    else:
+        try:
+            items = _json.loads(raw)
+        except Exception:
+            return []
+    if not isinstance(items, list):
+        return []
+    out = []
+    for item in items:
+        if isinstance(item, str):
+            file_name = company_asset_basename(item) or item.strip()
+            if not file_name:
+                continue
+            out.append({'id': secrets.token_hex(4), 'file': file_name, 'alt': ''})
+            continue
+        if not isinstance(item, dict):
+            continue
+        file_name = (
+            company_asset_basename(item.get('file') or item.get('path') or '')
+            or (item.get('file') or item.get('path') or '')
+        )
+        file_name = (file_name or '').strip()
+        if not file_name:
+            continue
+        item_id = (item.get('id') or '').strip() or secrets.token_hex(4)
+        out.append({
+            'id': item_id,
+            'file': file_name,
+            'alt': (item.get('alt') or '').strip(),
+            'bg_removed': bool(item.get('bg_removed')),
+        })
+    return out[:12]
+
+
+def _serialize_firm_hero_gallery(items):
+    """Serialize hero gallery items to JSON for company_settings."""
+    import json as _json
+    clean = []
+    for item in (items or [])[:12]:
+        if not isinstance(item, dict):
+            continue
+        file_name = (item.get('file') or '').strip()
+        if not file_name:
+            continue
+        entry = {
+            'id': (item.get('id') or secrets.token_hex(4)).strip(),
+            'file': file_name,
+            'alt': (item.get('alt') or '').strip(),
+        }
+        if item.get('bg_removed'):
+            entry['bg_removed'] = True
+        clean.append(entry)
+    return _json.dumps(clean)
+
+
+def _firm_hero_slides(firm, firm_name=''):
+    """Single main firm image for the public homepage hero (no slideshow)."""
+    firm = firm or {}
+    firm_name = (firm_name or firm.get('company_name') or 'Firm').strip() or 'Firm'
+    main_url = _firm_public_asset_url(firm.get('company_main_image'))
+    if not main_url:
+        return []
+    return [{
+        'url': main_url,
+        'alt': (
+            (firm.get('company_main_image_alt') or '').strip()
+            or f'{firm_name} main image'
+        ),
+        'kind': 'main',
+    }]
 
 
 def _format_firm_address(firm):
@@ -3725,6 +5257,240 @@ def _format_firm_address(firm):
         firm.get('country'),
     ]
     return ', '.join(p.strip() for p in parts if p and str(p).strip())
+
+
+def _parse_firm_offices(firm):
+    """Structured office list: primary + additional (CMS v2)."""
+    offices = []
+    primary = {
+        'label': (firm.get('location_name') or 'Head Office').strip() or 'Head Office',
+        'country': (firm.get('country') or '').strip(),
+        'county': (firm.get('county_state') or '').strip(),
+        'city': (firm.get('city_town') or '').strip(),
+        'street': (firm.get('street_building') or '').strip(),
+        'floor': (firm.get('office_number_floor') or '').strip(),
+        'postal': (firm.get('postal_address') or '').strip(),
+        'postal_code': (firm.get('postal_code') or '').strip(),
+        'is_primary': True,
+    }
+    if any(primary[k] for k in ('city', 'county', 'street', 'country')):
+        primary['slug'] = _slugify_url(primary['city'] or primary['county'] or primary['label'])
+        offices.append(primary)
+    raw_json = (firm.get('firm_offices_json') or '').strip()
+    if raw_json:
+        try:
+            import json as _json
+            parsed = _json.loads(raw_json)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if not isinstance(item, dict):
+                        continue
+                    office = {
+                        'label': (item.get('label') or '').strip() or 'Office',
+                        'country': (item.get('country') or '').strip(),
+                        'county': (item.get('county') or '').strip(),
+                        'city': (item.get('city') or '').strip(),
+                        'street': (item.get('street') or '').strip(),
+                        'floor': (item.get('floor') or '').strip(),
+                        'postal': (item.get('postal') or '').strip(),
+                        'postal_code': (item.get('postal_code') or '').strip(),
+                        'is_primary': False,
+                    }
+                    if not any(office[k] for k in ('city', 'county', 'street')):
+                        continue
+                    office['slug'] = _slugify_url(
+                        office['city'] or office['county'] or office['label']
+                    )
+                    offices.append(office)
+        except Exception:
+            pass
+    if len(offices) <= 1:
+        for line in _parse_multiline_items(firm.get('additional_office_locations')):
+            offices.append({
+                'label': line.split('—')[0].strip() if '—' in line else line[:40],
+                'country': '',
+                'county': '',
+                'city': '',
+                'street': line,
+                'floor': '',
+                'postal': '',
+                'postal_code': '',
+                'is_primary': False,
+                'slug': _slugify_url(line)[:80],
+            })
+    return offices
+
+
+def _serialize_firm_offices_from_form(request):
+    """Build firm_offices_json from additional-office repeater fields."""
+    import json as _json
+    offices = []
+    indices = set()
+    for key in request.form:
+        if key.startswith('office_label_'):
+            suffix = key.rsplit('_', 1)[-1]
+            if suffix.isdigit():
+                indices.add(int(suffix))
+    for idx in sorted(indices):
+        label = (request.form.get(f'office_label_{idx}') or '').strip()
+        city = (request.form.get(f'office_city_{idx}') or '').strip()
+        county = (request.form.get(f'office_county_{idx}') or '').strip()
+        street = (request.form.get(f'office_street_{idx}') or '').strip()
+        if not any((label, city, county, street)):
+            continue
+        offices.append({
+            'label': label or 'Branch',
+            'country': (request.form.get(f'office_country_{idx}') or '').strip(),
+            'county': county,
+            'city': city,
+            'street': street,
+            'floor': (request.form.get(f'office_floor_{idx}') or '').strip(),
+            'postal': (request.form.get(f'office_postal_{idx}') or '').strip(),
+            'postal_code': (request.form.get(f'office_postal_code_{idx}') or '').strip(),
+        })
+    return _json.dumps(offices, ensure_ascii=False)
+
+
+def _faqs_for_practice_area(faqs, practice_area):
+    """FAQs assigned to a practice area (or unassigned = site-wide)."""
+    if not practice_area or not faqs:
+        return faqs or []
+    pa_id = str(practice_area.get('id') or '')
+    matched = []
+    for faq in faqs:
+        ids_raw = (faq.get('practice_area_ids') or '').strip()
+        if not ids_raw:
+            continue
+        ids = {x.strip() for x in ids_raw.split(',') if x.strip()}
+        if pa_id in ids:
+            matched.append(faq)
+    return matched
+
+
+def _local_practice_page_slug(practice_area, office):
+    """e.g. family-law-nairobi from PA name + city."""
+    pa_slug = _practice_area_public_slug(practice_area) if practice_area else 'practice'
+    loc = (office or {}).get('slug') or _slugify_url((office or {}).get('city') or 'kenya')
+    return f'{pa_slug}-{loc}'
+
+
+def _firm_authored_posts_by_employee(blog_posts):
+    """Map employee_id -> list of published post titles (E-E-A-T authorship)."""
+    by_emp = {}
+    for post in blog_posts or []:
+        emp_id = post.get('author_employee_id')
+        if not emp_id:
+            continue
+        by_emp.setdefault(int(emp_id), []).append({
+            'title': post.get('title'),
+            'slug': post.get('slug'),
+            'url_slug': post.get('slug'),
+        })
+    return by_emp
+
+
+def _parse_firm_careers_content(text):
+    """Split careers body into intro, open roles, apply blurb, and contact email."""
+    import re as _re
+    raw = (text or '').strip()
+    empty = {
+        'is_html': False,
+        'html': '',
+        'intro': '',
+        'roles': [],
+        'apply_text': '',
+        'apply_email': '',
+    }
+    if not raw:
+        return empty
+    email_match = _re.search(r'[\w.+-]+@[\w.-]+\.\w{2,}', raw)
+    apply_email = email_match.group(0) if email_match else ''
+    if '<' in raw and '>' in raw and _re.search(r'<(p|div|ul|ol|h[1-6]|br)\b', raw, _re.I):
+        return {
+            'is_html': True,
+            'html': raw,
+            'intro': '',
+            'roles': [],
+            'apply_text': '',
+            'apply_email': apply_email,
+        }
+
+    lines = [ln.strip() for ln in raw.replace('\r\n', '\n').replace('\r', '\n').split('\n')]
+    intro_lines = []
+    role_lines = []
+    apply_lines = []
+    mode = 'intro'
+    bullet_re = _re.compile(r'^[\u2022\u2023\u25E6\u2043\u2219•·▪▸►\-\*\u0007]\s*(.+)$')
+    for line in lines:
+        if not line:
+            if mode == 'intro' and intro_lines:
+                intro_lines.append('')
+            continue
+        low = line.lower()
+        if mode != 'apply' and (
+            low.startswith('to apply')
+            or low.startswith('how to apply')
+            or low.startswith('application')
+            or (apply_email and apply_email.lower() in low)
+        ):
+            mode = 'apply'
+        if mode == 'intro' and (
+            'open role' in low
+            or low.startswith('vacancies')
+            or low.startswith('current opening')
+            or low.startswith('we are hiring')
+        ):
+            mode = 'roles'
+            continue
+        if mode == 'intro':
+            bullet = bullet_re.match(line)
+            if bullet and intro_lines:
+                mode = 'roles'
+                role_lines.append(bullet.group(1).strip())
+            else:
+                intro_lines.append(line)
+            continue
+        if mode == 'roles':
+            if low.startswith('to apply') or low.startswith('how to apply'):
+                mode = 'apply'
+                apply_lines.append(line)
+                continue
+            bullet = bullet_re.match(line)
+            role_lines.append(bullet.group(1).strip() if bullet else line)
+            continue
+        apply_lines.append(line)
+
+    roles = []
+    for item in role_lines:
+        if ' - ' in item:
+            title, detail = item.split(' - ', 1)
+            roles.append({'title': title.strip(), 'detail': detail.strip()})
+        elif ' – ' in item:
+            title, detail = item.split(' – ', 1)
+            roles.append({'title': title.strip(), 'detail': detail.strip()})
+        else:
+            roles.append({'title': item, 'detail': ''})
+
+    intro = '\n'.join(intro_lines).strip()
+    apply_text = '\n'.join(apply_lines).strip()
+    return {
+        'is_html': False,
+        'html': '',
+        'intro': intro,
+        'roles': roles,
+        'apply_text': apply_text,
+        'apply_email': apply_email,
+    }
+
+
+def _localize_firm_text(firm, en_key, sw_key=None):
+    """Return Swahili text when enabled and present, else English."""
+    sw_key = sw_key or f'{en_key}_sw'
+    if firm.get('swahili_enabled'):
+        sw = (firm.get(sw_key) or '').strip()
+        if sw:
+            return sw
+    return (firm.get(en_key) or '').strip()
 
 
 def _normalize_phone_digits(phone):
@@ -4001,8 +5767,10 @@ def _compute_settings_section_completion(section_key, firm, connection=None):
         check(1, bool(firm.get('company_logo')))
         check(1, bool((firm.get('firm_history') or '').strip() or (firm.get('mission_statement') or '').strip()))
         check(2, bool(_format_firm_address(firm)))
-        check(1, bool((firm.get('seo_home_meta_title') or '').strip()))
-        check(1, bool((firm.get('seo_home_meta_description') or '').strip()))
+        check(1, bool((firm.get('seo_home_h1_heading') or firm.get('company_name') or '').strip()))
+        check(1, bool(
+            (firm.get('homepage_hero_tagline') or firm.get('company_tagline') or '').strip()
+        ))
     elif section_key == 'contact':
         check(2, bool((firm.get('contact_number') or '').strip()))
         check(2, bool((firm.get('email') or firm.get('customer_support_email') or '').strip()))
@@ -4086,16 +5854,6 @@ def _get_firm_website_context(page='home', **extra):
     firm_name = (firm.get('company_name') or 'Law Firm').strip()
     seo_home = _firm_page_seo_from_settings(firm, 'home', default_h1=firm_name)
     seo_about = _firm_page_seo_from_settings(firm, 'about', default_h1='About Us')
-    if not seo_home['meta_title']:
-        tagline = (firm.get('company_tagline') or '').strip()
-        seo_home['meta_title'] = f"{firm_name}{(' | ' + tagline) if tagline else ''}"[:70]
-    if not seo_home['meta_description']:
-        tagline = (firm.get('company_tagline') or '').strip()
-        seo_home['meta_description'] = (tagline or f'Welcome to {firm_name}')[:160]
-    if not seo_about['meta_description']:
-        seo_about['meta_description'] = (
-            firm.get('mission_statement') or 'Learn more about our firm, our mission, and our values.'
-        )[:160]
     for pa in practice_areas:
         pa['url_slug'] = _practice_area_public_slug(pa)
         if pa.get('updated_at'):
@@ -4111,6 +5869,8 @@ def _get_firm_website_context(page='home', **extra):
     page_seo = _resolve_firm_page_seo(
         page, firm, firm_name, seo_home, seo_about, extra,
     )
+    if extra.get('page_seo_override'):
+        page_seo = {**page_seo, **(extra.get('page_seo_override') or {})}
     breadcrumbs = _firm_breadcrumbs(
         page,
         preview_mode=preview_mode,
@@ -4165,7 +5925,23 @@ def _get_firm_website_context(page='home', **extra):
     whatsapp_number = (
         firm.get('whatsapp_business_number') or firm.get('whatsapp_number') or ''
     ).strip()
-    active_attorneys = [e for e in attorneys if (e.get('status') or 'Active') == 'Active']
+    active_attorneys = _sort_public_team_members(
+        [e for e in attorneys if _is_public_team_member(e)]
+    )
+    for i, emp in enumerate(active_attorneys, start=1):
+        emp['team_role_label'] = _public_team_role_label(emp.get('role'))
+        emp['team_index'] = i
+    team_groups = _group_public_team_members(active_attorneys)
+    if attorney and attorney.get('id'):
+        for emp in active_attorneys:
+            if emp.get('id') == attorney.get('id'):
+                attorney = emp
+                break
+        else:
+            attorney['team_role_label'] = _public_team_role_label(attorney.get('role'))
+            if attorney.get('profile_picture') and not attorney.get('profile_picture_url'):
+                attorney['profile_picture_url'] = _firm_public_asset_url(attorney.get('profile_picture'))
+            attorney['url_slug'] = attorney.get('url_slug') or _attorney_public_slug(attorney)
     area_attorneys = (
         _attorneys_for_practice_area(active_attorneys, practice_area.get('name'))
         if practice_area else []
@@ -4185,6 +5961,7 @@ def _get_firm_website_context(page='home', **extra):
         'privacy': 'Privacy Policy',
         'terms': 'Terms of Service',
         'disclaimer': 'Website Disclaimer',
+        'accessibility': 'Accessibility Statement',
     }
     if legal_page_key == 'privacy':
         legal_content = firm.get('privacy_policy') or ''
@@ -4192,29 +5969,96 @@ def _get_firm_website_context(page='home', **extra):
         legal_content = firm.get('terms_of_service') or ''
     elif legal_page_key == 'disclaimer':
         legal_content = firm.get('website_disclaimer') or ''
+    elif legal_page_key == 'accessibility':
+        legal_content = (
+            (firm.get('accessibility_statement') or '').strip()
+            or KENYA_POLICY_TEMPLATES['accessibility']
+        )
+
+    core_values_items = _parse_firm_core_values(firm.get('core_values'))
+    additional_offices = _parse_multiline_items(firm.get('additional_office_locations'))
+    holiday_hours_label = _firm_holiday_hours_label(firm)
+    payment_methods = _firm_payment_methods(firm)
+    firm_credentials = _firm_public_credentials(firm, active_attorneys)
+    legal_nav = _firm_legal_nav_items(firm, firm_url)
+    support_email = (firm.get('customer_support_email') or '').strip()
+    primary_email = (firm.get('email') or '').strip()
+    if not primary_email:
+        primary_email = support_email
+
+    page_faqs = faqs
+    if page == 'practice_area' and practice_area:
+        page_faqs = _faqs_for_practice_area(faqs, practice_area)
+        if not page_faqs:
+            page_faqs = [f for f in faqs if not (f.get('practice_area_ids') or '').strip()]
+
+    authored_by_employee = _firm_authored_posts_by_employee(blog_posts)
+    firm_offices = _parse_firm_offices(firm)
+    local_office = extra.get('local_office')
+
+    # Swahili-aware display fields (English remains source of truth when SW empty)
+    display_tagline = _localize_firm_text(firm, 'homepage_hero_tagline') or _localize_firm_text(
+        firm, 'company_tagline'
+    )
+    if display_tagline:
+        hero_tagline = display_tagline
+
+    cookie_msg = (firm.get('cookie_consent_message') or '').strip() or KENYA_POLICY_TEMPLATES['cookie']
+    a11y_text = (firm.get('accessibility_statement') or '').strip() or KENYA_POLICY_TEMPLATES['accessibility']
 
     ctx = {
         'firm': firm,
         'firm_name': firm_name,
         'firm_tagline': hero_tagline,
         'firm_logo_url': _firm_public_asset_url(firm.get('company_logo')),
-        'firm_logo_alt': (firm.get('company_logo_alt') or firm_name).strip(),
+        'firm_logo_alt': (
+            (firm.get('company_logo_alt') or '').strip()
+            or _default_logo_alt_text(firm_name)
+        ),
+        'firm_main_image_url': _firm_public_asset_url(firm.get('company_main_image')),
+        'firm_main_image_alt': (
+            (firm.get('company_main_image_alt') or '').strip()
+            or f'{firm_name} main image'
+        ),
+        'firm_hero_slides': _firm_hero_slides(firm, firm_name),
         'firm_address': _format_firm_address(firm),
-        'firm_email': (firm.get('email') or firm.get('customer_support_email') or '').strip(),
+        'firm_location_name': (firm.get('location_name') or '').strip(),
+        'firm_offices': firm_offices,
+        'local_office': local_office,
+        'firm_email': primary_email,
+        'firm_support_email': support_email if support_email and support_email != primary_email else '',
         'firm_phone': display_phone,
+        'firm_alt_phone': (firm.get('alternative_phone') or '').strip(),
         'firm_whatsapp': (firm.get('whatsapp_number') or '').strip(),
         'firm_whatsapp_business': (firm.get('whatsapp_business_number') or '').strip(),
         'business_hours': business_hours,
+        'holiday_hours_label': holiday_hours_label,
+        'core_values_items': (
+            _parse_firm_core_values(_localize_firm_text(firm, 'core_values'))
+            if firm.get('swahili_enabled') and (firm.get('core_values_sw') or '').strip()
+            else core_values_items
+        ),
+        'additional_offices': additional_offices,
+        'payment_methods': payment_methods,
+        'firm_credentials': firm_credentials,
+        'legal_nav': legal_nav,
         'practice_areas': practice_areas,
         'attorneys': active_attorneys,
+        'team_groups': team_groups,
         'testimonials': testimonials,
         'case_outcomes': case_outcomes,
         'awards': awards,
-        'faqs': faqs,
+        'faqs': page_faqs,
+        'all_faqs': faqs,
         'blog_posts': blog_posts,
         'careers_content': careers_content,
+        'careers': _parse_firm_careers_content(careers_content),
         'attorney_notable_cases': attorney_notable_cases,
         'attorney_education': attorney_education,
+        'authored_posts': (
+            authored_by_employee.get(int(attorney['id']), [])
+            if attorney and attorney.get('id') else []
+        ),
         'firm_public_asset_url': _firm_public_asset_url,
         'seo_home': seo_home,
         'seo_about': seo_about,
@@ -4250,8 +6094,126 @@ def _get_firm_website_context(page='home', **extra):
         'legal_page_title': legal_titles.get(legal_page_key or '', ''),
         'form_success': extra.get('form_success'),
         'form_error': extra.get('form_error'),
+        'cookie_consent_enabled': bool(firm.get('cookie_consent_enabled', 1)),
+        'cookie_consent_message': cookie_msg,
+        'accessibility_statement_enabled': bool(firm.get('accessibility_statement_enabled')),
+        'accessibility_statement': a11y_text,
+        'ga4_measurement_id': (firm.get('ga4_measurement_id') or '').strip(),
+        'gtm_container_id': (firm.get('gtm_container_id') or '').strip(),
+        'meta_pixel_id': (firm.get('meta_pixel_id') or '').strip(),
+        'swahili_enabled': bool(firm.get('swahili_enabled')),
     }
     return ctx
+
+
+def _parse_multiline_items(text):
+    """Split textarea content into clean non-empty lines."""
+    if not text:
+        return []
+    items = []
+    for line in str(text).replace('\r\n', '\n').replace('\r', '\n').split('\n'):
+        cleaned = ' '.join(line.split()).strip(' •-\t')
+        if cleaned:
+            items.append(cleaned)
+    return items
+
+
+def _parse_firm_core_values(text):
+    """Parse core values into title/detail pairs for the About page."""
+    items = []
+    for raw in _parse_multiline_items(text):
+        title, detail = raw, ''
+        for sep in (' — ', ' – ', ' - ', ' —', '–', ':'):
+            if sep in raw:
+                left, right = raw.split(sep, 1)
+                if left.strip():
+                    title = left.strip()
+                    detail = right.strip()
+                    break
+        items.append({'title': title, 'detail': detail})
+    return items
+
+
+def _firm_holiday_hours_label(firm):
+    """Public-holiday opening status from contact settings."""
+    status = (firm.get('public_holiday_status') or '').strip()
+    if not status:
+        return ''
+    if status == 'Closed':
+        return 'Closed on public holidays'
+    open_t = (firm.get('public_holiday_open_time') or '').strip()
+    close_t = (firm.get('public_holiday_close_time') or '').strip()
+    if status in ('Open', 'Reduced hours') and open_t and close_t:
+        label = 'Reduced hours' if status == 'Reduced hours' else 'Open'
+        return f'{label} on public holidays · {open_t} – {close_t}'
+    return f'{status} on public holidays'
+
+
+def _firm_payment_methods(firm):
+    """M-Pesa payment options for the contact page (when configured)."""
+    methods = []
+    till = (firm.get('mpesa_till_number') or '').strip()
+    paybill = (firm.get('mpesa_paybill_number') or '').strip()
+    account = (firm.get('mpesa_paybill_account') or '').strip()
+    if till:
+        methods.append({'label': 'M-Pesa Till', 'value': till, 'icon': 'fa-mobile-screen'})
+    if paybill:
+        detail = paybill
+        if account:
+            detail = f'{paybill} · Account {account}'
+        methods.append({'label': 'M-Pesa Paybill', 'value': detail, 'icon': 'fa-building-columns'})
+    return methods
+
+
+def _firm_public_credentials(firm, attorneys=None):
+    """Legal & company credentials surfaced on About, Contact, and footer.
+
+    Tax PIN is intentionally omitted — internal use only (CMS v2).
+    """
+    lead = (firm.get('lead_advocate_name') or '').strip()
+    lead_id = firm.get('lead_advocate_employee_id')
+    if lead_id and attorneys:
+        try:
+            lead_id_int = int(lead_id)
+        except (TypeError, ValueError):
+            lead_id_int = None
+        if lead_id_int:
+            for emp in attorneys:
+                if emp.get('id') == lead_id_int:
+                    lead = (emp.get('full_name') or '').strip() or lead
+                    break
+    return {
+        'lead_advocate': lead,
+        'law_society': (firm.get('law_society_reg_number') or '').strip(),
+        'practicing_certificate': (firm.get('practicing_certificate_number') or '').strip(),
+        'bar_association': (firm.get('bar_association_membership') or '').strip(),
+        'registration_number': (firm.get('registration_number') or '').strip(),
+        'data_protection': (firm.get('data_protection_registration_number') or '').strip(),
+        'jurisdictions': (firm.get('jurisdictions_admitted') or '').strip(),
+        'malpractice': (
+            (firm.get('malpractice_insurance_detail') or '').strip()
+            if firm.get('malpractice_insurance_status') else ''
+        ),
+        'disciplinary': (firm.get('disciplinary_record_statement') or '').strip(),
+    }
+
+
+def _firm_legal_nav_items(firm, firm_url):
+    """Footer/legal page links only when policy content exists."""
+    items = []
+    if (firm.get('privacy_policy') or '').strip():
+        items.append({'key': 'privacy', 'label': 'Privacy Policy', 'url': firm_url('privacy')})
+    if (firm.get('terms_of_service') or '').strip():
+        items.append({'key': 'terms', 'label': 'Terms of Service', 'url': firm_url('terms')})
+    if (firm.get('website_disclaimer') or '').strip():
+        items.append({'key': 'disclaimer', 'label': 'Disclaimer', 'url': firm_url('disclaimer')})
+    if firm.get('accessibility_statement_enabled'):
+        items.append({
+            'key': 'accessibility',
+            'label': 'Accessibility',
+            'url': firm_url('accessibility'),
+        })
+    return items
 
 
 def _text_excerpt(text, max_len=280):
@@ -4267,20 +6229,26 @@ def _text_excerpt(text, max_len=280):
 
 def _firm_website_theme(firm):
     """Branding tokens from company settings for the public firm site."""
-    primary = (firm.get('primary_brand_color') or '#1E1A4E').strip()
-    secondary = (firm.get('secondary_color') or '#6C5CE7').strip()
-    tertiary = (firm.get('tertiary_color') or '#A29BFE').strip()
-    font_body = (firm.get('font_family') or 'Inter').strip()
+    primary = (firm.get('primary_brand_color') or '#0B1220').strip()
+    secondary = (firm.get('secondary_color') or '#C4A574').strip()
+    tertiary = (firm.get('tertiary_color') or '#E2D2B5').strip()
+    font_body = (firm.get('font_family') or 'Figtree').strip()
+    # Prefer modern editorial type for the public firm site over generic UI stacks.
+    if font_body in ('Inter', 'Roboto', 'Open Sans', 'Arial', 'system', 'Source Sans 3'):
+        font_body = 'Figtree'
     serif_fonts = {
         'Merriweather', 'Lora', 'Source Serif 4', 'Playfair Display',
+        'Cormorant Garamond', 'Libre Baskerville', 'Instrument Serif', 'Newsreader',
     }
-    font_heading = font_body if font_body in serif_fonts else 'Playfair Display'
+    font_heading = font_body if font_body in serif_fonts else 'Instrument Serif'
     return {
         'primary': primary,
         'secondary': secondary,
         'tertiary': tertiary,
         'font_body': font_body,
         'font_heading': font_heading,
+        'base_font_size': resolve_app_base_font_size(firm),
+        'font_size_id': (firm.get('font_size') or 'comfortable'),
     }
 
 
@@ -4346,7 +6314,7 @@ def _resolve_featured_practice_areas(practice_areas, firm):
 def _firm_cta_label(firm, practice_area=None):
     if practice_area and (practice_area.get('cta_label') or '').strip():
         return practice_area['cta_label'].strip()
-    return (firm.get('homepage_cta_label') or 'Book a Consultation').strip()
+    return (firm.get('homepage_cta_label') or 'Book a Free Consultation').strip()
 
 
 def _firm_consultation_fee_label(firm, practice_area=None):
@@ -4459,6 +6427,69 @@ def _attorney_public_slug(emp):
     return _slugify_url(emp.get('full_name') or '')
 
 
+# Public team directory: role hierarchy (Managing Partner first).
+_PUBLIC_TEAM_ROLE_ORDER = (
+    'Managing Partner',
+    'Associate Advocate',
+    'Firm Administrator',
+    'IT Support',
+    'Employee',
+    'Finance Office',
+    'Clerk',
+)
+_PUBLIC_TEAM_ROLE_LABELS = {
+    'Managing Partner': 'Managing Directors',
+    'Associate Advocate': 'Associates',
+    'Firm Administrator': 'Firm Administrators',
+    'IT Support': 'IT Support',
+    'Employee': 'Employees',
+    'Finance Office': 'Finance',
+    'Clerk': 'Clerks',
+}
+
+
+def _public_team_role_rank(role):
+    role = (role or '').strip()
+    try:
+        return _PUBLIC_TEAM_ROLE_ORDER.index(role)
+    except ValueError:
+        return len(_PUBLIC_TEAM_ROLE_ORDER)
+
+
+def _public_team_role_label(role):
+    role = (role or '').strip()
+    return _PUBLIC_TEAM_ROLE_LABELS.get(role) or role or 'Team'
+
+
+def _is_public_team_member(emp):
+    """True when an employee should appear on the public team directory."""
+    status = str((emp or {}).get('status') or '').strip().lower()
+    return status in ('', 'active')
+
+
+def _sort_public_team_members(employees):
+    """Order public team: Managing Partner → Associate → Admin → IT → Employee."""
+    return sorted(
+        employees or [],
+        key=lambda e: (
+            _public_team_role_rank(e.get('role')),
+            (e.get('full_name') or '').lower(),
+        ),
+    )
+
+
+def _group_public_team_members(employees):
+    """Group sorted public team members by role for sectioned directories."""
+    groups = []
+    for emp in employees or []:
+        role = (emp.get('role') or 'Employee').strip() or 'Employee'
+        label = emp.get('team_role_label') or _public_team_role_label(role)
+        if not groups or groups[-1]['role'] != role:
+            groups.append({'role': role, 'label': label, 'members': []})
+        groups[-1]['members'].append(emp)
+    return groups
+
+
 def _find_practice_area(practice_areas, slug):
     if not slug:
         return None
@@ -4486,9 +6517,9 @@ def _seo_from_practice_area(pa, firm_name):
         ),
         'h1_heading': (pa.get('h1_heading') or pa.get('name') or '').strip(),
         'url_slug': slug,
-        'canonical_url': (
-            (pa.get('canonical_url') or '').strip()
-            or _firm_canonical_url(f'practice-areas/{slug}')
+        'canonical_url': resolve_public_canonical_url(
+            pa.get('canonical_url'),
+            f'practice-areas/{slug}',
         ),
     }
 
@@ -4502,9 +6533,9 @@ def _seo_from_attorney(emp, firm_name):
         ),
         'h1_heading': (emp.get('h1_heading') or emp.get('full_name') or '').strip(),
         'url_slug': slug,
-        'canonical_url': (
-            (emp.get('canonical_url') or '').strip()
-            or _firm_canonical_url(f'team/{slug}')
+        'canonical_url': resolve_public_canonical_url(
+            emp.get('canonical_url'),
+            f'team/{slug}',
         ),
     }
 
@@ -4679,6 +6710,7 @@ FIRM_WEBSITE_TEMPLATES = {
     'privacy': 'firm_website/pages/legal.html',
     'terms': 'firm_website/pages/legal.html',
     'disclaimer': 'firm_website/pages/legal.html',
+    'accessibility': 'firm_website/pages/legal.html',
 }
 
 
@@ -4718,11 +6750,58 @@ def _dispatch_firm_website_path(subpath='', preview_mode=False):
         if len(parts) == 1:
             return _render_firm_website_page('practice_areas', preview_mode=preview_mode)
         ctx = _get_firm_website_context(page='practice_area', preview_mode=preview_mode)
+        if len(parts) >= 3:
+            pa = _find_practice_area(ctx['practice_areas'], parts[1])
+            loc_slug = parts[2]
+            office = next(
+                (o for o in (ctx.get('firm_offices') or []) if o.get('slug') == loc_slug),
+                None,
+            )
+            if pa and office:
+                # Local SEO page: /practice-areas/<pa>/<city>
+                city = office.get('city') or office.get('county') or office.get('label')
+                local_seo = dict(ctx.get('page_seo') or {})
+                local_seo['h1_heading'] = f"{pa.get('name')} in {city}"
+                local_seo['meta_title'] = _auto_firm_meta_title(
+                    local_seo['h1_heading'], ctx.get('firm_name') or ''
+                )
+                local_seo['meta_description'] = _text_excerpt(
+                    pa.get('short_description') or pa.get('description') or '',
+                    155,
+                ) or f"{pa.get('name')} lawyers serving {city}."
+                return _render_firm_website_page(
+                    'practice_area',
+                    preview_mode=preview_mode,
+                    practice_area=pa,
+                    local_office=office,
+                    page_seo_override=local_seo,
+                )
         pa = _find_practice_area(ctx['practice_areas'], parts[1])
         if not pa:
+            # Combined slug e.g. family-law-nairobi
+            for candidate in ctx['practice_areas']:
+                for office in (ctx.get('firm_offices') or []):
+                    if _local_practice_page_slug(candidate, office) == parts[1]:
+                        city = office.get('city') or office.get('county') or office.get('label')
+                        return _render_firm_website_page(
+                            'practice_area',
+                            preview_mode=preview_mode,
+                            practice_area=candidate,
+                            local_office=office,
+                        )
             flash('Practice area not found.', 'error')
             return redirect(_firm_site_path('practice-areas', preview_mode))
         return _render_firm_website_page('practice_area', preview_mode=preview_mode, practice_area=pa)
+    if head == 'accessibility':
+        ctx = _get_firm_website_context(page='about', preview_mode=preview_mode)
+        if not ctx.get('accessibility_statement_enabled'):
+            flash('Page not found.', 'error')
+            return redirect(_firm_site_path('', preview_mode))
+        return _render_firm_website_page(
+            'disclaimer',
+            preview_mode=preview_mode,
+            legal_page_key='accessibility',
+        )
     if head == 'team':
         if len(parts) == 1:
             return _render_firm_website_page('team', preview_mode=preview_mode)
@@ -5553,7 +7632,13 @@ def inject_global_theme_settings():
     """Inject company settings into all templates for consistent theming."""
     settings = get_company_settings()
     if not settings:
-        settings = {'company_name': 'BAUNI LAW GROUP'}
+        settings = {'company_name': 'SHERIA LAW FIRM'}
+    else:
+        # Merge SEO / image-alt fields used by branding + login backgrounds
+        try:
+            settings = _enrich_company_settings_with_site_meta(dict(settings))
+        except Exception as enrich_err:
+            print(f"Warning enriching company settings for templates: {enrich_err}")
     section_key = None
     if request.endpoint == 'system_settings_section':
         section_key = (request.view_args or {}).get('section')
@@ -5563,6 +7648,9 @@ def inject_global_theme_settings():
         section_key = 'documents'
     return {
         'company_settings': settings,
+        'app_base_font_size': resolve_app_base_font_size(settings),
+        'app_font_size_id': (settings.get('font_size') or 'comfortable'),
+        'APP_FONT_SIZE_PRESETS': APP_FONT_SIZE_PRESETS,
         'SYSTEM_SETTINGS_NAV': SYSTEM_SETTINGS_SECTIONS,
         'COMPANY_INFORMATION_SECTION': COMPANY_INFORMATION_SECTION,
         'COMPANY_TEMPLATES_SECTION': COMPANY_TEMPLATES_SECTION,
@@ -5615,6 +7703,28 @@ def inject_role_slug_helpers():
         'role_to_slug': role_to_slug,
         'role_url': role_url,
     }
+
+
+@app.context_processor
+def inject_nav_back_url():
+    """Previous page for header Back controls (app shell + firm website).
+
+    Computed against the current request before after_request appends/truncates
+    the stack, so Back always points at the real prior page — not browser history.
+    """
+    history = list(session.get('nav_history') or [])
+    try:
+        here = _nav_history_full_path()
+    except Exception:
+        here = None
+    back_url = None
+    if here and here in history:
+        idx = len(history) - 1 - history[::-1].index(here)
+        prior = history[:idx]
+        back_url = prior[-1] if prior else None
+    elif history:
+        back_url = history[-1]
+    return {'nav_back_url': back_url}
 
 # ==================== WHATSAPP CLOUD API HELPERS ====================
 
@@ -6116,9 +8226,9 @@ def login():
                             # Get company name from company_settings
                             company_settings = get_company_settings()
                             if company_settings:
-                                session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                                session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
                             else:
-                                session['company_name'] = 'BAUNI LAW GROUP'
+                                session['company_name'] = 'SHERIA LAW FIRM'
                             
                             # Redirect to onboarding if not completed
                             if not employee.get('onboarding_completed'):
@@ -6134,9 +8244,9 @@ def login():
                         # Get company name from company_settings
                         company_settings = get_company_settings()
                         if company_settings:
-                            session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                            session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
                         else:
-                            session['company_name'] = 'BAUNI LAW GROUP'
+                            session['company_name'] = 'SHERIA LAW FIRM'
 
                         # Run a one-shot Google Drive health check so a clear
                         # "Reconnect Google Drive" notice can appear on the
@@ -7317,7 +9427,7 @@ def dashboard(role_slug):
             # Get company settings
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             # Initialize variables
             individual_clients = []
@@ -7448,7 +9558,7 @@ def user_management():
     
     try:
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-            company_settings = get_company_settings() or {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = get_company_settings() or {'company_name': 'SHERIA LAW FIRM'}
 
             cursor.execute("SELECT COUNT(*) AS total FROM employees WHERE status = 'Active'")
             total_active_employees = (cursor.fetchone() or {}).get('total', 0)
@@ -7535,7 +9645,7 @@ def employee_management():
         # Get company settings
         company_settings = get_company_settings()
         if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = {'company_name': 'SHERIA LAW FIRM'}
         
         can_delete_employee = current_user_has_permission(connection, 'employee_delete')
         return render_template(
@@ -8445,7 +10555,7 @@ def roles_permissions():
         # Get company settings
         company_settings = get_company_settings()
         if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = {'company_name': 'SHERIA LAW FIRM'}
         
         return render_template('roles_permissions.html', company_settings=company_settings)
     except Exception as e:
@@ -8480,7 +10590,7 @@ def individual_client_management():
         # Get company settings
         company_settings = get_company_settings()
         if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = {'company_name': 'SHERIA LAW FIRM'}
         
         return render_template('individual_client_management.html', company_settings=company_settings)
     except Exception as e:
@@ -8515,7 +10625,7 @@ def corporate_client_management():
         # Get company settings
         company_settings = get_company_settings()
         if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = {'company_name': 'SHERIA LAW FIRM'}
         
         return render_template('corporate_client_management.html', company_settings=company_settings)
     except Exception as e:
@@ -8549,7 +10659,7 @@ def client_management():
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
             cursor.execute("""
                 SELECT id, full_name, email, phone_number, profile_picture,
@@ -8683,7 +10793,7 @@ def onboard_client(client_id):
 
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
             return render_template('client_onboarding.html',
                                    client=client,
@@ -8824,7 +10934,7 @@ def edit_client_page(client_id):
 
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
             return render_template('client_edit.html',
                                    client=client,
@@ -9043,7 +11153,7 @@ def client_login():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('client_login.html', company_settings=company_settings)
 
@@ -9055,7 +11165,7 @@ def client_manual_login():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     if request.method == 'POST':
         email = (request.form.get('email') or '').strip().lower()
@@ -9091,7 +11201,7 @@ def client_manual_login():
                     session['client_email'] = client.get('email', '')
                     session['client_profile_picture'] = client.get('profile_picture', '')
                     session['client_type'] = client.get('client_type', 'Pending')
-                    session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                    session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
                     flash('Please complete your registration to continue.', 'info')
                     return redirect(url_for('client_registration'))
 
@@ -9105,7 +11215,7 @@ def client_manual_login():
                 session['client_profile_picture'] = client.get('profile_picture', '')
                 session['client_type'] = client.get('client_type', 'Pending')
 
-                session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
                 flash('Successfully logged in!', 'success')
                 return redirect(url_for('client_dashboard'))
         except Exception as e:
@@ -9124,7 +11234,7 @@ def client_signup():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     if request.method == 'POST':
         full_name = (request.form.get('full_name') or '').strip()
@@ -9394,9 +11504,9 @@ def google_callback():
                         session['client_type'] = client.get('client_type', 'Pending')
                         company_settings = get_company_settings()
                         if company_settings:
-                            session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                            session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
                         else:
-                            session['company_name'] = 'BAUNI LAW GROUP'
+                            session['company_name'] = 'SHERIA LAW FIRM'
                         session.pop('state', None)
                         flash('Please complete your registration to continue.', 'info')
                         return redirect(url_for('client_registration'))
@@ -9416,9 +11526,9 @@ def google_callback():
                     # Set company name in session for header display
                     company_settings = get_company_settings()
                     if company_settings:
-                        session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+                        session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
                     else:
-                        session['company_name'] = 'BAUNI LAW GROUP'
+                        session['company_name'] = 'SHERIA LAW FIRM'
                     
                     # Check if client has completed registration based on client type
                     client_type = client.get('client_type', 'Pending')
@@ -9577,10 +11687,10 @@ def client_dashboard():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             # Set company name in session for header display
-            session['company_name'] = company_settings.get('company_name', 'BAUNI LAW GROUP')
+            session['company_name'] = company_settings.get('company_name', 'SHERIA LAW FIRM')
             
             is_employee_viewing = 'original_employee_id' in session
             
@@ -9605,7 +11715,7 @@ def my_tools():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('my_tools.html', company_settings=company_settings)
 
@@ -9617,7 +11727,7 @@ def my_templates():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     return render_template('my_templates.html', company_settings=company_settings)
 
@@ -11014,7 +13124,7 @@ def my_tasks():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     if not connection:
@@ -11381,7 +13491,7 @@ def my_task_view(task_id):
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     if not connection:
@@ -11483,7 +13593,7 @@ def my_session_task_view(material_id):
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     if not connection:
@@ -12585,7 +14695,7 @@ def notifications():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     if not connection:
@@ -12764,7 +14874,7 @@ def client_documents():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_documents.html',
                                  client=client,
@@ -12989,7 +15099,7 @@ def client_document_type(document_type):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_document_type.html',
                                  client=client,
@@ -13577,7 +15687,7 @@ def client_cases():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_cases.html',
                                  client=client,
@@ -13751,7 +15861,7 @@ def client_case_details(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_case_details.html',
                                  case_data=case_data,
@@ -13854,7 +15964,7 @@ def client_calendar():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_calendar.html', 
                                  company_settings=company_settings,
@@ -13978,7 +16088,7 @@ def client_reminders():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_reminders.html', 
                                  company_settings=company_settings,
@@ -14078,7 +16188,7 @@ def client_messages():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             is_employee_viewing = 'original_employee_id' in session
             employee_name = session.get('original_employee_name', '')
@@ -14608,7 +16718,7 @@ def client_registration():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     client = {}
     connection = get_db_connection()
@@ -14836,7 +16946,7 @@ def client_profile():
             # Get company settings
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('client_profile.html', client=client, company_settings=company_settings)
     except Exception as e:
@@ -14985,7 +17095,7 @@ def profile():
             # Get company settings
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             # Check if role is switched
             original_role = session.get('original_role')
@@ -15382,7 +17492,7 @@ def employee_communications():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('employee_communications.html',
                          company_settings=company_settings,
@@ -15466,7 +17576,7 @@ def employee_email_conversation(employee_id, contact_email):
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('employee_email_conversation.html',
                          company_settings=company_settings,
@@ -15491,7 +17601,7 @@ def onboarding_approvals():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     email_settings = get_email_settings() or {}
     email_domain = (email_settings.get('cpanel_domain') or 'baunilawgroup.com').strip().lstrip('@')
@@ -15525,7 +17635,7 @@ def onboarding_approval_detail(employee_id):
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     if not connection:
@@ -15628,7 +17738,7 @@ def onboarding():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('onboarding.html', employee=employee, company_settings=company_settings, has_contract=has_contract)
     except Exception as e:
@@ -15941,7 +18051,7 @@ def hr_roles_permissions():
         # Get company settings
         company_settings = get_company_settings()
         if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = {'company_name': 'SHERIA LAW FIRM'}
         
         # Fetch all employees with their roles
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -16353,7 +18463,7 @@ def employee_permissions():
     try:
         company_settings = get_company_settings()
         if not company_settings:
-            company_settings = {'company_name': 'BAUNI LAW GROUP'}
+            company_settings = {'company_name': 'SHERIA LAW FIRM'}
         
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute(
@@ -16416,7 +18526,7 @@ def leave_availability():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('leave_availability.html', company_settings=company_settings)
 
@@ -16437,7 +18547,7 @@ def performance_compliance():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('performance_compliance.html', company_settings=company_settings)
 
@@ -16458,7 +18568,7 @@ def training_certification():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('training_certification.html', company_settings=company_settings)
 
@@ -16479,7 +18589,7 @@ def payroll_expenses():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('payroll_expenses.html', company_settings=company_settings)
 
@@ -16500,7 +18610,7 @@ def audit_offboarding():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('audit_offboarding.html', company_settings=company_settings)
 
@@ -16521,7 +18631,7 @@ def finance_billing():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     # Fine-grained permission: view finance dashboard
     connection = get_db_connection()
@@ -16547,7 +18657,7 @@ def all_matters():
         return redirect(url_for('dashboard'))
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     _, see_firm_wide = _all_matters_overview_scope()
     return render_template(
         'all_matters.html',
@@ -16716,7 +18826,7 @@ def case_management():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     # Get current employee info for the form
     connection = get_db_connection()
@@ -16757,7 +18867,7 @@ def approve_cases():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     employee_name = session.get('employee_name', 'Unknown')
@@ -16799,7 +18909,7 @@ def case_task_management():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     connection = get_db_connection()
     if not connection:
         flash('Database connection error.', 'error')
@@ -17135,7 +19245,7 @@ def case_tracking():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     current_employee_id = session['employee_id']
     see_firm_wide = has_unrestricted_case_access(user_role, original_role)
@@ -17238,7 +19348,7 @@ def matter_tracking():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     connection = get_db_connection()
     if not connection:
@@ -17695,7 +19805,7 @@ def case_details(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             # Suggested doc title: your name + case tracking (no file created until user saves in app)
             emp_name = (session.get('employee_name') or '').strip()
             if not emp_name and session.get('employee_id'):
@@ -17814,7 +19924,7 @@ def case_edit(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             employee_name = session.get('employee_name', 'Unknown')
             
@@ -18068,7 +20178,7 @@ def case_documents(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
             document_groups = _build_case_document_groups(documents, parties)
 
@@ -18250,7 +20360,7 @@ def case_proceedings(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('case_proceedings.html', 
                                  case_data=case_data, 
@@ -18359,7 +20469,7 @@ def case_reminders(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('case_reminders.html', 
                                  case_data=case_data, 
@@ -18488,7 +20598,7 @@ def case_calendar(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('case_calendar.html', 
                                  case_data=case_data, 
@@ -18544,7 +20654,7 @@ def case_status(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('case_status.html', 
                                  case_data=case_data, 
@@ -18608,7 +20718,7 @@ def case_allocate(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('case_allocate.html', 
                                  case_data=case_data, 
@@ -18712,7 +20822,7 @@ def case_audit_progress(case_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('case_audit_progress.html', 
                                  case_data=case_data, 
@@ -19605,7 +21715,7 @@ def register_case():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     connection = get_db_connection()
     if connection:
@@ -20533,7 +22643,7 @@ def document_management():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('document_management.html', 
                          company_settings=company_settings,
@@ -23835,7 +25945,7 @@ def documents_settings():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     # Fine-grained permission: manage document settings
     connection = get_db_connection()
@@ -23966,7 +26076,7 @@ def view_client_documents(client_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('view_client_documents.html',
                                  client=client,
@@ -24623,7 +26733,7 @@ def view_client_document_type(client_id, document_type):
                 
                 company_settings = get_company_settings()
                 if not company_settings:
-                    company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                    company_settings = {'company_name': 'SHERIA LAW FIRM'}
                 
                 return render_template('view_client_other_matters.html',
                                      client=client,
@@ -24719,7 +26829,7 @@ def view_client_document_type(client_id, document_type):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('view_client_document_type.html',
                                  client=client,
@@ -24791,7 +26901,7 @@ def view_employee_documents(employee_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('view_employee_documents.html',
                                  employee=employee,
@@ -24842,7 +26952,7 @@ def registration_documents():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('registration_documents.html', 
                          company_settings=company_settings,
@@ -25139,7 +27249,7 @@ def calendar():
 
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('calendar.html', 
                                  company_settings=company_settings,
@@ -25316,7 +27426,7 @@ def reminders():
 
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
             return render_template('reminders.html',
                                  company_settings=company_settings,
@@ -25420,7 +27530,7 @@ def calendar_reminders():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('calendar_reminders.html', 
                                  company_settings=company_settings,
@@ -25453,7 +27563,7 @@ def communication_messaging():
     communication_type = request.args.get('type', 'email')
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     # Initialize variables
     email_accounts = []
@@ -25667,7 +27777,7 @@ def employee_communication_settings():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     # Fine-grained permission: manage communication channels / employee mappings
     connection = get_db_connection()
@@ -25781,7 +27891,7 @@ def _persist_notification_email_from_form(form, cursor):
     imap_host = smtp_host
     imap_port = int(existing.get('imap_port') or 993)
     imap_use_ssl = bool(existing.get('imap_use_ssl', True))
-    sender_name = (form.get('notify_sender_name') or existing.get('sender_name') or 'BAUNI LAW GROUP').strip()
+    sender_name = (form.get('notify_sender_name') or existing.get('sender_name') or 'SHERIA LAW FIRM').strip()
 
     if not main_email:
         return False, 'Email address is required.'
@@ -26660,7 +28770,7 @@ def communication_settings():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     # Fine-grained permission: manage communication channels (email, SMS, WhatsApp)
     connection = get_db_connection()
@@ -26725,7 +28835,7 @@ def api_save_email_settings():
             imap_host=data.get('imap_host', 'mail.baunilawgroup.com'),
             imap_port=int(data.get('imap_port', 993)),
             imap_use_ssl=imap_use_ssl,
-            sender_name=data.get('sender_name', 'BAUNI LAW GROUP')
+            sender_name=data.get('sender_name', 'SHERIA LAW FIRM')
         )
         
         if success:
@@ -27304,7 +29414,7 @@ def compliance_audit():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('compliance_audit.html', company_settings=company_settings)
 
@@ -27325,7 +29435,7 @@ def system_reports_analytics():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('system_reports_analytics.html', company_settings=company_settings)
 
@@ -27346,7 +29456,7 @@ def data_backup_recovery():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('data_backup_recovery.html', company_settings=company_settings)
 
@@ -27367,7 +29477,7 @@ def access_control_security():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('access_control_security.html', company_settings=company_settings)
 
@@ -27388,7 +29498,7 @@ def system_health_module():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     return render_template('system_health_module.html', company_settings=company_settings)
 
@@ -27506,7 +29616,8 @@ def _fetch_all_employees_for_legal_page(connection):
                    professional_title, attorney_bio, practice_areas,
                    public_contact_email, public_contact_phone,
                    lsk_practicing_certificate_number, education_institutions,
-                   year_called_to_bar, meta_title, meta_description, url_slug,
+                   year_called_to_bar, bar_admission_date, linkedin_profile_url,
+                   meta_title, meta_description, url_slug,
                    h1_heading, canonical_url, video_intro_url, updated_at
             FROM employees
             ORDER BY full_name ASC
@@ -27525,9 +29636,20 @@ def _save_attorney_directory_profiles(cursor, request, upload_folder):
         if not part.isdigit():
             continue
         emp_id = int(part)
-        cursor.execute("SELECT id FROM employees WHERE id = %s", (emp_id,))
-        if not cursor.fetchone():
+        cursor.execute("SELECT id, full_name, professional_title FROM employees WHERE id = %s", (emp_id,))
+        emp_row = cursor.fetchone()
+        if not emp_row:
             continue
+        firm_name = (request.form.get('company_name') or '').strip()
+        photo_alt = (request.form.get(f'profile_picture_alt_{emp_id}') or '').strip()
+        if not photo_alt:
+            title = (
+                (request.form.get(f'professional_title_{emp_id}') or '').strip()
+                or (emp_row.get('professional_title') or '').strip()
+            )
+            name = (emp_row.get('full_name') or '').strip() or 'Attorney'
+            photo_alt = f'{name}, {title} at {firm_name}'.strip(' ,') if firm_name else f'{name}, {title}'.strip(' ,')
+        bar_date = (request.form.get(f'bar_admission_date_{emp_id}') or '').strip() or None
         fields = {
             'professional_title': (request.form.get(f'professional_title_{emp_id}') or '').strip(),
             'attorney_bio': (request.form.get(f'attorney_bio_{emp_id}') or '').strip(),
@@ -27541,26 +29663,28 @@ def _save_attorney_directory_profiles(cursor, request, upload_folder):
                 request.form.get(f'education_institutions_{emp_id}') or ''
             ).strip(),
             'year_called_to_bar': (request.form.get(f'year_called_to_bar_{emp_id}') or '').strip(),
+            'bar_admission_date': bar_date,
+            'linkedin_profile_url': (
+                request.form.get(f'linkedin_profile_url_{emp_id}') or ''
+            ).strip()[:500],
             'meta_title': (request.form.get(f'attorney_meta_title_{emp_id}') or '').strip()[:70],
             'meta_description': (
                 request.form.get(f'attorney_meta_description_{emp_id}') or ''
             ).strip()[:160],
             'h1_heading': (request.form.get(f'attorney_h1_heading_{emp_id}') or '').strip(),
-            'profile_picture_alt': (
-                request.form.get(f'profile_picture_alt_{emp_id}') or ''
-            ).strip(),
+            'profile_picture_alt': photo_alt,
             'video_intro_url': (request.form.get(f'video_intro_url_{emp_id}') or '').strip()[:500],
         }
         url_slug = (request.form.get(f'attorney_url_slug_{emp_id}') or '').strip()
         if not url_slug:
-            cursor.execute("SELECT full_name FROM employees WHERE id = %s", (emp_id,))
-            row = cursor.fetchone()
-            name_for_slug = row['full_name'] if row else ''
+            name_for_slug = emp_row.get('full_name') or ''
             url_slug = _slugify_url(name_for_slug)
         else:
             url_slug = _slugify_url(url_slug)
         fields['url_slug'] = url_slug
-        canonical_url = (request.form.get(f'attorney_canonical_url_{emp_id}') or '').strip()
+        canonical_url = rewrite_public_url_for_current_host(
+            (request.form.get(f'attorney_canonical_url_{emp_id}') or '').strip()
+        )
         if not canonical_url and url_slug:
             canonical_url = _default_firm_page_canonical(url_slug)
         fields['canonical_url'] = canonical_url
@@ -27632,19 +29756,19 @@ def _enrich_company_settings_with_site_meta(settings, connection=None):
     if not connection:
         return settings
     try:
-        if not table_exists('firm_page_seo'):
-            return settings
-        page_seo = _fetch_firm_page_seo_map(connection)
-        for page_key, row in page_seo.items():
-            prefix = f'seo_{page_key}_'
-            for field in ('meta_title', 'meta_description', 'h1_heading', 'url_slug', 'canonical_url'):
-                val = row.get(field)
-                if val is not None and str(val).strip():
-                    settings[f'{prefix}{field}'] = str(val).strip()
+        if table_exists('firm_page_seo'):
+            page_seo = _fetch_firm_page_seo_map(connection)
+            for page_key, row in page_seo.items():
+                prefix = f'seo_{page_key}_'
+                for field in ('meta_title', 'meta_description', 'h1_heading', 'url_slug', 'canonical_url'):
+                    val = row.get(field)
+                    if val is not None and str(val).strip():
+                        settings[f'{prefix}{field}'] = str(val).strip()
         if table_exists('firm_image_alt'):
             alts = _fetch_firm_image_alt_map(connection)
             alt_field_map = {
                 'company_logo': 'company_logo_alt',
+                'company_main_image': 'company_main_image_alt',
                 'favicon': 'favicon_alt',
                 'login_page_background': 'login_page_background_alt',
             }
@@ -27665,7 +29789,8 @@ def _firm_absolute_public_url(path_or_url):
     if not text:
         return None
     if text.startswith('http://') or text.startswith('https://'):
-        return text
+        rewritten = rewrite_public_url_for_current_host(text)
+        return rewritten or text
     base = get_public_base_url().rstrip('/')
     if not base:
         return text
@@ -27680,7 +29805,8 @@ def _firm_absolute_asset_url(stored_value):
         return None
     text = str(stored_value).strip()
     if text.startswith('http://') or text.startswith('https://'):
-        return text
+        rewritten = rewrite_public_url_for_current_host(text)
+        return rewritten or text
     filename = company_asset_basename(text)
     if not filename:
         return None
@@ -27766,8 +29892,14 @@ def _build_firm_website_jsonld_scripts(
     attorney_education = attorney_education or {}
     page_seo = page_seo or seo_home
     base = get_public_base_url().rstrip('/')
-    canonical = (seo_home.get('canonical_url') or '').strip() or (f'{base}/' if base else '')
-    page_canonical = (page_seo.get('canonical_url') or '').strip() or canonical
+    canonical = resolve_public_canonical_url(
+        seo_home.get('canonical_url'),
+        '',
+    ) or (f'{base}/' if base else '')
+    page_canonical = resolve_public_canonical_url(
+        page_seo.get('canonical_url'),
+        '',
+    ) or canonical
     org_id = f'{canonical}#legalservice' if canonical else None
     scripts = []
 
@@ -27929,24 +30061,48 @@ def _build_firm_website_jsonld_scripts(
     return scripts
 
 
-def _save_firm_page_seo_from_form(cursor, request, page_keys):
-    """Persist home/about SEO rows from the company settings form."""
+def _save_firm_page_seo_from_form(cursor, request, page_keys, firm_context=None):
+    """Persist home/about SEO rows from the company settings form.
+
+    Meta title/description auto-fill from H1 / mission / tagline when empty.
+    Canonical URLs are always system-generated (CMS v2).
+    """
     if not table_exists('firm_page_seo'):
         return 0
+    firm_context = firm_context or {}
+    firm_name = (
+        (request.form.get('company_name') or '').strip()
+        or (firm_context.get('company_name') or '').strip()
+    )
+    mission = (
+        (request.form.get('mission_statement') or '').strip()
+        or (firm_context.get('mission_statement') or '').strip()
+    )
+    tagline = (
+        (request.form.get('company_tagline') or '').strip()
+        or (firm_context.get('company_tagline') or '').strip()
+    )
     saved = 0
     for page_key in page_keys:
         prefix = f'seo_{page_key}_'
+        h1_heading = (request.form.get(f'{prefix}h1_heading') or '').strip()
+        if not h1_heading:
+            h1_heading = firm_name if page_key == 'home' else 'About Us'
         meta_title = (request.form.get(f'{prefix}meta_title') or '').strip()[:70]
         meta_description = (request.form.get(f'{prefix}meta_description') or '').strip()[:160]
-        h1_heading = (request.form.get(f'{prefix}h1_heading') or '').strip()
+        if not meta_title:
+            meta_title = _auto_firm_meta_title(h1_heading, firm_name)
+        if not meta_description:
+            meta_description = _auto_firm_meta_description(mission, tagline, firm_name)
+            if page_key == 'about' and not meta_description:
+                meta_description = 'Learn more about our firm, our mission, and our values.'
         url_slug = (request.form.get(f'{prefix}url_slug') or '').strip()
-        canonical_url = (request.form.get(f'{prefix}canonical_url') or '').strip()
-        if page_key == 'home' and not canonical_url:
+        if page_key == 'home':
+            url_slug = 'home'
             canonical_url = _default_firm_page_canonical()
-        if page_key == 'about':
-            slug = url_slug or 'about'
-            if not canonical_url:
-                canonical_url = _default_firm_page_canonical(slug)
+        else:
+            url_slug = url_slug or 'about'
+            canonical_url = _default_firm_page_canonical(url_slug)
         if not any((meta_title, meta_description, h1_heading, url_slug, canonical_url)):
             cursor.execute("DELETE FROM firm_page_seo WHERE page_key = %s", (page_key,))
             saved += 1
@@ -28042,7 +30198,9 @@ def _save_firm_practice_areas_from_form(cursor, request, upload_folder=None):
                 url_slug = f'{base_slug}-{n}'
                 n += 1
             used_slugs.add(url_slug)
-        canonical_url = (request.form.get(f'practice_area_canonical_url_{idx}') or '').strip()
+        canonical_url = rewrite_public_url_for_current_host(
+            (request.form.get(f'practice_area_canonical_url_{idx}') or '').strip()
+        )
         if not canonical_url and url_slug:
             canonical_url = _default_firm_page_canonical(f'practice-areas/{url_slug}')
         cta_label = (request.form.get(f'practice_area_cta_label_{idx}') or '').strip()[:120]
@@ -28580,7 +30738,8 @@ def _save_firm_testimonials_from_form(cursor, request):
 def _fetch_firm_faqs(connection):
     with connection.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
-            SELECT id, question, answer, publish_confirmed, sort_order, updated_at
+            SELECT id, question, answer, publish_confirmed, practice_area_ids,
+                   sort_order, updated_at
             FROM firm_faqs
             ORDER BY sort_order ASC, id ASC
         """)
@@ -28590,7 +30749,7 @@ def _fetch_firm_faqs(connection):
 def _fetch_published_firm_faqs(connection):
     with connection.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
-            SELECT id, question, answer, sort_order
+            SELECT id, question, answer, practice_area_ids, sort_order
             FROM firm_faqs
             WHERE publish_confirmed = 1
             ORDER BY sort_order ASC, id ASC
@@ -28618,6 +30777,8 @@ def _save_firm_faqs_from_form(cursor, request):
         if not question or not answer:
             continue
         publish = 1 if request.form.get(f'faq_publish_{idx}') == 'on' else 0
+        pa_ids = request.form.getlist(f'faq_practice_areas_{idx}')
+        pa_ids_clean = ','.join(x.strip() for x in pa_ids if str(x).strip().isdigit())
         faq_id_raw = (request.form.get(f'faq_id_{idx}') or '').strip()
         if faq_id_raw.isdigit():
             faq_id = int(faq_id_raw)
@@ -28625,16 +30786,18 @@ def _save_firm_faqs_from_form(cursor, request):
             if cursor.fetchone():
                 cursor.execute("""
                     UPDATE firm_faqs
-                    SET question = %s, answer = %s, publish_confirmed = %s, sort_order = %s
+                    SET question = %s, answer = %s, publish_confirmed = %s,
+                        practice_area_ids = %s, sort_order = %s
                     WHERE id = %s
-                """, (question, answer, publish, sort_order, faq_id))
+                """, (question, answer, publish, pa_ids_clean or None, sort_order, faq_id))
                 keep_ids.append(faq_id)
                 sort_order += 1
                 continue
         cursor.execute("""
-            INSERT INTO firm_faqs (question, answer, publish_confirmed, sort_order)
-            VALUES (%s, %s, %s, %s)
-        """, (question, answer, publish, sort_order))
+            INSERT INTO firm_faqs
+            (question, answer, publish_confirmed, practice_area_ids, sort_order)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (question, answer, publish, pa_ids_clean or None, sort_order))
         keep_ids.append(cursor.lastrowid)
         sort_order += 1
     if keep_ids:
@@ -28654,7 +30817,8 @@ def _fetch_published_blog_posts(connection):
     with connection.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
             SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.author_employee_id,
-                   p.updated_at, e.full_name AS author_name, e.url_slug AS author_slug
+                   p.image_path, p.image_alt, p.updated_at,
+                   e.full_name AS author_name, e.url_slug AS author_slug
             FROM firm_blog_posts p
             LEFT JOIN employees e ON e.id = p.author_employee_id
             WHERE p.published = 1
@@ -28664,6 +30828,8 @@ def _fetch_published_blog_posts(connection):
         for row in rows:
             if row.get('updated_at'):
                 row['last_updated_display'] = _format_public_last_updated(row['updated_at'])
+            if row.get('image_path'):
+                row['image_url'] = _firm_public_asset_url(row['image_path'])
         return rows
 
 
@@ -28673,7 +30839,8 @@ def _fetch_blog_post_by_slug(connection, slug):
     with connection.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
             SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.author_employee_id,
-                   p.updated_at, e.full_name AS author_name, e.url_slug AS author_slug,
+                   p.image_path, p.image_alt, p.updated_at,
+                   e.full_name AS author_name, e.url_slug AS author_slug,
                    e.meta_title AS author_meta_title
             FROM firm_blog_posts p
             LEFT JOIN employees e ON e.id = p.author_employee_id
@@ -28683,6 +30850,8 @@ def _fetch_blog_post_by_slug(connection, slug):
         row = cursor.fetchone()
         if row and row.get('updated_at'):
             row['last_updated_display'] = _format_public_last_updated(row['updated_at'])
+        if row and row.get('image_path'):
+            row['image_url'] = _firm_public_asset_url(row['image_path'])
         return row
 
 
@@ -28715,7 +30884,8 @@ def _fetch_firm_blog_posts(connection):
     with connection.cursor(pymysql.cursors.DictCursor) as cursor:
         cursor.execute("""
             SELECT p.id, p.title, p.slug, p.excerpt, p.body, p.author_employee_id,
-                   p.published, p.updated_at, e.full_name AS author_name
+                   p.published, p.last_reviewed_at, p.meta_title, p.meta_description,
+                   p.image_path, p.image_alt, p.updated_at, e.full_name AS author_name
             FROM firm_blog_posts p
             LEFT JOIN employees e ON e.id = p.author_employee_id
             ORDER BY p.updated_at DESC, p.id DESC
@@ -28733,7 +30903,7 @@ def _blog_form_indices(request):
     return sorted(indices)
 
 
-def _save_firm_blog_posts_from_form(cursor, request):
+def _save_firm_blog_posts_from_form(cursor, request, upload_folder=None):
     if not table_exists('firm_blog_posts'):
         return 0
     indices = _blog_form_indices(request)
@@ -28749,7 +30919,51 @@ def _save_firm_blog_posts_from_form(cursor, request):
         published = 1 if request.form.get(f'blog_published_{idx}') == 'on' else 0
         author_raw = (request.form.get(f'blog_author_{idx}') or '').strip()
         author_id = int(author_raw) if author_raw.isdigit() else None
+        if published and not author_id:
+            # CMS v2: published posts require an attorney author for E-E-A-T.
+            continue
+        last_reviewed = (request.form.get(f'blog_last_reviewed_{idx}') or '').strip() or None
+        meta_title = (request.form.get(f'blog_meta_title_{idx}') or '').strip()[:70]
+        meta_description = (request.form.get(f'blog_meta_description_{idx}') or '').strip()[:160]
+        image_alt = (request.form.get(f'blog_image_alt_{idx}') or '').strip()
+        if not meta_title:
+            meta_title = title[:70]
+        if not meta_description:
+            meta_description = _text_excerpt(excerpt or body, 155)
+        if published and not last_reviewed:
+            from datetime import date as _date
+            last_reviewed = _date.today().isoformat()
         post_id_raw = (request.form.get(f'blog_id_{idx}') or '').strip()
+        existing_image_path = None
+        if post_id_raw.isdigit():
+            post_id = int(post_id_raw)
+            cursor.execute(
+                "SELECT id, image_path FROM firm_blog_posts WHERE id = %s",
+                (post_id,),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                existing_image_path = existing.get('image_path')
+        image_path = existing_image_path
+        if upload_folder:
+            f = request.files.get(f'blog_image_{idx}')
+            if f and f.filename and allowed_file(f.filename):
+                filename = secure_filename(f.filename)
+                ext = filename.rsplit('.', 1)[1].lower()
+                token = post_id_raw if post_id_raw.isdigit() else secrets.token_hex(4)
+                unique = f"blog_{token}_{secrets.token_hex(6)}.{ext}"
+                path = os.path.join(upload_folder, unique)
+                f.save(path)
+                if existing_image_path:
+                    old_path = os.path.join(upload_folder, os.path.basename(existing_image_path))
+                    if os.path.isfile(old_path):
+                        try:
+                            os.remove(old_path)
+                        except OSError:
+                            pass
+                image_path = unique
+                if not image_alt:
+                    image_alt = f'{title} cover image'
         if post_id_raw.isdigit():
             post_id = int(post_id_raw)
             cursor.execute("SELECT id FROM firm_blog_posts WHERE id = %s", (post_id,))
@@ -28757,16 +30971,26 @@ def _save_firm_blog_posts_from_form(cursor, request):
                 cursor.execute("""
                     UPDATE firm_blog_posts
                     SET title = %s, slug = %s, excerpt = %s, body = %s,
-                        author_employee_id = %s, published = %s
+                        author_employee_id = %s, published = %s,
+                        last_reviewed_at = %s, meta_title = %s, meta_description = %s,
+                        image_path = %s, image_alt = %s
                     WHERE id = %s
-                """, (title, slug, excerpt, body, author_id, published, post_id))
+                """, (
+                    title, slug, excerpt, body, author_id, published,
+                    last_reviewed, meta_title, meta_description,
+                    image_path, image_alt, post_id,
+                ))
                 keep_ids.append(post_id)
                 continue
         cursor.execute("""
             INSERT INTO firm_blog_posts
-            (title, slug, excerpt, body, author_employee_id, published)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (title, slug, excerpt, body, author_id, published))
+            (title, slug, excerpt, body, author_employee_id, published,
+             last_reviewed_at, meta_title, meta_description, image_path, image_alt)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            title, slug, excerpt, body, author_id, published,
+            last_reviewed, meta_title, meta_description, image_path, image_alt,
+        ))
         keep_ids.append(cursor.lastrowid)
     if keep_ids:
         placeholders = ','.join(['%s'] * len(keep_ids))
@@ -28779,14 +31003,23 @@ def _save_firm_blog_posts_from_form(cursor, request):
     return len(keep_ids)
 
 
-def _save_firm_careers_from_form(cursor, request):
+def _save_firm_careers_from_form(cursor, request, firm_context=None):
     """Persist careers page body content in firm_page_seo."""
     if not table_exists('firm_page_seo'):
         return 0
+    firm_context = firm_context or {}
+    firm_name = (
+        (request.form.get('company_name') or '').strip()
+        or (firm_context.get('company_name') or '').strip()
+    )
     body = (request.form.get('seo_careers_body_content') or '').strip()
+    h1 = (request.form.get('seo_careers_h1_heading') or '').strip() or 'Careers'
     meta_title = (request.form.get('seo_careers_meta_title') or '').strip()[:70]
     meta_description = (request.form.get('seo_careers_meta_description') or '').strip()[:160]
-    h1 = (request.form.get('seo_careers_h1_heading') or '').strip() or 'Careers'
+    if body and not meta_title:
+        meta_title = _auto_firm_meta_title(h1, firm_name)
+    if body and not meta_description:
+        meta_description = _text_excerpt(body, 155)
     if not body and not meta_title and not meta_description:
         cursor.execute("DELETE FROM firm_page_seo WHERE page_key = 'careers'")
         return 1
@@ -28837,7 +31070,7 @@ def company_information():
     if deny:
         return deny
     company_settings = _enrich_company_settings_with_site_meta(
-        get_company_settings() or {'company_name': 'BAUNI LAW GROUP'}
+        get_company_settings() or {'company_name': 'SHERIA LAW FIRM'}
     )
     template_kwargs = dict(
         company_settings=company_settings,
@@ -28872,6 +31105,19 @@ def company_information():
         featured_raw[i].strip() if i < len(featured_raw) else ''
         for i in range(3)
     ]
+    template_kwargs['core_values_items'] = _parse_firm_core_values(
+        company_settings.get('core_values')
+    )
+    all_offices = _parse_firm_offices(company_settings)
+    template_kwargs['firm_offices_extra'] = [
+        o for o in all_offices if not o.get('is_primary')
+    ]
+    gallery_items = _parse_firm_hero_gallery(
+        company_settings.get('company_hero_gallery')
+    )
+    for item in gallery_items:
+        item['static_path'] = company_asset_static_path(item.get('file'))
+    template_kwargs['firm_hero_gallery_items'] = gallery_items
     return render_template('system_settings_page.html', **template_kwargs)
 
 
@@ -28883,7 +31129,7 @@ def website_templates_settings():
         return deny
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     company_settings = _enrich_company_settings_with_site_meta(company_settings)
     template_kwargs = dict(
         company_settings=company_settings,
@@ -28960,7 +31206,7 @@ def system_settings_section(section):
         return redirect(url_for('system_settings_section', section='contact'))
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     company_settings = _enrich_company_settings_with_site_meta(company_settings)
     template_kwargs = dict(
         company_settings=company_settings,
@@ -29021,6 +31267,13 @@ def system_settings_section(section):
                 attorney_education = _fetch_attorney_education_by_employee(emp_conn)
             finally:
                 emp_conn.close()
+        # Show canonicals against the current host (rewrite saved localhost URLs).
+        for pa in firm_practice_areas:
+            if pa.get('canonical_url'):
+                pa['canonical_url'] = rewrite_public_url_for_current_host(pa.get('canonical_url'))
+        for emp in firm_employees:
+            if emp.get('canonical_url'):
+                emp['canonical_url'] = rewrite_public_url_for_current_host(emp.get('canonical_url'))
         template_kwargs['firm_employees'] = firm_employees
         template_kwargs['firm_practice_areas'] = firm_practice_areas
         template_kwargs['firm_case_outcomes'] = firm_case_outcomes
@@ -29059,7 +31312,7 @@ def system_settings_letterhead():
         return deny
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     return render_template(
         'system_settings/letterhead_settings.html',
         company_settings=company_settings,
@@ -29078,7 +31331,7 @@ def system_settings_asset_scan(asset_kind):
         flash('Unknown document asset type.', 'error')
         return redirect(url_for('system_settings_section', section='documents'))
 
-    company_settings = get_company_settings() or {'company_name': 'BAUNI LAW GROUP'}
+    company_settings = get_company_settings() or {'company_name': 'SHERIA LAW FIRM'}
     field = asset_meta['field']
     upload_folder = app.config['UPLOAD_FOLDER']
 
@@ -29568,11 +31821,31 @@ def update_company_settings():
                 f = request.files.get(file_key)
                 if not f or not f.filename:
                     return None
+                remove_bg = False
+                if file_key == 'company_main_image':
+                    bg_mode = (request.form.get('company_main_image_bg_mode') or '').strip().lower()
+                    remove_bg = (
+                        bg_mode == 'remove'
+                        or request.form.get('company_main_image_remove_bg') == '1'
+                    )
+                return save_upload_file(
+                    f,
+                    prefix,
+                    resize_hero=(file_key in (
+                        'company_main_image', 'company_hero_gallery'
+                    )),
+                    process_logo=(file_key == 'company_logo'),
+                    remove_bg=remove_bg,
+                )
+
+            def save_upload_file(f, prefix, *, resize_hero=False, process_logo=False, remove_bg=False):
+                if not f or not getattr(f, 'filename', None):
+                    return None
                 filename = secure_filename(f.filename)
                 if not filename or not allowed_file(filename):
                     return None
                 # Special-case: normalize company logo to a compact, metadata-free PNG.
-                if file_key == 'company_logo':
+                if process_logo:
                     raw = f.read()
                     stream = BytesIO(raw)
                     processed, ext = process_logo_image(stream)
@@ -29587,6 +31860,45 @@ def update_company_settings():
                     f = stream
                     filename = secure_filename(filename)
 
+                # Keep homepage hero photos web-sized (avoid multi-MB uploads).
+                if resize_hero:
+                    try:
+                        raw = f.read()
+                        stream = BytesIO(raw)
+                        if remove_bg:
+                            processed, ext = process_firm_cutout_image(stream, max_size=1600)
+                            if processed and ext:
+                                unique = f"{prefix}_{pk}_{secrets.token_hex(4)}.{ext}"
+                                path = os.path.join(upload_folder, unique)
+                                with open(path, 'wb') as out:
+                                    out.write(processed.read())
+                                return unique
+                            stream.seek(0)
+                        img = Image.open(stream)
+                        if img.mode not in ('RGB', 'RGBA'):
+                            img = img.convert('RGBA' if 'A' in img.getbands() else 'RGB')
+                        img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                        out_buf = BytesIO()
+                        if img.mode == 'RGBA':
+                            img.save(out_buf, format='PNG', optimize=True)
+                            ext = 'png'
+                        else:
+                            if img.mode != 'RGB':
+                                img = img.convert('RGB')
+                            img.save(out_buf, format='JPEG', optimize=True, quality=88)
+                            ext = 'jpg'
+                        unique = f"{prefix}_{pk}_{secrets.token_hex(4)}.{ext}"
+                        path = os.path.join(upload_folder, unique)
+                        with open(path, 'wb') as out:
+                            out.write(out_buf.getvalue())
+                        return unique
+                    except Exception as hero_img_err:
+                        print(f"[hero_image] process failed, saving original: {hero_img_err}")
+                        try:
+                            f.seek(0)
+                        except Exception:
+                            f = BytesIO(raw)
+
                 ext = os.path.splitext(filename)[1].lower() or '.bin'
                 unique = f"{prefix}_{pk}_{secrets.token_hex(4)}{ext}"
                 path = os.path.join(upload_folder, unique)
@@ -29598,6 +31910,33 @@ def update_company_settings():
                     with open(path, 'wb') as out:
                         out.write(f.read())
                 return unique
+
+            def reprocess_stored_cutout(stored_value, prefix, *, as_logo=False):
+                """Re-run background removal on an already-saved company asset."""
+                basename = company_asset_basename(stored_value)
+                if not basename:
+                    return None
+                src_path = os.path.join(upload_folder, basename)
+                if not os.path.isfile(src_path):
+                    return None
+                try:
+                    with open(src_path, 'rb') as fh:
+                        raw = fh.read()
+                    stream = BytesIO(raw)
+                    if as_logo:
+                        processed, ext = process_logo_image(stream)
+                    else:
+                        processed, ext = process_firm_cutout_image(stream, max_size=1600)
+                    if not processed or not ext:
+                        return None
+                    unique = f"{prefix}_{pk}_{secrets.token_hex(4)}.{ext}"
+                    path = os.path.join(upload_folder, unique)
+                    with open(path, 'wb') as out:
+                        out.write(processed.read())
+                    return unique
+                except Exception as reprocess_err:
+                    print(f"[reprocess_stored_cutout] failed for {basename}: {reprocess_err}")
+                    return None
 
             def save_document_asset(file_key, col, prefix, *, letterhead=False):
                 """Save letterhead, stamp, or signature with optional image processing."""
@@ -29663,13 +32002,19 @@ def update_company_settings():
                 'opening_time', 'closing_time', 'public_holiday_status', 'public_holiday_open_time', 'public_holiday_close_time',
                 'website_url', 'fb_link', 'linkedin_link', 'twitter_link', 'instagram_link',
                 'law_society_reg_number', 'practicing_certificate_number', 'lead_advocate_name', 'bar_association_membership',
+                'jurisdictions_admitted', 'malpractice_insurance_detail', 'disciplinary_record_statement',
                 'privacy_policy', 'terms_of_service', 'data_protection_registration_number', 'website_disclaimer',
+                'cookie_consent_message', 'accessibility_statement',
+                'ga4_measurement_id', 'gtm_container_id', 'meta_pixel_id',
+                'company_tagline_sw', 'mission_statement_sw', 'firm_history_sw',
+                'homepage_hero_tagline_sw', 'core_values_sw',
                 'awards_rankings', 'years_collective_experience', 'cases_handled_count',
                 'homepage_hero_tagline', 'homepage_cta_label', 'homepage_cta_url',
                 'homepage_header_phone', 'homepage_video_url',
                 'default_consultation_fee', 'consultation_response_time',
                 'document_footer_text', 'currency', 'invoice_prefix', 'payment_terms', 'bank_account_details', 'mobile_payment_mpesa',
-                'primary_brand_color', 'secondary_color', 'tertiary_color', 'theme_preset', 'font_family', 'font_size'
+                'primary_brand_color', 'secondary_color', 'tertiary_color', 'theme_preset', 'font_family', 'font_size',
+                'login_page_background_alt'
             ]
             for key in text_fields:
                 val = request.form.get(key)
@@ -29677,9 +32022,14 @@ def update_company_settings():
                     updates[key] = val.strip() if isinstance(val, str) else val
             page_seo_updated = 0
             image_alt_updated = 0
+            careers_updated = 0
             if settings_section == 'company':
-                page_seo_updated = _save_firm_page_seo_from_form(cursor, request, ('home', 'about'))
-                careers_updated = _save_firm_careers_from_form(cursor, request)
+                page_seo_updated = _save_firm_page_seo_from_form(
+                    cursor, request, ('home', 'about'), firm_context=current_settings
+                )
+                careers_updated = _save_firm_careers_from_form(
+                    cursor, request, firm_context=current_settings
+                )
                 featured_ids = []
                 for slot in (1, 2, 3):
                     raw = (request.form.get(f'homepage_featured_pa_{slot}') or '').strip()
@@ -29689,16 +32039,114 @@ def update_company_settings():
                 for key in (
                     'homepage_show_trust_lsk', 'homepage_show_trust_years',
                     'homepage_show_trust_cases', 'default_free_consultation',
+                    'swahili_enabled',
                 ):
                     updates[key] = 1 if request.form.get(key) == 'on' else 0
-                image_alt_updated = _save_firm_image_alt_from_form(
-                    cursor, request, {'company_logo': 'company_logo_alt'}
+                core_values_serialized = _serialize_core_values_from_form(request)
+                if core_values_serialized is not None:
+                    updates['core_values'] = core_values_serialized
+                # Additional offices repeater → JSON (keep textarea in sync for legacy)
+                if any(k.startswith('office_label_') for k in request.form):
+                    updates['firm_offices_json'] = _serialize_firm_offices_from_form(request)
+                    try:
+                        import json as _json
+                        offices = _json.loads(updates['firm_offices_json'] or '[]')
+                        updates['additional_office_locations'] = '\n'.join(
+                            f"{o.get('label') or 'Office'} — {o.get('street') or ''} {o.get('city') or ''}".strip()
+                            for o in offices
+                        )
+                    except Exception:
+                        pass
+                firm_name_for_alt = (
+                    (updates.get('company_name') or current_settings.get('company_name') or '')
+                ).strip()
+                logo_alt = (request.form.get('company_logo_alt') or '').strip()
+                if not logo_alt:
+                    logo_alt = _default_logo_alt_text(firm_name_for_alt)
+                main_alt = (request.form.get('company_main_image_alt') or '').strip()
+                if not main_alt:
+                    main_alt = f'{firm_name_for_alt or "Firm"} main image'
+                if table_exists('firm_image_alt'):
+                    cursor.execute("""
+                        INSERT INTO firm_image_alt (asset_key, alt_text)
+                        VALUES ('company_logo', %s)
+                        ON DUPLICATE KEY UPDATE alt_text = VALUES(alt_text)
+                    """, (logo_alt,))
+                    cursor.execute("""
+                        INSERT INTO firm_image_alt (asset_key, alt_text)
+                        VALUES ('company_main_image', %s)
+                        ON DUPLICATE KEY UPDATE alt_text = VALUES(alt_text)
+                    """, (main_alt,))
+                    image_alt_updated = 1
+                else:
+                    image_alt_updated = _save_firm_image_alt_from_form(
+                        cursor, request, {
+                            'company_logo': 'company_logo_alt',
+                            'company_main_image': 'company_main_image_alt',
+                        }
+                    )
+            if settings_section == 'legal':
+                lead_emp = (request.form.get('lead_advocate_employee_id') or '').strip()
+                if lead_emp.isdigit():
+                    updates['lead_advocate_employee_id'] = int(lead_emp)
+                    cursor.execute(
+                        "SELECT full_name FROM employees WHERE id = %s", (int(lead_emp),)
+                    )
+                    row = cursor.fetchone()
+                    if row and row.get('full_name'):
+                        updates['lead_advocate_name'] = row['full_name']
+                elif request.form.get('lead_advocate_employee_id') is not None:
+                    updates['lead_advocate_employee_id'] = None
+                updates['malpractice_insurance_status'] = (
+                    1 if request.form.get('malpractice_insurance_status') == 'on' else 0
                 )
+                updates['cookie_consent_enabled'] = (
+                    1 if request.form.get('cookie_consent_enabled') == 'on' else 0
+                )
+                updates['accessibility_statement_enabled'] = (
+                    1 if request.form.get('accessibility_statement_enabled') == 'on' else 0
+                )
+                # One-click Kenya policy templates
+                if request.form.get('apply_privacy_template') == '1' and not (
+                    request.form.get('privacy_policy') or ''
+                ).strip():
+                    updates['privacy_policy'] = KENYA_POLICY_TEMPLATES['privacy']
+                if request.form.get('apply_terms_template') == '1' and not (
+                    request.form.get('terms_of_service') or ''
+                ).strip():
+                    updates['terms_of_service'] = KENYA_POLICY_TEMPLATES['terms']
+                if request.form.get('apply_disclaimer_template') == '1' and not (
+                    request.form.get('website_disclaimer') or ''
+                ).strip():
+                    updates['website_disclaimer'] = KENYA_POLICY_TEMPLATES['disclaimer']
+                if request.form.get('apply_accessibility_template') == '1':
+                    updates['accessibility_statement'] = KENYA_POLICY_TEMPLATES['accessibility']
+                    updates['accessibility_statement_enabled'] = 1
+                if request.form.get('apply_cookie_template') == '1':
+                    updates['cookie_consent_message'] = KENYA_POLICY_TEMPLATES['cookie']
+                    updates['cookie_consent_enabled'] = 1
             if settings_section == 'branding':
-                image_alt_updated = _save_firm_image_alt_from_form(cursor, request, {
-                    'favicon': 'favicon_alt',
+                firm_name_for_fav = (current_settings.get('company_name') or '').strip()
+                fav_alt = (request.form.get('favicon_alt') or '').strip() or f'{firm_name_for_fav or "Site"} favicon'
+                bg_alt_saved = _save_firm_image_alt_from_form(cursor, request, {
                     'login_page_background': 'login_page_background_alt',
                 })
+                if table_exists('firm_image_alt'):
+                    cursor.execute("""
+                        INSERT INTO firm_image_alt (asset_key, alt_text)
+                        VALUES ('favicon', %s)
+                        ON DUPLICATE KEY UPDATE alt_text = VALUES(alt_text)
+                    """, (fav_alt,))
+                    image_alt_updated = 1 + (bg_alt_saved or 0)
+                else:
+                    image_alt_updated = bg_alt_saved
+                # Analytics IDs are saved via text_fields; normalize GA4 format
+                ga4 = (updates.get('ga4_measurement_id') or '').strip().upper()
+                if ga4 and not ga4.startswith('G-'):
+                    # Keep as-entered but strip spaces
+                    updates['ga4_measurement_id'] = ga4.replace(' ', '')
+                else:
+                    updates['ga4_measurement_id'] = ga4.replace(' ', '') if ga4 else updates.get('ga4_measurement_id')
             if settings_section == 'branding':
                 if request.form.get('primary_brand_color') is not None:
                     updates['primary_brand_color'] = _normalize_hex_color(
@@ -29732,9 +32180,8 @@ def update_company_settings():
                 font_val = updates.get('font_family')
                 if font_val is not None and font_val not in allowed_fonts:
                     updates['font_family'] = 'Inter'
-                allowed_font_sizes = {'compact', 'comfortable', 'large', 'xl'}
                 font_size_val = updates.get('font_size')
-                if font_size_val is not None and font_size_val not in allowed_font_sizes:
+                if font_size_val is not None and font_size_val not in APP_FONT_SIZE_PRESETS:
                     updates['font_size'] = 'comfortable'
             if settings_section == 'contact':
                 wd = request.form.getlist('working_days')
@@ -29833,6 +32280,99 @@ def update_company_settings():
                 if saved:
                     _delete_stored_asset(current_settings.get('company_logo'))
                     updates['company_logo'] = saved
+                    # CMS v2: auto-copy logo to favicon when no favicon is set yet.
+                    has_favicon = bool(
+                        (updates.get('favicon') or current_settings.get('favicon') or '').strip()
+                    )
+                    if not has_favicon:
+                        src = os.path.join(upload_folder, saved)
+                        if os.path.isfile(src):
+                            fav_name = f"favicon_{pk}_{secrets.token_hex(4)}{os.path.splitext(saved)[1]}"
+                            try:
+                                import shutil
+                                shutil.copy2(src, os.path.join(upload_folder, fav_name))
+                                updates['favicon'] = fav_name
+                                firm_name_for_fav = (
+                                    (updates.get('company_name') or current_settings.get('company_name') or '')
+                                ).strip()
+                                if table_exists('firm_image_alt'):
+                                    cursor.execute("""
+                                        INSERT INTO firm_image_alt (asset_key, alt_text)
+                                        VALUES ('favicon', %s)
+                                        ON DUPLICATE KEY UPDATE alt_text = VALUES(alt_text)
+                                    """, (f'{firm_name_for_fav or "Site"} favicon',))
+                                    image_alt_updated = max(image_alt_updated, 1)
+                            except OSError as err:
+                                print(f"Could not auto-create favicon from logo: {err}")
+                elif request.form.get('cutout_company_logo') == '1':
+                    logo_cut = reprocess_stored_cutout(
+                        current_settings.get('company_logo'),
+                        'company_logo',
+                        as_logo=True,
+                    )
+                    if logo_cut:
+                        _delete_stored_asset(current_settings.get('company_logo'))
+                        updates['company_logo'] = logo_cut
+
+                main_bg_mode = (request.form.get('company_main_image_bg_mode') or 'keep').strip().lower()
+                main_remove_bg = (
+                    main_bg_mode == 'remove'
+                    or request.form.get('company_main_image_remove_bg') == '1'
+                )
+                main_uploads = [
+                    f for f in (request.files.getlist('company_main_image') or [])
+                    if f and getattr(f, 'filename', None)
+                ]
+
+                current_main = (
+                    updates.get('company_main_image')
+                    if 'company_main_image' in updates
+                    else current_settings.get('company_main_image')
+                )
+                if request.form.get('remove_company_main_image') == '1':
+                    _delete_stored_asset(current_main)
+                    updates['company_main_image'] = ''
+                    current_main = ''
+                elif (
+                    request.form.get('cutout_company_main_image') == '1'
+                    and current_main
+                    and not main_uploads
+                ):
+                    main_cut = reprocess_stored_cutout(current_main, 'company_main')
+                    if main_cut:
+                        _delete_stored_asset(current_main)
+                        updates['company_main_image'] = main_cut
+                        current_main = main_cut
+
+                # Single main firm image for the homepage hero (replaces previous).
+                if main_uploads:
+                    saved_main = save_upload_file(
+                        main_uploads[0],
+                        'company_main',
+                        resize_hero=True,
+                        remove_bg=main_remove_bg,
+                    )
+                    if saved_main:
+                        if current_main:
+                            _delete_stored_asset(current_main)
+                        updates['company_main_image'] = saved_main
+                        current_main = saved_main
+
+                # Clear legacy hero gallery so the homepage never builds a slideshow.
+                legacy_gallery = _parse_firm_hero_gallery(
+                    current_settings.get('company_hero_gallery')
+                )
+                if legacy_gallery or (current_settings.get('company_hero_gallery') or '').strip():
+                    for item in legacy_gallery:
+                        _delete_stored_asset(item.get('file'))
+                    if not column_exists('company_settings', 'company_hero_gallery'):
+                        try:
+                            cursor.execute(
+                                "ALTER TABLE company_settings ADD COLUMN company_hero_gallery TEXT"
+                            )
+                        except Exception as gallery_col_err:
+                            print(f"[company_hero_gallery] add column failed: {gallery_col_err}")
+                    updates['company_hero_gallery'] = ''
             if settings_section == 'branding':
                 for file_key, col, prefix in [
                     ('favicon', 'favicon', 'favicon'),
@@ -29842,6 +32382,14 @@ def update_company_settings():
                     if saved:
                         _delete_stored_asset(current_settings.get(col))
                         updates[col] = saved
+                        if file_key == 'favicon' and table_exists('firm_image_alt'):
+                            firm_name_for_fav = (current_settings.get('company_name') or '').strip()
+                            cursor.execute("""
+                                INSERT INTO firm_image_alt (asset_key, alt_text)
+                                VALUES ('favicon', %s)
+                                ON DUPLICATE KEY UPDATE alt_text = VALUES(alt_text)
+                            """, (f'{firm_name_for_fav or "Site"} favicon',))
+                            image_alt_updated = max(image_alt_updated, 1)
             attorney_profiles_updated = 0
             practice_areas_updated = 0
             attorney_notable_cases_updated = 0
@@ -29851,7 +32399,6 @@ def update_company_settings():
             education_updated = 0
             faqs_updated = 0
             blog_posts_updated = 0
-            careers_updated = 0
             testimonials_updated = 0
             if settings_section == 'legal':
                 attorney_profiles_updated = _save_attorney_directory_profiles(
@@ -29866,7 +32413,7 @@ def update_company_settings():
                 media_mentions_updated = _save_firm_media_mentions_from_form(cursor, request)
                 awards_updated = _save_firm_awards_from_form(cursor, request)
                 faqs_updated = _save_firm_faqs_from_form(cursor, request)
-                blog_posts_updated = _save_firm_blog_posts_from_form(cursor, request)
+                blog_posts_updated = _save_firm_blog_posts_from_form(cursor, request, upload_folder)
             if settings_section == 'contact':
                 testimonials_updated = _save_firm_testimonials_from_form(cursor, request)
                 sec_cats = _collect_repeatable_form_values(request, 'gbp_secondary_category_')
@@ -29925,7 +32472,7 @@ def other_matters():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     
     can_approve_matters = (
         user_role in ['Firm Administrator', 'Managing Partner', 'IT Support']
@@ -29956,7 +32503,7 @@ def matter_task_management():
 
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
     connection = get_db_connection()
     if not connection:
         flash('Database connection error.', 'error')
@@ -30164,7 +32711,7 @@ def approve_matters():
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('approve_matters.html', matters=matters, company_settings=company_settings)
     except Exception as e:
@@ -30956,7 +33503,7 @@ def register_matter():
     
     company_settings = get_company_settings()
     if not company_settings:
-        company_settings = {'company_name': 'BAUNI LAW GROUP'}
+        company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
     matter_category_options = []
     connection = get_db_connection()
@@ -31066,7 +33613,7 @@ def matter_details(matter_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             # Documents and Google Drive (only when not pending accept)
             google_drive_connected = False
@@ -31347,7 +33894,7 @@ def matter_documents(matter_id):
 
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('matter_documents.html',
                                  matter_data=matter_data,
@@ -31440,7 +33987,7 @@ def matter_edit(matter_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('matter_edit.html', 
                                  matter_data=matter_data, 
@@ -31492,7 +34039,7 @@ def matter_status(matter_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('matter_status.html', 
                                  matter_data=matter_data, 
@@ -31543,7 +34090,7 @@ def matter_allocate(matter_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('matter_allocate.html', 
                                  matter_data=matter_data, 
@@ -31643,7 +34190,7 @@ def matter_audit_progress(matter_id):
             
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
             
             return render_template('matter_audit_progress.html', 
                                  matter_data=matter_data, 
@@ -31770,7 +34317,7 @@ def matter_attendances(matter_id):
 
             company_settings = get_company_settings()
             if not company_settings:
-                company_settings = {'company_name': 'BAUNI LAW GROUP'}
+                company_settings = {'company_name': 'SHERIA LAW FIRM'}
 
             return render_template(
                 'matter_attendances.html',
@@ -32487,6 +35034,12 @@ try:
     init_database()
 except Exception as e:
     print(f"[WARNING] Database initialization failed (may be first run or DB not configured): {e}")
+
+# Ensure one-shot firm seed is scheduled even if init_database returned early
+try:
+    _schedule_firm_defaults_seed_background()
+except Exception as e:
+    print(f"[WARNING] Could not schedule firm defaults seed: {e}")
 
 try:
     start_push_notification_worker()

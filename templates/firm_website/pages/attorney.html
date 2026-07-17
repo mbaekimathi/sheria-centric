@@ -3,82 +3,311 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
-  <div class="container firm-attorney-hero firm-reveal">
-  {% if attorney.profile_picture_url %}
-  <div class="firm-attorney-photo">
-    <img src="{{ attorney.profile_picture_url }}" alt="{{ attorney.profile_picture_alt or attorney.full_name }}" loading="eager" width="200" height="200">
+{% set atty_name = page_seo.h1_heading or attorney.full_name %}
+{% set atty_role = attorney.professional_title or attorney.team_role_label or attorney.role or 'Attorney' %}
+{% set areas_raw = (attorney.practice_areas or '').replace('\n', ',') %}
+{% set area_parts = areas_raw.split(',') if areas_raw else [] %}
+{% set pub_email = attorney.public_contact_email or attorney.work_email or '' %}
+{% set pub_phone = attorney.public_contact_phone or attorney.phone_number or '' %}
+{% set linkedin = attorney.linkedin_profile_url or '' %}
+{% set education = attorney_education.get(attorney.id, []) if attorney_education else [] %}
+{% set cases = attorney_notable_cases.get(attorney.id, []) if attorney_notable_cases else [] %}
+{% set first_name = attorney.full_name.split(' ')[0] if attorney.full_name else 'them' %}
+{% set other_attorneys = (attorneys or []) | rejectattr('id', 'equalto', attorney.id) | list %}
+
+<section class="firm-atty" aria-labelledby="atty-heading">
+  <div class="firm-atty-atmosphere" aria-hidden="true">
+    <span class="firm-atty-glow"></span>
+    <span class="firm-atty-orb"></span>
+    <span class="firm-atty-mesh"></span>
   </div>
-  {% endif %}
-  <div>
-    <p class="firm-eyebrow">Our team</p>
-    <h1>{{ page_seo.h1_heading or attorney.full_name }}</h1>
-    <p class="firm-page-lead">{{ attorney.professional_title or attorney.role or 'Attorney' }}</p>
-    {% if attorney.practice_areas %}
-    <p class="firm-attorney-areas">{{ attorney.practice_areas.replace('\n', ' · ') }}</p>
-      {% endif %}
+
+  <div class="container">
+    <div class="firm-atty-hero">
+      <div class="firm-atty-visual firm-reveal">
+        <div class="firm-atty-portrait">
+          {% if attorney.profile_picture_url %}
+          <img src="{{ attorney.profile_picture_url }}" alt="{{ attorney.profile_picture_alt or attorney.full_name }}" loading="eager" width="520" height="650">
+          {% else %}
+          <span class="firm-atty-fallback" aria-hidden="true">{{ (attorney.full_name or '?')[:1] | upper }}</span>
+          {% endif %}
+          <span class="firm-atty-portrait-shade" aria-hidden="true"></span>
+        </div>
+        <span class="firm-atty-frame" aria-hidden="true"></span>
+        <span class="firm-atty-corner" aria-hidden="true"></span>
+      </div>
+
+      <div class="firm-atty-intro firm-reveal" style="--reveal-delay: 90ms">
+        <p class="firm-eyebrow">Our team{% if attorney.team_role_label %} · {{ attorney.team_role_label }}{% endif %}</p>
+        <h1 id="atty-heading" class="firm-atty-name">{{ atty_name }}</h1>
+        <p class="firm-atty-role">{{ atty_role }}</p>
+
+        {% if attorney.year_called_to_bar or attorney.bar_admission_date or attorney.lsk_practicing_certificate_number %}
+        <ul class="firm-atty-signals" aria-label="Credentials">
+          {% if attorney.year_called_to_bar %}
+          <li><i class="fas fa-gavel" aria-hidden="true"></i> Called to the Bar · {{ attorney.year_called_to_bar }}</li>
+          {% elif attorney.bar_admission_date %}
+          <li><i class="fas fa-gavel" aria-hidden="true"></i> Bar admission · {{ attorney.bar_admission_date }}</li>
+          {% endif %}
+          {% if attorney.lsk_practicing_certificate_number %}
+          <li><i class="fas fa-id-card" aria-hidden="true"></i> LSK · {{ attorney.lsk_practicing_certificate_number }}</li>
+          {% endif %}
+        </ul>
+        {% endif %}
+
+        {% if area_parts %}
+        <ul class="firm-atty-chips">
+          {% for area in area_parts if area.strip() %}
+          {% if loop.index <= 6 %}
+          <li>{{ area.strip() }}</li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        <div class="firm-atty-actions">
+          <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary" data-firm-magnetic>
+            <span>{{ hero_cta_label }}</span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </a>
+          {% if whatsapp_url %}
+          <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-ghost" target="_blank" rel="noopener noreferrer">
+            <i class="fab fa-whatsapp" aria-hidden="true"></i>
+            <span>WhatsApp</span>
+          </a>
+          {% endif %}
+        </div>
+
+        {% if pub_email or pub_phone or linkedin %}
+        <div class="firm-atty-socials" aria-label="Contact {{ attorney.full_name }}">
+          {% if pub_email %}
+          <a href="mailto:{{ pub_email }}" class="firm-atty-social" title="Email">
+            <i class="fas fa-envelope" aria-hidden="true"></i>
+            <span>{{ pub_email }}</span>
+          </a>
+          {% endif %}
+          {% if pub_phone %}
+          <a href="tel:{{ pub_phone }}" class="firm-atty-social" title="Call">
+            <i class="fas fa-phone" aria-hidden="true"></i>
+            <span>{{ pub_phone }}</span>
+          </a>
+          {% endif %}
+          {% if linkedin %}
+          <a href="{{ linkedin if linkedin.startswith('http') else 'https://' ~ linkedin }}"
+             class="firm-atty-social firm-atty-social--li"
+             target="_blank"
+             rel="noopener noreferrer"
+             title="LinkedIn">
+            <i class="fab fa-linkedin-in" aria-hidden="true"></i>
+            <span>LinkedIn</span>
+          </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <a href="{{ firm_url('team') }}" class="firm-atty-back">
+          <i class="fas fa-arrow-left" aria-hidden="true"></i>
+          All team members
+        </a>
+      </div>
     </div>
-    {% if attorney_video_embed %}
-    <div class="firm-video-embed firm-reveal" style="margin-top:2rem;">
-      <iframe src="{{ attorney_video_embed }}" title="Video introduction — {{ attorney.full_name }}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-    </div>
-    {% endif %}
   </div>
 </section>
 
-<section class="firm-section">
-  <div class="container firm-about-grid">
-    <div class="firm-reveal">
+{% if attorney_video_embed %}
+<section class="firm-section firm-atty-video-section">
+  <div class="container firm-reveal">
+    <p class="firm-eyebrow">Introduction</p>
+    <h2 class="firm-section-title">Meet {{ first_name }}</h2>
+    <div class="firm-video-embed firm-atty-video">
+      <iframe src="{{ attorney_video_embed }}" title="Video introduction — {{ attorney.full_name }}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if attorney.attorney_bio or education or cases or authored_posts %}
+<section class="firm-section firm-section-alt firm-atty-body-section">
+  <div class="container firm-atty-body">
+    <div class="firm-atty-main">
       {% if attorney.attorney_bio %}
-      <h2 class="firm-section-title">Biography</h2>
-      <div class="firm-prose">{{ attorney.attorney_bio }}</div>
+      <article class="firm-atty-panel firm-reveal">
+        <p class="firm-eyebrow">Biography</p>
+        <h2 class="firm-atty-panel-title">About {{ first_name }}</h2>
+        <div class="firm-prose firm-atty-prose">{{ attorney.attorney_bio }}</div>
+      </article>
       {% endif %}
 
-      {% set education = attorney_education.get(attorney.id, []) %}
       {% if education %}
-      <h2 class="firm-section-title" style="margin-top:2rem;">Education</h2>
-      <ul class="firm-meta-list">
-        {% for edu in education %}
-        <li>
-          <strong>{{ edu.degree or 'Qualification' }}</strong>
-          <span>{{ edu.institution }}{% if edu.year %} ({{ edu.year }}){% endif %}</span>
-        </li>
-        {% endfor %}
-      </ul>
+      <article class="firm-atty-panel firm-reveal">
+        <p class="firm-eyebrow">Background</p>
+        <h2 class="firm-atty-panel-title">Education</h2>
+        <ul class="firm-atty-timeline">
+          {% for edu in education %}
+          <li>
+            <span class="firm-atty-timeline-mark" aria-hidden="true"></span>
+            <div>
+              <strong>{{ edu.degree or 'Qualification' }}</strong>
+              <span>{{ edu.institution }}{% if edu.year %} · {{ edu.year }}{% endif %}</span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </article>
       {% endif %}
 
-      {% set cases = attorney_notable_cases.get(attorney.id, []) %}
       {% if cases %}
-      <h2 class="firm-section-title" style="margin-top:2rem;">Notable matters</h2>
-      <ul class="firm-awards-list">
-        {% for case in cases %}
-        <li>{{ case.description }}</li>
-        {% endfor %}
-      </ul>
+      <article class="firm-atty-panel firm-reveal">
+        <p class="firm-eyebrow">Experience</p>
+        <h2 class="firm-atty-panel-title">Notable matters</h2>
+        <ol class="firm-atty-matters">
+          {% for case in cases %}
+          <li>
+            <span class="firm-atty-matter-num" aria-hidden="true">{{ '%02d'|format(loop.index) }}</span>
+            <span>{{ case.description }}</span>
+          </li>
+          {% endfor %}
+        </ol>
+      </article>
       {% endif %}
 
-      {% if attorney.last_updated_display %}
-      <p class="firm-updated">Last updated: {{ attorney.last_updated_display }}</p>
+      {% if authored_posts %}
+      <article class="firm-atty-panel firm-reveal">
+        <p class="firm-eyebrow">Insights</p>
+        <h2 class="firm-atty-panel-title">Articles by {{ first_name }}</h2>
+        <ul class="firm-atty-articles">
+          {% for post in authored_posts %}
+          <li>
+            <a href="{{ firm_url('blog/' ~ post.slug) }}">
+              <span>{{ post.title }}</span>
+              <i class="fas fa-arrow-right" aria-hidden="true"></i>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </article>
       {% endif %}
     </div>
-    <aside class="firm-reveal">
-      <div class="firm-card">
-        <h2>Contact {{ attorney.full_name.split(' ')[0] }}</h2>
-        {% if attorney.public_contact_phone or attorney.phone_number %}
-        <p><i class="fas fa-phone" aria-hidden="true"></i> <a href="tel:{{ attorney.public_contact_phone or attorney.phone_number }}">{{ attorney.public_contact_phone or attorney.phone_number }}</a></p>
+
+    <aside class="firm-atty-aside firm-reveal" style="--reveal-delay: 80ms">
+      <div class="firm-atty-card">
+        <p class="firm-eyebrow">Connect</p>
+        <h2 class="firm-atty-card-title">Contact {{ first_name }}</h2>
+        <p class="firm-atty-card-lead">Reach out directly or request a consultation through our office.</p>
+        {% if pub_phone %}
+        <a href="tel:{{ pub_phone }}" class="firm-atty-card-row">
+          <i class="fas fa-phone" aria-hidden="true"></i>
+          <span>{{ pub_phone }}</span>
+        </a>
         {% endif %}
-        {% if attorney.public_contact_email or attorney.work_email %}
-        <p><i class="fas fa-envelope" aria-hidden="true"></i> <a href="mailto:{{ attorney.public_contact_email or attorney.work_email }}">{{ attorney.public_contact_email or attorney.work_email }}</a></p>
+        {% if pub_email %}
+        <a href="mailto:{{ pub_email }}" class="firm-atty-card-row">
+          <i class="fas fa-envelope" aria-hidden="true"></i>
+          <span>{{ pub_email }}</span>
+        </a>
         {% endif %}
-        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary" style="margin-top:1rem;">Book a consultation</a>
+        {% if linkedin %}
+        <a href="{{ linkedin if linkedin.startswith('http') else 'https://' ~ linkedin }}"
+           class="firm-atty-card-row"
+           target="_blank"
+           rel="noopener noreferrer">
+          <i class="fab fa-linkedin-in" aria-hidden="true"></i>
+          <span>LinkedIn profile</span>
+        </a>
+        {% endif %}
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary firm-atty-card-cta" data-firm-magnetic>
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
       </div>
-      {% if attorney.lsk_practicing_certificate_number %}
-      <div class="firm-card" style="margin-top:1rem;">
-        <h3>Credentials</h3>
-        <p>LSK Practicing Certificate: {{ attorney.lsk_practicing_certificate_number }}</p>
+
+      {% if attorney.lsk_practicing_certificate_number or attorney.bar_admission_date or attorney.year_called_to_bar %}
+      <div class="firm-atty-card firm-atty-card--soft">
+        <p class="firm-eyebrow">Credentials</p>
+        <h3 class="firm-atty-card-title">Professional standing</h3>
+        <ul class="firm-atty-cred-list">
+          {% if attorney.lsk_practicing_certificate_number %}
+          <li>
+            <strong>LSK certificate</strong>
+            <span>{{ attorney.lsk_practicing_certificate_number }}</span>
+          </li>
+          {% endif %}
+          {% if attorney.bar_admission_date %}
+          <li>
+            <strong>Bar admission</strong>
+            <span>{{ attorney.bar_admission_date }}</span>
+          </li>
+          {% elif attorney.year_called_to_bar %}
+          <li>
+            <strong>Called to the Bar</strong>
+            <span>{{ attorney.year_called_to_bar }}</span>
+          </li>
+          {% endif %}
+        </ul>
       </div>
       {% endif %}
     </aside>
+  </div>
+</section>
+{% endif %}
+
+{% if other_attorneys %}
+<section class="firm-section firm-atty-more-section">
+  <div class="container">
+    <div class="firm-atty-more-head firm-reveal">
+      <p class="firm-eyebrow">Our people</p>
+      <h2 class="firm-section-title">More of the team</h2>
+    </div>
+    <div class="firm-atty-more-grid">
+      {% for emp in other_attorneys[:3] %}
+      <a href="{{ firm_url('team/' ~ (emp.url_slug or emp.id)) }}" class="firm-atty-more-card firm-reveal" style="--reveal-delay: {{ loop.index0 * 70 }}ms">
+        <span class="firm-atty-more-photo">
+          {% if emp.profile_picture_url %}
+          <img src="{{ emp.profile_picture_url }}" alt="" loading="lazy" width="200" height="240">
+          {% else %}
+          <span aria-hidden="true">{{ (emp.full_name or '?')[:1] | upper }}</span>
+          {% endif %}
+        </span>
+        <span class="firm-atty-more-copy">
+          <strong>{{ emp.full_name }}</strong>
+          <span>{{ emp.professional_title or emp.team_role_label or emp.role or 'Attorney' }}</span>
+        </span>
+        <span class="firm-atty-more-go" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="firm-atty-more-foot firm-reveal">
+      <a href="{{ firm_url('team') }}" class="firm-team-person-link">
+        View full team
+        <i class="fas fa-arrow-right" aria-hidden="true"></i>
+      </a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="firm-section firm-section-alt firm-atty-cta-section">
+  <div class="container">
+    <div class="firm-pa-consult-band firm-reveal">
+      <span class="firm-pa-consult-mark" aria-hidden="true"></span>
+      <div class="firm-pa-consult-copy">
+        <p class="firm-eyebrow firm-eyebrow-on-dark">Connect</p>
+        <h2>Ready to speak with {{ first_name }}?</h2>
+        <p>Share a brief outline of your matter and our office will help you take the next step.</p>
+      </div>
+      <div class="firm-pa-consult-actions">
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light" data-firm-magnetic>
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-ghost" target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp" aria-hidden="true"></i>
+          <span>WhatsApp</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </section>
 {% endblock %}

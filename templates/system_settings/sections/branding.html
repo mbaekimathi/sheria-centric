@@ -56,17 +56,159 @@
                     </div>
                 </div>
 
-                <!-- Live Theme Preview -->
-                <div class="rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-                    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                        <p class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <i class="fas fa-eye text-indigo-600"></i>
-                            Live Theme Preview
-                        </p>
-                        <div class="flex items-center gap-2">
-                            <span id="preview-primary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Primary"></span>
-                            <span id="preview-secondary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Accent"></span>
-                            <span id="preview-tertiary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Tertiary"></span>
+                <!-- Typography / Fonts — System Font Presets dropdown -->
+                {% set saved_font = cs.get('font_family') or 'Inter' %}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-font text-indigo-600"></i>
+                                System Font Presets
+                            </h3>
+                            <p class="text-xs text-gray-500">Curated professional typefaces tuned for long reading. Open the list to preview each font.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: Inter or DM Sans pair beautifully with any palette.</span>
+                    </div>
+
+                    <input type="hidden" name="font_family" id="font_family" value="{{ saved_font }}">
+
+                    <div class="relative max-w-xl" id="font-dropdown-root">
+                        <button type="button"
+                                id="font-dropdown-toggle"
+                                class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-white hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                                aria-controls="font-dropdown-list">
+                            <span class="flex items-center gap-3 min-w-0 text-left">
+                                <span id="font-toggle-sample"
+                                      class="inline-flex items-center justify-center h-10 w-12 rounded-lg bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 flex-shrink-0 text-xl"
+                                      style="font-family: Inter, sans-serif;">Aa</span>
+                                <span class="min-w-0">
+                                    <span id="font-toggle-label" class="block text-sm font-semibold text-gray-900 truncate">Inter</span>
+                                    <span id="font-toggle-meta" class="block text-xs text-gray-500 truncate">Neutral, highly legible (default)</span>
+                                </span>
+                            </span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs flex-shrink-0 transition-transform" id="font-dropdown-chevron" aria-hidden="true"></i>
+                        </button>
+
+                        <ul id="font-dropdown-list"
+                            class="hidden absolute z-30 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden max-h-96 overflow-y-auto"
+                            role="listbox"
+                            aria-label="System font presets">
+                            <!-- Options populated by branding script -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Text Size Presets (dropdown with size examples) -->
+                {% set saved_font_size = cs.get('font_size') or 'comfortable' %}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                <i class="fas fa-text-height text-indigo-600"></i>
+                                Text Size
+                            </h3>
+                            <p class="text-xs text-gray-500">One global size for the app, firm website, and marketing pages. Mobile scales down from this base. Pick a preset to preview.</p>
+                        </div>
+                        <span class="hidden md:inline text-xs text-gray-400">Tip: Comfortable suits most users; Large is friendlier for long reading.</span>
+                    </div>
+
+                    <input type="hidden" name="font_size" id="font_size" value="{{ saved_font_size }}">
+
+                    <div class="relative max-w-xl" id="font-size-dropdown-root">
+                        <button type="button"
+                                id="font-size-dropdown-toggle"
+                                class="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-white hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                                aria-controls="font-size-dropdown-list">
+                            <span class="flex items-center gap-3 min-w-0 text-left">
+                                <span id="font-size-toggle-sample"
+                                      class="inline-flex items-center justify-center h-10 w-12 rounded-lg bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100 flex-shrink-0"
+                                      style="font-size: 16px;">Aa</span>
+                                <span class="min-w-0">
+                                    <span id="font-size-toggle-label" class="block text-sm font-semibold text-gray-900 truncate">Comfortable</span>
+                                    <span id="font-size-toggle-meta" class="block text-xs text-gray-500 truncate">16px · Balanced default</span>
+                                </span>
+                            </span>
+                            <i class="fas fa-chevron-down text-gray-400 text-xs flex-shrink-0" id="font-size-dropdown-chevron" aria-hidden="true"></i>
+                        </button>
+
+                        <ul id="font-size-dropdown-list"
+                            class="hidden absolute z-30 mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden max-h-80 overflow-y-auto"
+                            role="listbox"
+                            aria-label="System font size presets">
+                            <!-- Options populated by branding script -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Branding Assets -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
+                        <input type="file" name="favicon" accept="image/*,.ico" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if cs.get('favicon') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.favicon }}</p>{% endif %}
+                        <p class="mt-1 text-xs text-gray-500">Optional — if empty, we use your company logo. Alt text is set automatically.</p>
+                        <input type="hidden" name="favicon_alt" value="{{ cs.get('favicon_alt') or ((cs.get('company_name') or 'Site') ~ ' favicon') }}">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Login Page Background</label>
+                        <input type="file" name="login_page_background" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% set _login_bg_path = company_asset_static_path(cs.get('login_page_background')) if cs.get('login_page_background') else none %}
+                        {% if _login_bg_path %}
+                        <div class="mt-2 flex items-start gap-3">
+                            <img src="{{ url_for('static', filename=_login_bg_path) }}"
+                                 alt="{{ cs.get('login_page_background_alt') or 'Current login background' }}"
+                                 class="h-16 w-24 rounded-lg object-cover border border-gray-200 shadow-sm flex-shrink-0">
+                            <p class="mt-0.5 text-xs text-gray-500">Current: {{ cs.login_page_background }}<br>Shown on firm and client login pages.</p>
+                        </div>
+                        {% else %}
+                        <p class="mt-1 text-xs text-gray-500">Optional. If empty, login pages use the company logo; if no logo either, the default gradient is used.</p>
+                        {% endif %}
+                        <label class="block text-xs font-medium text-gray-600 mt-2 mb-1">Background Alt Text <span class="text-red-500">*</span></label>
+                        <input type="text" name="login_page_background_alt" value="{{ cs.get('login_page_background_alt') or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Abstract legal office background" {% if cs.get('login_page_background') %}required{% endif %}>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-6 mt-2">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-1">Analytics &amp; tracking</h3>
+                    <p class="text-xs text-gray-500 mb-4">Optional. IDs are injected on the public firm website only — no hand-written markup required.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Google Analytics (GA4)</label>
+                            <input type="text" name="ga4_measurement_id" value="{{ cs.get('ga4_measurement_id') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="G-XXXXXXXX">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Google Tag Manager</label>
+                            <input type="text" name="gtm_container_id" value="{{ cs.get('gtm_container_id') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="GTM-XXXXXXX">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Pixel ID</label>
+                            <input type="text" name="meta_pixel_id" value="{{ cs.get('meta_pixel_id') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="1234567890">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Unified Live Preview (bottom): colors + font + size -->
+                <div class="rounded-2xl border border-gray-200 overflow-hidden shadow-sm" id="live-branding-preview">
+                    <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                <i class="fas fa-eye text-indigo-600"></i>
+                                Live Theme Preview
+                            </p>
+                            <p class="text-xs text-gray-500 mt-0.5">Updates live as you change colors, font, and text size above.</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <div class="flex items-center gap-1.5">
+                                <span id="preview-primary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Primary"></span>
+                                <span id="preview-secondary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Accent"></span>
+                                <span id="preview-tertiary" class="inline-block h-5 w-5 rounded-full border border-white shadow" title="Tertiary"></span>
+                            </div>
+                            <span id="preview-meta-font" class="text-[11px] font-medium text-gray-600 px-2 py-1 rounded-md bg-white border border-gray-200">Inter</span>
+                            <span id="preview-meta-size" class="text-[11px] font-medium text-gray-600 px-2 py-1 rounded-md bg-white border border-gray-200">Comfortable · 16px</span>
                         </div>
                     </div>
                     <div id="theme-preview-shell" class="p-4">
@@ -90,12 +232,18 @@
                                 <div class="flex items-center gap-2 px-2 py-1 rounded-md opacity-80"><i class="far fa-user"></i> Clients</div>
                             </aside>
                             <div class="sm:col-span-3 bg-white p-4 space-y-3">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span id="theme-preview-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"><i class="fas fa-star text-[10px]"></i> Featured</span>
                                     <span id="theme-preview-chip" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium">In Progress</span>
                                 </div>
-                                <p id="theme-preview-text" class="text-sm text-gray-700">The quick brown fox jumps over the lazy dog. 1234567890 &ndash; preview of body text in your chosen font.</p>
-                                <div class="flex flex-wrap items-center gap-2">
+                                <div id="font-preview" class="space-y-1">
+                                    <p class="text-xs uppercase tracking-wider text-gray-400">Typography</p>
+                                    <p id="theme-preview-heading" class="font-bold text-gray-900" data-fs-role="display">SHERIA CENTRIC — Modern Practice Management</p>
+                                    <p id="theme-preview-text" class="text-gray-700" data-fs-role="body">The quick brown fox jumps over the lazy dog. 1234567890 — body text in your chosen font and size.</p>
+                                    <p id="theme-preview-meta" class="text-gray-500" data-fs-role="meta">Small captions, table headers and helper text scale together.</p>
+                                </div>
+                                <div id="font-size-preview" class="hidden" aria-hidden="true"></div>
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
                                     <button type="button" id="theme-preview-btn-primary" class="px-3 py-1.5 rounded-lg text-white text-sm font-medium">Primary Button</button>
                                     <button type="button" id="theme-preview-btn-outline" class="px-3 py-1.5 rounded-lg text-sm font-medium border bg-white">Secondary</button>
                                     <button type="button" id="theme-preview-btn-soft" class="px-3 py-1.5 rounded-lg text-sm font-medium">Tertiary</button>
@@ -103,83 +251,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Typography / Fonts -->
-                {% set saved_font = cs.get('font_family') or 'Inter' %}
-                <div>
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
-                                <i class="fas fa-font text-indigo-600"></i>
-                                System Font Presets
-                            </h3>
-                            <p class="text-xs text-gray-500">Curated professional typefaces tuned for long reading. Click a card to apply.</p>
-                        </div>
-                        <span class="hidden md:inline text-xs text-gray-400">Tip: Inter or DM Sans pair beautifully with any palette.</span>
-                    </div>
-
-                    <input type="hidden" name="font_family" id="font_family" value="{{ saved_font }}">
-
-                    <div id="font-preset-grid" class="space-y-5">
-                        <!-- Grouped font cards are populated dynamically -->
-                    </div>
-
-                    <div class="mt-5">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Live Font Preview</label>
-                        <div id="font-preview" class="rounded-xl border border-gray-200 bg-white p-4 space-y-1">
-                            <p class="text-xs uppercase tracking-wider text-gray-400">Heading</p>
-                            <p class="text-2xl font-bold text-gray-900">SHERIA CENTRIC &mdash; Modern Practice Management</p>
-                            <p class="text-sm text-gray-600">The quick brown fox jumps over the lazy dog. 1234567890 &mdash; abcdefghijklmnopqrstuvwxyz.</p>
-                            <p class="text-xs text-gray-500">Body copy preview at 12px / 14px / 16px sizes.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Text Size Presets -->
-                {% set saved_font_size = cs.get('font_size') or 'comfortable' %}
-                <div>
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
-                                <i class="fas fa-text-height text-indigo-600"></i>
-                                Text Size
-                            </h3>
-                            <p class="text-xs text-gray-500">One global setting that scales every page consistently. Click a card to apply.</p>
-                        </div>
-                        <span class="hidden md:inline text-xs text-gray-400">Tip: Comfortable suits most users; Large is friendlier for long reading.</span>
-                    </div>
-
-                    <input type="hidden" name="font_size" id="font_size" value="{{ saved_font_size }}">
-
-                    <div id="font-size-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <!-- Cards populated dynamically -->
-                    </div>
-
-                    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-4" id="font-size-preview">
-                        <p class="text-xs uppercase tracking-wider text-gray-400 mb-1">Live Size Preview</p>
-                        <p class="text-3xl font-bold text-gray-900" data-fs-role="display">Page heading at this size</p>
-                        <p class="text-base text-gray-700 mt-1" data-fs-role="body">Body text reads at this comfort level. The quick brown fox jumps over the lazy dog. 1234567890.</p>
-                        <p class="text-xs text-gray-500 mt-1" data-fs-role="meta">Small captions, table headers and helper text scale together.</p>
-                    </div>
-                </div>
-
-                <!-- Branding Assets -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Favicon</label>
-                        <input type="file" name="favicon" accept="image/*,.ico" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
-                        {% if cs.get('favicon') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.favicon }}</p>{% endif %}
-                        <label class="block text-xs font-medium text-gray-600 mt-2 mb-1">Favicon Alt Text <span class="text-red-500">*</span></label>
-                        <input type="text" name="favicon_alt" value="{{ cs.get('favicon_alt') or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Site favicon">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Login Page Background</label>
-                        <input type="file" name="login_page_background" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
-                        {% if cs.get('login_page_background') %}<p class="mt-1 text-xs text-gray-500">Current: {{ cs.login_page_background }}</p>{% endif %}
-                        <label class="block text-xs font-medium text-gray-600 mt-2 mb-1">Background Alt Text <span class="text-red-500">*</span></label>
-                        <input type="text" name="login_page_background_alt" value="{{ cs.get('login_page_background_alt') or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Abstract legal office background">
                     </div>
                 </div>
             </div>

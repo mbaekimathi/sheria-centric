@@ -12,11 +12,13 @@
     {% set saved_font = cs.get('font_family') %}
     {% set theme_font = saved_font if saved_font in allowed_fonts else 'Inter' %}
     {% set font_param = theme_font.replace(' ', '+') %}
-    {# Global text size scale. Tailwind's text-* utilities use rem, so changing
-       the html base font-size scales the WHOLE system consistently. #}
-    {% set allowed_font_sizes = {'compact': '14px', 'comfortable': '16px', 'large': '17px', 'xl': '18px'} %}
+    {# Global text size from System Settings → Branding Text Size presets.
+       Injected as app_base_font_size by inject_global_theme_settings (APP_FONT_SIZE_PRESETS). #}
+    {% set allowed_font_sizes = APP_FONT_SIZE_PRESETS if APP_FONT_SIZE_PRESETS is defined else {'compact': '14px', 'comfortable': '16px', 'large': '17px', 'xl': '18px'} %}
     {% set saved_font_size = cs.get('font_size') %}
+    {% if app_base_font_size is not defined %}
     {% set app_base_font_size = allowed_font_sizes.get(saved_font_size, '16px') %}
+    {% endif %}
     {# PWA: manifest, icons, theme-color, service worker registration. #}
     {% include "_pwa_head.html" %}
     <script src="https://cdn.tailwindcss.com"></script>
@@ -47,6 +49,7 @@
             --brand-tertiary-border: color-mix(in srgb, {{ theme_tertiary }} 45%, white);
             /* Global typographic scale (drives every page consistently) */
             --app-base-font-size: {{ app_base_font_size }};
+            --app-font-scale: 1; /* multiplied on small screens for responsiveness */
             --text-2xs: 0.6875rem;   /* ~11px @ 16 */
             --text-xs:  0.75rem;     /* ~12px */
             --text-sm:  0.875rem;    /* ~14px */
@@ -64,11 +67,31 @@
         /* ----- Global typography normalisation (applies to ALL pages) -----
            Drives the rem-based Tailwind scale from one variable so every page
            lines up visually. Restores h1-h6 default sizes that Tailwind's
-           preflight strips out, and standardises form-control text size. */
+           preflight strips out, and standardises form-control text size.
+           --app-font-scale shrinks the whole system on tablets/phones while
+           still honouring the user's branding font-size preference. */
         html {
-            font-size: var(--app-base-font-size);
+            font-size: calc(var(--app-base-font-size) * var(--app-font-scale));
             -webkit-text-size-adjust: 100%;
             text-size-adjust: 100%;
+        }
+        /* Tablet / small laptop */
+        @media (max-width: 1024px) {
+            :root { --app-font-scale: 0.9375; } /* 16→15, 14→13.1 */
+        }
+        /* Phones */
+        @media (max-width: 640px) {
+            :root { --app-font-scale: 0.875; } /* 16→14, 14→12.25 */
+            body { line-height: 1.45; }
+            h1 { font-size: var(--text-2xl); }
+            h2 { font-size: var(--text-xl); }
+            h3 { font-size: var(--text-lg); }
+            h4 { font-size: var(--text-base); }
+        }
+        /* Very small phones */
+        @media (max-width: 400px) {
+            :root { --app-font-scale: 0.8125; } /* 16→13, 14→11.4 */
+            body { line-height: 1.4; }
         }
         body {
             font-size: var(--text-base);
@@ -232,6 +255,47 @@
         .app-header .live-nav-btn--notify { color: #6ee7b7; }
         .app-header .live-nav-btn.is-active {
             box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.45);
+        }
+        .app-header .header-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.55rem 0.85rem;
+            border-radius: 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 2px 8px rgba(15, 13, 46, 0.18);
+            transition: background 0.2s ease, transform 0.2s ease;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .app-header .header-back-btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+            transform: translateX(-1px);
+            color: #fff;
+        }
+        .app-header .header-back-btn.is-disabled {
+            opacity: 0.45;
+            pointer-events: none;
+            cursor: default;
+        }
+        /* Header Back is mobile-only; desktop uses the sidebar Back link */
+        @media (min-width: 1025px) {
+            .app-header .header-back-btn {
+                display: none;
+            }
+        }
+        /* Sidebar Back is desktop-only (header Back covers mobile) */
+        .sidebar-link.sidebar-back-link {
+            display: none;
+        }
+        @media (min-width: 1025px) {
+            .sidebar-link.sidebar-back-link {
+                display: flex;
+            }
         }
 
         /* Notification bell — rings when live */
@@ -439,6 +503,186 @@
         }
         .app-header .brand-word-accent {
             color: var(--brand-accent-light) !important;
+        }
+        .app-header .header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 5rem;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+        .app-header .header-left,
+        .app-header .header-right {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+            flex-shrink: 0;
+        }
+        .app-header .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 0;
+            text-decoration: none;
+        }
+        .app-header .header-brand-mark {
+            width: 3rem;
+            height: 3rem;
+            flex-shrink: 0;
+        }
+        .app-header .header-brand-text {
+            display: flex;
+            align-items: baseline;
+            gap: 0.125rem;
+            min-width: 0;
+        }
+        .app-header .header-brand-text span {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .app-header .header-menu-btn {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            flex-shrink: 0;
+        }
+        .app-header .header-clock-mobile {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            flex-shrink: 1;
+            min-width: 0;
+        }
+        .app-header .header-clock-mobile span {
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        .app-header .header-user-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 0.75rem;
+            flex-shrink: 0;
+        }
+        .app-header .header-user-avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            flex-shrink: 0;
+        }
+
+        /* Mobile / small screens: compact header that fits the viewport */
+        @media (max-width: 1024px) {
+            .app-header .container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            .app-header .header-bar {
+                height: 3.25rem;
+                gap: 0.25rem;
+            }
+            .app-header .header-left,
+            .app-header .header-right {
+                gap: 0.3rem;
+            }
+            .app-header .header-back-btn {
+                padding: 0.35rem 0.45rem;
+                border-radius: 0.5rem;
+                font-size: 0.65rem;
+                gap: 0.2rem;
+            }
+            .app-header .header-back-btn span {
+                display: none;
+            }
+            .app-header .header-menu-btn {
+                padding: 0.35rem 0.45rem;
+            }
+            .app-header .header-menu-btn i {
+                font-size: 0.85rem;
+            }
+            .app-header .header-brand {
+                gap: 0.35rem;
+            }
+            .app-header .header-brand-mark {
+                width: 1.85rem;
+                height: 1.85rem;
+                border-radius: 0.45rem;
+            }
+            .app-header .header-brand-mark i {
+                font-size: 0.75rem !important;
+            }
+            .app-header .header-brand .relative > .absolute {
+                display: none;
+            }
+            .app-header .header-brand-text span {
+                font-size: 0.78rem;
+            }
+            .app-header .header-clock-mobile {
+                padding: 0.25rem 0.4rem;
+            }
+            .app-header .header-clock-mobile span {
+                font-size: 0.62rem;
+            }
+            .app-header .live-nav-btn {
+                width: 2rem;
+                height: 2rem;
+                border-radius: 0.5rem;
+            }
+            .app-header .live-nav-icon,
+            .app-header .live-nav-icon svg {
+                width: 1rem;
+                height: 1rem;
+            }
+            .app-header .live-nav-badge {
+                min-width: 0.95rem;
+                height: 0.95rem;
+                font-size: 0.55rem;
+                top: -0.25rem;
+                right: -0.25rem;
+                padding: 0 0.2rem;
+            }
+            .app-header .header-user-btn {
+                padding: 0.2rem;
+                gap: 0.25rem;
+                border-radius: 0.5rem;
+            }
+            .app-header .header-user-avatar {
+                width: 1.85rem;
+                height: 1.85rem;
+                border-radius: 0.4rem;
+            }
+            .app-header .header-user-avatar span,
+            .app-header .header-user-avatar i {
+                font-size: 0.65rem !important;
+            }
+            .app-header .header-user-btn > .fa-chevron-down {
+                display: none;
+            }
+            .sidebar {
+                top: 3.25rem;
+            }
+            .sidebar-overlay {
+                top: 3.25rem;
+            }
+        }
+        @media (max-width: 400px) {
+            .app-header .header-brand-text .brand-word-accent {
+                display: none;
+            }
+            .app-header .header-clock-mobile {
+                display: none;
+            }
+            .app-header .header-brand-text span {
+                font-size: 0.72rem;
+            }
+        }
+        @media (max-width: 340px) {
+            .app-header .header-brand-text {
+                display: none;
+            }
         }
         .app-footer.glass-effect {
             background: linear-gradient(145deg, rgba(19, 16, 55, 0.97), rgba(34, 28, 86, 0.95));
@@ -825,6 +1069,7 @@
             .sidebar {
                 transform: translateX(-280px);
                 bottom: 0;
+                top: 3.25rem;
             }
             .sidebar.mobile-open {
                 transform: translateX(0);
@@ -839,7 +1084,7 @@
             .sidebar-overlay {
                 display: none;
                 position: fixed;
-                top: 80px;
+                top: 3.25rem;
                 left: 0;
                 right: 0;
                 bottom: 0;
@@ -986,28 +1231,37 @@
     <!-- Header -->
     <header class="app-header glass-effect border-b border-gray-200/50 sticky top-0 z-50 shadow-lg">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-20">
-                <!-- Left Section: Mobile Menu Toggle & Logo -->
-                <div class="flex items-center space-x-3">
+            <div class="header-bar">
+                <!-- Left Section: Back, Mobile Menu Toggle & Logo -->
+                <div class="header-left">
+                    {% if nav_back_url %}
+                    <a href="{{ nav_back_url }}"
+                       class="header-back-btn"
+                       title="Back to previous page"
+                       aria-label="Back to previous page">
+                        <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                        <span>Back</span>
+                    </a>
+                    {% endif %}
                     <!-- Mobile Sidebar Toggle -->
                     {% if session.get('employee_id') or session.get('client_id') %}
-                    <button onclick="toggleSidebar()" class="lg:hidden px-3 py-2 rounded-lg header-panel text-white transition-all duration-300 shadow-md hover:shadow-lg">
-                        <i class="fas fa-bars text-lg" id="sidebar-toggle-icon"></i>
+                    <button onclick="toggleSidebar()" class="lg:hidden header-menu-btn header-panel text-white transition-all duration-300 shadow-md hover:shadow-lg" aria-label="Toggle menu">
+                        <i class="fas fa-bars" id="sidebar-toggle-icon"></i>
                     </button>
                     {% endif %}
                     
                     <!-- SHERIA CENTRIC Logo/Icon -->
-                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard', role_slug=current_role_slug) }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('client_login') }}{% endif %}" class="flex items-center space-x-3 group">
+                    <a href="{% if session.get('employee_id') %}{{ url_for('dashboard', role_slug=current_role_slug) }}{% elif session.get('client_id') %}{{ url_for('client_dashboard') }}{% else %}{{ url_for('client_login') }}{% endif %}" class="header-brand group">
                         <div class="relative">
-                            <div class="w-12 h-12 rounded-xl brand-mark flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 icon-pulse">
+                            <div class="header-brand-mark rounded-xl brand-mark flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 icon-pulse">
                                 <i class="fas fa-hands-helping text-white text-xl icon-hover-effect"></i>
                             </div>
                             <div class="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 brand-dot rounded-full border-2 border-white shadow-md icon-bounce"></div>
                             <div class="absolute -top-1 -right-1 w-5 h-5 bg-orange-400/30 rounded-full animate-ping"></div>
                         </div>
-                        <div class="flex items-baseline space-x-0.5">
-                            <span class="text-2xl font-bold brand-word-main tracking-tight transition-colors duration-300">SHERIA</span>
-                            <span class="text-2xl font-bold brand-word-accent tracking-tight transition-colors duration-300">CENTRIC</span>
+                        <div class="header-brand-text">
+                            <span class="brand-word-main transition-colors duration-300">SHERIA</span>
+                            <span class="brand-word-accent transition-colors duration-300">CENTRIC</span>
                         </div>
                     </a>
                 </div>
@@ -1037,20 +1291,18 @@
                     <div class="flex items-center space-x-3 px-5 py-2.5 rounded-xl header-panel shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 backdrop-blur-sm">
                         <div class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm icon-bounce"></div>
                         <i class="fas fa-building text-green-600 text-sm icon-hover-effect"></i>
-                        <span class="text-xs font-semibold text-gray-800">{{ session.get('company_name', 'BAUNI LAW GROUP') }}</span>
+                        <span class="text-xs font-semibold text-gray-800">{{ session.get('company_name', 'SHERIA LAW FIRM') }}</span>
                     </div>
                     {% endif %}
                 </div>
                 
                 <!-- Mobile Date & Time (shown on smaller screens) -->
-                <div class="lg:hidden flex items-center space-x-2">
-                    <div class="px-3 py-2 rounded-lg header-panel shadow-sm">
-                        <span id="live-clock-mobile" class="text-xs font-bold text-orange-700 font-mono"></span>
-                    </div>
+                <div class="lg:hidden header-clock-mobile header-panel shadow-sm">
+                    <span id="live-clock-mobile" class="font-bold text-orange-700 font-mono"></span>
                 </div>
                 
                 <!-- Right Section: Client Login & User Menu -->
-                <div class="flex items-center space-x-3">
+                <div class="header-right">
                     <!-- Sign in: employee vs client (only when logged out) -->
                     {% if not session.get('employee_id') and not session.get('client_id') %}
                     <div class="relative" id="public-login-menu-root">
@@ -1082,10 +1334,10 @@
                     <!-- Client Menu (if logged in as client) -->
                     {% if session.get('client_id') and not session.get('employee_id') %}
                     <div class="relative">
-                        <button onclick="toggleClientDropdown()" class="flex items-center space-x-3 px-3 py-2 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group">
+                        <button onclick="toggleClientDropdown()" class="header-user-btn glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group">
                             <!-- Profile Photo -->
                             {% if session.get('client_profile_picture') %}
-                            <div class="w-10 h-10 rounded-lg overflow-hidden border-2 border-blue-500 shadow-md">
+                            <div class="header-user-avatar rounded-lg overflow-hidden border-2 border-blue-500 shadow-md">
                                 {% if session.client_profile_picture.startswith('http') %}
                                 <img src="{{ session.client_profile_picture }}" 
                                      alt="Profile" class="w-full h-full object-cover">
@@ -1095,7 +1347,7 @@
                                 {% endif %}
                             </div>
                             {% else %}
-                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-sm border-2 border-blue-500">
+                            <div class="header-user-avatar rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-sm border-2 border-blue-500">
                                 <span class="text-blue-600 font-semibold text-sm">{{ session.client_name[0] if session.client_name else 'C' }}</span>
                             </div>
                             {% endif %}
@@ -1154,10 +1406,10 @@
                     <!-- User Menu (if logged in) -->
                     {% if session.get('employee_id') %}
                     <div class="relative">
-                        <button onclick="toggleDropdown()" class="flex items-center space-x-3 px-3 py-2 rounded-xl glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group">
+                        <button onclick="toggleDropdown()" class="header-user-btn glass-effect border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 group">
                             <!-- Profile Photo -->
                             {% if session.get('profile_picture') %}
-                            <div class="w-10 h-10 rounded-lg overflow-hidden border-2 border-green-500 shadow-md">
+                            <div class="header-user-avatar rounded-lg overflow-hidden border-2 border-green-500 shadow-md">
                                 {% set _employee_pic = (session.get('profile_picture') or '')|trim %}
                                 {% if _employee_pic.startswith('http://') or _employee_pic.startswith('https://') %}
                                 <img src="{{ _employee_pic }}" 
@@ -1168,7 +1420,7 @@
                                 {% endif %}
                             </div>
                             {% else %}
-                            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-sm border-2 border-green-500">
+                            <div class="header-user-avatar rounded-lg bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-sm border-2 border-green-500">
                                 <i class="fas fa-user text-green-600 text-sm"></i>
                             </div>
                             {% endif %}
@@ -1613,6 +1865,16 @@
                         <span>Exit Client View</span>
                     </a>
                     {% endif %}
+                    {% if nav_back_url %}
+                    <a href="{{ nav_back_url }}"
+                       class="sidebar-link sidebar-back-link"
+                       id="nav-sidebar-back"
+                       title="Back to previous page"
+                       aria-label="Back to previous page">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back</span>
+                    </a>
+                    {% endif %}
                     <a href="{{ url_for('client_dashboard') }}" class="sidebar-link {% if request.endpoint == 'client_dashboard' %}active{% endif %}" id="nav-client-dashboard">
                         <i class="fas fa-home"></i>
                         <span>Dashboard</span>
@@ -1683,8 +1945,18 @@
                     <!-- Employee Sidebar Links -->
                     {% set user_mgmt_pages = ['user_management', 'employee_management', 'client_management', 'onboard_client', 'submit_onboard_client', 'edit_client_page', 'edit_client', 'individual_client_management', 'corporate_client_management', 'roles_permissions', 'hr_roles_permissions'] %}
                     {% set matter_mgmt_pages = ['all_matters', 'case_management', 'case_tracking', 'approve_cases', 'matter_tracking', 'case_task_management', 'case_details', 'case_proceedings', 'case_documents', 'case_reminders', 'case_calendar', 'case_status', 'case_allocate', 'case_audit', 'register_case', 'other_matters', 'approve_matters', 'matter_task_management', 'register_matter', 'matter_details', 'matter_edit', 'matter_status', 'matter_allocate', 'matter_audit_progress', 'matter_documents', 'matter_attendances'] %}
-                    <!-- Dashboard (pinned to the top of every employee sidebar) -->
+                    <!-- Back + Dashboard (pinned to the top of every employee sidebar) -->
                     {% if not hide_sidebar_nav_links %}
+                    {% if nav_back_url %}
+                    <a href="{{ nav_back_url }}"
+                       class="sidebar-link sidebar-back-link"
+                       id="nav-sidebar-back"
+                       title="Back to previous page"
+                       aria-label="Back to previous page">
+                        <i class="fas fa-arrow-left"></i>
+                        <span>Back</span>
+                    </a>
+                    {% endif %}
                     <a href="{{ url_for('dashboard', role_slug=current_role_slug) }}"
                        class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
                        id="nav-dashboard">

@@ -3,46 +3,137 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
+<section class="firm-page-hero firm-page-hero-rich">
   <div class="container firm-reveal">
     <p class="firm-eyebrow">Get in touch</p>
     <h1>{{ page_seo.h1_heading or 'Contact Us' }}</h1>
     <p class="firm-page-lead">{{ page_seo.meta_description or 'Book a consultation or reach our office during business hours.' }}</p>
+    {% if response_time_label or consultation_fee_label %}
+    <div class="firm-hero-chips">
+      {% if consultation_fee_label %}
+      <span class="firm-chip"><i class="fas fa-handshake" aria-hidden="true"></i> {{ consultation_fee_label }}</span>
+      {% endif %}
+      {% if response_time_label %}
+      <span class="firm-chip"><i class="fas fa-bolt" aria-hidden="true"></i> {{ response_time_label }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
 </section>
 
 <section class="firm-section">
-  <div class="container firm-contact-grid">
-    <div class="firm-reveal">
-      <h2 class="firm-section-title">Office details</h2>
-      <ul class="firm-contact-list">
-        {% if firm_address %}
-        <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>{{ firm_address }}</span></li>
-        {% endif %}
-        {% if firm_phone %}
-        <li><i class="fas fa-phone" aria-hidden="true"></i><a href="tel:{{ firm_phone }}">{{ firm_phone }}</a></li>
-        {% endif %}
-        {% if firm_email %}
-        <li><i class="fas fa-envelope" aria-hidden="true"></i><a href="mailto:{{ firm_email }}">{{ firm_email }}</a></li>
-        {% endif %}
-        {% if business_hours %}
-        <li><i class="fas fa-clock" aria-hidden="true"></i><span>{{ business_hours }}</span></li>
-        {% endif %}
-        {% if firm.get('gbp_service_areas') %}
-        <li><i class="fas fa-location-dot" aria-hidden="true"></i><span>Serving {{ firm.gbp_service_areas.replace('\n', ', ') }}</span></li>
-        {% endif %}
-      </ul>
-      {% if whatsapp_url %}
-      <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-outline" target="_blank" rel="noopener noreferrer" style="margin-top:1rem;">
-        <i class="fab fa-whatsapp" aria-hidden="true"></i> Chat on WhatsApp
+  <div class="container">
+    <div class="firm-contact-channels">
+      {% if firm_phone %}
+      <a href="tel:{{ firm_phone }}" class="firm-channel-card firm-reveal" style="--reveal-delay: 0ms">
+        <span class="firm-channel-icon"><i class="fas fa-phone" aria-hidden="true"></i></span>
+        <span class="firm-channel-label">Phone</span>
+        <strong>{{ firm_phone }}</strong>
       </a>
       {% endif %}
+      {% if firm_alt_phone %}
+      <a href="tel:{{ firm_alt_phone }}" class="firm-channel-card firm-reveal" style="--reveal-delay: 60ms">
+        <span class="firm-channel-icon"><i class="fas fa-phone-volume" aria-hidden="true"></i></span>
+        <span class="firm-channel-label">Alternative</span>
+        <strong>{{ firm_alt_phone }}</strong>
+      </a>
+      {% endif %}
+      {% if firm_email %}
+      <a href="mailto:{{ firm_email }}" class="firm-channel-card firm-reveal" style="--reveal-delay: 120ms">
+        <span class="firm-channel-icon"><i class="fas fa-envelope" aria-hidden="true"></i></span>
+        <span class="firm-channel-label">Email</span>
+        <strong>{{ firm_email }}</strong>
+      </a>
+      {% endif %}
+      {% if firm_support_email %}
+      <a href="mailto:{{ firm_support_email }}" class="firm-channel-card firm-reveal" style="--reveal-delay: 180ms">
+        <span class="firm-channel-icon"><i class="fas fa-headset" aria-hidden="true"></i></span>
+        <span class="firm-channel-label">Support</span>
+        <strong>{{ firm_support_email }}</strong>
+      </a>
+      {% endif %}
+      {% if whatsapp_url %}
+      <a href="{{ whatsapp_url }}" class="firm-channel-card firm-channel-whatsapp firm-reveal" style="--reveal-delay: 240ms" target="_blank" rel="noopener noreferrer">
+        <span class="firm-channel-icon"><i class="fab fa-whatsapp" aria-hidden="true"></i></span>
+        <span class="firm-channel-label">WhatsApp</span>
+        <strong>Chat with us</strong>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="firm-section firm-section-alt">
+  <div class="container firm-contact-grid">
+    <div>
+      <div class="firm-reveal">
+        <p class="firm-eyebrow">Visit us</p>
+        <h2 class="firm-section-title">Office details</h2>
+        <ul class="firm-contact-list">
+          {% if firm_location_name %}
+          <li><i class="fas fa-building" aria-hidden="true"></i><span>{{ firm_location_name }}</span></li>
+          {% endif %}
+          {% if firm_address %}
+          <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>{{ firm_address }}</span></li>
+          {% endif %}
+          {% if business_hours %}
+          <li><i class="fas fa-clock" aria-hidden="true"></i><span>{{ business_hours }}</span></li>
+          {% endif %}
+          {% if holiday_hours_label %}
+          <li><i class="fas fa-calendar-day" aria-hidden="true"></i><span>{{ holiday_hours_label }}</span></li>
+          {% endif %}
+          {% if firm.get('gbp_service_areas') %}
+          <li><i class="fas fa-location-dot" aria-hidden="true"></i><span>Serving {{ firm.gbp_service_areas.replace('\n', ', ') }}</span></li>
+          {% endif %}
+        </ul>
+      </div>
+
+      {% if additional_offices %}
+      <div class="firm-reveal" style="margin-top:2rem;">
+        <h3 class="firm-subheading">Other locations</h3>
+        <ul class="firm-branch-list">
+          {% for office in additional_offices %}
+          <li><i class="fas fa-map-pin" aria-hidden="true"></i><span>{{ office }}</span></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if payment_methods %}
+      <div class="firm-payment-panel firm-reveal" style="margin-top:2rem;">
+        <h3 class="firm-subheading">Payment options</h3>
+        <p class="firm-muted-note">Use these details when settling consultation or legal fees.</p>
+        <ul class="firm-payment-list">
+          {% for method in payment_methods %}
+          <li>
+            <i class="fas {{ method.icon }}" aria-hidden="true"></i>
+            <div>
+              <strong>{{ method.label }}</strong>
+              <span>{{ method.value }}</span>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if firm.get('website_disclaimer') %}
+      <p class="firm-contact-disclaimer firm-reveal">
+        Contacting us does not create an advocate–client relationship until we confirm engagement in writing.
+        <a href="{{ firm_url('disclaimer') }}">Read the full disclaimer</a>.
+      </p>
+      {% endif %}
+
       {% include 'firm_website/_map_embed.html' %}
     </div>
+
     <div class="firm-reveal">
-      <div class="firm-card">
+      <div class="firm-card firm-consult-card">
         <h2>Request a consultation</h2>
-        <p style="color:var(--color-text-muted);margin-bottom:1.25rem;">Tell us about your matter and we will respond during business hours.</p>
+        <p class="firm-muted-note">Tell us about your matter and we will respond during business hours.</p>
+        {% if consultation_fee_label %}
+        <p class="firm-consult-fee"><i class="fas fa-circle-info" aria-hidden="true"></i> {{ consultation_fee_label }}</p>
+        {% endif %}
         {% include 'firm_website/_consultation_form.html' %}
       </div>
     </div>

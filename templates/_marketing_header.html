@@ -1,0 +1,63 @@
+{# Shared marketing site header — brand left, nav center, Client Login right (desktop). #}
+{% set _cs = company_settings if company_settings is defined and company_settings else {} %}
+{% set _firm_name = (_cs.get('company_name') or 'SHERIA CENTRIC')|trim %}
+{% set _logo_path = company_asset_static_path(_cs.get('company_logo')) if _cs.get('company_logo') else none %}
+{% set _logo_alt = (_cs.get('company_logo_alt') or (_firm_name ~ ' logo'))|trim %}
+<header class="site-header" id="site-header" x-data="{open:false}">
+  <div class="container nav-wrap">
+    <a href="/" class="brand" aria-label="{{ _firm_name }} home">
+      {% if _logo_path %}
+      <img class="brand-logo" src="{{ url_for('static', filename=_logo_path) }}" alt="{{ _logo_alt }}" width="32" height="32">
+      {% else %}
+      <svg class="brand-mark" width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
+        <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
+      </svg>
+      {% endif %}
+      <span class="brand-name">{{ _firm_name }}</span>
+    </a>
+
+    <nav class="desktop-nav" aria-label="Primary navigation">
+      <a href="/platform" class="nav-link">Platform</a>
+      <a href="/features" class="nav-link">Features</a>
+      <a href="/pricing" class="nav-link">Pricing</a>
+      <a href="/security" class="nav-link">Security</a>
+      <a href="/contact" class="nav-link">Contact</a>
+    </nav>
+
+    <div class="nav-actions">
+      <details class="login-dropdown">
+        <summary class="login-summary" aria-label="Login menu">
+          <i class="ph ph-sign-in" aria-hidden="true"></i>
+          <span class="login-summary-label">Login</span>
+          <i class="ph ph-caret-down" aria-hidden="true"></i>
+        </summary>
+        <div class="login-dropdown-menu">
+          <a href="/client_login" class="login-menu-client"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
+          <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
+        </div>
+      </details>
+      <a href="{% if request.path == '/' %}#final-cta{% else %}/#final-cta{% endif %}" class="btn btn-demo">Request Demo</a>
+      <a href="/client_login" class="nav-client-login" aria-label="Client login">
+        <i class="ph ph-user" aria-hidden="true"></i>
+        <span>Client Login</span>
+      </a>
+      <button type="button" class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
+        <i class="ph ph-list" x-show="!open"></i>
+        <i class="ph ph-x" x-show="open" style="display:none"></i>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top x-cloak>
+    <span class="mobile-section-label">Navigate</span>
+    <a href="/platform" @click="open=false">Platform</a>
+    <a href="/features" @click="open=false">Features</a>
+    <a href="/pricing" @click="open=false">Pricing</a>
+    <a href="/security" @click="open=false">Security</a>
+    <a href="/contact" @click="open=false">Contact</a>
+    <span class="mobile-section-label">Account</span>
+    <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
+    <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
+    <a href="{% if request.path == '/' %}#final-cta{% else %}/#final-cta{% endif %}" @click="open=false" class="btn btn-demo">Request Demo</a>
+  </div>
+</header>

@@ -16,31 +16,94 @@
     <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Official Firm Name {{ req() }}</label>
-            <input type="text" name="company_name" value="{{ cs.get('company_name') or '' }}" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. BAUNI LAW GROUP">
+            <input type="text" name="company_name" value="{{ cs.get('company_name') or '' }}" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. SHERIA LAW FIRM">
         </div>
         <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tagline / Slogan {{ tip('Shown on your homepage and in search snippets when no custom meta description is set.') }}</label>
-            <input type="text" name="company_tagline" maxlength="500" value="{{ cs.get('company_tagline') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Excellence in Legal Services">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tagline / Slogan {{ tip('Shown on your homepage and used to draft search snippets automatically.') }}</label>
+            <input type="text" name="company_tagline" maxlength="500" value="{{ cs.get('company_tagline') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Trusted Legal Counsel Since 1998">
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>
             <input type="file" name="company_logo" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
             {% if cs.get('company_logo') %}
+            {% set _logo_static = company_asset_static_path(cs.get('company_logo')) %}
             <p class="mt-1 text-xs text-gray-500">Current: {{ cs.company_logo }}</p>
+            {% if _logo_static %}
+            <div class="mt-2 inline-block bg-transparent p-0 border-0 shadow-none">
+                <img src="{{ url_for('static', filename=_logo_static) }}" alt="{{ cs.get('company_logo_alt') or ((cs.get('company_name') or 'Firm') ~ ' logo') }}" class="max-h-16 w-auto object-contain bg-transparent border-0 shadow-none rounded-none" style="background:transparent;border:0;box-shadow:none;border-radius:0;">
+            </div>
             {% endif %}
+            {% endif %}
+            <p class="mt-1 text-xs text-gray-500">Used in the website header and documents. New logo uploads remove solid plates automatically. If you have not uploaded a favicon, we create one from this logo automatically.</p>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Logo Alt Text <span class="text-red-500">*</span></label>
-            <p class="text-xs text-gray-500 mb-1">Required when uploading a new logo. Describes the image for screen readers and SEO.</p>
-            <input type="text" name="company_logo_alt" value="{{ cs.get('company_logo_alt') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. {{ cs.get('company_name') or 'Bauni Law Group' }} logo">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Logo Alt Text</label>
+            <p class="text-xs text-gray-500 mb-1">Defaults to “{Firm name} logo”. Override only if needed.</p>
+            <input type="text" name="company_logo_alt" value="{{ cs.get('company_logo_alt') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (cs.get('company_name') or 'Your firm') ~ ' logo' }}">
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+            <input type="url" name="website_url" value="{{ cs.get('website_url') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://">
+            <p class="mt-1 text-xs text-gray-500">Your firm’s public website. Shown in footers, letterhead, and SEO sameAs links.</p>
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Main Firm Image</label>
+            <p class="text-xs text-gray-500 mb-2">One image for the homepage hero (team photo, chambers, or brand mark). Uploads are resized to a standard hero size (max 1600×1600) so they fit cleanly on desktop and mobile.</p>
+            <input type="file" name="company_main_image" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+            <fieldset class="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <legend class="px-1 text-sm font-medium text-gray-700">Background for this upload</legend>
+                <p class="text-xs text-gray-500 mb-2">Choose what to do with the background on the file you are uploading now.</p>
+                <div class="flex flex-col sm:flex-row gap-3 sm:gap-6">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="radio" name="company_main_image_bg_mode" value="keep" checked class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Keep background
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input type="radio" name="company_main_image_bg_mode" value="remove" class="border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        Remove background
+                    </label>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">“Remove background” works best on logos and photos with a solid or simple backdrop.</p>
+            </fieldset>
+            {% set _main_static = company_asset_static_path(cs.get('company_main_image')) if cs.get('company_main_image') else none %}
+            {% if cs.get('company_main_image') %}
+            <div class="mt-4 rounded-xl border border-gray-200 bg-white overflow-hidden firm-settings-hero-card">
+                <div class="firm-settings-hero-preview">
+                    {% if _main_static %}
+                    <img src="{{ url_for('static', filename=_main_static) }}?v=1" alt="{{ cs.get('company_main_image_alt') or 'Main firm image' }}">
+                    {% else %}
+                    <div class="firm-settings-hero-preview-empty">Image file missing</div>
+                    {% endif %}
+                </div>
+                <div class="p-4 space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Image Alt Text</label>
+                    <input type="text" name="company_main_image_alt" value="{{ cs.get('company_main_image_alt') or '' }}" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (cs.get('company_name') or 'Your firm') ~ ' main image' }}">
+                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                        <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" name="cutout_company_main_image" value="1" class="rounded border-gray-300 text-indigo-600">
+                            Remove background
+                        </label>
+                        <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" name="remove_company_main_image" value="1" class="rounded border-gray-300 text-indigo-600">
+                            Delete
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500">Preview matches the homepage hero frame (320–360px square). The image keeps its proportions — no stretching or cropping.</p>
+                </div>
+            </div>
+            {% else %}
+            <input type="hidden" name="company_main_image_alt" value="{{ cs.get('company_main_image_alt') or '' }}">
+            {% endif %}
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Registration Number / Law Firm Number</label>
             <input type="text" name="registration_number" value="{{ cs.get('registration_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <p class="text-xs text-gray-500 mt-1">Shown in the website footer when set.</p>
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Tax PIN / VAT Number</label>
             <input type="text" name="tax_pin_vat_number" value="{{ cs.get('tax_pin_vat_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <p class="text-xs text-gray-500 mt-1">Internal use only — never shown on the public website.</p>
         </div>
     </div>
 </div>
@@ -55,12 +118,13 @@
         <p class="settings-section-subtitle">When the firm was established and a short background story.</p>
     </div>
     <div class="p-6 space-y-4">
-        <div class="md:max-w-xs">
+        <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Year Founded</label>
-            <input type="text" name="year_established" value="{{ cs.get('year_established') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 2010">
+            <input type="number" name="year_established" min="1800" max="2100" value="{{ cs.get('year_established') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 2010">
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Brief Firm History</label>
+            <p class="text-xs text-gray-500 mb-2">Tell the story like you're introducing the firm to a new client.</p>
             <textarea name="firm_history" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="How the firm started, key milestones, growth, and what makes your practice distinctive.">{{ cs.get('firm_history') or '' }}</textarea>
         </div>
     </div>
@@ -81,8 +145,45 @@
             <textarea name="mission_statement" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Your firm's purpose — why you exist and who you serve.">{{ cs.get('mission_statement') or '' }}</textarea>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Core Values</label>
-            <textarea name="core_values" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Integrity, Client-first service, Excellence, Accountability — one per line or short paragraphs.">{{ cs.get('core_values') or '' }}</textarea>
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Core Values</label>
+                    <p class="text-xs text-gray-500">3–6 recommended. Each needs a short name and one-line description.</p>
+                </div>
+                <button type="button" id="add-core-value-btn" class="text-sm font-medium text-indigo-700 hover:text-indigo-900">
+                    <i class="fas fa-plus mr-1"></i>Add value
+                </button>
+            </div>
+            {% set core_values_items = core_values_items or [] %}
+            <div id="core-values-list" class="space-y-3">
+                {% if core_values_items %}
+                {% for item in core_values_items %}
+                <div class="core-value-row grid grid-cols-1 md:grid-cols-5 gap-2 items-start border border-gray-200 rounded-xl p-3 bg-white">
+                    <div class="md:col-span-2">
+                        <input type="text" name="core_value_title_{{ loop.index0 }}" value="{{ item.title }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Integrity">
+                    </div>
+                    <div class="md:col-span-2">
+                        <input type="text" name="core_value_detail_{{ loop.index0 }}" value="{{ item.detail }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="One-line description">
+                    </div>
+                    <div class="flex md:justify-end">
+                        <button type="button" class="remove-core-value-btn text-sm text-red-600 hover:text-red-800 px-2 py-2">Remove</button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="core-value-row grid grid-cols-1 md:grid-cols-5 gap-2 items-start border border-gray-200 rounded-xl p-3 bg-white">
+                    <div class="md:col-span-2">
+                        <input type="text" name="core_value_title_0" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Integrity">
+                    </div>
+                    <div class="md:col-span-2">
+                        <input type="text" name="core_value_detail_0" value="" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="One-line description">
+                    </div>
+                    <div class="flex md:justify-end">
+                        <button type="button" class="remove-core-value-btn text-sm text-red-600 hover:text-red-800 px-2 py-2">Remove</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -135,9 +236,56 @@
             </div>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Additional Office Locations</label>
-            <p class="text-xs text-gray-500 mb-2">List other branches — one per line (name, address, city).</p>
-            <textarea name="additional_office_locations" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Mombasa Branch — ABC House, 2nd Floor, Mombasa Road&#10;Kisumu Office — P.O. Box 1234, Kisumu">{{ cs.get('additional_office_locations') or '' }}</textarea>
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Additional offices</label>
+                    <p class="text-xs text-gray-500">Each branch can power a local practice-area page (e.g. /practice-areas/family-law/nairobi).</p>
+                </div>
+                <button type="button" id="add-office-btn" class="text-sm font-medium text-indigo-700 hover:text-indigo-900">
+                    <i class="fas fa-plus mr-1"></i>Add office
+                </button>
+            </div>
+            {% set extra_offices = firm_offices_extra or [] %}
+            <div id="offices-list" class="space-y-4">
+                {% for office in extra_offices %}
+                <div class="office-row border border-gray-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3 bg-white">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Office label</label>
+                        <input type="text" name="office_label_{{ loop.index0 }}" value="{{ office.label or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Mombasa Branch">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">City / Town</label>
+                        <input type="text" name="office_city_{{ loop.index0 }}" value="{{ office.city or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">County</label>
+                        <input type="text" name="office_county_{{ loop.index0 }}" value="{{ office.county or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Country</label>
+                        <input type="text" name="office_country_{{ loop.index0 }}" value="{{ office.country or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Street / building</label>
+                        <input type="text" name="office_street_{{ loop.index0 }}" value="{{ office.street or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Floor</label>
+                        <input type="text" name="office_floor_{{ loop.index0 }}" value="{{ office.floor or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    </div>
+                    <div class="flex items-end justify-between gap-2">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Postal</label>
+                            <input type="text" name="office_postal_{{ loop.index0 }}" value="{{ office.postal or '' }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        </div>
+                        <button type="button" class="remove-office-btn text-sm text-red-600 px-2 py-2">Remove</button>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500" id="offices-empty-hint">No additional offices yet.</p>
+                {% endfor %}
+            </div>
+            <textarea name="additional_office_locations" class="hidden">{{ cs.get('additional_office_locations') or '' }}</textarea>
         </div>
     </div>
 </div>
@@ -147,68 +295,87 @@
     <div class="settings-section-header">
         <h2 class="settings-section-title">
             <i class="fas fa-search settings-section-icon"></i>
-            5. Public Page SEO
+            5. Homepage &amp; About Headlines
         </h2>
-        <p class="settings-section-subtitle">Search titles, descriptions, headings, and canonical URLs for your firm website homepage and about section.</p>
+        <p class="settings-section-subtitle">Write plain-language headlines. Search titles and descriptions are drafted for you — open Advanced only if you need to tweak them.</p>
     </div>
     <div class="p-6 space-y-8">
+        {% set auto_home_title = ((cs.get('seo_home_h1_heading') or cs.get('company_name') or 'Your firm') ~ ' | ' ~ (cs.get('company_name') or 'Firm'))[:60] %}
+        {% set auto_home_desc = (cs.get('mission_statement') or cs.get('company_tagline') or ('Welcome to ' ~ (cs.get('company_name') or 'our firm')))[:155] %}
+        {% set auto_about_title = (('About Us | ' ~ (cs.get('company_name') or 'Firm')))[:60] %}
+        {% set auto_about_desc = (cs.get('mission_statement') or cs.get('company_tagline') or 'Learn more about our firm, our mission, and our values.')[:155] %}
         <div class="border border-indigo-100 rounded-xl p-5 bg-indigo-50/40">
             <h3 class="text-sm font-semibold text-gray-900 mb-1">Homepage</h3>
-            <p class="text-xs text-gray-500 mb-4">Controls the main landing page visitors see at <code class="text-indigo-700">{{ public_site_base_url or 'your-site' }}/</code></p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>
-                    <input type="text" name="seo_home_h1_heading" value="{{ cs.get('seo_home_h1_heading') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ cs.get('company_name') or 'Your firm name' }}">
-                </div>
+            <p class="text-xs text-gray-500 mb-4">Controls the main landing page at <code class="text-indigo-700">{{ public_site_base_url or 'your-site' }}/</code></p>
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
-                    <input type="text" name="seo_home_meta_title" maxlength="60" value="{{ cs.get('seo_home_meta_title') or '' }}" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="60" data-counter-target="seo-home-meta-title-count">
-                    <p class="text-xs text-gray-400 mt-1"><span id="seo-home-meta-title-count">{{ (cs.get('seo_home_meta_title') or '')|length }}</span> / 60</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Homepage headline (H1) {{ req() }}</label>
+                    <input type="text" id="seo_home_h1_heading" name="seo_home_h1_heading" value="{{ cs.get('seo_home_h1_heading') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ cs.get('company_name') or 'Your firm name' }}" data-seo-auto-source="home-h1">
+                    <p class="text-xs text-gray-500 mt-1">This is the main line visitors and Google see. Meta title is generated from it automatically.</p>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
-                    <input type="text" name="seo_home_url_slug" value="{{ cs.get('seo_home_url_slug') or 'home' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50" readonly>
-                    <p class="text-xs text-gray-500 mt-1">Homepage uses the root URL.</p>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
-                    <textarea name="seo_home_meta_description" maxlength="155" rows="2" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="155" data-counter-target="seo-home-meta-desc-count">{{ cs.get('seo_home_meta_description') or '' }}</textarea>
-                    <p class="text-xs text-gray-400 mt-1"><span id="seo-home-meta-desc-count">{{ (cs.get('seo_home_meta_description') or '')|length }}</span> / 155</p>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
-                    <input type="url" name="seo_home_canonical_url" value="{{ cs.get('seo_home_canonical_url') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (public_site_base_url or '') ~ '/' }}">
-                    <p class="text-xs text-gray-500 mt-1">Leave blank to auto-generate from your public site URL.</p>
-                </div>
+                <details class="seo-advanced rounded-lg border border-gray-200 bg-white">
+                    <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-800">
+                        <i class="fas fa-sliders-h text-gray-400 mr-2"></i>Advanced SEO (optional)
+                    </summary>
+                    <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                            <input type="text" id="seo_home_meta_title" name="seo_home_meta_title" maxlength="60" value="{{ cs.get('seo_home_meta_title') or '' }}" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="60" data-counter-target="seo-home-meta-title-count" data-seo-auto="home-title" placeholder="{{ auto_home_title }}">
+                            <p class="text-xs text-gray-400 mt-1"><span id="seo-home-meta-title-count">{{ (cs.get('seo_home_meta_title') or '')|length }}</span> / 60 · Leave blank to auto-fill</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+                            <input type="text" name="seo_home_url_slug" value="home" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                            <p class="text-xs text-gray-500 mt-1">Homepage always uses the root URL.</p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                            <textarea id="seo_home_meta_description" name="seo_home_meta_description" maxlength="155" rows="2" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="155" data-counter-target="seo-home-meta-desc-count" data-seo-auto="home-desc" placeholder="{{ auto_home_desc }}">{{ cs.get('seo_home_meta_description') or '' }}</textarea>
+                            <p class="text-xs text-gray-400 mt-1"><span id="seo-home-meta-desc-count">{{ (cs.get('seo_home_meta_description') or '')|length }}</span> / 155 · Drafted from mission + tagline when blank</p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
+                            <input type="text" value="{{ (public_site_base_url or '') ~ '/' }}" class="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600" readonly>
+                            <p class="text-xs text-gray-500 mt-1">System-managed to prevent duplicate-content issues.</p>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
         <div class="border border-gray-200 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-gray-900 mb-1">About Page</h3>
-            <p class="text-xs text-gray-500 mb-4">The about section on your firm website (<code class="text-indigo-700">#about</code> anchor).</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>
-                    <input type="text" name="seo_about_h1_heading" value="{{ cs.get('seo_about_h1_heading') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="About Us">
-                </div>
+            <p class="text-xs text-gray-500 mb-4">About page at <code class="text-indigo-700">/about</code></p>
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
-                    <input type="text" name="seo_about_meta_title" maxlength="60" value="{{ cs.get('seo_about_meta_title') or '' }}" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="60" data-counter-target="seo-about-meta-title-count">
-                    <p class="text-xs text-gray-400 mt-1"><span id="seo-about-meta-title-count">{{ (cs.get('seo_about_meta_title') or '')|length }}</span> / 60</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">About headline (H1)</label>
+                    <input type="text" id="seo_about_h1_heading" name="seo_about_h1_heading" value="{{ cs.get('seo_about_h1_heading') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="About Us" data-seo-auto-source="about-h1">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
-                    <input type="text" name="seo_about_url_slug" value="{{ cs.get('seo_about_url_slug') or 'about' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="about">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
-                    <textarea name="seo_about_meta_description" maxlength="155" rows="2" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="155" data-counter-target="seo-about-meta-desc-count">{{ cs.get('seo_about_meta_description') or '' }}</textarea>
-                    <p class="text-xs text-gray-400 mt-1"><span id="seo-about-meta-desc-count">{{ (cs.get('seo_about_meta_description') or '')|length }}</span> / 155</p>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
-                    <input type="url" name="seo_about_canonical_url" value="{{ cs.get('seo_about_canonical_url') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (public_site_base_url or '') ~ '/#about' }}">
-                    <p class="text-xs text-gray-500 mt-1">Leave blank to auto-generate. Last updated is shown automatically when settings are saved.</p>
-                </div>
+                <details class="seo-advanced rounded-lg border border-gray-200 bg-white">
+                    <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-800">
+                        <i class="fas fa-sliders-h text-gray-400 mr-2"></i>Advanced SEO (optional)
+                    </summary>
+                    <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                            <input type="text" id="seo_about_meta_title" name="seo_about_meta_title" maxlength="60" value="{{ cs.get('seo_about_meta_title') or '' }}" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="60" data-counter-target="seo-about-meta-title-count" placeholder="{{ auto_about_title }}">
+                            <p class="text-xs text-gray-400 mt-1"><span id="seo-about-meta-title-count">{{ (cs.get('seo_about_meta_title') or '')|length }}</span> / 60 · Leave blank to auto-fill</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+                            <input type="text" name="seo_about_url_slug" value="{{ cs.get('seo_about_url_slug') or 'about' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="about">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                            <textarea id="seo_about_meta_description" name="seo_about_meta_description" maxlength="155" rows="2" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="155" data-counter-target="seo-about-meta-desc-count" placeholder="{{ auto_about_desc }}">{{ cs.get('seo_about_meta_description') or '' }}</textarea>
+                            <p class="text-xs text-gray-400 mt-1"><span id="seo-about-meta-desc-count">{{ (cs.get('seo_about_meta_description') or '')|length }}</span> / 155</p>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
+                            <input type="text" value="{{ (public_site_base_url or '') ~ '/about' }}" class="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600" readonly>
+                            <p class="text-xs text-gray-500 mt-1">System-managed.</p>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
     </div>
@@ -227,21 +394,35 @@
     </div>
     <div class="p-6 space-y-6">
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Hero tagline {{ tip('Overrides the firm tagline on the homepage hero only. Leave blank to use the tagline above.') }}</label>
-            <input type="text" name="homepage_hero_tagline" maxlength="500" value="{{ cs.get('homepage_hero_tagline') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ cs.get('company_tagline') or 'Your firm tagline' }}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Hero tagline {{ req() }} {{ tip('Shown under the homepage headline. Defaults to the firm tagline if left blank on the live site.') }}</label>
+            <input type="text" name="homepage_hero_tagline" maxlength="500" value="{{ cs.get('homepage_hero_tagline') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ cs.get('company_tagline') or 'Trusted Legal Counsel Since 1998' }}">
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Primary CTA button text</label>
-                <input type="text" name="homepage_cta_label" maxlength="120" value="{{ cs.get('homepage_cta_label') or 'Book a Consultation' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <input type="text" name="homepage_cta_label" maxlength="120" value="{{ cs.get('homepage_cta_label') or 'Book a Free Consultation' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Primary CTA link {{ tip('Relative path (e.g. contact) or full URL. Defaults to the contact page.') }}</label>
-                <input type="text" name="homepage_cta_url" maxlength="500" value="{{ cs.get('homepage_cta_url') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="contact">
+                <select name="homepage_cta_url" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+                    {% set cta_url = cs.get('homepage_cta_url') or 'contact' %}
+                    {% for opt in [
+                        ('contact', 'Contact page'),
+                        ('about', 'About page'),
+                        ('practice-areas', 'Practice areas'),
+                        ('team', 'Our team'),
+                        ('faq', 'FAQ'),
+                    ] %}
+                    <option value="{{ opt[0] }}" {% if cta_url == opt[0] %}selected{% endif %}>{{ opt[1] }}</option>
+                    {% endfor %}
+                    {% if cta_url and cta_url not in ['contact', 'about', 'practice-areas', 'team', 'faq', ''] %}
+                    <option value="{{ cta_url }}" selected>Custom: {{ cta_url }}</option>
+                    {% endif %}
+                </select>
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Header / hero phone {{ tip('Shown in the site header and hero. Defaults to Contact Details phone.') }}</label>
-                <input type="text" name="homepage_header_phone" maxlength="30" value="{{ cs.get('homepage_header_phone') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ cs.get('contact_number') or '+254…' }}">
+                <input type="tel" name="homepage_header_phone" maxlength="30" value="{{ cs.get('homepage_header_phone') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ cs.get('contact_number') or '+254…' }}">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Firm intro video URL {{ tip('Optional YouTube or Vimeo link for a homepage video section.') }}</label>
@@ -285,16 +466,26 @@
         <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Default consultation fee</label>
-                <input type="text" name="default_consultation_fee" maxlength="120" value="{{ cs.get('default_consultation_fee') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. KES 5,000 initial consultation">
+                <input type="text" name="default_consultation_fee" maxlength="120" value="{{ cs.get('default_consultation_fee') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. KES 5,000 initial consultation" {% if cs.get('default_free_consultation') %}disabled{% endif %} id="default_consultation_fee">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Response time commitment</label>
-                <input type="text" name="consultation_response_time" maxlength="120" value="{{ cs.get('consultation_response_time') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. We respond within 24 hours">
+                {% set rt = cs.get('consultation_response_time') or '' %}
+                {% set rt_options = ['Within 1 hour', 'Within 24 hours', 'Within 48 hours', 'Within 2 business days', 'Same day'] %}
+                <select name="consultation_response_time" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">— Optional —</option>
+                    {% for opt in rt_options %}
+                    <option value="{{ opt }}" {% if rt == opt %}selected{% endif %}>{{ opt }}</option>
+                    {% endfor %}
+                    {% if rt and rt not in rt_options %}
+                    <option value="{{ rt }}" selected>{{ rt }}</option>
+                    {% endif %}
+                </select>
             </div>
             <div class="md:col-span-2">
                 <label class="inline-flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="default_free_consultation" value="on" {% if cs.get('default_free_consultation') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
-                    <span class="text-sm text-gray-700">Site-wide default: free initial consultation</span>
+                    <input type="checkbox" name="default_free_consultation" id="default_free_consultation" value="on" {% if cs.get('default_free_consultation') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                    <span class="text-sm text-gray-700">Free initial consultation (shows “Free” instead of a fee)</span>
                 </label>
             </div>
         </div>
@@ -312,24 +503,70 @@
         <p class="settings-section-subtitle">Optional careers page content. When filled in, a Careers link appears on your public website.</p>
     </div>
     <div class="p-6 space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Careers page content</label>
+            <textarea name="seo_careers_body_content" id="seo_careers_body_content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Describe open roles, how to apply, and what it's like to work at your firm…">{{ careers.get('body_content') or '' }}</textarea>
+            <p class="text-xs text-gray-500 mt-1">When this is empty, the Careers link stays hidden on the public site.</p>
+        </div>
+        <details class="seo-advanced rounded-lg border border-gray-200 bg-white">
+            <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-800">
+                <i class="fas fa-sliders-h text-gray-400 mr-2"></i>Advanced SEO (optional)
+            </summary>
+            <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Page H1</label>
+                    <input type="text" name="seo_careers_h1_heading" value="{{ careers.get('h1_heading') or 'Careers' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                    <input type="text" name="seo_careers_meta_title" maxlength="70" value="{{ careers.get('meta_title') or '' }}" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="70" data-counter-target="seo-careers-meta-title-count" placeholder="Auto from content">
+                    <p class="text-xs text-gray-400 mt-1"><span id="seo-careers-meta-title-count">{{ (careers.get('meta_title') or '')|length }}</span> / 70 · Leave blank to auto-fill</p>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                    <textarea name="seo_careers_meta_description" maxlength="160" rows="2" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="160" data-counter-target="seo-careers-meta-desc-count" placeholder="Auto from first lines of content">{{ careers.get('meta_description') or '' }}</textarea>
+                    <p class="text-xs text-gray-400 mt-1"><span id="seo-careers-meta-desc-count">{{ (careers.get('meta_description') or '')|length }}</span> / 160</p>
+                </div>
+            </div>
+        </details>
+    </div>
+</div>
+
+{# 8. Language #}
+<div id="section-language" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+    <div class="settings-section-header">
+        <h2 class="settings-section-title">
+            <i class="fas fa-language settings-section-icon"></i>
+            8. Language (Swahili)
+        </h2>
+        <p class="settings-section-subtitle">When enabled, Swahili versions of key firm copy are used on the public site where filled in. English remains required.</p>
+    </div>
+    <div class="p-6 space-y-4">
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="swahili_enabled" id="swahili_enabled" value="on" {% if cs.get('swahili_enabled') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+            <span class="text-sm font-medium text-gray-800">Enable Swahili content fields</span>
+        </label>
+        <div id="swahili-fields" class="space-y-4 {% if not cs.get('swahili_enabled') %}hidden{% endif %}">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Page H1</label>
-                <input type="text" name="seo_careers_h1_heading" value="{{ careers.get('h1_heading') or 'Careers' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tagline (Swahili)</label>
+                <input type="text" name="company_tagline_sw" value="{{ cs.get('company_tagline_sw') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
-                <input type="text" name="seo_careers_meta_title" maxlength="70" value="{{ careers.get('meta_title') or '' }}" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="70" data-counter-target="seo-careers-meta-title-count">
-                <p class="text-xs text-gray-400 mt-1"><span id="seo-careers-meta-title-count">{{ (careers.get('meta_title') or '')|length }}</span> / 70</p>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hero tagline (Swahili)</label>
+                <input type="text" name="homepage_hero_tagline_sw" value="{{ cs.get('homepage_hero_tagline_sw') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
             </div>
-            <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
-                <textarea name="seo_careers_meta_description" maxlength="160" rows="2" class="seo-counter-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter-max="160" data-counter-target="seo-careers-meta-desc-count">{{ careers.get('meta_description') or '' }}</textarea>
-                <p class="text-xs text-gray-400 mt-1"><span id="seo-careers-meta-desc-count">{{ (careers.get('meta_description') or '')|length }}</span> / 160</p>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mission (Swahili)</label>
+                <textarea name="mission_statement_sw" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg">{{ cs.get('mission_statement_sw') or '' }}</textarea>
             </div>
-            <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-gray-700 mb-1">Careers page content</label>
-                <textarea name="seo_careers_body_content" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Describe open roles, how to apply, and what it's like to work at your firm…">{{ careers.get('body_content') or '' }}</textarea>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Firm history (Swahili)</label>
+                <textarea name="firm_history_sw" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg">{{ cs.get('firm_history_sw') or '' }}</textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Core values (Swahili)</label>
+                <p class="text-xs text-gray-500 mb-1">One per line: Name — description</p>
+                <textarea name="core_values_sw" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg">{{ cs.get('core_values_sw') or '' }}</textarea>
             </div>
         </div>
     </div>
@@ -349,5 +586,96 @@
         el.addEventListener('input', upd);
         upd();
     });
+
+    var list = document.getElementById('core-values-list');
+    var addBtn = document.getElementById('add-core-value-btn');
+    function nextCoreIdx() {
+        var max = -1;
+        if (!list) return 0;
+        list.querySelectorAll('[name^="core_value_title_"]').forEach(function(inp) {
+            var n = parseInt(inp.name.split('_').pop(), 10);
+            if (!isNaN(n) && n > max) max = n;
+        });
+        return max + 1;
+    }
+    function bindRemove(row) {
+        var btn = row.querySelector('.remove-core-value-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            if (list.querySelectorAll('.core-value-row').length <= 1) {
+                row.querySelectorAll('input').forEach(function(i) { i.value = ''; });
+                return;
+            }
+            row.remove();
+        });
+    }
+    if (list) list.querySelectorAll('.core-value-row').forEach(bindRemove);
+    if (addBtn && list) {
+        addBtn.addEventListener('click', function() {
+            var idx = nextCoreIdx();
+            var row = document.createElement('div');
+            row.className = 'core-value-row grid grid-cols-1 md:grid-cols-5 gap-2 items-start border border-gray-200 rounded-xl p-3 bg-white';
+            row.innerHTML =
+                '<div class="md:col-span-2"><input type="text" name="core_value_title_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Integrity"></div>' +
+                '<div class="md:col-span-2"><input type="text" name="core_value_detail_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="One-line description"></div>' +
+                '<div class="flex md:justify-end"><button type="button" class="remove-core-value-btn text-sm text-red-600 hover:text-red-800 px-2 py-2">Remove</button></div>';
+            list.appendChild(row);
+            bindRemove(row);
+        });
+    }
+
+    var freeToggle = document.getElementById('default_free_consultation');
+    var feeInput = document.getElementById('default_consultation_fee');
+    function syncFee() {
+        if (!feeInput || !freeToggle) return;
+        feeInput.disabled = freeToggle.checked;
+        if (freeToggle.checked) feeInput.value = '';
+    }
+    if (freeToggle) freeToggle.addEventListener('change', syncFee);
+
+    var swToggle = document.getElementById('swahili_enabled');
+    var swFields = document.getElementById('swahili-fields');
+    if (swToggle && swFields) {
+        swToggle.addEventListener('change', function() {
+            swFields.classList.toggle('hidden', !swToggle.checked);
+        });
+    }
+
+    var officesList = document.getElementById('offices-list');
+    var addOfficeBtn = document.getElementById('add-office-btn');
+    function nextOfficeIdx() {
+        var max = -1;
+        if (!officesList) return 0;
+        officesList.querySelectorAll('[name^="office_label_"]').forEach(function(inp) {
+            var n = parseInt(inp.name.split('_').pop(), 10);
+            if (!isNaN(n) && n > max) max = n;
+        });
+        return max + 1;
+    }
+    function bindOfficeRemove(row) {
+        var btn = row.querySelector('.remove-office-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function() { row.remove(); });
+    }
+    if (officesList) officesList.querySelectorAll('.office-row').forEach(bindOfficeRemove);
+    if (addOfficeBtn && officesList) {
+        addOfficeBtn.addEventListener('click', function() {
+            var hint = document.getElementById('offices-empty-hint');
+            if (hint) hint.remove();
+            var idx = nextOfficeIdx();
+            var row = document.createElement('div');
+            row.className = 'office-row border border-gray-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3 bg-white';
+            row.innerHTML =
+                '<div><label class="block text-xs font-medium text-gray-600 mb-1">Office label</label><input type="text" name="office_label_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="e.g. Mombasa Branch"></div>' +
+                '<div><label class="block text-xs font-medium text-gray-600 mb-1">City / Town</label><input type="text" name="office_city_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>' +
+                '<div><label class="block text-xs font-medium text-gray-600 mb-1">County</label><input type="text" name="office_county_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>' +
+                '<div><label class="block text-xs font-medium text-gray-600 mb-1">Country</label><input type="text" name="office_country_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>' +
+                '<div class="md:col-span-2"><label class="block text-xs font-medium text-gray-600 mb-1">Street / building</label><input type="text" name="office_street_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>' +
+                '<div><label class="block text-xs font-medium text-gray-600 mb-1">Floor</label><input type="text" name="office_floor_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div>' +
+                '<div class="flex items-end justify-between gap-2"><div class="flex-1"><label class="block text-xs font-medium text-gray-600 mb-1">Postal</label><input type="text" name="office_postal_' + idx + '" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"></div><button type="button" class="remove-office-btn text-sm text-red-600 px-2 py-2">Remove</button></div>';
+            officesList.appendChild(row);
+            bindOfficeRemove(row);
+        });
+    }
 })();
 </script>

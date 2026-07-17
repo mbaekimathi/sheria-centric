@@ -19,25 +19,51 @@
     </div>
     <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Law Society Registration Number</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Law Society Registration Number {{ req() }}</label>
             <input type="text" name="law_society_reg_number" value="{{ cs.get('law_society_reg_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Practicing Certificate Number</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Practicing Certificate Number {{ req() }}</label>
             <input type="text" name="practicing_certificate_number" value="{{ cs.get('practicing_certificate_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Lead Advocate / Managing Partner</label>
-            <input type="text" name="lead_advocate_name" value="{{ cs.get('lead_advocate_name') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+            <select name="lead_advocate_employee_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white">
+                <option value="">— Select from team —</option>
+                {% for emp in firm_employees %}
+                <option value="{{ emp.id }}" {% if cs.get('lead_advocate_employee_id')|string == emp.id|string or (not cs.get('lead_advocate_employee_id') and cs.get('lead_advocate_name') == emp.full_name) %}selected{% endif %}>{{ emp.full_name }}{% if emp.professional_title %} — {{ emp.professional_title }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Avoids re-typing a name that already exists in staff profiles.</p>
+            <input type="hidden" name="lead_advocate_name" value="{{ cs.get('lead_advocate_name') or '' }}">
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Bar Association Membership</label>
             <input type="text" name="bar_association_membership" value="{{ cs.get('bar_association_membership') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
         </div>
+        <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Jurisdictions admitted</label>
+            <p class="text-xs text-gray-500 mb-1">Where the firm is admitted to practice — one per line or comma-separated.</p>
+            <textarea name="jurisdictions_admitted" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Kenya&#10;East African Court of Justice">{{ cs.get('jurisdictions_admitted') or '' }}</textarea>
+        </div>
+        <div class="md:col-span-2 border border-gray-100 rounded-xl p-4 space-y-3">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="malpractice_insurance_status" value="on" {% if cs.get('malpractice_insurance_status') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                <span class="text-sm font-medium text-gray-800">Malpractice / professional indemnity insurance in place</span>
+            </label>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Insurance detail (optional)</label>
+                <input type="text" name="malpractice_insurance_detail" value="{{ cs.get('malpractice_insurance_detail') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Professional indemnity cover with …">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Disciplinary record statement (optional)</label>
+                <input type="text" name="disciplinary_record_statement" value="{{ cs.get('disciplinary_record_statement') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. No disciplinary action on record">
+            </div>
+        </div>
     </div>
 </div>
 
-{# 2. Firm practice areas #}
+{# 2. Firm practice areas — summary list; expand form via View #}
 <div id="section-practice-areas" class="settings-section bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
     <div class="settings-section-header">
         <h2 class="settings-section-title">
@@ -45,105 +71,138 @@
             2. Practice Areas
         </h2>
         <p class="settings-section-subtitle">
-            SEO-ready content per practice area — keywords, listing blurbs, and dedicated landing-page copy.
+            Practice areas listed below. Click <strong>View</strong> to open a form and update SEO content, landing-page copy, and consultation settings.
         </p>
     </div>
     <div class="p-6 space-y-4">
-        <div id="practice-areas-list" class="space-y-4">
+        <div id="practice-areas-list" class="space-y-3">
             {% for pa in firm_practice_areas %}
-            <div class="practice-area-row border border-gray-200 rounded-xl p-5 space-y-4 bg-white">
-                <div class="flex items-start justify-between gap-3">
-                    <p class="text-sm font-semibold text-gray-800">Practice area {{ loop.index }}</p>
-                    <button type="button" class="remove-practice-area-btn text-sm text-red-600 hover:text-red-800 font-medium">
-                        <i class="fas fa-trash-alt mr-1"></i>Remove
-                    </button>
+            <div class="practice-area-row border border-gray-200 rounded-xl overflow-hidden bg-white">
+                <div class="practice-area-summary bg-gray-50 px-5 py-4 flex flex-wrap items-center gap-4 cursor-pointer">
+                    <div class="practice-area-summary-thumb flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-indigo-100 text-indigo-700 flex items-center justify-center border border-white shadow">
+                        {% if pa.image_path %}
+                            {% if pa.image_path.startswith('http') %}
+                            <img src="{{ pa.image_path }}" alt="{{ pa.image_alt or pa.name or 'Practice area' }}" class="w-full h-full object-cover">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + pa.image_path) }}" alt="{{ pa.image_alt or pa.name or 'Practice area' }}" class="w-full h-full object-cover">
+                            {% endif %}
+                        {% else %}
+                        <i class="fas fa-briefcase"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="practice-area-summary-name text-base font-semibold text-gray-900">{{ pa.name or 'Untitled practice area' }}</h3>
+                        {% if pa.url_slug %}
+                        <p class="practice-area-summary-slug text-xs text-gray-500 mt-0.5">/{{ pa.url_slug }}</p>
+                        {% else %}
+                        <p class="practice-area-summary-slug text-xs text-gray-400 mt-0.5 italic">No URL slug yet</p>
+                        {% endif %}
+                        {% if pa.short_description or pa.description %}
+                        <p class="practice-area-summary-desc text-xs text-gray-500 mt-1 line-clamp-2">{{ pa.short_description or pa.description }}</p>
+                        {% else %}
+                        <p class="practice-area-summary-desc text-xs text-gray-400 mt-1 italic">No short description yet</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex-shrink-0 flex items-center gap-2">
+                        <button type="button"
+                                class="toggle-practice-area-form-btn inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                                aria-expanded="false">
+                            <i class="fas fa-eye"></i>
+                            <span class="toggle-practice-area-form-label">View</span>
+                        </button>
+                        <button type="button" class="remove-practice-area-btn text-sm text-red-600 hover:text-red-800 font-medium px-2 py-2" title="Remove">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
                 </div>
-                <input type="hidden" name="practice_area_id_{{ loop.index0 }}" value="{{ pa.id }}">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Name {{ req() }}</label>
-                    <input type="text" name="practice_area_name_{{ loop.index0 }}" value="{{ pa.name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law, Criminal Defense, Real Estate, Corporate">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Target Keyword(s)</label>
-                    <p class="text-xs text-gray-500 mb-2">Primary search phrases for this practice area page (comma-separated).</p>
-                    <input type="text" name="practice_area_target_keywords_{{ loop.index0 }}" value="{{ pa.target_keywords or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. family lawyer Kiserian, divorce attorney Kajiado">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Sub-specialties</label>
-                    <p class="text-xs text-gray-500 mb-2">One per line (e.g. divorce &amp; custody, child support under Family Law).</p>
-                    <textarea name="practice_area_sub_specialties_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Divorce &amp; separation&#10;Child custody &amp; support&#10;Adoption">{{ pa.sub_specialties or '' }}</textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
-                    <p class="text-xs text-gray-500 mb-2">For the practice areas listing page (1–2 sentences).</p>
-                    <textarea name="practice_area_short_description_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief overview for cards and search snippets.">{{ pa.short_description or pa.description or '' }}</textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Long Description</label>
-                    <p class="text-xs text-gray-500 mb-2">For the dedicated landing page for this practice area.</p>
-                    <textarea name="practice_area_long_description_{{ loop.index0 }}" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Full page content: who you help, process, why choose your firm, local relevance…">{{ pa.long_description or '' }}</textarea>
-                </div>
-                <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="practice-area-form hidden border-t border-gray-200 p-5 space-y-4">
+                    <input type="hidden" name="practice_area_id_{{ loop.index0 }}" value="{{ pa.id }}">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
-                        <p class="text-xs text-gray-500 mb-1">Search result title (max 60 characters).</p>
-                        <input type="text" name="practice_area_meta_title_{{ loop.index0 }}" maxlength="60" value="{{ pa.meta_title or '' }}" class="pa-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="pa-meta-title-count-{{ loop.index0 }}">
-                        <p class="text-xs text-gray-400 mt-1"><span id="pa-meta-title-count-{{ loop.index0 }}">{{ (pa.meta_title or '')|length }}</span> / 60</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Name {{ req() }}</label>
+                        <input type="text" name="practice_area_name_{{ loop.index0 }}" value="{{ pa.name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law, Criminal Defense, Real Estate, Corporate">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
-                        <p class="text-xs text-gray-500 mb-1">Auto-generated from name if empty (e.g. family-law).</p>
-                        <input type="text" name="practice_area_url_slug_{{ loop.index0 }}" value="{{ pa.url_slug or '' }}" class="practice-area-slug w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="family-law">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
-                        <p class="text-xs text-gray-500 mb-1">Search snippet (max 155 characters).</p>
-                        <textarea name="practice_area_meta_description_{{ loop.index0 }}" maxlength="155" rows="2" class="pa-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="pa-meta-desc-count-{{ loop.index0 }}">{{ pa.meta_description or '' }}</textarea>
-                        <p class="text-xs text-gray-400 mt-1"><span id="pa-meta-desc-count-{{ loop.index0 }}">{{ (pa.meta_description or '')|length }}</span> / 155</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Target Keyword(s)</label>
+                        <p class="text-xs text-gray-500 mb-2">Primary search phrases for this practice area page (comma-separated).</p>
+                        <input type="text" name="practice_area_target_keywords_{{ loop.index0 }}" value="{{ pa.target_keywords or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. family lawyer Kiserian, divorce attorney Kajiado">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>
-                        <input type="text" name="practice_area_h1_heading_{{ loop.index0 }}" value="{{ pa.h1_heading or pa.name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ pa.name or 'Practice area title' }}">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Sub-specialties</label>
+                        <p class="text-xs text-gray-500 mb-2">One per line (e.g. divorce &amp; custody, child support under Family Law).</p>
+                        <textarea name="practice_area_sub_specialties_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Divorce &amp; separation&#10;Child custody &amp; support&#10;Adoption">{{ pa.sub_specialties or '' }}</textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
-                        <input type="url" name="practice_area_canonical_url_{{ loop.index0 }}" value="{{ pa.canonical_url or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (public_site_base_url or '') ~ '/#' ~ (pa.url_slug or 'practice-area') }}">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>
+                        <p class="text-xs text-gray-500 mb-2">For the practice areas listing page (1–2 sentences).</p>
+                        <textarea name="practice_area_short_description_{{ loop.index0 }}" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Brief overview for cards and search snippets.">{{ pa.short_description or pa.description or '' }}</textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Image</label>
-                        <input type="file" name="practice_area_image_{{ loop.index0 }}" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
-                        {% if pa.image_path %}<p class="mt-1 text-xs text-gray-500">Current: {{ pa.image_path }}</p>{% endif %}
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Long Description</label>
+                        <p class="text-xs text-gray-500 mb-2">For the dedicated landing page for this practice area.</p>
+                        <textarea name="practice_area_long_description_{{ loop.index0 }}" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Full page content: who you help, process, why choose your firm, local relevance…">{{ pa.long_description or '' }}</textarea>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Image Alt Text <span class="text-red-500">*</span></label>
-                        <p class="text-xs text-gray-500 mb-1">Required when uploading a new image.</p>
-                        <input type="text" name="practice_area_image_alt_{{ loop.index0 }}" value="{{ pa.image_alt or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. {{ pa.name }} legal services illustration">
+                    <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>
+                            <p class="text-xs text-gray-500 mb-1">Search result title (max 60 characters).</p>
+                            <input type="text" name="practice_area_meta_title_{{ loop.index0 }}" maxlength="60" value="{{ pa.meta_title or '' }}" class="pa-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="pa-meta-title-count-{{ loop.index0 }}">
+                            <p class="text-xs text-gray-400 mt-1"><span id="pa-meta-title-count-{{ loop.index0 }}">{{ (pa.meta_title or '')|length }}</span> / 60</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>
+                            <p class="text-xs text-gray-500 mb-1">Auto-generated from name if empty (e.g. family-law).</p>
+                            <input type="text" name="practice_area_url_slug_{{ loop.index0 }}" value="{{ pa.url_slug or '' }}" class="practice-area-slug w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="family-law">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>
+                            <p class="text-xs text-gray-500 mb-1">Search snippet (max 155 characters).</p>
+                            <textarea name="practice_area_meta_description_{{ loop.index0 }}" maxlength="155" rows="2" class="pa-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" data-counter="pa-meta-desc-count-{{ loop.index0 }}">{{ pa.meta_description or '' }}</textarea>
+                            <p class="text-xs text-gray-400 mt-1"><span id="pa-meta-desc-count-{{ loop.index0 }}">{{ (pa.meta_description or '')|length }}</span> / 155</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>
+                            <input type="text" name="practice_area_h1_heading_{{ loop.index0 }}" value="{{ pa.h1_heading or pa.name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ pa.name or 'Practice area title' }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
+                            <input type="url" name="practice_area_canonical_url_{{ loop.index0 }}" value="{{ pa.canonical_url or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="{{ (public_site_base_url or '') ~ '/#' ~ (pa.url_slug or 'practice-area') }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Image</label>
+                            <input type="file" name="practice_area_image_{{ loop.index0 }}" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                            {% if pa.image_path %}<p class="mt-1 text-xs text-gray-500">Current: {{ pa.image_path }}</p>{% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Image Alt Text <span class="text-red-500">*</span></label>
+                            <p class="text-xs text-gray-500 mb-1">Required when uploading a new image.</p>
+                            <input type="text" name="practice_area_image_alt_{{ loop.index0 }}" value="{{ pa.image_alt or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. {{ pa.name }} legal services illustration">
+                        </div>
+                        {% if pa.updated_at %}
+                        <div class="md:col-span-2">
+                            <p class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i> Last updated: {{ pa.updated_at }}</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% if pa.updated_at %}
-                    <div class="md:col-span-2">
-                        <p class="text-xs text-gray-500"><i class="fas fa-clock mr-1"></i> Last updated: {{ pa.updated_at }}</p>
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <p class="md:col-span-2 text-sm font-semibold text-gray-800">Conversion &amp; consultation</p>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Custom CTA text</label>
-                        <input type="text" name="practice_area_cta_label_{{ loop.index0 }}" maxlength="120" value="{{ pa.cta_label or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Book a Consultation">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Consultation fee</label>
-                        <input type="text" name="practice_area_consultation_fee_{{ loop.index0 }}" maxlength="120" value="{{ pa.consultation_fee or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Uses site default if empty">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Response time</label>
-                        <input type="text" name="practice_area_response_time_{{ loop.index0 }}" maxlength="120" value="{{ pa.response_time_commitment or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. We respond within 24 hours">
-                    </div>
-                    <div class="flex items-end">
-                        <label class="inline-flex items-center gap-2 cursor-pointer pb-2">
-                            <input type="checkbox" name="practice_area_free_consultation_{{ loop.index0 }}" value="on" {% if pa.free_consultation %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
-                            <span class="text-sm text-gray-700">Free consultation for this area</span>
-                        </label>
+                    <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <p class="md:col-span-2 text-sm font-semibold text-gray-800">Conversion &amp; consultation</p>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Custom CTA text</label>
+                            <input type="text" name="practice_area_cta_label_{{ loop.index0 }}" maxlength="120" value="{{ pa.cta_label or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Book a Consultation">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Consultation fee</label>
+                            <input type="text" name="practice_area_consultation_fee_{{ loop.index0 }}" maxlength="120" value="{{ pa.consultation_fee or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Uses site default if empty">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Response time</label>
+                            <input type="text" name="practice_area_response_time_{{ loop.index0 }}" maxlength="120" value="{{ pa.response_time_commitment or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. We respond within 24 hours">
+                        </div>
+                        <div class="flex items-end">
+                            <label class="inline-flex items-center gap-2 cursor-pointer pb-2">
+                                <input type="checkbox" name="practice_area_free_consultation_{{ loop.index0 }}" value="on" {% if pa.free_consultation %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                                <span class="text-sm text-gray-700">Free consultation for this area</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -350,8 +409,8 @@
                     {% endif %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Photo Alt Text <span class="text-red-500">*</span></label>
-                    <p class="text-xs text-gray-500 mb-1">Required when uploading a new photo.</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Photo Alt Text</label>
+                    <p class="text-xs text-gray-500 mb-1">Defaults to “{Name}, {Title} at {Firm}”.</p>
                     <input type="text" name="profile_picture_alt_{{ emp.id }}" value="{{ emp.profile_picture_alt or emp.full_name or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Portrait of {{ emp.full_name }}">
                 </div>
                 <div>
@@ -361,6 +420,14 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Year Called to the Bar</label>
                     <input type="text" name="year_called_to_bar_{{ emp.id }}" value="{{ emp.year_called_to_bar or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. 2012">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bar admission date</label>
+                    <input type="date" name="bar_admission_date_{{ emp.id }}" value="{{ emp.bar_admission_date or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn / professional profile</label>
+                    <input type="url" name="linkedin_profile_url_{{ emp.id }}" value="{{ emp.linkedin_profile_url or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="https://www.linkedin.com/in/…">
                 </div>
                 <div class="md:col-span-2">
                     <h4 class="text-sm font-semibold text-gray-800 mb-3">Education</h4>
@@ -509,6 +576,19 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Answer</label>
                     <textarea name="faq_answer_{{ loop.index0 }}" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Clear, helpful answer for potential clients…">{{ faq.answer or '' }}</textarea>
                 </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assign to practice area(s)</label>
+                    <p class="text-xs text-gray-500 mb-2">Optional — pulls this FAQ onto matching practice pages.</p>
+                    {% set faq_pa_ids = (faq.practice_area_ids or '').split(',') %}
+                    <div class="flex flex-wrap gap-3">
+                        {% for pa in firm_practice_areas %}
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="faq_practice_areas_{{ loop.index0 }}" value="{{ pa.id }}" {% if (pa.id|string) in faq_pa_ids %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                            {{ pa.name }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
                 <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="faq_publish_{{ loop.index0 }}" value="on" {% if faq.publish_confirmed %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                     <span class="text-sm text-gray-700">Publish on website and include in FAQ structured data</span>
@@ -556,22 +636,61 @@
                         <input type="text" name="blog_slug_{{ loop.index0 }}" value="{{ post.slug or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="auto-from-title">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Author</label>
-                        <select name="blog_author_{{ loop.index0 }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
-                            <option value="">— Select —</option>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Author <span class="text-red-500">*</span></label>
+                        <select name="blog_author_{{ loop.index0 }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" required>
+                            <option value="">— Select attorney —</option>
                             {% for emp in firm_employees %}
                             <option value="{{ emp.id }}" {% if post.author_employee_id == emp.id %}selected{% endif %}>{{ emp.full_name }}</option>
                             {% endfor %}
                         </select>
+                        <p class="text-xs text-gray-500 mt-1">Required for published articles — feeds authorship schema.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Last reviewed</label>
+                        <input type="date" name="blog_last_reviewed_{{ loop.index0 }}" value="{{ post.last_reviewed_at or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <p class="text-xs text-gray-500 mt-1">Defaults to publish date. Re-review after 12 months.</p>
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>
                         <textarea name="blog_excerpt_{{ loop.index0 }}" rows="2" maxlength="300" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ post.excerpt or '' }}</textarea>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cover image</label>
+                        <input type="file" name="blog_image_{{ loop.index0 }}" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">
+                        {% if post.image_path %}
+                        <div class="mt-2 flex items-center gap-3">
+                            {% if post.image_path.startswith('http') %}
+                            <img src="{{ post.image_path }}" alt="{{ post.image_alt or post.title or 'Cover' }}" class="h-16 w-24 object-cover rounded-lg border border-gray-200">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/profile_pictures/' + post.image_path) }}" alt="{{ post.image_alt or post.title or 'Cover' }}" class="h-16 w-24 object-cover rounded-lg border border-gray-200">
+                            {% endif %}
+                            <p class="text-xs text-gray-500">Current: {{ post.image_path }}</p>
+                        </div>
+                        {% endif %}
+                        <p class="text-xs text-gray-500 mt-1">PNG, JPG, or GIF. Shown on Insights cards and the article page.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cover image alt text</label>
+                        <input type="text" name="blog_image_alt_{{ loop.index0 }}" value="{{ post.image_alt or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. {{ post.title or 'Article' }} cover photo">
+                        <p class="text-xs text-gray-500 mt-1">Required when uploading a new image.</p>
+                    </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Article body</label>
                         <textarea name="blog_body_{{ loop.index0 }}" rows="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm">{{ post.body or '' }}</textarea>
                     </div>
+                    <details class="md:col-span-2 seo-advanced rounded-lg border border-gray-200 bg-gray-50">
+                        <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-gray-800">Advanced SEO (optional)</summary>
+                        <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Meta title</label>
+                                <input type="text" name="blog_meta_title_{{ loop.index0 }}" maxlength="70" value="{{ post.meta_title or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Auto from title">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Meta description</label>
+                                <input type="text" name="blog_meta_description_{{ loop.index0 }}" maxlength="160" value="{{ post.meta_description or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Auto from excerpt">
+                            </div>
+                        </div>
+                    </details>
                 </div>
                 <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="blog_published_{{ loop.index0 }}" value="on" {% if post.published %}checked{% endif %} class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
@@ -599,23 +718,60 @@
     </div>
     <div class="p-6 space-y-6">
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Data Protection Act (Kenya) Registration Number</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Data Protection Act (Kenya) Registration Number {{ req() }}</label>
             <input type="text" name="data_protection_registration_number" value="{{ cs.get('data_protection_registration_number') or '' }}" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="ODPC registration number">
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Privacy Policy</label>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label class="block text-sm font-medium text-gray-700">Privacy Policy</label>
+                <button type="submit" name="apply_privacy_template" value="1" class="text-xs font-semibold text-indigo-700 hover:text-indigo-900" formaction="{{ role_url('update_company_settings') }}">Start from Kenya template</button>
+            </div>
             <p class="text-xs text-gray-500 mb-2">How the firm collects, uses, stores, and protects client and visitor data.</p>
             <textarea name="privacy_policy" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="Enter your firm's privacy policy…">{{ cs.get('privacy_policy') or '' }}</textarea>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Terms of Service</label>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label class="block text-sm font-medium text-gray-700">Terms of Service</label>
+                <button type="submit" name="apply_terms_template" value="1" class="text-xs font-semibold text-indigo-700 hover:text-indigo-900">Start from Kenya template</button>
+            </div>
             <p class="text-xs text-gray-500 mb-2">Rules and conditions for using your services, website, and client portal.</p>
             <textarea name="terms_of_service" rows="10" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="Enter your firm's terms of service…">{{ cs.get('terms_of_service') or '' }}</textarea>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Website Disclaimer</label>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label class="block text-sm font-medium text-gray-700">Website Disclaimer</label>
+                <button type="submit" name="apply_disclaimer_template" value="1" class="text-xs font-semibold text-indigo-700 hover:text-indigo-900">Start from Kenya template</button>
+            </div>
             <p class="text-xs text-gray-500 mb-2">Attorney–client relationship notice and that site content is not legal advice.</p>
-            <textarea name="website_disclaimer" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="The information on this website is for general purposes only and does not create an attorney-client relationship…">{{ cs.get('website_disclaimer') or '' }}</textarea>
+            <textarea name="website_disclaimer" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm" placeholder="The information on this website is for general purposes only…">{{ cs.get('website_disclaimer') or '' }}</textarea>
+        </div>
+        <div class="border border-indigo-100 rounded-xl p-5 bg-indigo-50/40 space-y-4">
+            <h3 class="text-sm font-semibold text-gray-900">Cookie consent banner</h3>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="cookie_consent_enabled" value="on" {% if cs.get('cookie_consent_enabled', 1) %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                <span class="text-sm text-gray-800">Show cookie consent banner on the public site</span>
+            </label>
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                    <label class="block text-sm font-medium text-gray-700">Banner message</label>
+                    <button type="submit" name="apply_cookie_template" value="1" class="text-xs font-semibold text-indigo-700">Use default message</button>
+                </div>
+                <textarea name="cookie_consent_message" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ cs.get('cookie_consent_message') or '' }}</textarea>
+            </div>
+        </div>
+        <div class="border border-gray-200 rounded-xl p-5 space-y-4">
+            <h3 class="text-sm font-semibold text-gray-900">Accessibility statement</h3>
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="accessibility_statement_enabled" value="on" {% if cs.get('accessibility_statement_enabled') %}checked{% endif %} class="rounded border-gray-300 text-indigo-600">
+                <span class="text-sm text-gray-800">Publish accessibility statement page</span>
+            </label>
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                    <label class="block text-sm font-medium text-gray-700">Statement text</label>
+                    <button type="submit" name="apply_accessibility_template" value="1" class="text-xs font-semibold text-indigo-700">Use default template</button>
+                </div>
+                <textarea name="accessibility_statement" rows="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">{{ cs.get('accessibility_statement') or '' }}</textarea>
+            </div>
         </div>
     </div>
 </div>
@@ -645,61 +801,76 @@
 
     function practiceAreaRowHtml(idx) {
         return ''
-            + '<div class="practice-area-row border border-gray-200 rounded-xl p-5 space-y-4 bg-white">'
-            + '  <div class="flex items-start justify-between gap-3">'
-            + '    <p class="text-sm font-semibold text-gray-800">Practice area</p>'
-            + '    <button type="button" class="remove-practice-area-btn text-sm text-red-600 hover:text-red-800 font-medium">'
-            + '      <i class="fas fa-trash-alt mr-1"></i>Remove'
-            + '    </button>'
+            + '<div class="practice-area-row border border-gray-200 rounded-xl overflow-hidden bg-white">'
+            + '  <div class="practice-area-summary bg-gray-50 px-5 py-4 flex flex-wrap items-center gap-4 cursor-pointer">'
+            + '    <div class="practice-area-summary-thumb flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-indigo-100 text-indigo-700 flex items-center justify-center border border-white shadow">'
+            + '      <i class="fas fa-briefcase"></i>'
+            + '    </div>'
+            + '    <div class="flex-1 min-w-0">'
+            + '      <h3 class="practice-area-summary-name text-base font-semibold text-gray-900">New practice area</h3>'
+            + '      <p class="practice-area-summary-slug text-xs text-gray-400 mt-0.5 italic">No URL slug yet</p>'
+            + '      <p class="practice-area-summary-desc text-xs text-gray-400 mt-1 italic">No short description yet</p>'
+            + '    </div>'
+            + '    <div class="flex-shrink-0 flex items-center gap-2">'
+            + '      <button type="button" class="toggle-practice-area-form-btn inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors" aria-expanded="false">'
+            + '        <i class="fas fa-eye"></i>'
+            + '        <span class="toggle-practice-area-form-label">View</span>'
+            + '      </button>'
+            + '      <button type="button" class="remove-practice-area-btn text-sm text-red-600 hover:text-red-800 font-medium px-2 py-2" title="Remove">'
+            + '        <i class="fas fa-trash-alt"></i>'
+            + '      </button>'
+            + '    </div>'
             + '  </div>'
-            + '  <input type="hidden" name="practice_area_id_' + idx + '" value="">'
-            + '  <div>'
-            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Name</label>'
-            + '    <input type="text" name="practice_area_name_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law, Criminal Defense">'
-            + '  </div>'
-            + '  <div>'
-            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Target Keyword(s)</label>'
-            + '    <input type="text" name="practice_area_target_keywords_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">'
-            + '  </div>'
-            + '  <div>'
-            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Sub-specialties</label>'
-            + '    <textarea name="practice_area_sub_specialties_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
-            + '  </div>'
-            + '  <div>'
-            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>'
-            + '    <textarea name="practice_area_short_description_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
-            + '  </div>'
-            + '  <div>'
-            + '    <label class="block text-sm font-medium text-gray-700 mb-1">Long Description</label>'
-            + '    <textarea name="practice_area_long_description_' + idx + '" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
-            + '  </div>'
-            + '  <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>'
-            + '    <input type="text" name="practice_area_meta_title_' + idx + '" maxlength="60" class="pa-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>'
-            + '    <input type="text" name="practice_area_url_slug_' + idx + '" class="practice-area-slug w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>'
-            + '    <textarea name="practice_area_meta_description_' + idx + '" maxlength="155" rows="2" class="pa-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>'
-            + '    <input type="text" name="practice_area_h1_heading_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>'
-            + '    <input type="url" name="practice_area_canonical_url_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Image</label>'
-            + '    <input type="file" name="practice_area_image_' + idx + '" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700"></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Image Alt Text</label>'
-            + '    <input type="text" name="practice_area_image_alt_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '  </div>'
-            + '  <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">'
-            + '    <p class="md:col-span-2 text-sm font-semibold text-gray-800">Conversion &amp; consultation</p>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Custom CTA text</label>'
-            + '    <input type="text" name="practice_area_cta_label_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Consultation fee</label>'
-            + '    <input type="text" name="practice_area_consultation_fee_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Response time</label>'
-            + '    <input type="text" name="practice_area_response_time_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
-            + '    <div class="flex items-end"><label class="inline-flex items-center gap-2 cursor-pointer pb-2">'
-            + '    <input type="checkbox" name="practice_area_free_consultation_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600">'
-            + '    <span class="text-sm text-gray-700">Free consultation</span></label></div>'
+            + '  <div class="practice-area-form hidden border-t border-gray-200 p-5 space-y-4">'
+            + '    <input type="hidden" name="practice_area_id_' + idx + '" value="">'
+            + '    <div>'
+            + '      <label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Name</label>'
+            + '      <input type="text" name="practice_area_name_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="e.g. Family Law, Criminal Defense">'
+            + '    </div>'
+            + '    <div>'
+            + '      <label class="block text-sm font-medium text-gray-700 mb-1">Target Keyword(s)</label>'
+            + '      <input type="text" name="practice_area_target_keywords_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">'
+            + '    </div>'
+            + '    <div>'
+            + '      <label class="block text-sm font-medium text-gray-700 mb-1">Sub-specialties</label>'
+            + '      <textarea name="practice_area_sub_specialties_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
+            + '    </div>'
+            + '    <div>'
+            + '      <label class="block text-sm font-medium text-gray-700 mb-1">Short Description</label>'
+            + '      <textarea name="practice_area_short_description_' + idx + '" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
+            + '    </div>'
+            + '    <div>'
+            + '      <label class="block text-sm font-medium text-gray-700 mb-1">Long Description</label>'
+            + '      <textarea name="practice_area_long_description_' + idx + '" rows="6" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>'
+            + '    </div>'
+            + '    <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Meta Title</label>'
+            + '      <input type="text" name="practice_area_meta_title_' + idx + '" maxlength="60" class="pa-meta-title w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>'
+            + '      <input type="text" name="practice_area_url_slug_' + idx + '" class="practice-area-slug w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Meta Description</label>'
+            + '      <textarea name="practice_area_meta_description_' + idx + '" maxlength="155" rows="2" class="pa-meta-desc w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">H1 Heading</label>'
+            + '      <input type="text" name="practice_area_h1_heading_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>'
+            + '      <input type="url" name="practice_area_canonical_url_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Practice Area Image</label>'
+            + '      <input type="file" name="practice_area_image_' + idx + '" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700"></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Image Alt Text</label>'
+            + '      <input type="text" name="practice_area_image_alt_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '    </div>'
+            + '    <div class="border-t border-gray-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">'
+            + '      <p class="md:col-span-2 text-sm font-semibold text-gray-800">Conversion &amp; consultation</p>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Custom CTA text</label>'
+            + '      <input type="text" name="practice_area_cta_label_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Consultation fee</label>'
+            + '      <input type="text" name="practice_area_consultation_fee_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div><label class="block text-sm font-medium text-gray-700 mb-1">Response time</label>'
+            + '      <input type="text" name="practice_area_response_time_' + idx + '" maxlength="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></div>'
+            + '      <div class="flex items-end"><label class="inline-flex items-center gap-2 cursor-pointer pb-2">'
+            + '      <input type="checkbox" name="practice_area_free_consultation_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600">'
+            + '      <span class="text-sm text-gray-700">Free consultation</span></label></div>'
+            + '    </div>'
             + '  </div>'
             + '</div>';
     }
@@ -712,18 +883,122 @@
             .slice(0, 120);
     }
 
+    function setPracticeAreaFormOpen(row, open) {
+        if (!row) return;
+        var form = row.querySelector('.practice-area-form');
+        var btn = row.querySelector('.toggle-practice-area-form-btn');
+        if (!form || !btn) return;
+        var label = btn.querySelector('.toggle-practice-area-form-label');
+        var icon = btn.querySelector('i');
+        if (open) {
+            form.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+            if (label) label.textContent = 'Close';
+            if (icon) icon.className = 'fas fa-times';
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            btn.classList.add('bg-gray-600', 'hover:bg-gray-700');
+            form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            form.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+            if (label) label.textContent = 'View';
+            if (icon) icon.className = 'fas fa-eye';
+            btn.classList.remove('bg-gray-600', 'hover:bg-gray-700');
+            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        }
+    }
+
+    function closeOtherPracticeAreaForms(exceptRow) {
+        document.querySelectorAll('.practice-area-row').forEach(function(other) {
+            if (other === exceptRow) return;
+            setPracticeAreaFormOpen(other, false);
+        });
+    }
+
+    function bindPracticeAreaToggle(btn) {
+        if (!btn || btn.dataset.boundToggle) return;
+        btn.dataset.boundToggle = '1';
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var row = btn.closest('.practice-area-row');
+            if (!row) return;
+            var form = row.querySelector('.practice-area-form');
+            var isOpen = form && !form.classList.contains('hidden');
+            closeOtherPracticeAreaForms(row);
+            setPracticeAreaFormOpen(row, !isOpen);
+        });
+    }
+
+    function bindPracticeAreaSummaryClick(row) {
+        if (!row || row.dataset.boundSummary) return;
+        row.dataset.boundSummary = '1';
+        var summary = row.querySelector('.practice-area-summary');
+        if (!summary) return;
+        summary.addEventListener('click', function(e) {
+            if (e.target.closest('.remove-practice-area-btn') || e.target.closest('.toggle-practice-area-form-btn')) return;
+            var form = row.querySelector('.practice-area-form');
+            var isOpen = form && !form.classList.contains('hidden');
+            closeOtherPracticeAreaForms(row);
+            setPracticeAreaFormOpen(row, !isOpen);
+        });
+    }
+
+    function updatePracticeAreaSummary(row) {
+        if (!row) return;
+        var nameInput = row.querySelector('input[name^="practice_area_name_"]');
+        var slugInput = row.querySelector('.practice-area-slug');
+        var descInput = row.querySelector('textarea[name^="practice_area_short_description_"]');
+        var nameEl = row.querySelector('.practice-area-summary-name');
+        var slugEl = row.querySelector('.practice-area-summary-slug');
+        var descEl = row.querySelector('.practice-area-summary-desc');
+        var name = nameInput ? (nameInput.value || '').trim() : '';
+        var slug = slugInput ? (slugInput.value || '').trim() : '';
+        var desc = descInput ? (descInput.value || '').trim() : '';
+        if (nameEl) nameEl.textContent = name || 'Untitled practice area';
+        if (slugEl) {
+            if (slug) {
+                slugEl.textContent = '/' + slug;
+                slugEl.classList.remove('text-gray-400', 'italic');
+                slugEl.classList.add('text-gray-500');
+            } else {
+                slugEl.textContent = 'No URL slug yet';
+                slugEl.classList.add('text-gray-400', 'italic');
+                slugEl.classList.remove('text-gray-500');
+            }
+        }
+        if (descEl) {
+            if (desc) {
+                descEl.textContent = desc;
+                descEl.classList.remove('text-gray-400', 'italic');
+                descEl.classList.add('text-gray-500');
+            } else {
+                descEl.textContent = 'No short description yet';
+                descEl.classList.add('text-gray-400', 'italic');
+                descEl.classList.remove('text-gray-500');
+            }
+        }
+    }
+
     function wirePracticeAreaRow(row) {
         if (!row) return;
         var nameInput = row.querySelector('input[name^="practice_area_name_"]');
         var slugInput = row.querySelector('.practice-area-slug');
+        var descInput = row.querySelector('textarea[name^="practice_area_short_description_"]');
         if (nameInput && slugInput) {
             nameInput.addEventListener('input', function() {
                 if (!slugInput.dataset.touched) {
                     slugInput.value = slugifyText(nameInput.value);
                 }
+                updatePracticeAreaSummary(row);
             });
             slugInput.addEventListener('input', function() {
                 slugInput.dataset.touched = slugInput.value ? '1' : '';
+                updatePracticeAreaSummary(row);
+            });
+        }
+        if (descInput) {
+            descInput.addEventListener('input', function() {
+                updatePracticeAreaSummary(row);
             });
         }
         row.querySelectorAll('[data-counter]').forEach(function(el) {
@@ -739,6 +1014,8 @@
                 if (max && el.value.length > max) el.value = el.value.slice(0, max);
             });
         });
+        bindPracticeAreaToggle(row.querySelector('.toggle-practice-area-form-btn'));
+        bindPracticeAreaSummaryClick(row);
     }
 
     document.querySelectorAll('.practice-area-row').forEach(wirePracticeAreaRow);
@@ -759,6 +1036,10 @@
             paList.appendChild(row);
             bindRemove(row.querySelector('.remove-practice-area-btn'), '.practice-area-row');
             wirePracticeAreaRow(row);
+            closeOtherPracticeAreaForms(row);
+            setPracticeAreaFormOpen(row, true);
+            var nameInput = row.querySelector('input[name^="practice_area_name_"]');
+            if (nameInput) nameInput.focus();
             paNextIndex += 1;
         });
     }
@@ -990,6 +1271,15 @@
     var addFaqBtn = document.getElementById('add-faq-btn');
     var faqNextIndex = faqList ? faqList.querySelectorAll('.faq-row').length : 0;
     function faqRowHtml(idx) {
+        var paChecks = '';
+        document.querySelectorAll('#section-practice-areas .practice-area-row input[name^="practice_area_id_"]').forEach(function(inp) {
+            var row = inp.closest('.practice-area-row');
+            var nameInp = row && row.querySelector('input[name^="practice_area_name_"]');
+            var label = nameInp ? nameInp.value : ('Area ' + inp.value);
+            paChecks += '<label class="inline-flex items-center gap-2 text-sm text-gray-700">'
+                + '<input type="checkbox" name="faq_practice_areas_' + idx + '" value="' + inp.value + '" class="rounded border-gray-300 text-indigo-600"> '
+                + (label || inp.value) + '</label>';
+        });
         return ''
             + '<div class="faq-row border border-gray-200 rounded-xl p-5 space-y-3 bg-white">'
             + '  <div class="flex items-start justify-between gap-3">'
@@ -1003,6 +1293,8 @@
             + '  <input type="text" name="faq_question_' + idx + '" maxlength="500" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></div>'
             + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Answer</label>'
             + '  <textarea name="faq_answer_' + idx + '" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea></div>'
+            + '  <div><label class="block text-sm font-medium text-gray-700 mb-1">Assign to practice area(s)</label>'
+            + '  <div class="flex flex-wrap gap-3">' + paChecks + '</div></div>'
             + '  <label class="inline-flex items-center gap-2 cursor-pointer">'
             + '    <input type="checkbox" name="faq_publish_' + idx + '" value="on" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">'
             + '    <span class="text-sm text-gray-700">Publish on website and include in FAQ structured data</span>'
@@ -1048,6 +1340,12 @@
             + '    <select name="blog_author_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">' + authorOptionsHtml() + '</select></div>'
             + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>'
             + '    <textarea name="blog_excerpt_' + idx + '" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Cover image</label>'
+            + '    <input type="file" name="blog_image_' + idx + '" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700">'
+            + '    <p class="text-xs text-gray-500 mt-1">PNG, JPG, or GIF.</p></div>'
+            + '    <div><label class="block text-sm font-medium text-gray-700 mb-1">Cover image alt text</label>'
+            + '    <input type="text" name="blog_image_alt_' + idx + '" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="Describe the cover image">'
+            + '    <p class="text-xs text-gray-500 mt-1">Required when uploading a new image.</p></div>'
             + '    <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Article body</label>'
             + '    <textarea name="blog_body_' + idx + '" rows="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"></textarea></div>'
             + '  </div>'

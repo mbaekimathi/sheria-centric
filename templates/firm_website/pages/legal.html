@@ -3,8 +3,9 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
+<section class="firm-page-hero firm-page-hero-rich">
   <div class="container firm-reveal">
+    <p class="firm-eyebrow">Legal</p>
     <h1>{{ page_seo.h1_heading or legal_page_title }}</h1>
     {% if page_seo.meta_description %}
     <p class="firm-page-lead">{{ page_seo.meta_description }}</p>
@@ -12,12 +13,41 @@
   </div>
 </section>
 
+{% if legal_nav|length > 1 %}
+<nav class="firm-legal-nav" aria-label="Legal documents">
+  <div class="container firm-legal-nav-inner firm-reveal">
+    {% for item in legal_nav %}
+    <a href="{{ item.url }}" class="firm-legal-nav-link{% if legal_page_key == item.key %} is-active{% endif %}">{{ item.label }}</a>
+    {% endfor %}
+  </div>
+</nav>
+{% endif %}
+
 <section class="firm-section">
   <div class="container firm-reveal">
     {% if legal_content %}
-    <div class="firm-prose firm-legal-doc">{{ legal_content }}</div>
+    <article class="firm-legal-shell">
+      <div class="firm-prose firm-legal-doc">{{ legal_content }}</div>
+      {% if firm_credentials.law_society or firm_credentials.data_protection or firm_name %}
+      <aside class="firm-legal-meta">
+        <h2 class="firm-subheading">Firm details</h2>
+        <ul class="firm-meta-list">
+          <li><strong>Firm</strong><span>{{ firm_name }}</span></li>
+          {% if firm_credentials.law_society %}
+          <li><strong>LSK registration</strong><span>{{ firm_credentials.law_society }}</span></li>
+          {% endif %}
+          {% if firm_credentials.data_protection %}
+          <li><strong>Data protection</strong><span>{{ firm_credentials.data_protection }}</span></li>
+          {% endif %}
+          {% if firm_email %}
+          <li><strong>Contact</strong><span><a href="mailto:{{ firm_email }}">{{ firm_email }}</a></span></li>
+          {% endif %}
+        </ul>
+      </aside>
+      {% endif %}
+    </article>
     {% else %}
-    <p class="firm-empty-state">This page has not been configured yet. Add content in System Settings.</p>
+    <p class="firm-empty-state">This page has not been configured yet. Add content in System Settings → Legal.</p>
     {% endif %}
     {% if site_last_updated %}
     <p class="firm-updated">Last updated: {{ site_last_updated }}</p>

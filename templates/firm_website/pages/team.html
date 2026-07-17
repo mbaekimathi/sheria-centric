@@ -3,40 +3,154 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
-  <div class="container firm-reveal">
-    <p class="firm-eyebrow">Our people</p>
-    <h1>{{ page_seo.h1_heading or 'Our Team' }}</h1>
-    <p class="firm-page-lead">{{ page_seo.meta_description or 'Meet the advocates and legal professionals at our firm.' }}</p>
+<section class="firm-team-page" aria-labelledby="team-heading">
+  <div class="firm-team-page-atmosphere" aria-hidden="true">
+    <span class="firm-team-page-glow"></span>
+    <span class="firm-team-page-orb"></span>
+    <span class="firm-team-page-mesh"></span>
   </div>
-</section>
 
-<section class="firm-section">
   <div class="container">
-    {% if attorneys %}
-    <div class="firm-grid-3">
-      {% for emp in attorneys %}
-      <article class="firm-card firm-team-card firm-reveal">
-        {% if emp.profile_picture_url %}
-        <div class="firm-team-photo">
-          <img src="{{ emp.profile_picture_url }}" alt="{{ emp.profile_picture_alt or emp.full_name }}" loading="lazy" width="120" height="120">
-        </div>
-        {% endif %}
-        <h2>{{ emp.full_name }}</h2>
-        <p class="firm-team-role">{{ emp.professional_title or emp.role or 'Attorney' }}</p>
-        {% if emp.practice_areas %}
-        <p class="firm-team-areas">{{ emp.practice_areas.replace('\n', ', ') }}</p>
-        {% endif %}
-        {% if emp.attorney_bio %}
-        <p>{{ emp.attorney_bio | truncate(140) }}</p>
-        {% endif %}
-        <a href="{{ firm_url('team/' ~ (emp.url_slug or emp.id)) }}" class="firm-card-link">View profile</a>
-      </article>
-      {% endfor %}
-    </div>
+    <header class="firm-team-page-hero firm-reveal">
+      <div>
+        <p class="firm-eyebrow">Our people</p>
+        <h1 id="team-heading">{{ page_seo.h1_heading or 'Our Team' }}</h1>
+        <p class="firm-team-page-lead">{{ page_seo.meta_description or 'Meet the advocates and legal professionals who serve our clients with clarity, care, and resolve.' }}</p>
+      </div>
+      {% if attorneys %}
+      <div class="firm-team-page-stat" aria-label="Team count">
+        <strong>{{ '%02d'|format(attorneys|length) }}</strong>
+        <span>{% if attorneys|length == 1 %}Member{% else %}Members{% endif %}</span>
+      </div>
+      {% endif %}
+    </header>
+
+    {% if team_groups or attorneys %}
+    {% set spotlight_id = attorneys[0].id if attorneys and attorneys|length > 2 else none %}
+    {% for group in (team_groups if team_groups else [{'role': '', 'label': '', 'members': attorneys}]) %}
+    <section class="firm-team-group firm-reveal" {% if group.label %}aria-labelledby="team-group-{{ loop.index }}"{% endif %} style="--reveal-delay: {{ loop.index0 * 50 }}ms">
+      {% if group.label %}
+      <header class="firm-team-group-head">
+        <p class="firm-eyebrow">Role</p>
+        <h2 id="team-group-{{ loop.index }}" class="firm-team-group-title">{{ group.label }}</h2>
+      </header>
+      {% endif %}
+      <div class="firm-team-gallery">
+        {% for emp in group.members %}
+        {% set profile_href = firm_url('team/' ~ (emp.url_slug or emp.id)) %}
+        {% set areas_raw = (emp.practice_areas or '').replace('\n', ',') %}
+        {% set area_parts = areas_raw.split(',') if areas_raw else [] %}
+        {% set linkedin = emp.linkedin_profile_url or '' %}
+        {% set pub_email = emp.public_contact_email or '' %}
+        {% set pub_phone = emp.public_contact_phone or '' %}
+        {% set is_spotlight = spotlight_id is not none and emp.id == spotlight_id %}
+        {% set bio_len = 220 if is_spotlight else 130 %}
+        <article class="firm-team-person firm-reveal{% if is_spotlight %} firm-team-person--spotlight{% endif %}"
+                 style="--reveal-delay: {{ ((emp.team_index or loop.index) - 1) * 70 }}ms">
+          <a href="{{ profile_href }}" class="firm-team-person-photo" aria-label="{{ emp.full_name }}">
+            {% if emp.profile_picture_url %}
+            <img src="{{ emp.profile_picture_url }}" alt="{{ emp.profile_picture_alt or emp.full_name }}" loading="{{ 'eager' if (emp.team_index or loop.index) == 1 else 'lazy' }}" width="480" height="600">
+            {% else %}
+            <span class="firm-team-person-fallback" aria-hidden="true">{{ (emp.full_name or '?')[:1] | upper }}</span>
+            {% endif %}
+            <span class="firm-team-person-shade" aria-hidden="true"></span>
+            <span class="firm-team-person-chrome">
+              <span class="firm-team-person-num" aria-hidden="true">{{ '%02d'|format(emp.team_index or loop.index) }}</span>
+              <span class="firm-team-person-go" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+            </span>
+            <span class="firm-team-person-caption">
+              <span class="firm-team-person-title">{{ emp.professional_title or emp.team_role_label or emp.role or 'Team member' }}</span>
+              <h3 class="firm-team-person-name">{{ emp.full_name }}</h3>
+            </span>
+          </a>
+
+          <div class="firm-team-person-info">
+            {% if emp.year_called_to_bar or emp.lsk_practicing_certificate_number %}
+            <p class="firm-team-person-cred">
+              {% if emp.year_called_to_bar %}Called to the Bar · {{ emp.year_called_to_bar }}{% endif %}
+              {% if emp.year_called_to_bar and emp.lsk_practicing_certificate_number %} · {% endif %}
+              {% if emp.lsk_practicing_certificate_number %}LSK {{ emp.lsk_practicing_certificate_number }}{% endif %}
+            </p>
+            {% endif %}
+
+            {% if emp.attorney_bio %}
+            <p class="firm-team-person-bio">{{ emp.attorney_bio | truncate(bio_len) }}</p>
+            {% endif %}
+
+            {% if area_parts %}
+            <ul class="firm-team-person-focus">
+              {% for area in area_parts if area.strip() %}
+              {% if loop.index <= 3 %}
+              <li>{{ area.strip() }}</li>
+              {% endif %}
+              {% endfor %}
+            </ul>
+            {% endif %}
+
+            <div class="firm-team-person-footer">
+              <a href="{{ profile_href }}" class="firm-team-person-link">
+                View profile
+                <i class="fas fa-arrow-right" aria-hidden="true"></i>
+              </a>
+              {% if pub_email or pub_phone or linkedin %}
+              <div class="firm-team-person-socials">
+                {% if pub_email %}
+                <a href="mailto:{{ pub_email }}" class="firm-team-person-social" aria-label="Email {{ emp.full_name }}" title="Email">
+                  <i class="fas fa-envelope" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+                {% if pub_phone %}
+                <a href="tel:{{ pub_phone }}" class="firm-team-person-social" aria-label="Call {{ emp.full_name }}" title="Call">
+                  <i class="fas fa-phone" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+                {% if linkedin %}
+                <a href="{{ linkedin if linkedin.startswith('http') else 'https://' ~ linkedin }}"
+                   class="firm-team-person-social firm-team-person-social--li"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   aria-label="{{ emp.full_name }} on LinkedIn"
+                   title="LinkedIn">
+                  <i class="fab fa-linkedin-in" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
     {% else %}
     <p class="firm-empty-state firm-reveal">Team profiles will appear here once configured in settings.</p>
     {% endif %}
+  </div>
+</section>
+
+<section class="firm-section firm-section-alt firm-team-page-cta">
+  <div class="container">
+    <div class="firm-pa-consult-band firm-reveal">
+      <span class="firm-pa-consult-mark" aria-hidden="true"></span>
+      <div class="firm-pa-consult-copy">
+        <p class="firm-eyebrow firm-eyebrow-on-dark">Connect</p>
+        <h2>Looking for the right advocate?</h2>
+        <p>Tell us about your matter and we will connect you with the right member of our team.</p>
+      </div>
+      <div class="firm-pa-consult-actions">
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light" data-firm-magnetic>
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-ghost" target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp" aria-hidden="true"></i>
+          <span>WhatsApp</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 </section>
 {% endblock %}

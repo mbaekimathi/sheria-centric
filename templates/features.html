@@ -21,58 +21,12 @@
     .skip-link:focus { top: 16px; }
   </style>
   <link rel="stylesheet" href="/static/style.css">
+  {% include "_branding_font_base.html" %}
 </head>
 <body class="features-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
-  <header class="site-header" id="site-header" x-data="{open:false}">
-    <div class="container nav-wrap">
-      <a href="/" class="brand" aria-label="SHERIA CENTRIC home">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 3L4 6v5c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-3Z" stroke="#A29BFE" stroke-width="1.8"/>
-          <path d="M9.2 11.5l1.8 1.8 3.8-3.8" stroke="#FDCB6E" stroke-width="1.8"/>
-        </svg>
-        <span>SHERIA CENTRIC</span>
-      </a>
-      <nav class="desktop-nav" aria-label="Primary navigation">
-        <a href="/platform" class="nav-link">Platform</a>
-        <a href="/features" class="nav-link">Features</a>
-        <a href="/pricing" class="nav-link">Pricing</a>
-        <a href="/security" class="nav-link">Security</a>
-        <a href="/contact" class="nav-link">Contact</a>
-      </nav>
-      <div class="nav-actions">
-        <details class="login-dropdown">
-          <summary class="login-summary" aria-label="Login menu">
-            <i class="ph ph-sign-in" aria-hidden="true"></i>
-            <span>Login</span>
-            <i class="ph ph-caret-down" aria-hidden="true"></i>
-          </summary>
-          <div class="login-dropdown-menu">
-            <a href="/client_login"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
-            <a href="/login"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-          </div>
-        </details>
-        <a href="#features-cta" class="btn btn-demo">Request Demo</a>
-        <button class="mobile-toggle" @click="open=!open" :aria-expanded="open.toString()" aria-controls="mobile-menu" aria-label="Toggle mobile navigation">
-          <i class="ph ph-list" x-show="!open"></i>
-          <i class="ph ph-x" x-show="open" style="display:none"></i>
-        </button>
-      </div>
-    </div>
-    <div class="mobile-menu" id="mobile-menu" x-show="open" x-transition.origin.top>
-      <span class="mobile-section-label">Navigate</span>
-      <a href="/platform" @click="open=false">Platform</a>
-      <a href="/features" @click="open=false">Features</a>
-      <a href="/pricing" @click="open=false">Pricing</a>
-      <a href="/security" @click="open=false">Security</a>
-      <a href="/contact" @click="open=false">Contact</a>
-      <span class="mobile-section-label">Account</span>
-      <a href="/client_login" @click="open=false"><i class="ph ph-user" aria-hidden="true"></i> Client Login</a>
-      <a href="/login" @click="open=false"><i class="ph ph-briefcase" aria-hidden="true"></i> Employee Login</a>
-      <a href="#features-cta" @click="open=false" class="btn btn-demo">Request Demo</a>
-    </div>
-  </header>
+  {% include "_marketing_header.html" %}
 
   <main id="main-content">
     <!-- Hero: bento mosaic preview -->

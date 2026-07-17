@@ -1,58 +1,77 @@
-<footer class="firm-footer">
-  <div class="container">
-    <div class="firm-footer-grid">
-      <div>
-        <h3>{{ firm_name }}</h3>
-        <ul class="firm-footer-nap">
-          {% if firm_address %}
-          <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>{{ firm_address }}</span></li>
+<footer class="firm-footer firm-footer--compact">
+  {% set socials = [
+    (firm.get('linkedin_link'), 'fab fa-linkedin-in', 'LinkedIn', 'linkedin'),
+    (firm.get('fb_link'), 'fab fa-facebook-f', 'Facebook', 'facebook'),
+    (firm.get('instagram_link'), 'fab fa-instagram', 'Instagram', 'instagram'),
+    (firm.get('twitter_link'), 'fab fa-x-twitter', 'X', 'x'),
+    (whatsapp_url if whatsapp_url is defined else none, 'fab fa-whatsapp', 'WhatsApp', 'whatsapp'),
+    (firm.get('website_url'), 'fas fa-globe', 'Website', 'website')
+  ] %}
+
+  <div class="container firm-footer-shell">
+    <div class="firm-footer-row firm-footer-row--primary">
+      <div class="firm-footer-brand-block">
+        <a href="{{ firm_url('') }}" class="firm-footer-brand">
+          {% if firm_logo_url %}
+          <img src="{{ firm_logo_url }}" alt="" height="32" loading="lazy">
+          {% else %}
+          <span class="firm-brand-mark" aria-hidden="true">{{ firm_name[:1] }}</span>
           {% endif %}
-          {% if firm_phone %}
-          <li><i class="fas fa-phone" aria-hidden="true"></i><a href="tel:{{ firm_phone }}">{{ firm_phone }}</a></li>
-          {% endif %}
-          {% if firm_email %}
-          <li><i class="fas fa-envelope" aria-hidden="true"></i><a href="mailto:{{ firm_email }}">{{ firm_email }}</a></li>
-          {% endif %}
-        </ul>
-        {% set socials = [
-          (firm.get('fb_link'), 'fab fa-facebook-f', 'Facebook'),
-          (firm.get('linkedin_link'), 'fab fa-linkedin-in', 'LinkedIn'),
-          (firm.get('twitter_link'), 'fab fa-x-twitter', 'X / Twitter'),
-          (firm.get('instagram_link'), 'fab fa-instagram', 'Instagram'),
-          (firm.get('website_url'), 'fas fa-globe', 'Website')
-        ] %}
-        <div class="firm-socials" aria-label="Social media">
-          {% for url, icon, label in socials %}
-          {% if url %}
-          <a href="{{ url if url.startswith('http') else 'https://' ~ url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ label }}"><i class="{{ icon }}" aria-hidden="true"></i></a>
-          {% endif %}
-          {% endfor %}
-        </div>
+          <span>{{ firm_name }}</span>
+        </a>
+        {% if firm_tagline %}
+        <p class="firm-footer-tagline-mini">{{ firm_tagline }}</p>
+        {% endif %}
       </div>
-      <div>
-        <h3>Explore</h3>
-        <div class="firm-footer-links">
-          {% for item in firm_nav %}
-          <a href="{{ item.url }}">{{ item.label }}</a>
-          {% endfor %}
-        </div>
-      </div>
-      <div>
-        <h3>Legal</h3>
-        <div class="firm-footer-links">
-          {% if firm.get('privacy_policy') %}<a href="{{ firm_url('privacy') }}">Privacy Policy</a>{% endif %}
-          {% if firm.get('terms_of_service') %}<a href="{{ firm_url('terms') }}">Terms of Service</a>{% endif %}
-          {% if firm.get('website_disclaimer') %}<a href="{{ firm_url('disclaimer') }}">Disclaimer</a>{% endif %}
-          <a href="{{ url_for('client_login') }}">Client Login</a>
-        </div>
+
+      <nav class="firm-footer-nav" aria-label="Footer">
+        <a href="{{ firm_url('') }}">Home</a>
+        <a href="{{ firm_url('practice-areas') }}">Practice Areas</a>
+        <a href="{{ firm_url('contact') }}">Contact</a>
+        {% set privacy = (legal_nav or []) | selectattr('key', 'equalto', 'privacy') | list %}
+        {% if privacy %}
+        <a href="{{ privacy[0].url }}">Privacy</a>
+        {% endif %}
+        <span class="firm-footer-nav-divider" aria-hidden="true"></span>
+        <a href="{{ url_for('client_login') }}">Client Login</a>
+        <a href="{{ url_for('login') }}">Employee Login</a>
+      </nav>
+
+      <div class="firm-footer-socials" aria-label="Social media">
+        {% for url, icon, label, network in socials %}
+        {% if url %}
+        <a href="{{ url if url.startswith('http') else 'https://' ~ url }}"
+           class="firm-footer-social firm-footer-social--{{ network }}"
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="{{ label }}">
+          <i class="{{ icon }}" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+        {% endfor %}
       </div>
     </div>
-    <div class="firm-footer-bottom">
-      <span>&copy; {{ firm_name }}. All rights reserved.</span>
-      {% if site_last_updated %}
-      <span>Last updated: {{ site_last_updated }}</span>
-      {% endif %}
-      <span>Powered by SHERIA CENTRIC</span>
+
+    <div class="firm-footer-row firm-footer-row--secondary">
+      <div class="firm-footer-contacts">
+        {% if firm_phone %}
+        <a href="tel:{{ firm_phone }}"><i class="fas fa-phone" aria-hidden="true"></i><span>{{ firm_phone }}</span></a>
+        {% endif %}
+        {% if firm_email %}
+        <a href="mailto:{{ firm_email }}"><i class="fas fa-envelope" aria-hidden="true"></i><span>{{ firm_email }}</span></a>
+        {% endif %}
+        {% if firm_address or firm_location_name %}
+        <span class="firm-footer-location">
+          <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+          <span>{{ firm_location_name or firm_address }}</span>
+        </span>
+        {% endif %}
+      </div>
+      <div class="firm-footer-legal">
+        <span>&copy; {{ firm_name }}</span>
+        <span class="firm-footer-sep" aria-hidden="true">·</span>
+        <span>Powered by SHERIA CENTRIC</span>
+      </div>
     </div>
   </div>
 </footer>

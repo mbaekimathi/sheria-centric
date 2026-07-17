@@ -70,6 +70,10 @@
     const fontSelect = document.getElementById('font_family');
     const fontPreview = document.getElementById('font-preview');
     const themePreviewShell = document.getElementById('theme-preview-shell');
+    const previewMetaFont = document.getElementById('preview-meta-font');
+    const previewMetaSize = document.getElementById('preview-meta-size');
+    const themePreviewHeading = document.getElementById('theme-preview-heading');
+    const themePreviewMeta = document.getElementById('theme-preview-meta');
 
     if (!primaryText || !primaryPicker || !secondaryText || !secondaryPicker || !tertiaryText || !tertiaryPicker) return;
 
@@ -205,6 +209,10 @@
             previewChip.style.border = '1px solid ' + hexToRgba(s, 0.35);
         }
 
+        // Keep typography preview in sync whenever colors change
+        if (typeof applyFontPreview === 'function') applyFontPreview();
+        if (typeof applyFontSizePreview === 'function') applyFontSizePreview();
+
         // If user manually changes colors, reflect a matching preset (or "custom")
         if (themePresetInput && themeGrid) {
             const detected = detectPresetFromColors(p, s, ter);
@@ -224,6 +232,13 @@
             : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
         if (fontPreview) fontPreview.style.fontFamily = stack;
         if (themePreviewShell) themePreviewShell.style.fontFamily = stack;
+        if (previewMetaFont) {
+            previewMetaFont.textContent = f;
+            previewMetaFont.style.fontFamily = stack;
+        }
+        if (typeof updateFontToggle === 'function') {
+            updateFontToggle(typeof getFontPreset === 'function' ? getFontPreset(f) : { id: f, name: f, desc: '', category: '' });
+        }
     }
 
     // ----- Modern, professionally curated font presets -----
@@ -249,11 +264,50 @@
         { id: 'Source Serif 4',    name: 'Source Serif 4',    desc: 'Refined & timeless',                category: 'Professional Serif' }
     ];
 
-    const fontGrid = document.getElementById('font-preset-grid');
+    const fontGrid = document.getElementById('font-preset-grid'); // legacy (unused on branding page)
+    const fontDropdownRoot = document.getElementById('font-dropdown-root');
+    const fontDropdownList = document.getElementById('font-dropdown-list');
+    const fontDropdownToggle = document.getElementById('font-dropdown-toggle');
+    const fontDropdownChevron = document.getElementById('font-dropdown-chevron');
+    const fontToggleSample = document.getElementById('font-toggle-sample');
+    const fontToggleLabel = document.getElementById('font-toggle-label');
+    const fontToggleMeta = document.getElementById('font-toggle-meta');
+
+    function fontStackFor(id) {
+        return "'" + id + "', " + (SERIF_FONTS.has(id)
+            ? "Georgia, 'Times New Roman', serif"
+            : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+    }
+
+    function getFontPreset(id) {
+        return FONT_PRESETS.find(function (f) { return f.id === id; }) || FONT_PRESETS[0];
+    }
+
+    function setFontDropdownOpen(open) {
+        if (!fontDropdownList || !fontDropdownToggle) return;
+        fontDropdownList.classList.toggle('hidden', !open);
+        fontDropdownToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (fontDropdownChevron) fontDropdownChevron.classList.toggle('rotate-180', !!open);
+    }
+
+    function updateFontToggle(preset) {
+        if (!preset) return;
+        const stack = fontStackFor(preset.id);
+        if (fontToggleSample) fontToggleSample.style.fontFamily = stack;
+        if (fontToggleLabel) {
+            fontToggleLabel.textContent = preset.name;
+            fontToggleLabel.style.fontFamily = stack;
+        }
+        if (fontToggleMeta) fontToggleMeta.textContent = preset.category + ' · ' + preset.desc;
+    }
 
     function renderFontCards() {
+        // Prefer the System Font Presets dropdown when present.
+        if (fontDropdownList) {
+            renderFontDropdown();
+            return;
+        }
         if (!fontGrid) return;
-        // Group by category, preserving order from FONT_PRESETS
         const groups = [];
         const groupMap = new Map();
         FONT_PRESETS.forEach(function (f) {
@@ -267,9 +321,7 @@
 
         const html = groups.map(function (g) {
             const cards = g.items.map(function (f) {
-                const stack = "'" + f.id + "', " + (SERIF_FONTS.has(f.id)
-                    ? "Georgia, 'Times New Roman', serif"
-                    : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif");
+                const stack = fontStackFor(f.id);
                 return ''
                     + '<button type="button" data-font="' + f.id + '" '
                     + 'class="font-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
@@ -296,7 +348,6 @@
         }).join('');
 
         fontGrid.innerHTML = html;
-
         fontGrid.querySelectorAll('.font-card').forEach(function (card) {
             card.addEventListener('click', function () {
                 const f = card.getAttribute('data-font');
@@ -308,7 +359,72 @@
         });
     }
 
+    function renderFontDropdown() {
+        if (!fontDropdownList) return;
+        const current = (fontSelect && fontSelect.value) || 'Inter';
+        const groups = [];
+        const groupMap = new Map();
+        FONT_PRESETS.forEach(function (f) {
+            if (!groupMap.has(f.category)) {
+                const g = { name: f.category, items: [] };
+                groupMap.set(f.category, g);
+                groups.push(g);
+            }
+            groupMap.get(f.category).items.push(f);
+        });
+
+        fontDropdownList.innerHTML = groups.map(function (g) {
+            const items = g.items.map(function (f) {
+                const selected = f.id === current;
+                const stack = fontStackFor(f.id);
+                return ''
+                    + '<li role="option" data-font="' + f.id + '" tabindex="0" aria-selected="' + (selected ? 'true' : 'false') + '"'
+                    + ' class="font-option flex items-center gap-3 px-3 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors '
+                    + (selected ? 'bg-indigo-50' : 'hover:bg-gray-50') + '">'
+                    +   '<span class="inline-flex items-center justify-center h-11 w-14 rounded-lg bg-white border border-gray-200 text-gray-900 font-semibold flex-shrink-0 shadow-sm text-xl"'
+                    +        ' style="font-family:' + stack + ';" aria-hidden="true">Aa</span>'
+                    +   '<span class="min-w-0 flex-1">'
+                    +     '<span class="block text-sm font-semibold text-gray-900" style="font-family:' + stack + ';">' + f.name + '</span>'
+                    +     '<span class="block text-xs text-gray-500 mt-0.5">' + f.desc + '</span>'
+                    +     '<span class="block text-sm text-gray-600 mt-1 truncate" style="font-family:' + stack + ';">The quick brown fox jumps</span>'
+                    +   '</span>'
+                    +   (selected
+                        ? '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
+                        : '<span class="w-5 flex-shrink-0"></span>')
+                    + '</li>';
+            }).join('');
+            return ''
+                + '<li class="px-3 pt-2.5 pb-1.5 sticky top-0 bg-gray-50 border-b border-gray-100" role="presentation">'
+                +   '<span class="text-[10px] uppercase tracking-wider font-semibold text-gray-500">' + g.name + '</span>'
+                + '</li>'
+                + items;
+        }).join('');
+
+        fontDropdownList.querySelectorAll('.font-option').forEach(function (option) {
+            const select = function () {
+                const id = option.getAttribute('data-font');
+                if (!id || !fontSelect) return;
+                fontSelect.value = id;
+                renderFontDropdown();
+                applyFontPreview();
+                setFontDropdownOpen(false);
+            };
+            option.addEventListener('click', select);
+            option.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    select();
+                }
+            });
+        });
+        updateFontToggle(getFontPreset(current));
+    }
+
     function updateActiveFontCard() {
+        if (fontDropdownList) {
+            renderFontDropdown();
+            return;
+        }
         if (!fontGrid) return;
         const current = (fontSelect && fontSelect.value) || 'Inter';
         fontGrid.querySelectorAll('.font-card').forEach(function (card) {
@@ -320,9 +436,27 @@
         });
     }
 
-    // ----- Text Size presets (consistent global scale) -----
-    // Numbers here MUST match the server-side allowlist in app.py and the
-    // {% raw %}{{ allowed_font_sizes }}{% endraw %} map in base.html.
+    if (fontDropdownToggle) {
+        fontDropdownToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const open = fontDropdownToggle.getAttribute('aria-expanded') !== 'true';
+            setFontDropdownOpen(open);
+            // Close the text-size dropdown if open
+            if (typeof setFontSizeDropdownOpen === 'function') setFontSizeDropdownOpen(false);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (fontDropdownRoot && !fontDropdownRoot.contains(e.target)) {
+            setFontDropdownOpen(false);
+        }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setFontDropdownOpen(false);
+    });
+
+    // ----- System Font Size presets (dropdown with examples) -----
+    // Numbers here MUST match APP_FONT_SIZE_PRESETS in app.py and base.html.
     const FONT_SIZE_PRESETS = [
         { id: 'compact',     name: 'Compact',     px: '14px', desc: 'Dense — fits more on screen', sample: 14 },
         { id: 'comfortable', name: 'Comfortable', px: '16px', desc: 'Balanced default',            sample: 16 },
@@ -331,67 +465,126 @@
     ];
 
     const fontSizeInput = document.getElementById('font_size');
-    const fontSizeGrid  = document.getElementById('font-size-grid');
+    const fontSizeList = document.getElementById('font-size-dropdown-list');
+    const fontSizeToggle = document.getElementById('font-size-dropdown-toggle');
+    const fontSizeRoot = document.getElementById('font-size-dropdown-root');
+    const fontSizeChevron = document.getElementById('font-size-dropdown-chevron');
+    const fontSizeToggleSample = document.getElementById('font-size-toggle-sample');
+    const fontSizeToggleLabel = document.getElementById('font-size-toggle-label');
+    const fontSizeToggleMeta = document.getElementById('font-size-toggle-meta');
     const fontSizePreview = document.getElementById('font-size-preview');
 
-    function renderFontSizeCards() {
-        if (!fontSizeGrid) return;
-        const html = FONT_SIZE_PRESETS.map(function (s) {
-            return ''
-                + '<button type="button" data-size="' + s.id + '" '
-                + 'class="size-card group relative text-left rounded-xl border border-gray-200 bg-white hover:border-indigo-400 hover:shadow-md transition-all overflow-hidden focus:outline-none focus:ring-2 focus:ring-indigo-500">'
-                +     '<div class="h-16 w-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-white border-b border-gray-100">'
-                +         '<span class="font-semibold text-gray-900 leading-none" style="font-size:' + (s.sample + 6) + 'px;">Aa</span>'
-                +         '<span class="ml-2 text-[10px] text-gray-500">' + s.px + '</span>'
-                +     '</div>'
-                +     '<div class="p-2.5">'
-                +         '<div class="flex items-center justify-between gap-2">'
-                +             '<p class="text-xs font-semibold text-gray-900 truncate">' + s.name + '</p>'
-                +             '<span class="hidden group-[.is-active]:inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
-                +         '</div>'
-                +         '<p class="text-[10px] text-gray-500 truncate">' + s.desc + '</p>'
-                +     '</div>'
-                + '</button>';
-        }).join('');
-        fontSizeGrid.innerHTML = html;
-        fontSizeGrid.querySelectorAll('.size-card').forEach(function (card) {
-            card.addEventListener('click', function () {
-                const id = card.getAttribute('data-size');
-                if (!id) return;
-                fontSizeInput.value = id;
-                updateActiveFontSizeCard();
-                applyFontSizePreview();
-            });
-        });
+    function getFontSizePreset(id) {
+        return FONT_SIZE_PRESETS.find(function (s) { return s.id === id; }) || FONT_SIZE_PRESETS[1];
     }
 
-    function updateActiveFontSizeCard() {
-        if (!fontSizeGrid) return;
+    function setFontSizeDropdownOpen(open) {
+        if (!fontSizeList || !fontSizeToggle) return;
+        fontSizeList.classList.toggle('hidden', !open);
+        fontSizeToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (fontSizeChevron) {
+            fontSizeChevron.classList.toggle('rotate-180', open);
+        }
+    }
+
+    function updateFontSizeToggle(preset) {
+        if (!preset) return;
+        if (fontSizeToggleSample) fontSizeToggleSample.style.fontSize = preset.sample + 'px';
+        if (fontSizeToggleLabel) fontSizeToggleLabel.textContent = preset.name;
+        if (fontSizeToggleMeta) fontSizeToggleMeta.textContent = preset.px + ' · ' + preset.desc;
+    }
+
+    function renderFontSizeDropdown() {
+        if (!fontSizeList) return;
         const current = (fontSizeInput && fontSizeInput.value) || 'comfortable';
-        fontSizeGrid.querySelectorAll('.size-card').forEach(function (card) {
-            const isActive = card.getAttribute('data-size') === current;
-            card.classList.toggle('is-active', isActive);
-            card.classList.toggle('ring-2', isActive);
-            card.classList.toggle('ring-indigo-500', isActive);
-            card.classList.toggle('border-indigo-500', isActive);
+        fontSizeList.innerHTML = FONT_SIZE_PRESETS.map(function (s) {
+            const selected = s.id === current;
+            return ''
+                + '<li role="option" data-size="' + s.id + '" tabindex="0" aria-selected="' + (selected ? 'true' : 'false') + '"'
+                + ' class="font-size-option flex items-center gap-3 px-3 py-3 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors '
+                + (selected ? 'bg-indigo-50' : 'hover:bg-gray-50') + '">'
+                +   '<span class="inline-flex items-center justify-center h-11 w-14 rounded-lg bg-white border border-gray-200 text-gray-900 font-semibold flex-shrink-0 shadow-sm"'
+                +        ' style="font-size:' + s.sample + 'px;" aria-hidden="true">Aa</span>'
+                +   '<span class="min-w-0 flex-1">'
+                +     '<span class="flex items-center justify-between gap-2">'
+                +       '<span class="text-sm font-semibold text-gray-900">' + s.name + '</span>'
+                +       '<span class="text-[11px] font-medium text-gray-500">' + s.px + '</span>'
+                +     '</span>'
+                +     '<span class="block text-xs text-gray-500 mt-0.5 truncate">' + s.desc + '</span>'
+                +     '<span class="block text-[11px] text-gray-400 mt-1 truncate" style="font-size:' + s.sample + 'px;">The quick brown fox jumps</span>'
+                +   '</span>'
+                +   (selected
+                    ? '<span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] flex-shrink-0"><i class="fas fa-check"></i></span>'
+                    : '<span class="w-5 flex-shrink-0"></span>')
+                + '</li>';
+        }).join('');
+
+        fontSizeList.querySelectorAll('.font-size-option').forEach(function (option) {
+            const select = function () {
+                const id = option.getAttribute('data-size');
+                if (!id || !fontSizeInput) return;
+                fontSizeInput.value = id;
+                renderFontSizeDropdown();
+                applyFontSizePreview();
+                setFontSizeDropdownOpen(false);
+            };
+            option.addEventListener('click', select);
+            option.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    select();
+                }
+            });
         });
+        updateFontSizeToggle(getFontSizePreset(current));
     }
 
     function applyFontSizePreview() {
-        if (!fontSizePreview || !fontSizeInput) return;
+        if (!fontSizeInput) return;
         const id = fontSizeInput.value || 'comfortable';
-        const map = { compact: 14, comfortable: 16, large: 17, xl: 18 };
-        const base = map[id] || 16;
-        // Scale the live preview block as if html font-size were `base`px.
-        // Tailwind's text-3xl/base/xs are 1.875rem/1rem/0.75rem respectively.
-        const set = function (role, rem) {
-            const el = fontSizePreview.querySelector('[data-fs-role="' + role + '"]');
-            if (el) el.style.fontSize = (base * rem) + 'px';
-        };
-        set('display', 1.875);
-        set('body',    1.0);
-        set('meta',    0.75);
+        const preset = getFontSizePreset(id);
+        const base = preset.sample || 16;
+        document.documentElement.style.setProperty('--app-base-font-size', base + 'px');
+        updateFontSizeToggle(preset);
+        if (previewMetaSize) {
+            previewMetaSize.textContent = preset.name + ' · ' + preset.px;
+            previewMetaSize.style.fontSize = Math.max(11, Math.round(base * 0.7)) + 'px';
+        }
+        // Apply size inside the unified Live Theme Preview (and any legacy size preview)
+        const roots = [themePreviewShell, fontPreview, fontSizePreview].filter(Boolean);
+        roots.forEach(function (root) {
+            const set = function (role, rem) {
+                root.querySelectorAll('[data-fs-role="' + role + '"]').forEach(function (el) {
+                    el.style.fontSize = (base * rem) + 'px';
+                });
+            };
+            set('display', 1.875);
+            set('body',    1.0);
+            set('meta',    0.75);
+        });
+        // Buttons / links in the shell should also track the base size
+        [previewBtnPrimary, previewBtnOutline, previewBtnSoft, previewLink].forEach(function (el) {
+            if (el) el.style.fontSize = (base * 0.875) + 'px';
+        });
     }
+
+    if (fontSizeToggle) {
+        fontSizeToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const open = fontSizeToggle.getAttribute('aria-expanded') !== 'true';
+            setFontSizeDropdownOpen(open);
+            if (typeof setFontDropdownOpen === 'function') setFontDropdownOpen(false);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (!fontSizeRoot || !fontSizeRoot.contains(e.target)) {
+            setFontSizeDropdownOpen(false);
+        }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setFontSizeDropdownOpen(false);
+    });
 
     primaryPicker.addEventListener('input', function () { primaryText.value = primaryPicker.value; syncAndPreview(); });
     secondaryPicker.addEventListener('input', function () { secondaryText.value = secondaryPicker.value; syncAndPreview(); });
@@ -406,8 +599,7 @@
     renderFontCards();
     updateActiveFontCard();
     applyFontPreview();
-    renderFontSizeCards();
-    updateActiveFontSizeCard();
+    renderFontSizeDropdown();
     applyFontSizePreview();
 })();
 </script>

@@ -3,28 +3,152 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<article class="firm-section">
-  <div class="container firm-article firm-reveal">
-    <header>
+{% set words = ((blog_post.body or blog_post.excerpt or '')|striptags|length / 5)|round(0, 'ceil')|int %}
+{% set mins = ([1, (words / 200)|round(0, 'ceil')|int]|max) %}
+{% set ns = namespace(related=[]) %}
+{% if blog_posts %}
+  {% for post in blog_posts %}
+    {% if post.slug != blog_post.slug and ns.related|length < 3 %}
+      {% set _ = ns.related.append(post) %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+<article class="firm-blog-post" aria-labelledby="blog-post-heading">
+  <div class="firm-blog-atmosphere firm-blog-atmosphere--post" aria-hidden="true">
+    <span class="firm-blog-glow"></span>
+    <span class="firm-blog-orb"></span>
+    <span class="firm-blog-mesh"></span>
+  </div>
+
+  <div class="container">
+    <header class="firm-blog-post-hero firm-reveal">
       <p class="firm-eyebrow">Insights</p>
-      <h1>{{ page_seo.h1_heading or blog_post.title }}</h1>
-      <p class="firm-article-meta">
+      <h1 id="blog-post-heading">{{ page_seo.h1_heading or blog_post.title }}</h1>
+      <p class="firm-blog-post-meta">
         {% if blog_post.author_name %}
-        <span>By {% if blog_post.author_slug %}<a href="{{ firm_url('team/' ~ blog_post.author_slug) }}">{{ blog_post.author_name }}</a>{% else %}{{ blog_post.author_name }}{% endif %}</span>
+        <span class="firm-blog-post-author">
+          By
+          {% if blog_post.author_slug %}
+          <a href="{{ firm_url('team/' ~ blog_post.author_slug) }}">{{ blog_post.author_name }}</a>
+          {% else %}
+          {{ blog_post.author_name }}
+          {% endif %}
+        </span>
         {% endif %}
         {% if blog_post.last_updated_display %}
         <span>{{ blog_post.last_updated_display }}</span>
         {% endif %}
+        <span>{{ mins }} min read</span>
       </p>
       {% if blog_post.excerpt %}
-      <p class="firm-page-lead">{{ blog_post.excerpt }}</p>
+      <p class="firm-blog-post-lead">{{ blog_post.excerpt }}</p>
       {% endif %}
     </header>
-    <div class="firm-prose">{{ blog_post.body }}</div>
-    <footer class="firm-article-footer">
-      <a href="{{ firm_url('blog') }}" class="firm-card-link"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to insights</a>
-      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">{{ hero_cta_label }}</a>
-    </footer>
+
+    {% if blog_post.image_url %}
+    <figure class="firm-blog-post-cover firm-reveal" style="--reveal-delay: 60ms">
+      <img src="{{ blog_post.image_url }}" alt="{{ blog_post.image_alt or blog_post.title }}" loading="eager" decoding="async" width="1200" height="675">
+    </figure>
+    {% endif %}
+
+    <div class="firm-blog-post-layout firm-reveal" style="--reveal-delay: 100ms">
+      <div class="firm-blog-post-prose firm-prose">{{ blog_post.body }}</div>
+
+      <aside class="firm-blog-post-aside">
+        <div class="firm-blog-post-aside-card">
+          <p class="firm-eyebrow">In this piece</p>
+          <ul class="firm-blog-post-aside-meta">
+            <li><i class="fas fa-clock" aria-hidden="true"></i> {{ mins }} minute read</li>
+            {% if blog_post.last_updated_display %}
+            <li><i class="fas fa-calendar" aria-hidden="true"></i> {{ blog_post.last_updated_display }}</li>
+            {% endif %}
+            {% if blog_post.author_name %}
+            <li><i class="fas fa-user-pen" aria-hidden="true"></i> {{ blog_post.author_name }}</li>
+            {% endif %}
+          </ul>
+          <a href="{{ firm_url('blog') }}" class="firm-blog-read">
+            <i class="fas fa-arrow-left" aria-hidden="true"></i> All insights
+          </a>
+          <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary firm-blog-post-cta">
+            <span>{{ hero_cta_label }}</span>
+            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </a>
+        </div>
+      </aside>
+    </div>
+
+    {% if blog_post.author_name %}
+    <section class="firm-blog-author-band firm-reveal" style="--reveal-delay: 120ms" aria-label="Author">
+      <div class="firm-blog-author-band-inner">
+        <span class="firm-blog-author-mark" aria-hidden="true">{{ (blog_post.author_name or '?')[:1] | upper }}</span>
+        <div>
+          <p class="firm-eyebrow">Written by</p>
+          <h2 class="firm-blog-author-band-name">
+            {% if blog_post.author_slug %}
+            <a href="{{ firm_url('team/' ~ blog_post.author_slug) }}">{{ blog_post.author_name }}</a>
+            {% else %}
+            {{ blog_post.author_name }}
+            {% endif %}
+          </h2>
+        </div>
+        {% if blog_post.author_slug %}
+        <a href="{{ firm_url('team/' ~ blog_post.author_slug) }}" class="firm-btn firm-btn-ghost">
+          <span>View profile</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if ns.related %}
+    <section class="firm-blog-related firm-reveal" style="--reveal-delay: 140ms" aria-labelledby="related-heading">
+      <header class="firm-blog-related-head">
+        <p class="firm-eyebrow">Keep reading</p>
+        <h2 id="related-heading">More from chambers</h2>
+      </header>
+      <div class="firm-blog-related-grid">
+        {% for post in ns.related %}
+        {% set rwords = ((post.body or post.excerpt or '')|striptags|length / 5)|round(0, 'ceil')|int %}
+        {% set rmins = ([1, (rwords / 200)|round(0, 'ceil')|int]|max) %}
+        <article class="firm-blog-related-card">
+          <p class="firm-blog-meta">
+            {% if post.last_updated_display %}<span>{{ post.last_updated_display }}</span>{% endif %}
+            <span>{{ rmins }} min</span>
+          </p>
+          <h3><a href="{{ firm_url('blog/' ~ post.slug) }}">{{ post.title }}</a></h3>
+          {% if post.excerpt %}<p>{{ post.excerpt | truncate(100) }}</p>{% endif %}
+          <a href="{{ firm_url('blog/' ~ post.slug) }}" class="firm-blog-read">
+            Read <i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </a>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
   </div>
 </article>
+
+<section class="firm-section firm-section-alt firm-blog-cta">
+  <div class="container">
+    <div class="firm-pa-consult-band firm-reveal">
+      <span class="firm-pa-consult-mark" aria-hidden="true"></span>
+      <div class="firm-pa-consult-copy">
+        <p class="firm-eyebrow firm-eyebrow-on-dark">Next step</p>
+        <h2>Have a matter in mind?</h2>
+        <p>Share a brief outline and our team will advise on the practical path forward.</p>
+      </div>
+      <div class="firm-pa-consult-actions">
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light">
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        <a href="{{ firm_url('blog') }}" class="firm-btn firm-btn-ghost">
+          <span>Back to insights</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
 {% endblock %}

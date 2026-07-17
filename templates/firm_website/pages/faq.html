@@ -3,19 +3,221 @@
 {% block content %}
 {% include 'firm_website/_breadcrumbs.html' %}
 
-<section class="firm-page-hero firm-section-alt">
-  <div class="container firm-reveal">
-    <p class="firm-eyebrow">Help centre</p>
-    <h1>{{ page_seo.h1_heading or 'Frequently Asked Questions' }}</h1>
-    <p class="firm-page-lead">{{ page_seo.meta_description or 'Answers to common questions about our firm and services.' }}</p>
-  </div>
-</section>
+{% set faq_icons = [
+  'fa-scale-balanced',
+  'fa-comments',
+  'fa-briefcase',
+  'fa-file-contract',
+  'fa-handshake',
+  'fa-clock',
+  'fa-building-columns',
+  'fa-user-tie',
+  'fa-gavel',
+  'fa-shield-halved'
+] %}
 
-<section class="firm-section">
+<section class="firm-faq-page" aria-labelledby="faq-heading" data-firm-faq-page>
+  <div class="firm-faq-page-atmosphere" aria-hidden="true">
+    <span class="firm-faq-page-glow"></span>
+    <span class="firm-faq-page-orb"></span>
+    <span class="firm-faq-page-orb firm-faq-page-orb--2"></span>
+    <span class="firm-faq-page-orb firm-faq-page-orb--3"></span>
+    <span class="firm-faq-page-mesh"></span>
+    <span class="firm-faq-page-ring"></span>
+  </div>
+
   <div class="container">
+    <header class="firm-faq-page-hero firm-reveal">
+      <div class="firm-faq-page-hero-copy">
+        <p class="firm-eyebrow">Help centre</p>
+        <h1 id="faq-heading">{{ page_seo.h1_heading or 'Frequently Asked Questions' }}</h1>
+        <p class="firm-faq-page-lead">{{ page_seo.meta_description or 'Clear answers to common questions about our firm, process, and how we work with clients.' }}</p>
+        <div class="firm-faq-hero-actions">
+          {% if faqs %}
+          <a href="#faq-explorer" class="firm-btn firm-btn-primary">
+            <span>Browse answers</span>
+            <i class="fas fa-arrow-down" aria-hidden="true"></i>
+          </a>
+          {% endif %}
+          <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-ghost">
+            <span>Ask us directly</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="firm-faq-hero-panel firm-reveal" style="--reveal-delay: 80ms">
+        <div class="firm-faq-hero-panel-glow" aria-hidden="true"></div>
+        {% if faqs %}
+        <div class="firm-faq-hero-metrics">
+          <div class="firm-faq-metric">
+            <strong>{{ '%02d'|format(faqs|length) }}</strong>
+            <span>Published answers</span>
+          </div>
+          <div class="firm-faq-metric firm-faq-metric--accent">
+            <strong><i class="fas fa-bolt" aria-hidden="true"></i></strong>
+            <span>Instant clarity</span>
+          </div>
+        </div>
+        <ul class="firm-faq-hero-points">
+          <li><i class="fas fa-check" aria-hidden="true"></i> Consultations & fees</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> How to instruct us</li>
+          <li><i class="fas fa-check" aria-hidden="true"></i> Offices & practice areas</li>
+        </ul>
+        {% else %}
+        <p class="firm-faq-hero-empty">Answers will appear here once published.</p>
+        {% endif %}
+      </div>
+    </header>
+
     {% if faqs %}
-    <div class="firm-reveal">
-      {% include 'firm_website/_faq_accordion.html' %}
+    <div class="firm-faq-highlights firm-reveal" style="--reveal-delay: 100ms">
+      {% for faq in faqs[:3] %}
+      {% set icon = faq_icons[(loop.index0) % (faq_icons|length)] %}
+      <button type="button"
+              class="firm-faq-chip"
+              data-firm-faq-jump="faq-item-{{ faq.id or loop.index }}"
+              style="--faq-accent: {{ (loop.index0 % 5) + 1 }}">
+        <span class="firm-faq-chip-icon" aria-hidden="true"><i class="fas {{ icon }}"></i></span>
+        <span class="firm-faq-chip-copy">
+          <strong>Quick answer {{ '%02d'|format(loop.index) }}</strong>
+          <span>{{ faq.question | truncate(52) }}</span>
+        </span>
+        <i class="fas fa-arrow-right firm-faq-chip-go" aria-hidden="true"></i>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="firm-faq-shell" id="faq-explorer">
+      <div class="firm-faq-rail-card firm-faq-rail-card--filters firm-reveal" style="--reveal-delay: 120ms">
+        <p class="firm-eyebrow">Explore</p>
+        <h2 class="firm-faq-rail-title">Find by topic</h2>
+        <label class="firm-faq-search firm-faq-search--rail" for="firm-faq-search">
+          <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="search"
+                 id="firm-faq-search"
+                 name="faq_search"
+                 placeholder="Search questions…"
+                 autocomplete="off"
+                 enterkeyhint="search"
+                 inputmode="search"
+                 data-firm-faq-search>
+        </label>
+        <p class="firm-faq-search-hint" data-firm-faq-count>{{ faqs|length }} question{% if faqs|length != 1 %}s{% endif %}</p>
+        <div class="firm-faq-topics" data-firm-faq-topics role="tablist" aria-label="FAQ topics">
+          <button type="button" class="firm-faq-topic is-active" data-faq-topic="all" role="tab" aria-selected="true">
+            <i class="fas fa-layer-group" aria-hidden="true"></i><span>All topics</span>
+          </button>
+          <button type="button" class="firm-faq-topic" data-faq-topic="consult" role="tab" aria-selected="false">
+            <i class="fas fa-comments" aria-hidden="true"></i><span>Consultations</span>
+          </button>
+          <button type="button" class="firm-faq-topic" data-faq-topic="practice" role="tab" aria-selected="false">
+            <i class="fas fa-briefcase" aria-hidden="true"></i><span>Practice areas</span>
+          </button>
+          <button type="button" class="firm-faq-topic" data-faq-topic="start" role="tab" aria-selected="false">
+            <i class="fas fa-rocket" aria-hidden="true"></i><span>Getting started</span>
+          </button>
+          <button type="button" class="firm-faq-topic" data-faq-topic="office" role="tab" aria-selected="false">
+            <i class="fas fa-location-dot" aria-hidden="true"></i><span>Offices</span>
+          </button>
+          <button type="button" class="firm-faq-topic" data-faq-topic="general" role="tab" aria-selected="false">
+            <i class="fas fa-circle-question" aria-hidden="true"></i><span>General</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="firm-faq-main firm-reveal" style="--reveal-delay: 160ms">
+        {% set featured = faqs[0] %}
+        {% set rest = faqs[1:] if faqs|length > 1 else [] %}
+        {% set fq = (featured.question or '')|lower %}
+        {% if 'consult' in fq or 'fee' in fq %}
+          {% set f_topic = 'consult' %}
+        {% elif 'practi' in fq or 'law' in fq or 'area' in fq %}
+          {% set f_topic = 'practice' %}
+        {% elif 'instruct' in fq or 'engage' in fq or 'hire' in fq %}
+          {% set f_topic = 'start' %}
+        {% elif 'office' in fq or 'locat' in fq or 'where' in fq %}
+          {% set f_topic = 'office' %}
+        {% else %}
+          {% set f_topic = 'general' %}
+        {% endif %}
+
+        <article class="firm-faq-featured"
+                 id="faq-item-{{ featured.id or 1 }}"
+                 style="--faq-accent: 1"
+                 data-faq-text="{{ ((featured.question or '') ~ ' ' ~ (featured.answer or '')) | lower | e }}"
+                 data-faq-topic="{{ f_topic }}"
+                 data-firm-faq-card>
+          <div class="firm-faq-featured-badge"><i class="fas fa-star" aria-hidden="true"></i> Featured</div>
+          <div class="firm-faq-featured-top">
+            <span class="firm-faq-icon firm-faq-icon--lg" aria-hidden="true"><i class="fas {{ faq_icons[0] }}"></i></span>
+            <div>
+              <p class="firm-faq-num">01 · Start here</p>
+              <h2 class="firm-faq-featured-q">{{ featured.question }}</h2>
+            </div>
+          </div>
+          <div class="firm-faq-featured-a">{{ featured.answer }}</div>
+        </article>
+
+        <div class="firm-faq-list firm-faq-list--rich" data-firm-faq>
+          {% for faq in rest %}
+          {% set icon = faq_icons[(loop.index) % (faq_icons|length)] %}
+          {% set qlow = (faq.question or '')|lower %}
+          {% if 'consult' in qlow or 'fee' in qlow %}
+            {% set topic = 'consult' %}
+          {% elif 'practi' in qlow or 'law' in qlow or 'area' in qlow %}
+            {% set topic = 'practice' %}
+          {% elif 'instruct' in qlow or 'engage' in qlow or 'hire' in qlow %}
+            {% set topic = 'start' %}
+          {% elif 'office' in qlow or 'locat' in qlow or 'where' in qlow %}
+            {% set topic = 'office' %}
+          {% else %}
+            {% set topic = 'general' %}
+          {% endif %}
+          <div class="firm-faq-item{% if loop.first %} is-open{% endif %}"
+               id="faq-item-{{ faq.id or (loop.index + 1) }}"
+               style="--faq-accent: {{ (loop.index % 5) + 1 }}"
+               data-faq-text="{{ ((faq.question or '') ~ ' ' ~ (faq.answer or '')) | lower | e }}"
+               data-faq-topic="{{ topic }}"
+               data-firm-faq-card>
+            <button type="button"
+                    class="firm-faq-question"
+                    aria-expanded="{% if loop.first %}true{% else %}false{% endif %}"
+                    id="faq-q-{{ faq.id or (loop.index + 1) }}"
+                    aria-controls="faq-a-{{ faq.id or (loop.index + 1) }}">
+              <span class="firm-faq-icon" aria-hidden="true"><i class="fas {{ icon }}"></i></span>
+              <span class="firm-faq-q-copy">
+                <span class="firm-faq-num" aria-hidden="true">{{ '%02d'|format(loop.index + 1) }}</span>
+                <span class="firm-faq-q-text">{{ faq.question }}</span>
+              </span>
+              <span class="firm-faq-toggle" aria-hidden="true"><i class="fas fa-plus"></i></span>
+            </button>
+            <div class="firm-faq-answer" id="faq-a-{{ faq.id or (loop.index + 1) }}" role="region" aria-labelledby="faq-q-{{ faq.id or (loop.index + 1) }}">
+              <div class="firm-faq-answer-inner">
+                <div class="firm-faq-answer-body">{{ faq.answer }}</div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <p class="firm-faq-empty-filter" data-firm-faq-empty hidden>No questions match that filter. Try another topic or keyword.</p>
+      </div>
+
+      <aside class="firm-faq-rail-card firm-faq-rail-card--contact firm-reveal" style="--reveal-delay: 180ms">
+        <p class="firm-eyebrow">Need a human</p>
+        <h3 class="firm-faq-rail-title">Talk to chambers</h3>
+        <p class="firm-faq-rail-lead">If your question is matter-specific, our team can guide you personally.</p>
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-primary">
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" class="firm-faq-wa" target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp" aria-hidden="true"></i>
+          WhatsApp
+        </a>
+        {% endif %}
+      </aside>
     </div>
     {% else %}
     <p class="firm-empty-state firm-reveal">FAQs will appear here once published in settings.</p>
@@ -23,14 +225,27 @@
   </div>
 </section>
 
-<section class="firm-section firm-section-alt">
-  <div class="container firm-reveal">
-    <div class="firm-cta-band">
-      <div>
-        <h2>Still have a question?</h2>
-        <p>Our team is ready to help with your specific matter.</p>
+<section class="firm-section firm-section-alt firm-faq-page-cta">
+  <div class="container">
+    <div class="firm-pa-consult-band firm-reveal">
+      <span class="firm-pa-consult-mark" aria-hidden="true"></span>
+      <div class="firm-pa-consult-copy">
+        <p class="firm-eyebrow firm-eyebrow-on-dark">Still curious</p>
+        <h2>Didn’t find your answer?</h2>
+        <p>Tell us about your matter and our team will guide you with clear next steps.</p>
       </div>
-      <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light">{{ hero_cta_label }}</a>
+      <div class="firm-pa-consult-actions">
+        <a href="{{ firm_url('contact') }}" class="firm-btn firm-btn-light">
+          <span>{{ hero_cta_label }}</span>
+          <i class="fas fa-arrow-right" aria-hidden="true"></i>
+        </a>
+        {% if whatsapp_url %}
+        <a href="{{ whatsapp_url }}" class="firm-btn firm-btn-ghost" target="_blank" rel="noopener noreferrer">
+          <i class="fab fa-whatsapp" aria-hidden="true"></i>
+          <span>WhatsApp</span>
+        </a>
+        {% endif %}
+      </div>
     </div>
   </div>
 </section>

@@ -254,7 +254,7 @@
 <script>
 // Global variables for debouncing
 let clientSearchTimeout;
-const LAW_FIRM_NAME = {{ (company_settings.company_name if company_settings and company_settings.company_name else 'BAUNI LAW GROUP')|tojson }};
+const LAW_FIRM_NAME = {{ (company_settings.company_name if company_settings and company_settings.company_name else 'SHERIA LAW FIRM')|tojson }};
 
 function mapClientCategory(clientType) {
     const t = (clientType || '').trim().toUpperCase();

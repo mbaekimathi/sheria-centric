@@ -603,6 +603,11 @@ def get_db_config():
 # Initialize DB_CONFIG
 DB_CONFIG = get_db_config()
 
+# Fail fast on hosted MySQL instead of hanging until the web server times out.
+_DB_CONNECT_TIMEOUT = int(os.environ.get('DB_CONNECT_TIMEOUT', '10') or 10)
+_DB_READ_TIMEOUT = int(os.environ.get('DB_READ_TIMEOUT', '30') or 30)
+_DB_WRITE_TIMEOUT = int(os.environ.get('DB_WRITE_TIMEOUT', '30') or 30)
+
 # Debug function to test database connection (can be called manually)
 def test_db_connection():
     """Test database connection with current configuration"""
@@ -635,7 +640,12 @@ def get_db_connection(use_database=True):
         config = DB_CONFIG.copy()
         if not use_database:
             config.pop('database', None)
-        connection = pymysql.connect(**config)
+        connection = pymysql.connect(
+            **config,
+            connect_timeout=max(1, _DB_CONNECT_TIMEOUT),
+            read_timeout=max(1, _DB_READ_TIMEOUT),
+            write_timeout=max(1, _DB_WRITE_TIMEOUT),
+        )
         return connection
     except pymysql.Error as e:
         error_code, error_msg = e.args
@@ -8065,6 +8075,12 @@ def pwa_apple_touch_icon():
     return send_from_directory(
         app.static_folder, 'apple-touch-icon.png', mimetype='image/png'
     )
+
+
+@app.route('/health')
+def health_check():
+    """Lightweight probe for cPanel/Passenger — no database."""
+    return Response('ok\n', mimetype='text/plain')
 
 
 @app.route('/')

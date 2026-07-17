@@ -1,4 +1,7 @@
 PassengerEnabled On
 PassengerAppType wsgi
 PassengerStartupFile passenger_wsgi.py
+# Large app import + first DB connect can exceed default limits on cPanel/LiteSpeed.
+PassengerStartTimeout 300
+PassengerAppConnectTimeout 120
 

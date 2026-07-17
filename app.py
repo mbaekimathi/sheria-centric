@@ -42,6 +42,8 @@ _company_settings_cache = {
     'expires_at': 0.0,
 }
 _company_settings_cache_lock = Lock()
+_table_exists_cache = {}
+_table_exists_cache_lock = Lock()
 
 # Some hosted environments (e.g. cPanel/Passenger) may default stdout/stderr to ASCII.
 # Reconfigure to UTF-8 so any Unicode in logs (e.g. checkmarks) won't crash startup.
@@ -405,6 +407,26 @@ def get_google_drive_redirect_uri():
     )
 
 
+def get_request_db_connection():
+    """Reuse one MySQL connection per HTTP request for lightweight checks."""
+    conn = getattr(g, '_request_db_conn', None)
+    if conn is not None:
+        return conn
+    conn = get_db_connection()
+    g._request_db_conn = conn
+    return conn
+
+
+@app.teardown_request
+def _release_request_db_connection(exc):
+    conn = g.pop('_request_db_conn', None)
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 @app.before_request
 def _apply_request_security_from_host():
     """Enable secure session cookies when the site is accessed over HTTPS."""
@@ -717,7 +739,13 @@ def create_database():
             connection.close()
 
 def table_exists(table_name):
-    """Check if a table exists"""
+    """Check if a table exists (cached for the process lifetime)."""
+    with _table_exists_cache_lock:
+        if table_name in _table_exists_cache:
+            return _table_exists_cache[table_name]
+
+    exists = False
+    connection = None
     try:
         connection = get_db_connection()
         if not connection:
@@ -730,13 +758,17 @@ def table_exists(table_name):
                 AND table_name = %s
             """, (DB_CONFIG['database'], table_name))
             result = cursor.fetchone()
-            return result[0] > 0
+            exists = result[0] > 0
     except Exception as e:
         print(f"Error checking table existence: {e}")
         return False
     finally:
         if connection:
             connection.close()
+
+    with _table_exists_cache_lock:
+        _table_exists_cache[table_name] = exists
+    return exists
 
 def ensure_case_proceeding_advocates_table(cursor, connection=None):
     """Ensure advocates table exists (fixes DBs that missed migration 15)."""
@@ -7663,11 +7695,20 @@ def inject_global_theme_settings():
     if not settings:
         settings = {'company_name': 'SHERIA LAW FIRM'}
     else:
-        # Merge SEO / image-alt fields used by branding + login backgrounds
-        try:
-            settings = _enrich_company_settings_with_site_meta(dict(settings))
-        except Exception as enrich_err:
-            print(f"Warning enriching company settings for templates: {enrich_err}")
+        # Enrichment only needed on firm website / system settings pages, not every page
+        endpoint = request.endpoint or ''
+        needs_enrichment = (
+            endpoint in ('company_information', 'system_settings', 'system_settings_section',
+                         'system_settings_letterhead', 'system_settings_asset_scan',
+                         'system_settings_asset_capture', 'firm_website_public',
+                         'website_templates_settings')
+            or endpoint.startswith('firm_website')
+        )
+        if needs_enrichment:
+            try:
+                settings = _enrich_company_settings_with_site_meta(dict(settings))
+            except Exception as enrich_err:
+                print(f"Warning enriching company settings for templates: {enrich_err}")
     section_key = None
     if request.endpoint == 'system_settings_section':
         section_key = (request.view_args or {}).get('section')
@@ -18268,7 +18309,7 @@ def _load_session_permissions_map(connection=None):
 
     owns = connection is None
     if owns:
-        connection = get_db_connection()
+        connection = get_request_db_connection()
     if not connection:
         g._employee_permissions_map = {}
         return g._employee_permissions_map
@@ -18436,15 +18477,12 @@ def _enforce_endpoint_permissions():
     if not permission_key:
         return None
 
-    connection = get_db_connection()
+    connection = get_request_db_connection()
     if not connection:
         return None
-    try:
-        if current_user_has_permission(connection, permission_key):
-            return None
-        return permission_denied_response(permission_key)
-    finally:
-        connection.close()
+    if current_user_has_permission(connection, permission_key):
+        return None
+    return permission_denied_response(permission_key)
 
 
 @app.context_processor
@@ -35022,11 +35060,17 @@ def inject_my_task_badge():
 
 @app.before_request
 def cleanup_idle_connections_before_request():
-    """Clean up idle connections before each request"""
+    """Clean up idle connections periodically (not every request)."""
+    # Only run every ~60 seconds to avoid per-request overhead
+    now = time.monotonic()
+    last = getattr(app, '_last_conn_cleanup', 0.0)
+    if now - last < 60:
+        return
+    app._last_conn_cleanup = now
     try:
         cleanup_idle_connections(max_idle_minutes=30)
     except:
-        pass  # Don't fail requests if cleanup fails
+        pass
 
 # Initialize database on import only when explicitly enabled.
 # This avoids blocking every worker start in multi-worker hosts.

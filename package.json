@@ -1,0 +1,10 @@
+{
+  "name": "advocates",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/tailwind.input.css -o ./static/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

@@ -32,8 +32,16 @@ import re
 import sys
 import time
 import mimetypes
+from threading import Lock
 
 app = Flask(__name__)
+
+_COMPANY_SETTINGS_CACHE_TTL_SECONDS = int(os.environ.get('COMPANY_SETTINGS_CACHE_TTL', '30') or 30)
+_company_settings_cache = {
+    'value': None,
+    'expires_at': 0.0,
+}
+_company_settings_cache_lock = Lock()
 
 # Some hosted environments (e.g. cPanel/Passenger) may default stdout/stderr to ASCII.
 # Reconfigure to UTF-8 so any Unicode in logs (e.g. checkmarks) won't crash startup.
@@ -5102,7 +5110,15 @@ def process_logo_image(image_file, max_size=512):
 
 
 def get_company_settings():
-    """Get company settings from database"""
+    """Get company settings from database with short-lived process cache."""
+    now = time.monotonic()
+    with _company_settings_cache_lock:
+        cached = _company_settings_cache.get('value')
+        expires_at = float(_company_settings_cache.get('expires_at') or 0.0)
+        if cached is not None and now < expires_at:
+            # Return a copy so callers can mutate safely.
+            return dict(cached)
+
     try:
         connection = get_db_connection()
         if not connection:
@@ -5110,7 +5126,10 @@ def get_company_settings():
         with connection.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("SELECT * FROM company_settings ORDER BY id DESC LIMIT 1")
             settings = cursor.fetchone()
-            return settings
+            with _company_settings_cache_lock:
+                _company_settings_cache['value'] = dict(settings) if settings else None
+                _company_settings_cache['expires_at'] = time.monotonic() + max(1, _COMPANY_SETTINGS_CACHE_TTL_SECONDS)
+            return dict(settings) if settings else None
     except Exception as e:
         print(f"Error getting company settings: {e}")
         return None
@@ -34976,49 +34995,14 @@ def api_matters_update(matter_id):
 
 @app.context_processor
 def inject_my_task_badge():
-    """Provide task and notification badge counts for nav UI."""
-    try:
-        employee_id = session.get('employee_id')
-        user_role = session.get('employee_role')
-        original_role = session.get('original_role')
-        if not employee_id:
-            return {
-                'my_task_badge_count': 0,
-                'notification_badge_count': 0,
-                'reminder_badge_count': 0,
-                'approve_matters_badge_count': 0,
-                'approve_cases_badge_count': 0
-            }
-
-        connection = get_db_connection()
-        if not connection:
-            return {
-                'my_task_badge_count': 0,
-                'notification_badge_count': 0,
-                'reminder_badge_count': 0,
-                'approve_matters_badge_count': 0,
-                'approve_cases_badge_count': 0
-            }
-
-        try:
-            with connection.cursor(pymysql.cursors.DictCursor) as cursor:
-                ensure_task_management_table(cursor, connection)
-                return _compute_employee_badge_counts(
-                    cursor,
-                    employee_id,
-                    user_role,
-                    original_role,
-                )
-        finally:
-            connection.close()
-    except Exception:
-        return {
-            'my_task_badge_count': 0,
-            'notification_badge_count': 0,
-            'reminder_badge_count': 0,
-            'approve_matters_badge_count': 0,
-            'approve_cases_badge_count': 0
-        }
+    """Render quickly; live-updates.js hydrates these from the badges API."""
+    return {
+        'my_task_badge_count': 0,
+        'notification_badge_count': 0,
+        'reminder_badge_count': 0,
+        'approve_matters_badge_count': 0,
+        'approve_cases_badge_count': 0
+    }
 
 @app.before_request
 def cleanup_idle_connections_before_request():
@@ -35028,12 +35012,15 @@ def cleanup_idle_connections_before_request():
     except:
         pass  # Don't fail requests if cleanup fails
 
-# Initialize database when app is loaded (runs for both 'python app.py' and WSGI/Passenger)
-# This ensures tables and migrations are applied on the hosted side too
-try:
-    init_database()
-except Exception as e:
-    print(f"[WARNING] Database initialization failed (may be first run or DB not configured): {e}")
+# Initialize database on import only when explicitly enabled.
+# This avoids blocking every worker start in multi-worker hosts.
+if (os.environ.get('RUN_DB_INIT_ON_STARTUP', '0') or '').strip().lower() in ('1', 'true', 'yes', 'on'):
+    try:
+        init_database()
+    except Exception as e:
+        print(f"[WARNING] Database initialization failed (may be first run or DB not configured): {e}")
+else:
+    print("[INFO] Skipping startup DB init (set RUN_DB_INIT_ON_STARTUP=1 to enable).")
 
 # Ensure one-shot firm seed is scheduled even if init_database returned early
 try:

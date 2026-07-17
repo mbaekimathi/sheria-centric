@@ -14,7 +14,7 @@
  *   uploads). These must always hit the network.
  */
 
-const VERSION = "sheria-centric-pwa-v5";
+const VERSION = "sheria-centric-pwa-v6";
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
